@@ -181,7 +181,7 @@ Herobrine Companion 是一款为 Minecraft 1.20.1forge/1.21.1neoforge打造的�
 
 ## 贡献
 
-欢迎提交 Issue 和 Pull Request 来帮助改进这个模组。
+感谢gemini提供代码支持，vibe coding
 
 ## 支持
 
