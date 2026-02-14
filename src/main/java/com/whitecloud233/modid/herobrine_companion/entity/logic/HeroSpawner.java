@@ -92,6 +92,13 @@ public class HeroSpawner {
                     HeroEntity hero = ModEvents.HERO.get().create(level);
                     if (hero != null) {
                         hero.moveTo(targetPos.getX() + 0.5, targetPos.getY(), targetPos.getZ() + 0.5, random.nextFloat() * 360F, 0);
+
+                        // [关键修复] 生成瞬间立即绑定主人，防止后续逻辑将 Trust 重置为 0
+                        hero.setOwnerUUID(player.getUUID());
+
+                        // [关键修复] 立即尝试恢复数据
+                        HeroDataHandler.restoreTrustFromPlayer(hero);
+
                         level.addFreshEntity(hero);
                         return true;
                     }
