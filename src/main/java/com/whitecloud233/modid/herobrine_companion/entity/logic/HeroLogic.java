@@ -111,6 +111,10 @@ public class HeroLogic {
             }
             if (closestPlayer != null) {
                 hero.setOwnerUUID(closestPlayer.getUUID());
+
+                // [关键修复] 自动认主后，必须立即从该玩家/全局存档中恢复数据！
+                // 防止 tick 100 的 updateGlobalTrust 将 0 信任度写入存档
+                HeroDataHandler.restoreTrustFromPlayer(hero);
             }
         }
     }
