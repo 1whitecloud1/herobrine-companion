@@ -1,0 +1,13 @@
+{
+  "replace": false,
+  "entries": [
+    "herobrine_companion:add_eternal_key",
+    "herobrine_companion:mineshaft_fragment_2",
+    "herobrine_companion:stronghold_library_fragment_2",
+    "herobrine_companion:fragment_3_mobs",
+    "herobrine_companion:fragment_7_village",
+    "herobrine_companion:fragment_8_end_city",
+    "herobrine_companion:fragment_10_ancient_city",
+    "herobrine_companion:fragment_5_ghosts"
+  ]
+}

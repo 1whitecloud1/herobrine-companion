@@ -1,0 +1,38 @@
+{
+  "parent": "herobrine_companion:root",
+  "display": {
+    "icon": {
+      "id": "herobrine_companion:eternal_key"
+    },
+    "title": {
+      "translate": "advancement.herobrine_companion.eternal_key.title"
+    },
+    "description": {
+      "translate": "advancement.herobrine_companion.eternal_key.desc"
+    },
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "has_eternal_key": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "herobrine_companion:eternal_key"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "requirements": [
+    [
+      "has_eternal_key"
+    ]
+  ],
+  "sends_telemetry_event": true
+}

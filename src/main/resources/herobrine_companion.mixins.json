@@ -1,0 +1,19 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.whitecloud233.herobrine_companion.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "herobrine_companion.refmap.json",
+  "plugin": "com.whitecloud233.herobrine_companion.mixin.HerobrineCompanionMixinPlugin",
+  "mixins": [
+    "LivingEntityMixin",
+    "DragonSittingScanningPhaseMixin",
+    "EnderDragonMixin",
+    "MobSubmissionMixin"
+  ],
+  "client": [
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

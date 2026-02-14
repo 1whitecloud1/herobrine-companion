@@ -1,0 +1,28 @@
+{
+  "parent": "herobrine_companion:lore_handbook",
+  "display": {
+    "icon": {
+      "id": "herobrine_companion:lore_fragment"
+    },
+    "title": {
+      "translate": "advancement.herobrine_companion.fragment_6.title"
+    },
+    "description": {
+      "translate": "advancement.herobrine_companion.fragment_6.desc"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "has_fragment_6": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "requirements": [
+    [
+      "has_fragment_6"
+    ]
+  ]
+}

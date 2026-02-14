@@ -1,0 +1,7 @@
+{
+  "type": "herobrine_companion:end_ring",
+  "biomes": "minecraft:the_void",
+  "step": "raw_generation",
+  "spawn_overrides": {},
+  "terrain_adaptation": "none"
+}

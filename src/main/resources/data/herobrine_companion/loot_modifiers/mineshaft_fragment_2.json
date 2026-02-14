@@ -1,0 +1,15 @@
+{
+  "type": "herobrine_companion:add_item",
+  "conditions": [
+    {
+      "condition": "neoforge:loot_table_id",
+      "loot_table_id": "minecraft:chests/abandoned_mineshaft"
+    },
+    {
+      "condition": "minecraft:random_chance",
+      "chance": 0.3
+    }
+  ],
+  "item": "herobrine_companion:lore_fragment",
+  "nbt": "{lore_id:\"fragment_2\"}"
+}

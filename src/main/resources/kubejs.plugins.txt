@@ -1,0 +1,1 @@
+com.whitecloud233.herobrine_companion.compat.kubejs.HerobrineCompanionKubeJSPlugin

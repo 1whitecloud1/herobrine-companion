@@ -1,0 +1,26 @@
+# Gradle 缓存
+.gradle/
+build/
+
+# IDE 配置 (IntelliJ IDEA / Eclipse)
+.idea/
+*.iml
+*.ipr
+*.iws
+.settings/
+.classpath
+.project
+bin/
+
+# 运行时的临时文件 (测试时的存档、日志)
+run/
+logs/
+crash-reports/
+debug/
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 认证文件 (防止你的 CurseForge Token 泄露)
+gradle.properties

@@ -1,0 +1,17 @@
+// 1. 必须排在第一位
+pluginManagement {
+    repositories {
+        maven { url 'https://maven.aliyun.com/repository/public/' }
+        maven { url 'https://maven.aliyun.com/repository/gradle-plugin' }
+        gradlePluginPortal()
+        maven { url 'https://maven.neoforged.net/releases/' }
+    }
+}
+
+// 2. 这里的 plugins 块排在第二位（如果你的文件里有的话）
+plugins {
+    id 'org.gradle.toolchains.foojay-resolver' version '0.8.0'
+}
+
+// 3. 最后才是项目名称定义
+rootProject.name = 'herobrine_companion'

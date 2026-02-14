@@ -1,0 +1,29 @@
+modLoader = "javafml"
+loaderVersion = "[4,)"
+license = "All Rights Reserved"
+
+[[mods]]
+modId = "herobrine_companion"
+version = "0.1"
+displayName = "Herobrine Companion"
+authors = "whitecloud233"
+description = '''
+Herobrine Companion Mod
+'''
+
+[[mixins]]
+config = "herobrine_companion.mixins.json"
+
+[[dependencies.herobrine_companion]]
+modId = "neoforge"
+type = "required"
+versionRange = "[21,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.herobrine_companion]]
+modId = "minecraft"
+type = "required"
+versionRange = "[1.21.1,1.22)"
+ordering = "NONE"
+side = "BOTH"

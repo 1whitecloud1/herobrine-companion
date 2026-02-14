@@ -1,0 +1,30 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "key": {
+    "C": {
+      "item": "herobrine_companion:corrupted_code"
+    },
+    "E": {
+      "item": "minecraft:ender_pearl"
+    },
+    "G": {
+      "item": "herobrine_companion:glitch_fragment"
+    },
+    "M": {
+      "item": "herobrine_companion:memory_shard"
+    },
+    "T": {
+      "item": "minecraft:totem_of_undying"
+    }
+  },
+  "pattern": [
+    "GEG",
+    "CMC",
+    "GTG"
+  ],
+  "result": {
+    "count": 1,
+    "id": "herobrine_companion:recall_stone"
+  }
+}
