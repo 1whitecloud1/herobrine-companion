@@ -1,0 +1,8 @@
+{
+  "entries": [
+    "herobrine_companion:add_eternal_key_stronghold",
+    "herobrine_companion:add_eternal_key_ancient_city",
+    "herobrine_companion:add_eternal_key_end_city"
+  ],
+  "replace": false
+}

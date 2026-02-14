@@ -1,0 +1,10 @@
+Manifest-Version: 1.0
+Specification-Title: herobrine_companion
+Specification-Vendor: whitecloud233
+Specification-Version: 1
+Implementation-Title: herobrine_companion
+Implementation-Version: forge-0.1
+Implementation-Vendor: whitecloud233
+Implementation-Timestamp: 2026-02-14T17:37:10+0800
+MixinConfigs: herobrine_companion.mixins.json
+

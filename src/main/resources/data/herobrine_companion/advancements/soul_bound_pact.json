@@ -1,0 +1,37 @@
+{
+  "parent": "herobrine_companion:root",
+  "display": {
+    "icon": {
+      "item": "herobrine_companion:soul_bound_pact"
+    },
+    "title": {
+      "translate": "advancement.herobrine_companion.soul_bound_pact.title"
+    },
+    "description": {
+      "translate": "advancement.herobrine_companion.soul_bound_pact.desc"
+    },
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "has_soul_bound_pact": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "herobrine_companion:soul_bound_pact"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "requirements": [
+    [
+      "has_soul_bound_pact"
+    ]
+  ]
+}

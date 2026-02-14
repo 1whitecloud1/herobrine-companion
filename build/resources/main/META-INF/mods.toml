@@ -1,0 +1,29 @@
+modLoader = "javafml"
+loaderVersion = "[47,)"
+license = "All Rights Reserved"
+[[mods]]
+modId = "herobrine_companion"
+version = "forge-0.1"
+displayName = "herobrine companion"
+authors = "whitecloud233"
+description = ''''''
+logoFile = "icon.png"
+
+[[dependencies."herobrine_companion"]]
+modId = "forge"
+mandatory = true
+versionRange = "[47,)"
+ordering = "NONE"
+side = "BOTH"
+[[dependencies."herobrine_companion"]]
+modId = "minecraft"
+mandatory = true
+versionRange = "[1.20.1,1.21)"
+ordering = "NONE"
+side = "BOTH"
+[[dependencies."herobrine_companion"]]
+modId = "kubejs"
+mandatory = false
+versionRange = "[2001.6.0-build.1,)"
+ordering = "AFTER"
+side = "BOTH"

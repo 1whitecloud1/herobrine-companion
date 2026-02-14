@@ -1,0 +1,29 @@
+{
+  "herobrine_companion:poem_of_the_end": {
+    "criteria": {
+      "has_poem_of_the_end": "2026-02-10 17:28:04 +0800"
+    },
+    "done": true
+  },
+  "minecraft:recipes/decorations/crafting_table": {
+    "criteria": {
+      "unlock_right_away": "2026-02-10 17:27:39 +0800"
+    },
+    "done": true
+  },
+  "minecraft:adventure/root": {
+    "criteria": {
+      "killed_something": "2026-02-10 17:28:08 +0800"
+    },
+    "done": true
+  },
+  "minecraft:adventure/adventuring_time": {
+    "criteria": {
+      "minecraft:birch_forest": "2026-02-10 17:27:39 +0800",
+      "minecraft:forest": "2026-02-10 17:27:50 +0800",
+      "minecraft:meadow": "2026-02-10 17:28:44 +0800"
+    },
+    "done": false
+  },
+  "DataVersion": 3465
+}

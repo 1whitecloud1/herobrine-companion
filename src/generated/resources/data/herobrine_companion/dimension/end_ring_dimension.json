@@ -1,0 +1,12 @@
+{
+  "type": "herobrine_companion:end_ring_type",
+  "generator": {
+    "type": "minecraft:flat",
+    "settings": {
+      "biome": "minecraft:the_void",
+      "features": false,
+      "lakes": false,
+      "layers": []
+    }
+  }
+}

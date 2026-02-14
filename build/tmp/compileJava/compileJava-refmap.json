@@ -1,0 +1,32 @@
+{
+  "mappings": {
+    "com/whitecloud233/modid/herobrine_companion/mixin/LivingEntityMixin": {
+      "canAttack(Lnet/minecraft/world/entity/LivingEntity;)Z": "Lnet/minecraft/world/entity/LivingEntity;m_6779_(Lnet/minecraft/world/entity/LivingEntity;)Z"
+    },
+    "com/whitecloud233/modid/herobrine_companion/mixin/MobSubmissionMixin": {
+      "serverAiStep": "Lnet/minecraft/world/entity/Mob;m_6140_()V"
+    },
+    "com/whitecloud233/modid/herobrine_companion/mixin/EnderDragonSoundMixin": {
+      "aiStep": "Lnet/minecraft/world/entity/boss/enderdragon/EnderDragon;m_8107_()V"
+    },
+    "com/whitecloud233/modid/herobrine_companion/mixin/DragonSittingScanningPhaseMixin": {
+      "doServerTick": "Lnet/minecraft/world/entity/boss/enderdragon/phases/DragonSittingScanningPhase;m_6989_()V"
+    }
+  },
+  "data": {
+    "searge": {
+      "com/whitecloud233/modid/herobrine_companion/mixin/LivingEntityMixin": {
+        "canAttack(Lnet/minecraft/world/entity/LivingEntity;)Z": "Lnet/minecraft/world/entity/LivingEntity;m_6779_(Lnet/minecraft/world/entity/LivingEntity;)Z"
+      },
+      "com/whitecloud233/modid/herobrine_companion/mixin/MobSubmissionMixin": {
+        "serverAiStep": "Lnet/minecraft/world/entity/Mob;m_6140_()V"
+      },
+      "com/whitecloud233/modid/herobrine_companion/mixin/EnderDragonSoundMixin": {
+        "aiStep": "Lnet/minecraft/world/entity/boss/enderdragon/EnderDragon;m_8107_()V"
+      },
+      "com/whitecloud233/modid/herobrine_companion/mixin/DragonSittingScanningPhaseMixin": {
+        "doServerTick": "Lnet/minecraft/world/entity/boss/enderdragon/phases/DragonSittingScanningPhase;m_6989_()V"
+      }
+    }
+  }
+}

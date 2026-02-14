@@ -1,0 +1,37 @@
+{
+  "parent": "herobrine_companion:root",
+  "display": {
+    "icon": {
+      "item": "herobrine_companion:lore_handbook"
+    },
+    "title": {
+      "translate": "advancement.herobrine_companion.lore_handbook.title"
+    },
+    "description": {
+      "translate": "advancement.herobrine_companion.lore_handbook.desc"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "has_lore_handbook": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "herobrine_companion:lore_handbook"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "requirements": [
+    [
+      "has_lore_handbook"
+    ]
+  ]
+}

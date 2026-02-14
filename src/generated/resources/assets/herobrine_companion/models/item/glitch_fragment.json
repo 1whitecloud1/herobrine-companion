@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "herobrine_companion:item/glitch_fragment"
+  }
+}

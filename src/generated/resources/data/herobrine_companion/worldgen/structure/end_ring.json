@@ -1,0 +1,6 @@
+{
+  "type": "herobrine_companion:end_ring",
+  "biomes": "minecraft:the_void",
+  "spawn_overrides": {},
+  "step": "surface_structures"
+}
