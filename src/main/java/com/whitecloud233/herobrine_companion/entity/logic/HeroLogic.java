@@ -15,12 +15,14 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.scores.PlayerTeam;
+import net.minecraft.world.scores.Scoreboard;
+import net.minecraft.world.scores.Team;
 
 import java.util.List;
 
 public class HeroLogic {
 
-    // --- Tick Logic ---
     public static void tick(HeroEntity hero) {
         if (hero.level().isClientSide) {
             clientTick(hero);
@@ -45,17 +47,18 @@ public class HeroLogic {
 
     private static void serverTick(HeroEntity hero) {
         // 1. 唯一性检查
-        // [修复] 将检查延迟到 Tick 20，避免 Entity Load 过程中的数据未就绪导致误杀
         if (hero.tickCount == 20) {
             HeroLifecycleHandler.checkUniqueness(hero);
+            // [双重保险] 如果 Spawner 已经设置了 Owner，这里再次尝试恢复数据
+            if (hero.getOwnerUUID() != null) {
+                HeroDataHandler.restoreTrustFromPlayer(hero);
+            }
         }
 
-        // [修改] 自动绑定最近的玩家为 Owner
-        // [修复] 增加严格判断：只有当没有主人时才尝试。
-        // 如果是从磁盘加载的(isLoadedFromDisk)，且 tick 小于 600 (30秒)，则禁止自动绑定，防止 NBT 读取延迟导致抢主人
+        // 2. 自动绑定逻辑
         if (hero.getOwnerUUID() == null) {
+            // 如果是从磁盘加载的(isLoadedFromDisk)，且 tick 小于 600 (30秒)，则禁止自动绑定
             boolean isFreshSpawn = !hero.isLoadedFromDisk();
-            // 如果是新刷怪蛋生成的，tick > 20 就绑定；如果是重载的，必须等待 30秒 确认真的丢了才绑定
             boolean safeToBind = isFreshSpawn ? (hero.tickCount > 20) : (hero.tickCount > 600);
 
             if (safeToBind && hero.tickCount % 100 == 0) {
@@ -63,31 +66,22 @@ public class HeroLogic {
             }
         }
 
-        // 2. 数据同步 (现在基于 Owner 同步)
+        // 3. 数据同步与保存
         if (hero.tickCount == 5) {
-            HeroDataHandler.syncGlobalTrust(hero);
+            HeroDataHandler.syncGlobalTrust(hero); // S2C 包，同步给客户端显示
         }
+
+        // [警告] 这是一个危险操作：将 Entity 数据保存到 Disk
+        // 我们必须确保在此之前，Entity 数据已经从 Disk 恢复了，否则会用 0 覆盖存档
         if (hero.tickCount % 100 == 0) {
             HeroDataHandler.updateGlobalTrust(hero);
         }
 
-        // 3. 动态名字
+        // 4. 动态名字
         if (hero.tickCount % 20 == 0) {
             boolean isEndRing = hero.level().dimension() == ModStructures.END_RING_DIMENSION_KEY;
-
-            String key;
-            if (isEndRing) {
-                key = "entity.herobrine_companion.herobrine";
-            } else {
-                int skinVariant = hero.getSkinVariant();
-                if (skinVariant == HeroEntity.SKIN_HEROBRINE) {
-                    key = "entity.herobrine_companion.herobrine";
-                } else if (skinVariant == HeroEntity.SKIN_HERO) {
-                    key = "entity.herobrine_companion.hero";
-                } else {
-                    key = "entity.herobrine_companion.hero";
-                }
-            }
+            String key = isEndRing ? "entity.herobrine_companion.herobrine" : "entity.herobrine_companion.hero";
+            // 这里简化处理，根据需求可以加回 Variant 判断
 
             Component expectedName = Component.translatable(key);
             if (!hero.getCustomName().equals(expectedName)) {
@@ -95,26 +89,16 @@ public class HeroLogic {
             }
         }
 
-        // 4. 维度逻辑
         HeroDimensionHandler.handleVoidProtection(hero);
-
-
-        // 5. 对话逻辑
         HeroDialogueHandler.tick(hero);
-
-        // 6. 恶作剧逻辑
         HeroPrankHandler.tick(hero);
-
-        // 7. 观察者逻辑
         HeroObserver.tick(hero);
 
-        // 8. 检查并结算待处理的委托奖励
         if (hero.tickCount % 100 == 50) {
             checkPendingQuestRewards(hero);
             checkPendingLoreFragments(hero);
         }
 
-        // [新增] 强制头部朝向修正
         if (hero.isPassenger()) {
             hero.setYHeadRot(hero.yBodyRot);
         }
@@ -135,7 +119,12 @@ public class HeroLogic {
             }
             if (closestPlayer != null) {
                 hero.setOwnerUUID(closestPlayer.getUUID());
-                // [新增] 切换 Owner 时同步数据
+
+                // [BUG 修复核心] 认主成功后，立即从存档恢复该玩家的信任度
+                // 注意：这里用 restoreTrustFromPlayer (Load from disk)，而不是 sync (Send packet)
+                HeroDataHandler.restoreTrustFromPlayer(hero);
+
+                // 恢复完数据后，再同步给客户端
                 HeroDataHandler.syncGlobalTrust(hero);
             }
         }
@@ -150,7 +139,7 @@ public class HeroLogic {
         if (data.contains("HeroPendingTrustReward")) {
             int reward = data.getInt("HeroPendingTrustReward");
             hero.increaseTrust(reward);
-            // 立即保存到该玩家的 Profile
+            // 立即保存
             HeroDataHandler.updateGlobalTrust(hero);
 
             owner.sendSystemMessage(Component.translatable("message.herobrine_companion.trust_increase", reward, hero.getTrustLevel()));
@@ -173,7 +162,6 @@ public class HeroLogic {
 
             for (int i = 0; i < list.size(); i++) {
                 String fragmentId = list.getString(i);
-                // [修改] 传入 Owner UUID
                 hero.getHeroBrain().inputLoreFragment(owner.getUUID(), fragmentId);
             }
 
@@ -185,8 +173,6 @@ public class HeroLogic {
         }
     }
 
-    // --- Forwarding Methods (Facade) ---
-
     public static InteractionResult onInteract(HeroEntity hero, Player player, InteractionHand hand) {
         return HeroInteractionHandler.onInteract(hero, player, hand);
     }
@@ -195,17 +181,18 @@ public class HeroLogic {
         return HeroCombatHandler.onHurt(hero, source, amount);
     }
 
-    // --- Client Utils ---
+    // --- 1.21.1 Client Utils ---
     public static void setupHiddenTeam(HeroEntity hero) {
         net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
         if (mc.level == null) return;
-        net.minecraft.world.scores.Scoreboard scoreboard = mc.level.getScoreboard();
+        Scoreboard scoreboard = mc.level.getScoreboard();
         String teamName = "hero_hidden_hud";
-        net.minecraft.world.scores.PlayerTeam team = scoreboard.getPlayerTeam(teamName);
+        PlayerTeam team = scoreboard.getPlayerTeam(teamName);
         if (team == null) {
             team = scoreboard.addPlayerTeam(teamName);
-            team.setNameTagVisibility(net.minecraft.world.scores.Team.Visibility.NEVER);
-            team.setCollisionRule(net.minecraft.world.scores.Team.CollisionRule.NEVER);
+            // 1.21 名字标签可见性设置
+            team.setNameTagVisibility(Team.Visibility.NEVER);
+            team.setCollisionRule(Team.CollisionRule.NEVER);
         }
         scoreboard.addPlayerToTeam(hero.getStringUUID(), team);
     }
