@@ -48,6 +48,7 @@ public class HeroLogic {
         if (hero.tickCount == 20) {
             HeroLifecycleHandler.checkUniqueness(hero);
             // 尝试从附近玩家恢复信任度
+            // 如果 Spawner 已经设置了 UUID，这里会再次确认，双重保险
             HeroDataHandler.restoreTrustFromPlayer(hero);
         }
 
@@ -67,6 +68,9 @@ public class HeroLogic {
         if (hero.tickCount == 5) {
             HeroDataHandler.syncGlobalTrust(hero);
         }
+
+        // [风险点] 此处会保存数据。如果 Trust 为 0 且 Owner 不为空，会把存档覆盖为 0。
+        // 所以必须保证在此之前，restoreTrustFromPlayer 已经成功执行。
         if (hero.tickCount % 100 == 0) {
             HeroDataHandler.updateGlobalTrust(hero);
         }
@@ -119,6 +123,7 @@ public class HeroLogic {
         }
     }
 
+    // ... (其余方法保持不变) ...
     private static void checkPendingQuestRewards(HeroEntity hero) {
         if (hero.getOwnerUUID() == null) return;
         Player owner = hero.level().getPlayerByUUID(hero.getOwnerUUID());
