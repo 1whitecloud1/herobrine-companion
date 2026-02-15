@@ -62,8 +62,13 @@ public class HeroIdleActionGoal extends Goal {
             }
         }
 
+        // [新增] 如果处于邀请状态 (InvitedPos 不为空)，绝对不执行待机动作
+        if (this.hero.getInvitedPos() != null) {
+            return false;
+        }
+
         // [修改] 提高触发概率：约每 0.5 秒尝试一次 (10 ticks)
-        return this.hero.getRandom().nextInt(200) == 0;
+        return this.hero.getRandom().nextInt(1000) == 0;
     }
 
     @Override
@@ -123,9 +128,12 @@ public class HeroIdleActionGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
+        // [新增] 如果中途进入邀请状态，立即停止
+        if (this.hero.getInvitedPos() != null) {
+            return false;
+        }
         return this.idleTime > 0;
     }
-
     @Override
     public void tick() {
         this.idleTime--;
