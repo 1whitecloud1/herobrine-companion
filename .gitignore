@@ -1,0 +1,49 @@
+# Gradle
+.gradle/
+build/
+out/
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Eclipse
+.classpath
+.project
+.settings/
+bin/
+
+# VS Code
+.vscode/
+
+# Mac
+.DS_Store
+
+# Minecraft Run Directories
+run/
+run-data/
+logs/
+crash-reports/
+debug.log
+debug.log.gz
+latest.log
+
+# User specific
+user.properties
+
+# Temporary files
+*.log
+*.tmp
+*.bak
+
+# Java
+*.class
+*.jar
+*.war
+*.ear
+hs_err_pid*
+
+# Mod specific
+# Add any other mod-specific generated files or directories here
