@@ -1,8 +1,0 @@
-[10:14:39] [INIT] KubeJS 2001.6.5-build.16; MC 2001 forge
-[10:14:39] [INIT] Loaded plugins:
-[10:14:39] [INIT] - dev.latvian.mods.kubejs.forge.BuiltinKubeJSForgePlugin
-[10:14:39] [INIT] - dev.latvian.mods.kubejs.forge.BuiltinKubeJSForgeClientPlugin
-[10:14:39] [INIT] - com.whitecloud233.modid.herobrine_companion.compat.KubeJS.HerobrineCompanionKubeJSPlugin
-[10:14:39] [INFO] example.js#5: Hello, World! (Loaded startup scripts)
-[10:14:39] [INFO] Loaded script startup_scripts:example.js in 0.028 s
-[10:14:39] [INFO] Loaded 1/1 KubeJS startup scripts in 0.211 s with 0 errors and 0 warnings
