@@ -1,9 +1,9 @@
-[12:17:02] [INIT] KubeJS 2001.6.5-build.16; MC 2001 forge
-[12:17:02] [INIT] Loaded plugins:
-[12:17:02] [INIT] - dev.latvian.mods.kubejs.forge.BuiltinKubeJSForgePlugin
-[12:17:02] [INIT] - dev.latvian.mods.kubejs.forge.BuiltinKubeJSForgeClientPlugin
-[12:17:02] [INIT] - com.whitecloud233.modid.herobrine_companion.compat.KubeJS.HerobrineCompanionKubeJSPlugin
-[12:17:02] [INFO] Loaded script server_scripts:test_trades.js in 0.006 s
-[12:17:02] [INFO] Loaded 1/1 KubeJS server scripts in 0.012 s with 0 errors and 0 warnings
-[12:17:02] [INFO] Scripts loaded
-[12:17:04] [INFO] Server resource reload complete!
+[10:16:44] [INIT] KubeJS 2001.6.5-build.16; MC 2001 forge
+[10:16:44] [INIT] Loaded plugins:
+[10:16:44] [INIT] - dev.latvian.mods.kubejs.forge.BuiltinKubeJSForgePlugin
+[10:16:44] [INIT] - dev.latvian.mods.kubejs.forge.BuiltinKubeJSForgeClientPlugin
+[10:16:44] [INIT] - com.whitecloud233.modid.herobrine_companion.compat.KubeJS.HerobrineCompanionKubeJSPlugin
+[10:16:44] [INFO] Loaded script server_scripts:test_trades.js in 0.007 s
+[10:16:44] [INFO] Loaded 1/1 KubeJS server scripts in 0.014 s with 0 errors and 0 warnings
+[10:16:44] [INFO] Scripts loaded
+[10:16:46] [INFO] Server resource reload complete!
