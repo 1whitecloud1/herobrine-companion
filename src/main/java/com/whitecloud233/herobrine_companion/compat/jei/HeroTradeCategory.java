@@ -23,7 +23,7 @@ public class HeroTradeCategory implements IRecipeCategory<MerchantOffer> {
 
     public HeroTradeCategory(IGuiHelper guiHelper) {
         // 使用 JEI 自带的类似村民交易的背景
-        ResourceLocation texture = ResourceLocation.fromNamespaceAndPath("jei", "textures/jei/gui/gui_vanilla.png");
+        ResourceLocation texture = ResourceLocation.fromNamespaceAndPath("jei", "textures/gui/gui_vanilla.png");
         // 截取一部分作为背景 (0, 220) 是 JEI 默认的村民交易背景位置
         this.background = guiHelper.createDrawable(texture, 0, 220, 82, 34);
         
