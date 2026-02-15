@@ -1,5 +1,0 @@
-// 1.20.1	2026-01-26T21:59:00.0360416	Global Loot Modifiers : herobrine_companion
-e6ad281e0ff966d4c2960edb5cbe1c40a1d06a0b data/forge/loot_modifiers/global_loot_modifiers.json
-cc83955491bcb6b65192a01e15a9f5388b8a5ec0 data/herobrine_companion/loot_modifiers/add_eternal_key_ancient_city.json
-fe3505fa356fb15b2eb7c6826f03fde8297348e9 data/herobrine_companion/loot_modifiers/add_eternal_key_end_city.json
-f70c0aa5ae0350aceef264fa0a71b4dc64406aa5 data/herobrine_companion/loot_modifiers/add_eternal_key_stronghold.json
