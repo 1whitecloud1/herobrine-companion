@@ -157,7 +157,8 @@ dependencies {
 
     // JEI
     compileOnly fg.deobf("mezz.jei:jei-1.20.1-common-api:15.20.0.106")
-    runtimeOnly fg.deobf("mezz.jei:jei-1.20.1-forge-api:15.20.0.106")
+    compileOnly fg.deobf("mezz.jei:jei-1.20.1-forge-api:15.20.0.106")
+    // runtimeOnly fg.deobf("mezz.jei:jei-1.20.1-forge:15.20.0.106")
 
     // Architectury
     implementation fg.deobf("dev.architectury:architectury-forge:9.2.14")
