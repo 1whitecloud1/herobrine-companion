@@ -119,15 +119,20 @@ public class HeroSummonItem extends Item {
 
                 // 否则执行原有的召唤/传送逻辑
                 Vec3 targetPos = context.getClickLocation().add(0, 1, 0);
-                
+
                 if (existingHero != null) {
-                    existingHero.teleportTo(serverLevel, targetPos.x, targetPos.y, targetPos.z, Collections.emptySet(), existingHero.getYRot(), existingHero.getXRot());
-                    existingHero.getNavigation().stop();
-                    existingHero.setTarget(null);
+                    // [新增] 如果 Hero 正在骑乘（例如坐在椅子上），强制下车
+                    if (existingHero.isPassenger()) {
+                        existingHero.stopRiding();
+                    }
+
                     // 清除之前的邀请状态
                     existingHero.setInvitedPos(null);
                     existingHero.setInvitedAction(0);
 
+                    existingHero.teleportTo(serverLevel, targetPos.x, targetPos.y, targetPos.z, Collections.emptySet(), existingHero.getYRot(), existingHero.getXRot());
+                    existingHero.getNavigation().stop();
+                    existingHero.setTarget(null);
                     level.playSound(null, context.getClickedPos(), SoundEvents.ENDERMAN_TELEPORT, SoundSource.PLAYERS, 1.0f, 1.0f);
                     if (player != null) {
                         player.sendSystemMessage(Component.translatable("message.herobrine_companion.hero_teleported"));
