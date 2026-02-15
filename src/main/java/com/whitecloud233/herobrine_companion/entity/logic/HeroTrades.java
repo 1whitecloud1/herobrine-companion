@@ -108,7 +108,11 @@ public class HeroTrades {
 
         // --- 核心修改：在此处调用 KubeJS 事件 ---
         // 这行代码会把当前的 offers 列表和 hero 实体传给 KubeJS 脚本进行“后处理”
-        HerobrineCompanionKubeJSPlugin.fireTradeEvent(offers, hero);
+        try {
+            HerobrineCompanionKubeJSPlugin.fireTradeEvent(offers, hero);
+        } catch (NoClassDefFoundError e) {
+            // KubeJS not installed, ignore
+        }
         // -------------------------------------
 
         LOGGER.info("Generated {} offers (after KubeJS modification).", offers.size());

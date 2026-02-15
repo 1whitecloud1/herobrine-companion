@@ -17,7 +17,6 @@ import net.minecraft.world.item.trading.ItemCost;
 import net.minecraft.world.item.trading.MerchantOffer;
 import net.minecraft.world.item.trading.MerchantOffers;
 import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.TagsUpdatedEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,9 +29,7 @@ import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-// 1. 注册为 NeoForge 事件监听者，以便捕获重载事件
-// 1.21.1: EventBusSubscriber.Bus.GAME 已被移除，默认就是 GAME 总线，或者使用 NeoForge.EVENT_BUS.register()
-@EventBusSubscriber
+// Removed @EventBusSubscriber to prevent loading when KubeJS is missing
 public class HerobrineCompanionKubeJSPlugin implements KubeJSPlugin {
     private static final Logger LOGGER = LoggerFactory.getLogger("HerobrineCompanionKubeJS");
     public static final EventGroup GROUP = EventGroup.of("HerobrineCompanionEvents");

@@ -162,18 +162,24 @@ public class HerobrineCompanion {
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
         
         LLMConfig.load();
+        
+        // Register KubeJS plugin if present
+        try {
+            Class.forName("dev.latvian.mods.kubejs.plugin.KubeJSPlugin");
+            NeoForge.EVENT_BUS.register(com.whitecloud233.herobrine_companion.compat.kubejs.HerobrineCompanionKubeJSPlugin.class);
+        } catch (ClassNotFoundException e) {
+            // KubeJS not present
+        }
+        
+        // Register JEI plugin if present (although JEI usually auto-discovers plugins via annotation, 
+        // explicit registration isn't typically needed for JEI, but we ensure no hard crash happens)
+        // Note: JEI uses @JeiPlugin annotation processor to find plugins, so we don't manually register it to event bus usually.
+        // The crash usually happens if we import JEI classes in our main code without checking.
+        // Since HerobrineJeiPlugin is in a separate class and only loaded by JEI, it should be fine as long as we don't reference it directly in common code.
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {
         LOGGER.info("HELLO FROM COMMON SETUP");
-        try {
-            var resources = this.getClass().getClassLoader().getResources("META-INF/services/dev.latvian.mods.kubejs.plugin.KubeJSPlugin");
-            while (resources.hasMoreElements()) {
-                LOGGER.info("Found KubeJS Plugin service: {}", resources.nextElement());
-            }
-        } catch (Exception e) {
-            LOGGER.error("Failed to list KubeJS Plugin services", e);
-        }
     }
     
     private void clientSetup(final FMLClientSetupEvent event) {

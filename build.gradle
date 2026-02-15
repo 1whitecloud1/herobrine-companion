@@ -111,14 +111,15 @@ dependencies {
     implementation files('libs/h2-2.2.224.jar')
     jarJar files('libs/h2-2.2.224.jar')
 
-    implementation("dev.latvian.mods:kubejs-neoforge:2101.+") {
+    // KubeJS (Optional)
+    compileOnly("dev.latvian.mods:kubejs-neoforge:2101.+") {
         exclude group: 'dev.latvian.mods', module: 'better-advanced-tooltips'
     }
 
-    // JEI dependency
+    // JEI dependency (Optional)
     compileOnly "mezz.jei:jei-${minecraft_version}-common-api:${jei_version}"
     compileOnly "mezz.jei:jei-${minecraft_version}-neoforge-api:${jei_version}"
-    // at runtime, use the full JEI jar for NeoForge
+    // at runtime, use the full JEI jar for NeoForge (only for dev environment)
     runtimeOnly "mezz.jei:jei-${minecraft_version}-neoforge:${jei_version}"
 }
 
