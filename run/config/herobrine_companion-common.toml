@@ -1,7 +1,0 @@
-#Whether the Poem of the End weapon causes explosions in its broken state
-#终末之诗在破境状态下是否启用爆炸
-poemOfTheEndExplosion_v2 = false
-#Whether the Hero King Aura goal is enabled for Herobrine
-#是否启用 Herobrine 的怪物臣服AI
-heroKingAuraEnabled_v2 = true
-
