@@ -5,6 +5,7 @@ import com.mojang.serialization.Codec;
 import com.whitecloud233.modid.herobrine_companion.block.EndRingPortalBlock;
 import com.whitecloud233.modid.herobrine_companion.block.entity.EndRingPortalBlockEntity;
 import com.whitecloud233.modid.herobrine_companion.client.render.IrisPatcher;
+import com.whitecloud233.modid.herobrine_companion.compat.KubeJS.HerobrineCompanionKubeJSPlugin;
 import com.whitecloud233.modid.herobrine_companion.config.Config;
 import com.whitecloud233.modid.herobrine_companion.config.ConfigScreen;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.AIConfig;
@@ -162,6 +163,14 @@ public class HerobrineCompanion {
                         (minecraft, screen) -> new ConfigScreen(screen)
                 )
         );
+
+        // KubeJS Soft Dependency
+        try {
+            Class.forName("dev.latvian.mods.kubejs.plugin.KubeJSPlugin");
+            MinecraftForge.EVENT_BUS.register(HerobrineCompanionKubeJSPlugin.class);
+        } catch (ClassNotFoundException e) {
+            LOGGER.info("KubeJS not found, skipping KubeJS integration.");
+        }
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {

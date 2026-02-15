@@ -16,7 +16,6 @@ import net.minecraft.world.item.trading.MerchantOffer;
 import net.minecraft.world.item.trading.MerchantOffers;
 import net.minecraftforge.event.TagsUpdatedEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,7 +26,6 @@ import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-@Mod.EventBusSubscriber
 public class HerobrineCompanionKubeJSPlugin extends KubeJSPlugin {
     private static final Logger LOGGER = LoggerFactory.getLogger("HerobrineCompanionKubeJS");
     public static final EventGroup GROUP = EventGroup.of("HerobrineCompanionEvents");

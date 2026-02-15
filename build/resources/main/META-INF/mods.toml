@@ -27,3 +27,9 @@ mandatory = false
 versionRange = "[2001.6.0-build.1,)"
 ordering = "AFTER"
 side = "BOTH"
+[[dependencies."herobrine_companion"]]
+modId = "jei"
+mandatory = false
+versionRange = "[15.20.0.106,)"
+ordering = "AFTER"
+side = "CLIENT"
