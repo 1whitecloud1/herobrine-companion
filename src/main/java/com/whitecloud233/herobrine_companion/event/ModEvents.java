@@ -10,6 +10,7 @@ import com.whitecloud233.herobrine_companion.entity.GlitchVillagerEntity;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.VoidRiftEntity;
 import com.whitecloud233.herobrine_companion.entity.projectile.RealmBreakerLightningEntity;
+import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.world.effect.MobEffectInstance;
@@ -36,6 +37,8 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.minecraft.core.registries.Registries;
+
+import java.util.List;
 
 @EventBusSubscriber(modid = HerobrineCompanion.MODID)
 public class ModEvents {
@@ -227,6 +230,38 @@ public class ModEvents {
             Entity owner = lightningEntity.getOwner();
             if (owner != null) {
                 event.getAffectedEntities().remove(owner);
+            }
+        }
+
+        // [新增] 检查爆炸范围内是否有正在执行守卫任务的 Hero
+        List<BlockPos> affectedBlocks = event.getAffectedBlocks();
+        if (affectedBlocks.isEmpty()) return;
+
+        // 获取爆炸中心
+        net.minecraft.world.phys.Vec3 explosionCenter = event.getExplosion().center();
+        
+        // 查找附近的 Hero
+        List<HeroEntity> heroes = event.getLevel().getEntitiesOfClass(HeroEntity.class, 
+            new net.minecraft.world.phys.AABB(explosionCenter.x - 20, explosionCenter.y - 20, explosionCenter.z - 20, 
+                                              explosionCenter.x + 20, explosionCenter.y + 20, explosionCenter.z + 20));
+        
+        for (HeroEntity hero : heroes) {
+            // 检查 Hero 是否正在守卫 (Action 3) 且有邀请位置
+            if (hero.getInvitedAction() == 3 && hero.getInvitedPos() != null) {
+                BlockPos guardPos = hero.getInvitedPos();
+                // 检查爆炸是否在守卫范围内 (例如 10 格)
+                if (guardPos.distSqr(new net.minecraft.core.Vec3i((int)explosionCenter.x, (int)explosionCenter.y, (int)explosionCenter.z)) < 100) { // 10^2
+                    // 移除受保护区域内的方块破坏
+                    affectedBlocks.removeIf(pos -> pos.distSqr(guardPos) < 100);
+                    
+                    // 视觉反馈：在守卫点生成粒子
+                    if (!event.getLevel().isClientSide) {
+                        ((net.minecraft.server.level.ServerLevel)event.getLevel()).sendParticles(net.minecraft.core.particles.ParticleTypes.ENCHANT, 
+                            guardPos.getX() + 0.5, guardPos.getY() + 1.0, guardPos.getZ() + 0.5, 
+                            20, 0.5, 0.5, 0.5, 0.1);
+                    }
+                    break; // 一个 Hero 保护就够了
+                }
             }
         }
     }

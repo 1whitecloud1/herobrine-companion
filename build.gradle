@@ -55,7 +55,7 @@ repositories {
 }
 
 base {
-    archivesName = mod_id
+    archivesName = "Herobrine Companion"
 }
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
@@ -115,7 +115,9 @@ dependencies {
     compileOnly("dev.latvian.mods:kubejs-neoforge:2101.+") {
         exclude group: 'dev.latvian.mods', module: 'better-advanced-tooltips'
     }
-
+// [新增] Rhino (KubeJS 的脚本引擎依赖)
+    // [新增] 显式引入 Rhino，并使用 implementation 确保编译和运行都可用
+    implementation "dev.latvian.mods:rhino:2101.+"
     // JEI dependency (Optional)
     compileOnly "mezz.jei:jei-${minecraft_version}-common-api:${jei_version}"
     compileOnly "mezz.jei:jei-${minecraft_version}-neoforge-api:${jei_version}"

@@ -33,7 +33,7 @@ public class LoreFragmentItem extends Item {
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
         ItemStack fragmentStack = player.getItemInHand(hand);
-        
+
         // 适配 1.20.5+ DataComponents
         CustomData customData = fragmentStack.get(DataComponents.CUSTOM_DATA);
         CompoundTag fragmentTag = customData != null ? customData.copyTag() : new CompoundTag();
@@ -55,7 +55,7 @@ public class LoreFragmentItem extends Item {
                 // Use the title key for the message
                 Component fragmentTitle = Component.translatable("lore.herobrine_companion." + fragmentId + ".title");
                 player.sendSystemMessage(Component.translatable("item.herobrine_companion.lore_fragment.collected", fragmentTitle).withStyle(ChatFormatting.GREEN));
-                
+
                 // Trigger advancement
                 if (player instanceof ServerPlayer serverPlayer) {
                     ResourceLocation advancementId = ResourceLocation.fromNamespaceAndPath(HerobrineCompanion.MODID, fragmentId);
@@ -65,7 +65,7 @@ public class LoreFragmentItem extends Item {
                     } else {
                         System.out.println("Failed to find advancement: " + advancementId);
                     }
-                    
+
                     // [修改] 将碎片 ID 记录到玩家的 NBT 中，等待 Herobrine 读取
                     CompoundTag playerData = player.getPersistentData();
                     ListTag pendingLore;
@@ -76,6 +76,14 @@ public class LoreFragmentItem extends Item {
                     }
                     pendingLore.add(StringTag.valueOf(fragmentId));
                     playerData.put("HeroPendingLore", pendingLore);
+
+                    // [新增] 增加 20 点信任度奖励 (HeroPendingTrustReward)
+                    // HeroLogic 会在下一次检测时自动读取此值并增加信任度
+                    int currentReward = 0;
+                    if (playerData.contains("HeroPendingTrustReward")) {
+                        currentReward = playerData.getInt("HeroPendingTrustReward");
+                    }
+                    playerData.putInt("HeroPendingTrustReward", currentReward + 20);
                 }
 
                 fragmentStack.shrink(1);

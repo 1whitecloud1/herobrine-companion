@@ -67,8 +67,8 @@ public class HeroIdleActionGoal extends Goal {
             return false;
         }
         
-        // 触发概率：约每 1 秒尝试一次 (20 ticks)
-        return this.hero.getRandom().nextInt(1000) == 0;
+        // 触发概率：
+        return this.hero.getRandom().nextInt(3000) == 0;
     }
 
     @Override
