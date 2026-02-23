@@ -23,6 +23,7 @@ version = mod_version
 group = mod_group_id
 archivesBaseName = mod_id
 
+
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 
 println "Java: ${System.getProperty 'java.version'}, JVM: ${System.getProperty 'java.vm.version'} (${System.getProperty 'java.vendor'}), Arch: ${System.getProperty 'os.arch'}"
@@ -210,6 +211,13 @@ tasks.named('jar', Jar).configure {
         files('libs/h2-2.2.224.jar').collect { it.isDirectory() ? it : zipTree(it) }
     }
     exclude 'META-INF/*.RSA', 'META-INF/*.SF', 'META-INF/*.DSA', 'module-info.class'
+    
+    // 排除被审核标记为敏感的 H2 工具类
+    exclude 'org/h2/tools/Upgrade.class'
+    exclude 'org/h2/tools/Shell.class'
+    exclude 'org/h2/tools/RunScript.class'
+    exclude 'org/h2/tools/Console.class'
+
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     finalizedBy 'reobfJar'
 }
