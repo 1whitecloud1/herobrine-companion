@@ -9,7 +9,8 @@
     "LivingEntityMixin",
     "DragonSittingScanningPhaseMixin",
     "EnderDragonMixin",
-    "MobSubmissionMixin"
+    "MobSubmissionMixin",
+    "LevelMixin"
   ],
   "client": [
   ],
