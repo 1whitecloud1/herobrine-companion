@@ -12,12 +12,12 @@ import org.joml.Matrix4f;
 public class EndRingDimensionEffects extends DimensionSpecialEffects {
     
     private static final ResourceLocation[] REAL_WORLD_TEXTURES = new ResourceLocation[] {
-        ResourceLocation.fromNamespaceAndPath(HerobrineCompanion.MODID, "textures/environment/real_world_down.png"),  // 0: 底面 (地面)
-        ResourceLocation.fromNamespaceAndPath(HerobrineCompanion.MODID, "textures/environment/real_world_up.png"),    // 1: 顶面 (天空)
-        ResourceLocation.fromNamespaceAndPath(HerobrineCompanion.MODID, "textures/environment/real_world_north.png"), // 2: 北面
-        ResourceLocation.fromNamespaceAndPath(HerobrineCompanion.MODID, "textures/environment/real_world_south.png"), // 3: 南面
-        ResourceLocation.fromNamespaceAndPath(HerobrineCompanion.MODID, "textures/environment/real_world_east.png"),  // 4: 东面
-        ResourceLocation.fromNamespaceAndPath(HerobrineCompanion.MODID, "textures/environment/real_world_west.png")   // 5: 西面
+        new ResourceLocation(HerobrineCompanion.MODID, "textures/environment/real_world_down.png"),  // 0: 底面 (地面)
+        new ResourceLocation(HerobrineCompanion.MODID, "textures/environment/real_world_up.png"),    // 1: 顶面 (天空)
+        new ResourceLocation(HerobrineCompanion.MODID, "textures/environment/real_world_north.png"), // 2: 北面
+        new ResourceLocation(HerobrineCompanion.MODID, "textures/environment/real_world_south.png"), // 3: 南面
+        new ResourceLocation(HerobrineCompanion.MODID, "textures/environment/real_world_east.png"),  // 4: 东面
+        new ResourceLocation(HerobrineCompanion.MODID, "textures/environment/real_world_west.png")   // 5: 西面
     };
 
     public EndRingDimensionEffects() {

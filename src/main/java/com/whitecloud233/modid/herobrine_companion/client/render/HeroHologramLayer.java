@@ -19,7 +19,7 @@ import org.joml.Matrix4f;
 
 public class HeroHologramLayer extends RenderLayer<HeroEntity, PlayerModel<HeroEntity>> {
     // 贴图路径：请确保你的资源包中有这个文件
-    private static final ResourceLocation HOLOGRAM_TEXTURE = ResourceLocation.fromNamespaceAndPath(HerobrineCompanion.MODID, "textures/entity/hologram_screen.png");
+    private static final ResourceLocation HOLOGRAM_TEXTURE = new ResourceLocation(HerobrineCompanion.MODID, "textures/entity/hologram_screen.png");
 
     public HeroHologramLayer(RenderLayerParent<HeroEntity, PlayerModel<HeroEntity>> renderer) {
         super(renderer);

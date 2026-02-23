@@ -22,8 +22,8 @@ import org.joml.Matrix4f;
 
 public class HeroRenderer extends LivingEntityRenderer<HeroEntity, PlayerModel<HeroEntity>> {
 
-    private static final ResourceLocation HERO_TEXTURE = ResourceLocation.fromNamespaceAndPath(HerobrineCompanion.MODID, "textures/entity/hero.png");
-    private static final ResourceLocation HEROBRINE_TEXTURE = ResourceLocation.fromNamespaceAndPath(HerobrineCompanion.MODID, "textures/entity/herobrine.png");
+    private static final ResourceLocation HERO_TEXTURE = new ResourceLocation(HerobrineCompanion.MODID, "textures/entity/hero.png");
+    private static final ResourceLocation HEROBRINE_TEXTURE = new ResourceLocation(HerobrineCompanion.MODID, "textures/entity/herobrine.png");
 
     public HeroRenderer(EntityRendererProvider.Context context) {
         super(context, new HeroModel(context.bakeLayer(HeroModel.LAYER_LOCATION), false), 0.5f);

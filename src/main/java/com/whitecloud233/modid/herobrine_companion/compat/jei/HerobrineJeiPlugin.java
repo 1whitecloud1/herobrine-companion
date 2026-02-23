@@ -27,7 +27,7 @@ public class HerobrineJeiPlugin implements IModPlugin {
 
     @Override
     public ResourceLocation getPluginUid() {
-        return ResourceLocation.fromNamespaceAndPath("herobrine_companion", "jei_plugin");
+        return new ResourceLocation("herobrine_companion", "jei_plugin");
     }
 
     @Override

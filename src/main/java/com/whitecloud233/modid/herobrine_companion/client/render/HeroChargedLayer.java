@@ -17,7 +17,7 @@ import net.minecraft.util.Mth;
 // [修复] 将泛型改为 PlayerModel<HeroEntity> 以匹配 HeroRenderer
 public class HeroChargedLayer extends RenderLayer<HeroEntity, PlayerModel<HeroEntity>> {
     // 使用原版高压苦力怕的电弧贴图
-    private static final ResourceLocation POWER_LOCATION = ResourceLocation.withDefaultNamespace("textures/entity/creeper/creeper_armor.png");
+    private static final ResourceLocation POWER_LOCATION = new ResourceLocation("textures/entity/creeper/creeper_armor.png");
 
     private final HeroModel model;
 

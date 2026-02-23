@@ -22,7 +22,7 @@ public class HeroGiftPlayerGoal extends Goal {
     public HeroGiftPlayerGoal(HeroEntity hero) {
         this.hero = hero;
         this.setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
-        this.cooldown = 6000; // 初始冷却 5分钟
+        this.cooldown = 1500; // 初始冷却 5分钟
     }
 
     @Override

@@ -193,6 +193,16 @@ public class HeroScreen extends Screen {
             return Component.translatable(isProtected ? "gui.herobrine_companion.disable_protection" : "gui.herobrine_companion.enable_protection");
         }, button -> {
             boolean isProtected = this.minecraft != null && this.minecraft.player != null && this.minecraft.player.getTags().contains("herobrine_companion_peaceful");
+            
+            // [核心修复] 在客户端手动同步这个 Tag 的状态，保持客户端与服务端一致
+            if (this.minecraft != null && this.minecraft.player != null) {
+                if (isProtected) {
+                    this.minecraft.player.removeTag("herobrine_companion_peaceful");
+                } else {
+                    this.minecraft.player.addTag("herobrine_companion_peaceful");
+                }
+            }
+
             PacketHandler.sendToServer(new PeacefulPacket(!isProtected));
             this.onClose();
         }, Tooltip.create(Component.translatable(protectionUnlocked ? "gui.herobrine_companion.protection_tooltip" : "gui.herobrine_companion.protection_locked_tooltip"))).active = protectionUnlocked;

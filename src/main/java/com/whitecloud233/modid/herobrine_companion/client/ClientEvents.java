@@ -80,7 +80,8 @@ public class ClientEvents {
 
     @SubscribeEvent
     public static void registerDimensionSpecialEffects(RegisterDimensionSpecialEffectsEvent event) {
-        event.register(ResourceLocation.fromNamespaceAndPath(HerobrineCompanion.MODID, "end_ring_type"), new EndRingDimensionEffects());
+        // [Fix] 1.20.1 中 ResourceLocation 没有 fromNamespaceAndPath 方法，使用构造函数
+        event.register(new ResourceLocation(HerobrineCompanion.MODID, "end_ring_type"), new EndRingDimensionEffects());
     }
 
     private static Method startAttackMethod;

@@ -19,7 +19,7 @@ public class HeroDragonRenderer extends EnderDragonRenderer {
     private static final Logger LOGGER = LogUtils.getLogger();
     
     // 使用自定义纹理路径
-    private static final ResourceLocation DRAGON_TEXTURE = ResourceLocation.fromNamespaceAndPath(HerobrineCompanion.MODID, "textures/entity/hero_dragon.png");
+    private static final ResourceLocation DRAGON_TEXTURE = new ResourceLocation(HerobrineCompanion.MODID, "textures/entity/hero_dragon.png");
 
     private final HeroDragonModel customModel;
 

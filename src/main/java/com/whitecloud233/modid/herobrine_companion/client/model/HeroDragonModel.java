@@ -13,7 +13,7 @@ import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.entity.boss.enderdragon.phases.EnderDragonPhase;
 
 public class HeroDragonModel extends EntityModel<EnderDragon> {
-    public static final ModelLayerLocation LAYER_LOCATION = new ModelLayerLocation(ResourceLocation.fromNamespaceAndPath(HerobrineCompanion.MODID, "hero_dragon"), "main");
+    public static final ModelLayerLocation LAYER_LOCATION = new ModelLayerLocation(new ResourceLocation(HerobrineCompanion.MODID, "hero_dragon"), "main");
 
     private final ModelPart body;
     private final ModelPart neck5;

@@ -47,9 +47,16 @@ public class HeroLogic {
         // [修复] 延迟检查到 Tick 20，避免世界加载初期的不稳定性导致误杀
         if (hero.tickCount == 20) {
             HeroLifecycleHandler.checkUniqueness(hero);
-            // 尝试从附近玩家恢复信任度
-            // 如果 Spawner 已经设置了 UUID，这里会再次确认，双重保险
-            HeroDataHandler.restoreTrustFromPlayer(hero);
+            // [修复] 只有在全新生成（非读取）时才执行初始化
+            if (!hero.isLoadedFromDisk()) {
+                if (hero.getOwnerUUID() == null) {
+                    // 如果刚生成时没有主人（例如通过召唤物生成），立刻寻找玩家认主并恢复数据
+                    findAndSetOwner(hero);
+                } else {
+                    // 如果生成时自带主人，直接恢复数据
+                    HeroDataHandler.restoreTrustFromPlayer(hero);
+                }
+            }
         }
 
         // [修复] 自动绑定 Owner 逻辑
