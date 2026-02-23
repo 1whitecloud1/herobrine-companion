@@ -150,6 +150,10 @@ public class PlayerGameplayHandler {
         if (original.contains("HasReceivedFragment6")) {
             cur.putBoolean("HasReceivedFragment6", original.getBoolean("HasReceivedFragment6"));
         }
+        // [Fix] 继承到过 End Ring 的标记
+        if (original.contains("HasVisitedHeroDimension")) {
+            cur.putBoolean("HasVisitedHeroDimension", original.getBoolean("HasVisitedHeroDimension"));
+        }
     }
     
     // [新增] 玩家睡觉事件 (使用 CanPlayerSleepEvent 替代)

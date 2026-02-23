@@ -53,11 +53,14 @@ public class HeroDimensionHandler {
         if (fromLevel != null) {
             for (var entity : fromLevel.getAllEntities()) {
                 if (entity instanceof HeroEntity hero && hero.isAlive()) {
-                    carriedHeroData = new CompoundTag();
-                    hero.saveWithoutId(carriedHeroData);
-                    HeroDataHandler.updateGlobalTrust(hero); // 确保数据保存
-                    hero.discard();
-                    break;
+                    // [Fix] 确保是玩家的 Hero
+                    if (hero.getOwnerUUID() != null && hero.getOwnerUUID().equals(player.getUUID())) {
+                        carriedHeroData = new CompoundTag();
+                        hero.saveWithoutId(carriedHeroData);
+                        HeroDataHandler.updateGlobalTrust(hero); // 确保数据保存
+                        hero.discard();
+                        break;
+                    }
                 }
             }
         }
@@ -65,9 +68,12 @@ public class HeroDimensionHandler {
         // 2. 在新维度生成 Hero
         boolean alreadyHasHero = false;
         for (var entity : endLevel.getAllEntities()) {
-            if (entity instanceof HeroEntity && entity.isAlive()) {
-                alreadyHasHero = true;
-                break;
+            if (entity instanceof HeroEntity hero && entity.isAlive()) {
+                // [Fix] 确保是玩家的 Hero
+                if (hero.getOwnerUUID() != null && hero.getOwnerUUID().equals(player.getUUID())) {
+                    alreadyHasHero = true;
+                    break;
+                }
             }
         }
 
@@ -89,6 +95,8 @@ public class HeroDimensionHandler {
                 HeroDataHandler.syncGlobalTrust(hero);
 
             } else {
+                // [Fix] 绑定主人，防止信任度丢失
+                hero.setOwnerUUID(player.getUUID());
                 hero.setTrustLevel(0);
                 HeroDataHandler.syncGlobalTrust(hero);
             }

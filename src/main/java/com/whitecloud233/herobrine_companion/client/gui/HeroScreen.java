@@ -129,12 +129,11 @@ public class HeroScreen extends Screen {
         boolean visited = false;
 
         if (this.minecraft.player != null) {
-            // [NeoForge 1.21 变更] getPersistentData() 已移除。
-            // 这里你需要使用 Data Attachment API。
-            // 示例: visited = this.minecraft.player.getData(ModAttachments.HAS_VISITED);
-            // 暂时默认为 false，请根据你的 Mod 逻辑修复此处。
-            // visited = this.minecraft.player.getPersistentData().getBoolean("HasVisitedHeroDimension");
-            visited = false; // TODO: FIX THIS WITH ATTACHMENT API
+            // [Fix] 使用 getPersistentData() 获取 HasVisitedHeroDimension 标记
+            // 注意：在客户端，getPersistentData() 可能不会自动同步，需要服务端发包同步
+            // 我们之前在 HeroDimensionHandler 中已经添加了 SyncHeroVisitPacket
+            // 所以这里应该能读到同步后的数据
+            visited = this.minecraft.player.getPersistentData().getBoolean("HasVisitedHeroDimension");
         }
 
         // Chat Action
