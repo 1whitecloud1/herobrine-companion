@@ -142,11 +142,11 @@ public class HeroInspectBlockGoal extends Goal {
         // [深度学习] 根据状态调整冷却时间
         SimpleNeuralNetwork.MindState state = this.hero.getHeroBrain().getState();
         if (state == SimpleNeuralNetwork.MindState.GLITCH_LORD) {
-            this.cooldown = 100; // 代码之神：几乎没有冷却 (5秒)
+            this.cooldown = 500; // 代码之神：几乎没有冷却 (5秒)
         } else if (state == SimpleNeuralNetwork.MindState.MAINTAINER) {
-            this.cooldown = 300; // 维护者：较短冷却 (15秒)
+            this.cooldown = 1000; // 维护者：较短冷却 (15秒)
         } else {
-            this.cooldown = 600 + this.hero.getRandom().nextInt(600); // 默认：30-60秒
+            this.cooldown = 1000 + this.hero.getRandom().nextInt(600); // 默认：30-60秒
         }
     }
 

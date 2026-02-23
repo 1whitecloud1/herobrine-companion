@@ -68,7 +68,7 @@ public class HeroIdleActionGoal extends Goal {
         }
         
         // 触发概率：
-        return this.hero.getRandom().nextInt(3000) == 0;
+        return this.hero.getRandom().nextInt(1500) == 0;
     }
 
     @Override
