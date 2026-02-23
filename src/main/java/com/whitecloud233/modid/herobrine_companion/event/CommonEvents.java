@@ -6,6 +6,8 @@ import com.whitecloud233.modid.herobrine_companion.entity.logic.GlitchVillagerSp
 import com.whitecloud233.modid.herobrine_companion.entity.logic.HeroQuestHandler;
 import com.whitecloud233.modid.herobrine_companion.entity.logic.HeroSpawner;
 import com.whitecloud233.modid.herobrine_companion.entity.projectile.RealmBreakerLightningEntity;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.server.level.ServerLevel;
@@ -14,6 +16,9 @@ import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Explosion;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.living.LivingDropsEvent;
@@ -23,6 +28,8 @@ import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.event.level.ExplosionEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+
+import java.util.List;
 
 @Mod.EventBusSubscriber(modid = HerobrineCompanion.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class CommonEvents {
@@ -202,6 +209,57 @@ public class CommonEvents {
             Entity owner = lightningEntity.getOwner();
             if (owner != null) {
                 event.getAffectedEntities().remove(owner);
+            }
+        }
+
+        // [新增] 检查爆炸范围内是否有正在执行守卫任务的 Hero
+        List<BlockPos> affectedBlocks = event.getAffectedBlocks();
+        if (affectedBlocks.isEmpty()) return;
+
+        // 2. [修复] 获取爆炸中心 (1.20.1 没有 center() 方法，需直接读取 x, y, z)
+        Explosion explosion = event.getExplosion();
+
+// 尝试使用 getPosition() 获取 Vec3 对象
+// 注意：在你的映射表中，这个方法应该返回 Vec3
+        Vec3 centerPos = explosion.getPosition();
+
+        double ex = centerPos.x;
+        double ey = centerPos.y;
+        double ez = centerPos.z;
+
+        // 3. 查找附近的 Hero (使用 AABB)
+        // 范围设为以爆炸点为中心，半径 20 格的立方体
+        List<HeroEntity> heroes = event.getLevel().getEntitiesOfClass(HeroEntity.class,
+                new AABB(ex - 20, ey - 20, ez - 20, ex + 20, ey + 20, ez + 20));
+
+        // 4. 遍历检测守卫逻辑
+        for (HeroEntity hero : heroes) {
+            // 检查 Hero 是否正在守卫 (Action 3) 且有合法的守卫点
+            BlockPos guardPos = hero.getInvitedPos();
+            if (hero.getInvitedAction() == 3 && guardPos != null) {
+
+                // 计算爆炸点到守卫点的距离平方
+                // 使用 BlockPos.containing 转换 double 坐标到 BlockPos，比强制转 int 更准确
+                double distSqr = guardPos.distSqr(BlockPos.containing(ex, ey, ez));
+
+                // 检查爆炸中心是否在守卫范围内 (例如 15格半径 = 225平方)
+                // 你原本写的是 100 (10格)，这里可以根据需要调整
+                if (distSqr < 225) {
+
+                    // [核心逻辑] 移除受保护区域内的方块破坏
+                    // 保护半径设为 10 格 (100平方)
+                    affectedBlocks.removeIf(pos -> pos.distSqr(guardPos) < 100);
+
+                    // 视觉反馈：在守卫点生成粒子 (仅服务端执行)
+                    if (!event.getLevel().isClientSide && event.getLevel() instanceof ServerLevel serverLevel) {
+                        serverLevel.sendParticles(ParticleTypes.ENCHANT,
+                                guardPos.getX() + 0.5, guardPos.getY() + 1.0, guardPos.getZ() + 0.5,
+                                20, 0.5, 0.5, 0.5, 0.1);
+                    }
+
+                    // 只要有一个 Hero 进行了保护，就跳出循环，避免重复计算
+                    break;
+                }
             }
         }
     }

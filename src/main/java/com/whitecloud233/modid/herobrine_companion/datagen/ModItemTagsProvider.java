@@ -21,15 +21,23 @@ public class ModItemTagsProvider extends ItemTagsProvider {
         tag(ModTags.Items.HERO_ITEMS)
                 .add(HerobrineCompanion.HERO_SHELTER.get())
                 .add(HerobrineCompanion.ETERNAL_KEY.get())
+                .add(HerobrineCompanion.ABYSSAL_GAZE.get())
                 .add(HerobrineCompanion.UNSTABLE_GUNPOWDER.get())
                 .add(HerobrineCompanion.CORRUPTED_CODE.get())
                 .add(HerobrineCompanion.VOID_MARROW.get())
                 .add(HerobrineCompanion.GLITCH_FRAGMENT.get())
+                .add(HerobrineCompanion.SOURCE_CODE_FRAGMENT.get())
                 .add(HerobrineCompanion.MEMORY_SHARD.get())
                 .add(HerobrineCompanion.RECALL_STONE.get())
+                .add(HerobrineCompanion.SOUL_BOUND_PACT.get())
+                .add(HerobrineCompanion.TRANSCENDENCE_PERMIT.get())
+                .add(HerobrineCompanion.POEM_OF_THE_END.get())
+                .add(HerobrineCompanion.LORE_FRAGMENT.get())
+                .add(HerobrineCompanion.LORE_HANDBOOK.get())
                 .add(HerobrineCompanion.END_RING_PORTAL_ITEM.get())
                 .add(HerobrineCompanion.GHOST_CREEPER_SPAWN_EGG.get())
                 .add(HerobrineCompanion.GHOST_ZOMBIE_SPAWN_EGG.get())
-                .add(HerobrineCompanion.GHOST_SKELETON_SPAWN_EGG.get());
+                .add(HerobrineCompanion.GHOST_SKELETON_SPAWN_EGG.get())
+                .add(HerobrineCompanion.GHOST_STEVE_SPAWN_EGG.get());
     }
 }

@@ -34,6 +34,7 @@ public class LoreFragmentItem extends Item {
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
         ItemStack fragmentStack = player.getItemInHand(hand);
 
+        // 1.20.1 NBT 获取方式
         CompoundTag fragmentTag = fragmentStack.getTag();
 
         if (fragmentTag == null || !fragmentTag.contains(LORE_ID_KEY)) {
@@ -50,14 +51,15 @@ public class LoreFragmentItem extends Item {
         if (handbookStackOpt.isPresent()) {
             if (!level.isClientSide) {
                 LoreHandbookItem.addFragment(handbookStackOpt.get(), fragmentId);
-                // Use the title key for the message
+                // 使用标题 key 发送消息
                 Component fragmentTitle = Component.translatable("lore.herobrine_companion." + fragmentId + ".title");
                 player.sendSystemMessage(Component.translatable("item.herobrine_companion.lore_fragment.collected", fragmentTitle).withStyle(ChatFormatting.GREEN));
-                
-                // 触发进度
+
+                // 触发进度 (1.20.1 写法)
                 if (player instanceof ServerPlayer serverPlayer) {
                     ResourceLocation advancementId = new ResourceLocation(HerobrineCompanion.MODID, fragmentId);
                     Advancement advancement = serverPlayer.server.getAdvancements().getAdvancement(advancementId);
+
                     if (advancement != null) {
                         AdvancementProgress progress = serverPlayer.getAdvancements().getOrStartProgress(advancement);
                         if (!progress.isDone()) {
@@ -75,7 +77,8 @@ public class LoreFragmentItem extends Item {
                     } else {
                         pendingLore = new ListTag();
                     }
-                    // 避免重复添加
+
+                    // 避免在 pending 列表中重复添加同一个ID
                     boolean alreadyPending = false;
                     for (Tag t : pendingLore) {
                         if (t.getAsString().equals(fragmentId)) {
@@ -83,18 +86,24 @@ public class LoreFragmentItem extends Item {
                             break;
                         }
                     }
+
                     if (!alreadyPending) {
                         pendingLore.add(StringTag.valueOf(fragmentId));
                         playerData.put("HeroPendingLore", pendingLore);
                     }
-                }
-            }
 
-            // 消耗物品 (仅在非创造模式下)
-            if (!player.getAbilities().instabuild) {
+                    // [新增] 增加 20 点信任度奖励 (HeroPendingTrustReward)
+                    // HeroLogic 会在下一次检测时自动读取此值并增加信任度
+                    int currentReward = 0;
+                    if (playerData.contains("HeroPendingTrustReward")) {
+                        currentReward = playerData.getInt("HeroPendingTrustReward");
+                    }
+                    playerData.putInt("HeroPendingTrustReward", currentReward + 20);
+                }
+
+                // 消耗物品
                 fragmentStack.shrink(1);
             }
-
             return InteractionResultHolder.sidedSuccess(fragmentStack, level.isClientSide());
         } else {
             if (!level.isClientSide) {
