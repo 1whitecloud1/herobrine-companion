@@ -72,7 +72,13 @@ public class HeroLogic {
         // [风险点] 此处会保存数据。如果 Trust 为 0 且 Owner 不为空，会把存档覆盖为 0。
         // 所以必须保证在此之前，restoreTrustFromPlayer 已经成功执行。
         if (hero.tickCount % 100 == 0) {
-            HeroDataHandler.updateGlobalTrust(hero);
+            // [Fix] 仅在信任度 > 0 时更新全局数据，防止意外覆盖
+            if (hero.getTrustLevel() > 0) {
+                HeroDataHandler.updateGlobalTrust(hero);
+            } else {
+                // 如果信任度为 0，尝试恢复
+                HeroDataHandler.restoreTrustFromPlayer(hero);
+            }
         }
 
         if (hero.tickCount % 20 == 0) {
@@ -123,7 +129,6 @@ public class HeroLogic {
         }
     }
 
-    // ... (其余方法保持不变) ...
     private static void checkPendingQuestRewards(HeroEntity hero) {
         if (hero.getOwnerUUID() == null) return;
         Player owner = hero.level().getPlayerByUUID(hero.getOwnerUUID());

@@ -37,7 +37,7 @@ public class HeroDimensionHandler {
         }
 
         if (event.getFrom() == ModStructures.END_RING_DIMENSION_KEY && event.getTo() == Level.OVERWORLD) {
-            handleReturnToOverworld(toLevel, player);
+            handleReturnToOverworld(fromLevel, toLevel, player);
         }
     }
 
@@ -46,20 +46,31 @@ public class HeroDimensionHandler {
         if (fromLevel != null) {
             for (var entity : fromLevel.getAllEntities()) {
                 if (entity instanceof HeroEntity hero && hero.isAlive()) {
-                    carriedHeroData = new CompoundTag();
-                    hero.saveWithoutId(carriedHeroData);
-                    HeroDataHandler.updateGlobalTrust(hero); 
-                    hero.remove(Entity.RemovalReason.DISCARDED);
-                    break;
+                    // [Fix] 确保是玩家的 Hero
+                    if (hero.getOwnerUUID() != null && hero.getOwnerUUID().equals(player.getUUID())) {
+                        carriedHeroData = new CompoundTag();
+                        hero.saveWithoutId(carriedHeroData);
+                        
+                        // [Fix] 仅在信任度 > 0 时更新全局数据，防止意外覆盖
+                        if (hero.getTrustLevel() > 0) {
+                            HeroDataHandler.updateGlobalTrust(hero);
+                        }
+                        
+                        hero.remove(Entity.RemovalReason.DISCARDED);
+                        break;
+                    }
                 }
             }
         }
 
         boolean alreadyHasHero = false;
         for (var entity : endLevel.getAllEntities()) {
-            if (entity instanceof HeroEntity && entity.isAlive()) {
-                alreadyHasHero = true;
-                break;
+            if (entity instanceof HeroEntity hero && entity.isAlive()) {
+                // [Fix] 确保是玩家的 Hero
+                if (hero.getOwnerUUID() != null && hero.getOwnerUUID().equals(player.getUUID())) {
+                    alreadyHasHero = true;
+                    break;
+                }
             }
         }
 
@@ -76,10 +87,27 @@ public class HeroDimensionHandler {
                 if (carriedHeroData.contains("TrustLevel")) {
                     hero.setTrustLevel(carriedHeroData.getInt("TrustLevel"));
                 }
+                
+                // [Fix] 尝试恢复信任度
+                if (hero.getTrustLevel() == 0) {
+                    HeroDataHandler.restoreTrustFromPlayer(hero);
+                    // Fallback: 直接使用 player 对象查询数据
+                    if (hero.getTrustLevel() == 0) {
+                        HeroWorldData data = HeroWorldData.get(endLevel);
+                        int trust = data.getTrust(player.getUUID());
+                        if (trust > 0) hero.setTrustLevel(trust);
+                    }
+                }
+                
                 HeroDataHandler.syncGlobalTrust(hero);
                 
             } else {
                 hero.setTrustLevel(0);
+                // Fallback: 即使没有携带数据，也尝试从玩家数据恢复
+                HeroWorldData data = HeroWorldData.get(endLevel);
+                int trust = data.getTrust(player.getUUID());
+                if (trust > 0) hero.setTrustLevel(trust);
+                
                 HeroDataHandler.syncGlobalTrust(hero);
             }
 
@@ -95,29 +123,73 @@ public class HeroDimensionHandler {
         PacketHandler.sendToPlayer(new SyncHeroVisitPacket(true), player);
     }
 
-    private static void handleReturnToOverworld(ServerLevel level, ServerPlayer player) {
+    private static void handleReturnToOverworld(ServerLevel fromLevel, ServerLevel toLevel, ServerPlayer player) {
         if (player.getPersistentData().getBoolean("HasVisitedHeroDimension")) {
             PacketHandler.sendToPlayer(new SyncHeroVisitPacket(true), player);
         }
 
-        CompoundTag playerData = player.getPersistentData();
-        if (playerData.contains("HeroPendingRespawn") && playerData.contains("HeroRespawnData")) {
-            CompoundTag heroData = playerData.getCompound("HeroRespawnData");
-            HeroEntity newHero = new HeroEntity(ModEvents.HERO.get(), level);
+        CompoundTag carriedHeroData = null;
 
-            if (heroData.contains("UUID")) heroData.remove("UUID");
-            if (heroData.contains("UUIDMost")) heroData.remove("UUIDMost");
-            if (heroData.contains("UUIDLeast")) heroData.remove("UUIDLeast");
-            
-            newHero.load(heroData);
-            
-            if (heroData.contains("TrustLevel")) {
-                newHero.setTrustLevel(heroData.getInt("TrustLevel"));
+        // 1. 尝试在旧维度（End Ring）寻找跟随玩家的 Hero
+        if (fromLevel != null) {
+            for (var entity : fromLevel.getAllEntities()) {
+                if (entity instanceof HeroEntity hero && hero.isAlive()) {
+                    if (hero.getOwnerUUID() != null && hero.getOwnerUUID().equals(player.getUUID())) {
+                        carriedHeroData = new CompoundTag();
+                        hero.saveWithoutId(carriedHeroData);
+                        
+                        // [Fix] 仅在信任度 > 0 时更新全局数据
+                        if (hero.getTrustLevel() > 0) {
+                            HeroDataHandler.updateGlobalTrust(hero);
+                        }
+                        
+                        hero.remove(Entity.RemovalReason.DISCARDED);
+                        break;
+                    }
+                }
             }
+        }
+
+        // 2. 如果没找到，检查是否有挂起的重生数据
+        CompoundTag playerData = player.getPersistentData();
+        if (carriedHeroData == null && playerData.contains("HeroPendingRespawn") && playerData.contains("HeroRespawnData")) {
+            carriedHeroData = playerData.getCompound("HeroRespawnData");
+            playerData.remove("HeroPendingRespawn");
+            playerData.remove("HeroRespawnData");
+        }
+
+        // 3. 生成 Hero
+        if (carriedHeroData != null) {
+            HeroEntity newHero = new HeroEntity(ModEvents.HERO.get(), toLevel);
+
+            if (carriedHeroData.contains("UUID")) carriedHeroData.remove("UUID");
+            if (carriedHeroData.contains("UUIDMost")) carriedHeroData.remove("UUIDMost");
+            if (carriedHeroData.contains("UUIDLeast")) carriedHeroData.remove("UUIDLeast");
+            
+            newHero.load(carriedHeroData);
+            
+            if (carriedHeroData.contains("TrustLevel")) {
+                newHero.setTrustLevel(carriedHeroData.getInt("TrustLevel"));
+            }
+            
+            // [Fix] 尝试恢复信任度
+            if (newHero.getTrustLevel() == 0) {
+                HeroDataHandler.restoreTrustFromPlayer(newHero);
+                
+                // [Fix] Fallback: 直接使用 player 对象查询数据 (防止 restoreTrustFromPlayer 找不到玩家实体)
+                if (newHero.getTrustLevel() == 0) {
+                    HeroWorldData data = HeroWorldData.get(toLevel);
+                    int trust = data.getTrust(player.getUUID());
+                    if (trust > 0) {
+                        newHero.setTrustLevel(trust);
+                    }
+                }
+            }
+            
             HeroDataHandler.syncGlobalTrust(newHero);
 
             double radius = 3.0D;
-            double angle = level.random.nextDouble() * Math.PI * 2.0D;
+            double angle = toLevel.random.nextDouble() * Math.PI * 2.0D;
             double offsetX = Math.cos(angle) * radius;
             double offsetZ = Math.sin(angle) * radius;
             
@@ -135,10 +207,7 @@ public class HeroDimensionHandler {
             newHero.setCustomName(Component.translatable("entity.herobrine_companion.hero"));
             newHero.setNoGravity(false);
 
-            level.addFreshEntity(newHero);
-
-            playerData.remove("HeroPendingRespawn");
-            playerData.remove("HeroRespawnData");
+            toLevel.addFreshEntity(newHero);
         }
     }
 
@@ -152,24 +221,7 @@ public class HeroDimensionHandler {
         }
     }
 
-
-
     public static void leaveWorld(HeroEntity hero, @Nullable String messageKey) {
-            // [新增] 离开前保存大脑记忆
-            // 我们需要把当前实体的数据（包括大脑）保存下来，以便重生时恢复
-            // 但由于 leaveWorld 通常是 discard，我们只能依赖 HeroWorldData 或者临时保存到玩家身上
-            // 这里简化处理：如果是被攻击离开，我们假设他只是暂时躲起来，重生时会继承全局数据
-            // 但大脑数据是存储在实体 NBT 里的，如果 discard 了，新生成的实体就是新的大脑
-
-            // 解决方案：将大脑数据序列化并保存到 HeroWorldData (如果支持) 或者 玩家 NBT
-            // 目前 HeroWorldData 只存了 TrustLevel 和 SkinVariant
-            // 为了简单起见，我们让他在重生时保留记忆，这需要修改 respawnNearPlayer 方法
-
-            // 暂时先保存到 hero 自身，如果 respawnNearPlayer 能获取到旧数据最好
-            // 但目前的逻辑是 create 新实体。
-
-            // 既然是“失望离开”，那他重生时应该带着这份“失望” (记忆)
-            // 我们可以把大脑数据临时存到 HeroWorldData 的一个临时字段里
         if (hero.level() instanceof ServerLevel serverLevel) {
             HeroWorldData data = HeroWorldData.get(serverLevel);
             CompoundTag brainData = new CompoundTag();
@@ -187,8 +239,7 @@ public class HeroDimensionHandler {
             serverLevel.sendParticles(ParticleTypes.REVERSE_PORTAL, hero.getX(), hero.getY() + 1, hero.getZ(), 30, 0.5, 0.5, 0.5, 0.1);
             serverLevel.playSound(null, hero.blockPosition(), net.minecraft.sounds.SoundEvents.ENDERMAN_TELEPORT, net.minecraft.sounds.SoundSource.NEUTRAL, 1.0f, 0.5f);
             
-            // Set cooldown
-            int cooldownMinutes = 0; // Set to 0 for testing as requested
+            int cooldownMinutes = 0; 
             HeroWorldData.get(serverLevel).setRespawnCooldown(serverLevel, cooldownMinutes);
         }
         hero.remove(Entity.RemovalReason.DISCARDED);
@@ -206,40 +257,33 @@ public class HeroDimensionHandler {
         }
     }
 
-    // [新增] 在玩家附近生成 Hero
     public static void respawnNearPlayer(ServerLevel level, ServerPlayer player) {
-        // 检查是否已经存在 Hero
         for (Entity entity : level.getAllEntities()) {
             if (entity instanceof HeroEntity && entity.isAlive()) {
-                return; // 已经存在，不重复生成
+                return; 
             }
         }
 
         HeroEntity hero = ModEvents.HERO.get().create(level);
         if (hero != null) {
-            // 随机位置
             double angle = level.random.nextDouble() * Math.PI * 2.0D;
             double distance = 4.0 + level.random.nextDouble() * 4.0;
             double x = player.getX() + Math.cos(angle) * distance;
             double z = player.getZ() + Math.sin(angle) * distance;
             double y = player.getY();
 
-            // 简单的位置调整，防止卡墙
             if (!level.getBlockState(new net.minecraft.core.BlockPos((int)x, (int)y, (int)z)).isAir()) {
                 y = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, (int)x, (int)z);
             }
 
             hero.moveTo(x, y, z, level.random.nextFloat() * 360F, 0);
             
-            // 同步信任度
             HeroDataHandler.syncGlobalTrust(hero);
             
-            // [修复] 恢复皮肤状态
             HeroWorldData worldData = HeroWorldData.get(level);
             if (worldData.shouldUseHerobrineSkin()) {
                 hero.setUseHerobrineSkin(true);
             } else {
-                // 检查玩家数据中的临时状态
                 CompoundTag data = player.getPersistentData();
                 if (data.contains("HeroCombatRespawnData")) {
                     CompoundTag heroData = data.getCompound("HeroCombatRespawnData");
@@ -250,17 +294,13 @@ public class HeroDimensionHandler {
                 }
             }
 
-            // [新增] 尝试恢复大脑记忆
             if (worldData.getTempBrainData() != null) {
                 hero.getHeroBrain().load(worldData.getTempBrainData());
-                // 恢复后清除临时数据，或者保留以防再次消失？保留比较安全
             }
-            // 添加防重复生成的标签 (可选)
             hero.addTag(EndRingContext.TAG_RESPAWNED_SAFE);
 
             level.addFreshEntity(hero);
             
-            // 特效
             level.sendParticles(ParticleTypes.REVERSE_PORTAL, x, y + 1, z, 30, 0.5, 0.5, 0.5, 0.1);
             level.playSound(null, hero.blockPosition(), net.minecraft.sounds.SoundEvents.ENDERMAN_TELEPORT, net.minecraft.sounds.SoundSource.NEUTRAL, 1.0f, 0.5f);
         }

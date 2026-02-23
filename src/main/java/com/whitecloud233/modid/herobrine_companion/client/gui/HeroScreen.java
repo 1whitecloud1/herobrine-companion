@@ -120,7 +120,7 @@ public class HeroScreen extends Screen {
         // String key = currentSkin ? "gui.herobrine_companion.switch_skin_hero" : "gui.herobrine_companion.switch_skin_herobrine";
         // 这两个键对应的值分别是 "切换为 Hero 皮肤" 和 "切换为 Herobrine 皮肤"。
         // 用户说 "文本保持“切换皮肤“不变"，可能是指保持这个动态切换的文本逻辑。
-        
+
         String skinKey = currentSkin ? "gui.herobrine_companion.switch_skin_hero" : "gui.herobrine_companion.switch_skin_herobrine";
 
         Button skinBtn = new ThemedButton(
@@ -164,7 +164,12 @@ public class HeroScreen extends Screen {
     private void populateActionList() {
         if (this.minecraft == null) return;
         boolean visited = false;
+
         if (this.minecraft.player != null) {
+            // [Fix] 使用 getPersistentData() 获取 HasVisitedHeroDimension 标记
+            // 注意：在客户端，getPersistentData() 可能不会自动同步，需要服务端发包同步
+            // 我们之前在 HeroDimensionHandler 中已经添加了 SyncHeroVisitPacket
+            // 所以这里应该能读到同步后的数据
             visited = this.minecraft.player.getPersistentData().getBoolean("HasVisitedHeroDimension");
         }
 

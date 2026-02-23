@@ -106,7 +106,8 @@ public class LocalChatService {
 
             // 连接字符串 (去掉了 MODE=SQLite)
             String dbPathStr = configDir.resolve(DB_FILE_NAME).toAbsolutePath().toString();
-            String url = "jdbc:h2:file:" + dbPathStr + ";AUTO_SERVER=TRUE";
+            // 移除 ;AUTO_SERVER=TRUE 以减少对 org.h2.tools.Server 的依赖，避免因排除 Server 类导致连接失败
+            String url = "jdbc:h2:file:" + dbPathStr;
 
             LOGGER.info("正在连接数据库: {}", url);
 
