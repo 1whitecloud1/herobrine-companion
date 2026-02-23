@@ -38,22 +38,26 @@ public record PeacefulPacket(boolean peaceful) implements CustomPacketPayload {
 
                 if (payload.peaceful) {
                     // === 开启和平 ===
-                    serverPlayer.addTag("herobrine_companion_peaceful");
-                    
-                    // 音效：幻术师准备法术 (神秘感)
-                    serverPlayer.level().playSound(null, serverPlayer.blockPosition(), SoundEvents.ILLUSIONER_PREPARE_MIRROR, SoundSource.PLAYERS, 1.0f, 0.8f);
-                    
-                    // 警告提示：告知玩家不能攻击
-                    serverPlayer.sendSystemMessage(Component.translatable("message.herobrine_companion.peace_enabled_warning"));
+                    if (!serverPlayer.getTags().contains("herobrine_companion_peaceful")) {
+                        serverPlayer.addTag("herobrine_companion_peaceful");
+                        
+                        // 音效：幻术师准备法术 (神秘感)
+                        serverPlayer.level().playSound(null, serverPlayer.blockPosition(), SoundEvents.ILLUSIONER_PREPARE_MIRROR, SoundSource.PLAYERS, 1.0f, 0.8f);
+                        
+                        // 警告提示：告知玩家不能攻击
+                        serverPlayer.sendSystemMessage(Component.translatable("message.herobrine_companion.peace_enabled_warning"));
+                    }
                     
                 } else {
                     // === 关闭和平 ===
-                    serverPlayer.removeTag("herobrine_companion_peaceful");
-                    
-                    // 音效：信标关闭 (机械感/终止感)
-                    serverPlayer.level().playSound(null, serverPlayer.blockPosition(), SoundEvents.BEACON_DEACTIVATE, SoundSource.PLAYERS, 1.0f, 1.0f);
-                    
-                    serverPlayer.sendSystemMessage(Component.translatable("message.herobrine_companion.peace_disabled"));
+                    if (serverPlayer.getTags().contains("herobrine_companion_peaceful")) {
+                        serverPlayer.removeTag("herobrine_companion_peaceful");
+                        
+                        // 音效：信标关闭 (机械感/终止感)
+                        serverPlayer.level().playSound(null, serverPlayer.blockPosition(), SoundEvents.BEACON_DEACTIVATE, SoundSource.PLAYERS, 1.0f, 1.0f);
+                        
+                        serverPlayer.sendSystemMessage(Component.translatable("message.herobrine_companion.peace_disabled"));
+                    }
                 }
             }
         });

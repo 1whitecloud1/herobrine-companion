@@ -49,8 +49,8 @@ public class HeroLogic {
         // 1. 唯一性检查
         if (hero.tickCount == 20) {
             HeroLifecycleHandler.checkUniqueness(hero);
-            // [双重保险] 如果 Spawner 已经设置了 Owner，这里再次尝试恢复数据
-            if (hero.getOwnerUUID() != null) {
+            // [修复] 只有在全新生成（非读取）时，才从全局同步数据，防止覆盖存档原有数据
+            if (!hero.isLoadedFromDisk() && hero.getOwnerUUID() != null) {
                 HeroDataHandler.restoreTrustFromPlayer(hero);
             }
         }

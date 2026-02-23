@@ -223,7 +223,7 @@ public class HeroWorldData extends SavedData {
                 new SavedData.Factory<>(
                         HeroWorldData::new,
                         HeroWorldData::load,
-                        DataFixTypes.LEVEL
+                        null // <--- 修复：改为 null，防止原版清洗自定义数据
                 ),
                 "herobrine_companion_data"
         );
