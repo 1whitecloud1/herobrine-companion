@@ -4,6 +4,7 @@ import com.whitecloud233.herobrine_companion.entity.ai.HeroMoveControl;
 import com.whitecloud233.herobrine_companion.entity.ai.HeroAI;
 import com.whitecloud233.herobrine_companion.entity.ai.learning.HeroBrain;
 import com.whitecloud233.herobrine_companion.entity.ai.learning.SimpleNeuralNetwork;
+import com.whitecloud233.herobrine_companion.entity.logic.HeroDataHandler;
 import com.whitecloud233.herobrine_companion.entity.logic.HeroLogic;
 import com.whitecloud233.herobrine_companion.entity.logic.HeroOtherProtection;
 import com.whitecloud233.herobrine_companion.entity.logic.HeroTrades;
@@ -501,7 +502,15 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     public boolean isFloating() { return entityData.get(IS_FLOATING); }
     public void setFloating(boolean floating) { entityData.set(IS_FLOATING, floating); }
     public int getTrustLevel() { return entityData.get(TRUST_LEVEL); }
-    public void setTrustLevel(int level) { entityData.set(TRUST_LEVEL, level); }
+    
+    public void setTrustLevel(int level) { 
+        entityData.set(TRUST_LEVEL, level);
+        // [修复] 信任度变化时立即同步到全局数据，防止跨维度丢失
+        if (!this.level().isClientSide) {
+            HeroDataHandler.updateGlobalTrust(this);
+        }
+    }
+    
     public void increaseTrust(int amount) { setTrustLevel(getTrustLevel() + amount); }
     public boolean isCompanionMode() { return entityData.get(IS_COMPANION_MODE); }
     public void setCompanionMode(boolean active) { entityData.set(IS_COMPANION_MODE, active); }

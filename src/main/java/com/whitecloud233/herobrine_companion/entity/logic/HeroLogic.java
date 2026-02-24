@@ -54,6 +54,11 @@ public class HeroLogic {
                 HeroDataHandler.restoreTrustFromPlayer(hero);
             }
         }
+        
+        // [新增] 持续性唯一性检查 (每5秒检查一次，防止跨维度传送后旧实体未清除)
+        if (hero.tickCount % 100 == 0) {
+            HeroLifecycleHandler.checkUniqueness(hero);
+        }
 
         // 2. 自动绑定逻辑
         if (hero.getOwnerUUID() == null) {

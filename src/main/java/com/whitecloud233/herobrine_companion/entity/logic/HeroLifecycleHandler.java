@@ -2,48 +2,82 @@ package com.whitecloud233.herobrine_companion.entity.logic;
 
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.util.EndRingContext;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
+
+import java.util.UUID;
 
 public class HeroLifecycleHandler {
 
     public static void checkUniqueness(HeroEntity hero) {
         if (hero.level().isClientSide) return;
 
-        // 1. 检查自己是否是"特权替身"
-        boolean amISafe = hero.getTags().contains(EndRingContext.TAG_RESPAWNED_SAFE);
-        ServerLevel serverLevel = (ServerLevel) hero.level();
+        ServerLevel currentLevel = (ServerLevel) hero.level();
+        MinecraftServer server = currentLevel.getServer();
+        if (server == null) return;
 
-        // 遍历所有实体寻找同类
-        for (Entity entity : serverLevel.getAllEntities()) {
-            if (entity instanceof HeroEntity other && entity.getId() != hero.getId() && other.isAlive()) {
+        UUID myOwner = hero.getOwnerUUID();
+        boolean iAmSafe = hero.getTags().contains(EndRingContext.TAG_RESPAWNED_SAFE);
 
-                // 情况 A: 我是特权替身 (我是新的)
-                if (amISafe) {
-                    // 我拥有最高优先级，清理掉所有旧的/其他的 Hero
-                    other.discard();
-                }
-                // 情况 B: 我是普通 Hero，对方也是普通 Hero
-                else if (!other.getTags().contains(EndRingContext.TAG_RESPAWNED_SAFE)) {
-                    // 冲突了！保留存在时间更长的那个，或者保留ID更小的那个
-                    // 这里我们采取简单的策略：后生成的自杀 (tickCount 小的通常是后生成的)
-                    if (hero.tickCount < other.tickCount) {
-                        hero.discard();
-                        return; // 我死了，不用继续检查了
+        // 遍历所有维度
+        for (ServerLevel level : server.getAllLevels()) {
+            for (Entity entity : level.getAllEntities()) {
+                // 跳过自己
+                if (entity.getId() == hero.getId()) continue;
+
+                if (entity instanceof HeroEntity other && other.isAlive()) {
+                    // 检查是否属于同一个主人 (或者都是无主的)
+                    UUID otherOwner = other.getOwnerUUID();
+                    boolean sameOwner = (myOwner == null && otherOwner == null) || (myOwner != null && myOwner.equals(otherOwner));
+
+                    if (sameOwner) {
+                        // --- 冲突解决策略 ---
+
+                        // 1. 优先保留带有 "TAG_RESPAWNED_SAFE" 的 (特权标记)
+                        boolean otherIsSafe = other.getTags().contains(EndRingContext.TAG_RESPAWNED_SAFE);
+
+                        if (iAmSafe && !otherIsSafe) {
+                            other.discard();
+                            continue; // 杀敌后继续检查其他敌人
+                        } else if (!iAmSafe && otherIsSafe) {
+                            hero.discard();
+                            return; // 我死了，结束检查
+                        }
+
+                        // 2. 优先保留与 Owner 同维度的 (跟随逻辑)
+                        if (myOwner != null) {
+                            ServerPlayer owner = server.getPlayerList().getPlayer(myOwner);
+                            if (owner != null) {
+                                boolean iAmWithPlayer = hero.level() == owner.level();
+                                boolean otherIsWithPlayer = other.level() == owner.level();
+
+                                if (iAmWithPlayer && !otherIsWithPlayer) {
+                                    other.discard();
+                                    continue;
+                                } else if (!iAmWithPlayer && otherIsWithPlayer) {
+                                    hero.discard();
+                                    return;
+                                }
+                            }
+                        }
+
+                        // 3. 如果条件都一样，保留 tickCount 小的 (假设是新生成的)
+                        // 注意：tickCount 小意味着存活时间短。通常新生成的是为了替换旧的。
+                        if (hero.tickCount < other.tickCount) {
+                            other.discard();
+                        } else {
+                            hero.discard();
+                            return;
+                        }
                     }
-                }
-                // 情况 C: 对方是特权替身
-                else {
-                    // 对方有特权，我必须死
-                    hero.discard();
-                    return;
                 }
             }
         }
 
-        // 2. 如果我是特权替身，并且我已经完成了清理工作 (活过了这一帧)
-        // 移除特权标签，变回普通实体，防止未来出 Bug
-        if (amISafe) {
+        // 检查完毕，如果我还活着，移除特权标签
+        if (iAmSafe) {
             hero.removeTag(EndRingContext.TAG_RESPAWNED_SAFE);
         }
     }

@@ -38,14 +38,12 @@ public class HeroDimensionHandler {
         if (event.getTo() == ModStructures.END_RING_DIMENSION_KEY) {
             handleEnterEndRing(fromLevel, toLevel, player);
         }
-
         // B. 从 End Ring 回归
-        if (event.getFrom() == ModStructures.END_RING_DIMENSION_KEY && event.getTo() == Level.OVERWORLD) {
+        else if (event.getFrom() == ModStructures.END_RING_DIMENSION_KEY && event.getTo() == Level.OVERWORLD) {
             handleReturnToOverworld(toLevel, player);
         }
     }
 
-    // --- Dimension Transition Logic ---
 
     private static void handleEnterEndRing(ServerLevel fromLevel, ServerLevel endLevel, ServerPlayer player) {
         // 1. 尝试在旧维度（如主世界）寻找跟随玩家的 Hero
