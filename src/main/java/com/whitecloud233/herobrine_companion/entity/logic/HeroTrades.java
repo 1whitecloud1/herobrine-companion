@@ -3,12 +3,14 @@ package com.whitecloud233.herobrine_companion.entity.logic;
 import com.mojang.logging.LogUtils;
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.compat.kubejs.HerobrineCompanionKubeJSPlugin;
+import com.whitecloud233.herobrine_companion.compat.kubejs.SafeKubeJSCaller;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.trading.ItemCost;
 import net.minecraft.world.item.trading.MerchantOffer;
 import net.minecraft.world.item.trading.MerchantOffers;
+import net.neoforged.fml.ModList;
 import org.slf4j.Logger;
 import java.util.Optional;
 
@@ -108,10 +110,10 @@ public class HeroTrades {
 
         // --- 核心修改：在此处调用 KubeJS 事件 ---
         // 这行代码会把当前的 offers 列表和 hero 实体传给 KubeJS 脚本进行“后处理”
-        try {
-            HerobrineCompanionKubeJSPlugin.fireTradeEvent(offers, hero);
-        } catch (NoClassDefFoundError e) {
-            // KubeJS not installed, ignore
+        // ... 在 HeroTrades.java 的对应位置 ...
+        if (ModList.get().isLoaded("kubejs")) {
+            // 将实际的调用封装在另一个类（如 SafeKubeJSCaller）中
+            SafeKubeJSCaller.fireEvent(offers, hero);
         }
         // -------------------------------------
 
