@@ -1,6 +1,3 @@
-Here is the English translation for your `README.md`. I have formatted it to match standard GitHub conventions while preserving your mod's unique lore and mechanics.
-
----
 
 # Herobrine Companion
 
