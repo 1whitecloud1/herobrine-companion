@@ -1,5 +1,5 @@
-[! [English](https://img.shields.io/badge/lang-English-blue)](./README_en_us.md)
-[! [简体中文](https://img.shields.io/badge/lang-简体中文-red)](./README.md)
+[![English](https://img.shields.io/badge/lang-English-blue)](./README_en_us.md)
+[![简体中文](https://img.shields.io/badge/lang-简体中文-red)](./README.md)
 
 # Herobrine Companion
 
