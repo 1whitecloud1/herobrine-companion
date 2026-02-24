@@ -1,4 +1,4 @@
-
+[![Bilibili](https://img.shields.io/badge/Bilibili-FB7299?logo=bilibili&logoColor=white)](https://space.bilibili.com/12857266)
 # Herobrine Companion
 
 ## Getting Started
