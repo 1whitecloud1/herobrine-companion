@@ -55,9 +55,9 @@ Herobrine Companion 深度集成了 JEI 与 KubeJS。在 JEI 中你可以直接�
 通过 KubeJS 脚本，整合包作者可以动态修改奖励与交易，实现高度自定义。
 KubeJS示例：
 
-HerobrineCompanionEvents.registerTrades(event => {
-    console.info('HerobrineCompanion: Registering custom trades via KubeJS...')
 
+    HerobrineCompanionEvents.registerTrades(event => {
+    console.info('HerobrineCompanion: Registering custom trades via KubeJS...')
     // 移除所有默认交易 (可选)
     // event.removeAll()
 
@@ -72,9 +72,10 @@ HerobrineCompanionEvents.registerTrades(event => {
     // 或者直接调用方法 event.getTrustLevel()
     if (event.getTrustLevel() >= 50) {
         event.add('minecraft:dirt', 'minecraft:nether_star')
-    }
-})
-HerobrineCompanionEvents.registerRewards(event => {
+        }
+     })
+
+    HerobrineCompanionEvents.registerRewards(event => {
     // 1. 修改现有奖励 (ID 2 是钻石奖励)
     event.modify(2, reward => {
         // 修改需要的信任值
@@ -92,7 +93,7 @@ HerobrineCompanionEvents.registerRewards(event => {
 
     // 3. 添加一个全新的奖励
     event.add(100, 10, 'minecraft:nether_star', '3x minecraft:diamond_block')
-})
+    })
 
 ## 📜 背景故事搜集
 
