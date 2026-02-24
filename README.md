@@ -169,6 +169,6 @@ herobrine信任度达到2奖励页面领取
 
 感谢gemini提供代码支持，vibe coding
 
-## 支持
+## 问题
 
-如果你在使用过程中遇到问题，请在 GitHub Issues 中提交反馈。
+如果你在使用过程中遇到问题，请在 GitHub Issues 中提交反馈或加入qq群[![QQ群](https://img.shields.io/badge/QQ群-加入探讨-12B7F5?logo=qq&logoColor=white)](https://qm.qq.com/q/RSwFYl8Je)。
