@@ -32,7 +32,7 @@ Herobrine 能与玩家进行真正意义上的对话。如果你配置了云端�
 .minecraft/run/config/herobrine_companion/herobrine_companion_ai.json，如图
 使用任意提供AI 的API的网站
 比如部分的免费的七牛云 https://s.qiniu.com/BRBNf2
-注册，在https://portal.qiniu.com/ai-inference/api-key获得API key
+注册，在https://portal.qiniu.com/ai-inference/api-key   获得API key
 
 复制到 aiApiKey里
 
