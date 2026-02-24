@@ -27,7 +27,19 @@ Herobrine 拥有动态的心态系统，会根据你的行为在多种心态间�
 ## 智能对话系统
 Herobrine 能与玩家进行真正意义上的对话。如果你配置了云端服务（支持 deepseek等， 兼容 API），他将接入自然大语言模型，实现自由的交谈，并记住你们之前的聊天内容。若没有网络，内置的本地对话库也会通过关键词匹配回应你的话，数千条预设对话覆盖了各种情境。他还会根据你的活动主动点评：挖矿时、战斗时、生命垂危时，都有可能会与你交流。
 
-云端服务在.minecraft/run/config/herobrine_companion/herobrine_companion_ai.json 配置
+云端服务api配置教程
+打开
+.minecraft/run/config/herobrine_companion/herobrine_companion_ai.json，如图
+使用任意提供AI 的API的网站
+比如部分的免费的七牛云 https://s.qiniu.com/BRBNf2
+注册，在https://portal.qiniu.com/ai-inference/api-key获得API key
+
+复制到 aiApiKey里
+
+如果是七牛云 aiEndpoint 链接可以不动，其余提供AI 的API的网站需要自己填
+
+如果是七牛云 aiModel 可以不动，其余提供AI 的API的网站需要自己填
+aiSystemPrompt 提示词可以按照自己的喜好改
 
 ## 世界异象与探索 
 
