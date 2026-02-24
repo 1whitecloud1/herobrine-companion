@@ -101,7 +101,7 @@ public class LoreFragmentItem extends Item {
                     playerData.putInt("HeroPendingTrustReward", currentReward + 20);
                 }
 
-                // 消耗物品
+                // 消耗物品 (即使是创造模式也消耗，防止刷屏)
                 fragmentStack.shrink(1);
             }
             return InteractionResultHolder.sidedSuccess(fragmentStack, level.isClientSide());
@@ -114,15 +114,18 @@ public class LoreFragmentItem extends Item {
     }
 
     private Optional<ItemStack> findHandbook(Player player) {
-        if (player.getMainHandItem().is(HerobrineCompanion.LORE_HANDBOOK.get())) {
+        // 优先检查主手和副手
+        if (player.getMainHandItem().getItem() == HerobrineCompanion.LORE_HANDBOOK.get()) {
             return Optional.of(player.getMainHandItem());
         }
-        if (player.getOffhandItem().is(HerobrineCompanion.LORE_HANDBOOK.get())) {
+        if (player.getOffhandItem().getItem() == HerobrineCompanion.LORE_HANDBOOK.get()) {
             return Optional.of(player.getOffhandItem());
         }
+        
+        // 然后检查背包
         for (int i = 0; i < player.getInventory().getContainerSize(); ++i) {
             ItemStack stack = player.getInventory().getItem(i);
-            if (stack.is(HerobrineCompanion.LORE_HANDBOOK.get())) {
+            if (stack.getItem() == HerobrineCompanion.LORE_HANDBOOK.get()) {
                 return Optional.of(stack);
             }
         }

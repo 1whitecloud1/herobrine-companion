@@ -1,10 +1,12 @@
 package com.whitecloud233.modid.herobrine_companion.item;
 
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.modid.herobrine_companion.entity.logic.HeroDataHandler;
 import com.whitecloud233.modid.herobrine_companion.entity.logic.HeroLogic;
 import com.whitecloud233.modid.herobrine_companion.event.ModEvents;
 import com.whitecloud233.modid.herobrine_companion.world.inventory.HeroContractMenu;
 import com.whitecloud233.modid.herobrine_companion.world.structure.ModStructures;
+import com.whitecloud233.modid.herobrine_companion.util.EndRingContext;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
@@ -37,6 +39,7 @@ import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.Collections;
 import java.util.Random;
+import java.util.UUID;
 
 public class HeroSummonItem extends Item {
     
@@ -130,19 +133,67 @@ public class HeroSummonItem extends Item {
                     existingHero.setInvitedPos(null);
                     existingHero.setInvitedAction(0);
 
-                    existingHero.teleportTo(serverLevel, targetPos.x, targetPos.y, targetPos.z, Collections.emptySet(), existingHero.getYRot(), existingHero.getXRot());
-                    existingHero.getNavigation().stop();
-                    existingHero.setTarget(null);
-                    level.playSound(null, context.getClickedPos(), SoundEvents.ENDERMAN_TELEPORT, SoundSource.PLAYERS, 1.0f, 1.0f);
-                    if (player != null) {
-                        player.sendSystemMessage(Component.translatable("message.herobrine_companion.hero_teleported"));
-                        setLastUseTime(stack, currentTime);
+                    // [修复] 跨维度传送逻辑
+                    if (existingHero.level().dimension() != serverLevel.dimension()) {
+                        // 1. 保存旧实体数据
+                        CompoundTag heroData = new CompoundTag();
+                        existingHero.saveWithoutId(heroData);
+                        HeroDataHandler.updateGlobalTrust(existingHero); // 确保信任度保存
+                        existingHero.discard(); // 销毁旧实体
+
+                        // 2. 在新维度创建新实体
+                        HeroEntity newHero = ModEvents.HERO.get().create(serverLevel);
+                        if (newHero != null) {
+                            // 清洗 UUID
+                            if (heroData.contains("UUID")) heroData.remove("UUID");
+                            if (heroData.contains("UUIDMost")) heroData.remove("UUIDMost");
+                            if (heroData.contains("UUIDLeast")) heroData.remove("UUIDLeast");
+
+                            newHero.load(heroData);
+                            newHero.moveTo(targetPos.x, targetPos.y, targetPos.z, existingHero.getYRot(), existingHero.getXRot());
+                            newHero.setUUID(UUID.randomUUID());
+                            
+                            // 添加特权标签，防止被误杀
+                            newHero.addTag(EndRingContext.TAG_RESPAWNED_SAFE);
+                            
+                            // 确保信任度同步
+                            HeroDataHandler.syncGlobalTrust(newHero);
+
+                            serverLevel.addFreshEntity(newHero);
+                            
+                            if (player != null) {
+                                player.sendSystemMessage(Component.translatable("message.herobrine_companion.hero_teleported"));
+                                setLastUseTime(stack, currentTime);
+                            }
+                        }
+                    } else {
+                        // 同维度传送
+                        existingHero.teleportTo(serverLevel, targetPos.x, targetPos.y, targetPos.z, Collections.emptySet(), existingHero.getYRot(), existingHero.getXRot());
+                        existingHero.getNavigation().stop();
+                        existingHero.setTarget(null);
+                        
+                        if (player != null) {
+                            player.sendSystemMessage(Component.translatable("message.herobrine_companion.hero_teleported"));
+                            setLastUseTime(stack, currentTime);
+                        }
                     }
+
+                    level.playSound(null, context.getClickedPos(), SoundEvents.ENDERMAN_TELEPORT, SoundSource.PLAYERS, 1.0f, 1.0f);
+                    
                 } else {
+                    // 召唤新 Hero
                     HeroEntity hero = ModEvents.HERO.get().create(serverLevel);
                     if (hero != null) {
                         hero.moveTo(targetPos);
                         hero.finalizeSpawn(serverLevel, serverLevel.getCurrentDifficultyAt(hero.blockPosition()), MobSpawnType.TRIGGERED, null, null);
+                        
+                        // [修复] 绑定主人并同步信任度
+                        if (player != null) {
+                            hero.setOwnerUUID(player.getUUID());
+                            HeroDataHandler.restoreTrustFromPlayer(hero); // 恢复信任度
+                            HeroDataHandler.syncGlobalTrust(hero);
+                        }
+
                         serverLevel.addFreshEntity(hero);
                         
                         if (player != null) {
@@ -202,6 +253,8 @@ public class HeroSummonItem extends Item {
     }
 
     private HeroEntity findHeroInAnyDimension(net.minecraft.server.MinecraftServer server) {
+        // 优先查找当前维度的实体，避免不必要的遍历
+        // 但由于我们需要"AnyDimension"，所以还是得遍历所有 level
         for (ServerLevel level : server.getAllLevels()) {
             var entities = level.getEntities(ModEvents.HERO.get(), entity -> true);
             if (!entities.isEmpty()) {

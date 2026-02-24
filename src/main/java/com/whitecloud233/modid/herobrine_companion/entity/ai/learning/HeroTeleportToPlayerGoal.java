@@ -30,6 +30,9 @@ public class HeroTeleportToPlayerGoal extends Goal {
     public boolean canUse() {
         // [新增] 如果正在骑乘 (比如在船上)，禁止传送，防止下车
         if (this.hero.isPassenger()) return false;
+        
+        // [新增] 如果正在交易，禁止传送
+        if (this.hero.getTradingPlayer() != null) return false;
 
         if (this.cooldown > 0) {
             this.cooldown--;
@@ -158,6 +161,8 @@ public class HeroTeleportToPlayerGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
+        // [新增] 如果正在交易，立即停止
+        if (this.hero.getTradingPlayer() != null) return false;
         return this.isStaring && this.stareTimer > 0 && this.targetPlayer != null && this.targetPlayer.isAlive();
     }
 

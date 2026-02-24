@@ -15,6 +15,8 @@ public class HeroSwitchStateGoal extends Goal {
     @Override
     public boolean canUse() {
         if (this.hero.isCompanionMode()) return false;
+        // [新增] 如果正在交易，禁止切换状态
+        if (this.hero.getTradingPlayer() != null) return false;
 
         if (this.cooldown > 0) {
             this.cooldown--;
@@ -25,6 +27,8 @@ public class HeroSwitchStateGoal extends Goal {
     
     @Override
     public boolean canContinueToUse() {
+        // [新增] 如果正在交易，禁止继续
+        if (this.hero.getTradingPlayer() != null) return false;
         return !this.hero.isCompanionMode() && super.canContinueToUse();
     }
     

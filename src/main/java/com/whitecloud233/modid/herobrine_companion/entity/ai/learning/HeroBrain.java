@@ -176,6 +176,9 @@ public class HeroBrain {
         // 【低频执行区】
         // ==========================================
         if (hero.tickCount % 20 != 0) return;
+        
+        // [新增] 如果正在交易，禁止执行任何状态行为 (除了上面的方块修复)
+        if (hero.getTradingPlayer() != null) return;
 
         switch (state) {
             case OBSERVER -> {

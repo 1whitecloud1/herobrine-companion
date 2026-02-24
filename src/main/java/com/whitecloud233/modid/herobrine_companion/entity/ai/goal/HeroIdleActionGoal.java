@@ -66,6 +66,11 @@ public class HeroIdleActionGoal extends Goal {
         if (this.hero.getInvitedPos() != null) {
             return false;
         }
+        
+        // [新增] 如果正在交易，不执行
+        if (this.hero.getTradingPlayer() != null) {
+            return false;
+        }
 
         // [修改] 提高触发概率：
         return this.hero.getRandom().nextInt(1500) == 0;
@@ -130,6 +135,10 @@ public class HeroIdleActionGoal extends Goal {
     public boolean canContinueToUse() {
         // [新增] 如果中途进入邀请状态，立即停止
         if (this.hero.getInvitedPos() != null) {
+            return false;
+        }
+        // [新增] 如果正在交易，立即停止
+        if (this.hero.getTradingPlayer() != null) {
             return false;
         }
         return this.idleTime > 0;

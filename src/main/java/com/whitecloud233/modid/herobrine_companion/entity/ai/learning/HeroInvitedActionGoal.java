@@ -59,6 +59,9 @@ public class HeroInvitedActionGoal extends Goal {
     public boolean canUse() {
         BlockPos pos = this.hero.getInvitedPos();
         if (pos == null) return false;
+        
+        // [新增] 如果正在交易，暂时不执行邀请动作
+        if (this.hero.getTradingPlayer() != null) return false;
 
         SimpleNeuralNetwork.MindState state = this.hero.getHeroBrain().getState();
         // 只有在非常不满(JUDGE)时才可能拒绝，且拒绝方式必须高冷
@@ -90,6 +93,9 @@ public class HeroInvitedActionGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
+        // [新增] 如果正在交易，立即停止
+        if (this.hero.getTradingPlayer() != null) return false;
+
         BlockPos currentInvitedPos = this.hero.getInvitedPos();
         if (currentInvitedPos == null || !currentInvitedPos.equals(this.targetPos)) {
             return false;

@@ -7,8 +7,8 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.entity.Entity;
 import net.minecraftforge.network.NetworkEvent;
+import net.minecraftforge.network.NetworkHooks;
 
-import java.util.OptionalInt;
 import java.util.function.Supplier;
 
 public class OpenTradePacket {
@@ -35,15 +35,30 @@ public class OpenTradePacket {
 
                 if (entity instanceof HeroEntity hero) {
                     if (player.distanceToSqr(hero) < 64.0D) {
-                        hero.setTradingPlayer(player);
-                        hero.getOffers(); // Ensure offers are generated
-                        
-                        // Open the menu and capture the container ID
-                        OptionalInt containerId = player.openMenu(new SimpleMenuProvider((id, inventory, p) -> new HeroMerchantMenu(id, inventory, hero), hero.getDisplayName()));
-                        
-                        // CRITICAL FIX: Send the merchant offers to the client immediately after opening the menu
-                        if (containerId.isPresent()) {
-                            player.sendMerchantOffers(containerId.getAsInt(), hero.getOffers(), 1, hero.getVillagerXp(), hero.showProgressBar(), hero.canRestock());
+
+                        // 获取交易列表（此时已修复了 KubeJS 导致的崩溃）
+                        net.minecraft.world.item.trading.MerchantOffers offers = hero.getOffers();
+
+                        // 判空保护，防止列表为空时导致客户端卡死
+                        if (offers == null || offers.isEmpty()) {
+                            hero.setTradingPlayer(null);
+                            return;
+                        }
+
+                        // 使用 Forge 的 NetworkHooks 打开自定义菜单，并附带必要的 Buffer
+                        NetworkHooks.openScreen(player, new SimpleMenuProvider(
+                                (id, inventory, p) -> new HeroMerchantMenu(id, inventory, hero),
+                                hero.getDisplayName()
+                        ), buf -> {
+                            buf.writeInt(hero.getId());
+                        });
+
+                        // 菜单成功打开后，再绑定玩家并同步商品，完美避开闪退 Bug
+                        if (player.containerMenu instanceof HeroMerchantMenu) {
+                            hero.setTradingPlayer(player);
+                            player.sendMerchantOffers(player.containerMenu.containerId, offers, 1, hero.getVillagerXp(), hero.showProgressBar(), hero.canRestock());
+                        } else {
+                            hero.setTradingPlayer(null);
                         }
                     }
                 }

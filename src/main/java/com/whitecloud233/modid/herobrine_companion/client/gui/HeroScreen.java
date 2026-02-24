@@ -209,7 +209,9 @@ public class HeroScreen extends Screen {
 
         this.actionList.addAction(Component.translatable("gui.herobrine_companion.trade"), button -> {
             PacketHandler.sendToServer(new OpenTradePacket(this.entityId));
-            this.onClose();
+            // [修复] 不要在这里关闭屏幕！
+            // this.onClose(); 
+            // 让服务端打开新菜单时自动覆盖当前屏幕
         }, Tooltip.create(Component.translatable("gui.herobrine_companion.trade_tooltip")));
         // [新增] 委托按钮
         this.actionList.addAction(Component.translatable("gui.herobrine_companion.requests"), button -> {

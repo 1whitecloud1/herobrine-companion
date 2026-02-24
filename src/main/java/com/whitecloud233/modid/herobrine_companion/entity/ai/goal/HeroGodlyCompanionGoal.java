@@ -39,6 +39,9 @@ public class HeroGodlyCompanionGoal extends Goal {
     @Override
     public boolean canUse() {
         if (!this.hero.isCompanionMode()) return false;
+        // [新增] 如果正在交易，禁止跟随移动
+        if (this.hero.getTradingPlayer() != null) return false;
+
         Player player = this.hero.level().getNearestPlayer(this.hero, 64.0D);
         if (player == null) return false;
         this.owner = player;
@@ -48,6 +51,9 @@ public class HeroGodlyCompanionGoal extends Goal {
     @Override
     public boolean canContinueToUse() {
         if (!this.hero.isCompanionMode()) return false;
+        // [新增] 如果正在交易，立即停止跟随
+        if (this.hero.getTradingPlayer() != null) return false;
+
         if (this.owner == null || !this.owner.isAlive()) return false;
         // [修复] 当距离足够近时，停止该 Goal，允许 IdleGoal 执行
         return this.hero.distanceToSqr(this.owner) > (FOLLOW_DISTANCE * FOLLOW_DISTANCE);

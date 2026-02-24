@@ -44,26 +44,22 @@ public class HeroLogic {
 
     private static void serverTick(HeroEntity hero) {
         // 1. 唯一性检查
-        // [修复] 延迟检查到 Tick 20，避免世界加载初期的不稳定性导致误杀
         if (hero.tickCount == 20) {
             HeroLifecycleHandler.checkUniqueness(hero);
-            // [修复] 只有在全新生成（非读取）时才执行初始化
-            if (!hero.isLoadedFromDisk()) {
-                if (hero.getOwnerUUID() == null) {
-                    // 如果刚生成时没有主人（例如通过召唤物生成），立刻寻找玩家认主并恢复数据
-                    findAndSetOwner(hero);
-                } else {
-                    // 如果生成时自带主人，直接恢复数据
-                    HeroDataHandler.restoreTrustFromPlayer(hero);
-                }
+            // [修复] 只有在全新生成（非读取）时，才从全局同步数据，防止覆盖存档原有数据
+            if (!hero.isLoadedFromDisk() && hero.getOwnerUUID() != null) {
+                HeroDataHandler.restoreTrustFromPlayer(hero);
             }
         }
+        
+        // [新增] 持续性唯一性检查 (每5秒检查一次，防止跨维度传送后旧实体未清除)
+        if (hero.tickCount % 100 == 0) {
+            HeroLifecycleHandler.checkUniqueness(hero);
+        }
 
-        // [修复] 自动绑定 Owner 逻辑
+        // 2. 自动绑定逻辑
         if (hero.getOwnerUUID() == null) {
-            // 如果是刚从磁盘加载的 (loadedFromDisk)，则在它“存活”至少 600 tick (30秒) 之前，禁止自动认主。
-            // 这样可以给 NBT 数据同步留出足够的时间，防止因为读取延迟而错误地将路人认作主人。
-            // 如果是刷怪蛋新生成的 (!loadedFromDisk)，则在 20 tick 后即可认主。
+            // 如果是从磁盘加载的(isLoadedFromDisk)，且 tick 小于 600 (30秒)，则禁止自动绑定
             boolean isFreshSpawn = !hero.isLoadedFromDisk();
             boolean safeToBind = isFreshSpawn ? (hero.tickCount > 20) : (hero.tickCount > 600);
 
