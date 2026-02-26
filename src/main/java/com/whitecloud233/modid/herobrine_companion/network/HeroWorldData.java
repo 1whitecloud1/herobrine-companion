@@ -37,7 +37,7 @@ public class HeroWorldData extends SavedData {
     private final Map<UUID, PlayerProfile> playerProfiles = new HashMap<>();
 
     private long respawnReadyTime = 0;
-    private boolean useHerobrineSkin = false;
+    private boolean useHerobrineSkin = true;
     private CompoundTag tempBrainData = null;
 
     @Override

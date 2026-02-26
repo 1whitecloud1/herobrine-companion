@@ -370,7 +370,7 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         this.entityData.define(IS_FLOATING, true);
         this.entityData.define(TRUST_LEVEL, 0);
         this.entityData.define(IS_COMPANION_MODE, false);
-        this.entityData.define(USE_HEROBRINE_SKIN, false);
+        this.entityData.define(USE_HEROBRINE_SKIN, true);
         this.entityData.define(OWNER_UUID, Optional.empty());
         this.entityData.define(INVITED_POS, Optional.empty());
         this.entityData.define(INVITED_ACTION, 0);
