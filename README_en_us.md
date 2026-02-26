@@ -51,6 +51,19 @@ If you are offline, the built-in local dialogue library will respond to your mes
 
 *Cloud services are configured in `.minecraft/run/config/herobrine_companion/herobrine_companion_ai.json`.*
 
+After connecting to AI(cloud service), Herobrine's interaction capabilities have seen a tremendous improvement: Cheat Mode Requirement: Herobrine can only use commands to assist players if cheat mode is enabled.
+
+Companionship and Teleportation: Players can now directly ask Herobrine to follow them.
+
+Location Search and Cross-Dimensional Teleportation: Players can have him teleport them to other dimensions (such as the Nether). Additionally, he can now accurately locate and provide coordinates for specific biomes and vanilla structures, and will offer precise exclusive coordinates when players are searching for "unstable regions."
+
+Item and Structure Generation: Players can request specific items from him through dialogue. Moreover, he can now generate vanilla houses, large villages, or system-preset exclusive structures near the player, and can even place command blocks out of thin air.
+
+Game Rule and Environment Control: Supports directly modifying the current world's time and weather, enabling keepInventory, or instantly growing crops by adjusting the tick speed—all through dialogue.
+
+Player Game Mode Control: Herobrine now has the authority to modify the player's game mode. Based on the context of the conversation, he can switch the player to Creative, Survival, or Spectator mode.
+
+Punishment and Trial Mechanism: When the player's words provoke him, he can punish them with lightning strikes, high-altitude teleportation, or summoning massive thunderstorms; he can also summon monsters or strengthen hostile mobs around the player at any time to create trials.
 ## World Anomalies & Exploration
 
 While exploring the Overworld, you might stumble upon **Unstable Zones**—terrain replaced by exotic blocks like Netherrack and Soul Soil, haunted by Phantom creatures. These Phantom Zombies, Phantom Creepers, and Phantom Skeletons drop special items upon death, which can be used to trade with Herobrine.
