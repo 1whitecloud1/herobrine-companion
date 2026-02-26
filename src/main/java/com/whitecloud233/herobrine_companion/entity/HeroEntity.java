@@ -167,7 +167,7 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         builder.define(OWNER_UUID, Optional.empty());
         builder.define(INVITED_POS, Optional.empty());
         builder.define(INVITED_ACTION, 0);
-        builder.define(SKIN_VARIANT, SKIN_AUTO);
+        builder.define(SKIN_VARIANT, SKIN_HEROBRINE);
         builder.define(CLAIMED_REWARDS_FLAGS, 0);
         builder.define(MIND_STATE, 0);
         builder.define(INSPECTING_SCYTHE, false);

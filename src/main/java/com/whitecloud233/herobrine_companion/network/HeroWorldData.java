@@ -22,7 +22,8 @@ public class HeroWorldData extends SavedData {
     private int legacyGlobalTrust = -1;
     private int legacyClaimedRewards = 0;
 
-    private int globalSkinVariant = 0;
+    // [修改] 默认皮肤状态改为 Herobrine (2)
+    private int globalSkinVariant = 2;
     private CompoundTag tempBrainData = null;
 
     public static class PlayerProfile {
