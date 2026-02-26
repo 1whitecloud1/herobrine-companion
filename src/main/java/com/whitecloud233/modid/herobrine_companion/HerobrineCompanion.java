@@ -8,7 +8,7 @@ import com.whitecloud233.modid.herobrine_companion.client.render.IrisPatcher;
 import com.whitecloud233.modid.herobrine_companion.compat.KubeJS.HerobrineCompanionKubeJSPlugin;
 import com.whitecloud233.modid.herobrine_companion.config.Config;
 import com.whitecloud233.modid.herobrine_companion.config.ConfigScreen;
-import com.whitecloud233.modid.herobrine_companion.entity.ai.AIConfig;
+import com.whitecloud233.modid.herobrine_companion.client.service.LLMConfig;
 import com.whitecloud233.modid.herobrine_companion.event.ModEvents;
 import com.whitecloud233.modid.herobrine_companion.item.*;
 import com.whitecloud233.modid.herobrine_companion.loot.AddItemModifier;
@@ -152,7 +152,7 @@ public class HerobrineCompanion {
 
         MinecraftForge.EVENT_BUS.register(this);
 
-        AIConfig.load();
+        LLMConfig.load();
 
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, Config.SPEC);
 
