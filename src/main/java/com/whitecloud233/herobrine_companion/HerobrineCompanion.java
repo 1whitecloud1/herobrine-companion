@@ -8,7 +8,7 @@ import com.whitecloud233.herobrine_companion.config.ConfigScreen;
 import com.whitecloud233.herobrine_companion.client.render.IrisPatcher;
 import com.whitecloud233.herobrine_companion.config.Config;
 import com.whitecloud233.herobrine_companion.datagen.DataGenerators;
-import com.whitecloud233.herobrine_companion.entity.ai.LLMConfig;
+import com.whitecloud233.herobrine_companion.client.service.LLMConfig;
 import com.whitecloud233.herobrine_companion.event.ModEvents;
 import com.whitecloud233.herobrine_companion.item.*;
 import com.whitecloud233.herobrine_companion.loot.AddItemModifier;

@@ -24,18 +24,20 @@ public class ClientHooks {
         currentMode = ChatMode.NONE;
     }
 
+    // 👇 【新增】：彻底重置所有状态的方法
+    public static void resetAll() {
+        currentMode = ChatMode.NONE;
+        apiEnabled = false; // 强行重置回本地模式
+    }
+
     public static ChatMode getChatMode() {
         return currentMode;
     }
-    
+
     public static boolean isApiEnabled() {
         return apiEnabled;
     }
-    
-    public static void setApiEnabled(boolean enabled) {
-        apiEnabled = enabled;
-    }
-    
+
     public static void toggleApiEnabled() {
         apiEnabled = !apiEnabled;
     }
