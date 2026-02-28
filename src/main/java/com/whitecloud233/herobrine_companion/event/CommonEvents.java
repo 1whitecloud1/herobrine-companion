@@ -1,12 +1,15 @@
 package com.whitecloud233.herobrine_companion.event;
 
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.herobrine_companion.entity.ai.learning.HeroBrain;
 import com.whitecloud233.herobrine_companion.entity.logic.HeroQuestHandler;
 import com.whitecloud233.herobrine_companion.entity.logic.HeroSpawner;
 import com.whitecloud233.herobrine_companion.entity.logic.GlitchVillagerSpawner;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.portal.DimensionTransition;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
@@ -17,8 +20,8 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 import java.util.Set;
 import java.util.UUID;
 
-// 注意：这里是 Bus.GAME，不是 Bus.MOD
-@EventBusSubscriber(modid = HerobrineCompanion.MODID, bus = EventBusSubscriber.Bus.GAME)
+// 1.21.1 修复：移除 bus 参数，默认为 GAME
+@EventBusSubscriber(modid = HerobrineCompanion.MODID)
 public class CommonEvents {
 
     // 创建一个静态的生成器实例
@@ -77,6 +80,19 @@ public class CommonEvents {
     public static void onPlayerTick(PlayerTickEvent.Post event) {
         if (event.getEntity() instanceof ServerPlayer player) {
             HeroQuestHandler.tickPacifyQuest(player);
+        }
+    }
+
+    private static void checkAndTeleportHero(ServerPlayer player) {
+        // 遍历全局活跃的 Hero 列表
+        for (HeroEntity hero : HeroBrain.ACTIVE_HEROES) {
+            // 找到属于该玩家且处于陪伴模式的 Hero
+            if (hero.isCompanionMode() && hero.getOwnerUUID() != null && hero.getOwnerUUID().equals(player.getUUID())) {
+
+                hero.teleportTo(player.getX(), player.getY(), player.getZ());
+                // 找到一个就退出，避免多重处理
+                return;
+            }
         }
     }
 }

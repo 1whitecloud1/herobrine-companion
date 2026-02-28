@@ -61,6 +61,19 @@ public class HeroDataHandler {
      * [Deprecated] 现在使用 HeroWorldData，此方法仅用于兼容旧存档迁移
      */
     public static void restoreTrustFromPlayer(HeroEntity hero) {
-        // No-op or migration logic if needed
+        if (hero.level() instanceof ServerLevel serverLevel) {
+            UUID ownerUUID = hero.getOwnerUUID();
+            if (ownerUUID == null) return;
+
+            HeroWorldData data = HeroWorldData.get(serverLevel);
+            int trust = data.getTrust(ownerUUID);
+            
+            // 同步到实体
+            hero.setTrustLevel(trust);
+            
+            // 同步奖励状态
+            int[] rewards = data.getClaimedRewards(ownerUUID);
+            hero.setClaimedRewards(rewards);
+        }
     }
 }

@@ -26,6 +26,9 @@ public class HeroWorldData extends SavedData {
     private int globalSkinVariant = 2;
     private CompoundTag tempBrainData = null;
 
+    // [新增] 记录全局唯一的活跃 Hero UUID
+    private UUID activeHeroUUID = null;
+
     public static class PlayerProfile {
         private int trustLevel = 0;
         private int claimedRewardsFlags = 0;
@@ -71,6 +74,10 @@ public class HeroWorldData extends SavedData {
             compound.putInt("GlobalTrust", this.legacyGlobalTrust);
             compound.putInt("ClaimedRewardsFlags", this.legacyClaimedRewards);
         }
+
+        if (this.activeHeroUUID != null) {
+            compound.putUUID("ActiveHeroUUID", this.activeHeroUUID);
+        }
         
         return compound;
     }
@@ -115,6 +122,10 @@ public class HeroWorldData extends SavedData {
         
         if (compound.contains("TempBrainData")) {
             data.tempBrainData = compound.getCompound("TempBrainData");
+        }
+
+        if (compound.hasUUID("ActiveHeroUUID")) {
+            data.activeHeroUUID = compound.getUUID("ActiveHeroUUID");
         }
         
         return data;
@@ -215,6 +226,17 @@ public class HeroWorldData extends SavedData {
     
     public void setTempBrainData(CompoundTag data) {
         this.tempBrainData = data;
+        this.setDirty();
+    }
+
+    // --- Active Hero API ---
+
+    public UUID getActiveHeroUUID() {
+        return this.activeHeroUUID;
+    }
+
+    public void setActiveHeroUUID(UUID uuid) {
+        this.activeHeroUUID = uuid;
         this.setDirty();
     }
 

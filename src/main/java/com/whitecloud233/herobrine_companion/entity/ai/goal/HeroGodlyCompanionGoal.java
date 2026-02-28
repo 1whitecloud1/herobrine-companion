@@ -8,26 +8,25 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.EnumSet;
-
 public class HeroGodlyCompanionGoal extends Goal {
     private final HeroEntity hero;
     private final double speedModifier;
     private Player owner;
-    
+
     // 参数配置
-    private static final double HOVER_HEIGHT_AIR = 2.0D;    
-    private static final double FOLLOW_DISTANCE = 3.5D;     
-    
+    private static final double HOVER_HEIGHT_AIR = 2.0D;
+    private static final double FOLLOW_DISTANCE = 3.5D;
+
     // [修复] 落地阈值稍微调高一点点，更容易触发
-    private static final double LANDING_THRESHOLD = 0.8D; 
+    private static final double LANDING_THRESHOLD = 0.8D;
 
     private int teleportCooldown;
-    
+
     // 柔性跟随参数
-    private float randomOffset;      
-    private float currentOrbitAngle; 
-    private float targetOrbitAngle;  
-    
+    private float randomOffset;
+    private float currentOrbitAngle;
+    private float targetOrbitAngle;
+
     private int changePositionTimer;
 
     public HeroGodlyCompanionGoal(HeroEntity hero, double speed) {
@@ -39,6 +38,9 @@ public class HeroGodlyCompanionGoal extends Goal {
     @Override
     public boolean canUse() {
         if (!this.hero.isCompanionMode()) return false;
+        // [新增] 如果正在交易，禁止跟随移动
+        if (this.hero.getTradingPlayer() != null) return false;
+
         Player player = this.hero.level().getNearestPlayer(this.hero, 64.0D);
         if (player == null) return false;
         this.owner = player;
@@ -48,6 +50,9 @@ public class HeroGodlyCompanionGoal extends Goal {
     @Override
     public boolean canContinueToUse() {
         if (!this.hero.isCompanionMode()) return false;
+        // [新增] 如果正在交易，立即停止跟随
+        if (this.hero.getTradingPlayer() != null) return false;
+
         if (this.owner == null || !this.owner.isAlive()) return false;
         // [修复] 当距离足够近时，停止该 Goal，允许 IdleGoal 执行
         return this.hero.distanceToSqr(this.owner) > (FOLLOW_DISTANCE * FOLLOW_DISTANCE);
@@ -59,7 +64,7 @@ public class HeroGodlyCompanionGoal extends Goal {
         // 初始默认飞行，由 tick 修正
         this.hero.setNoGravity(true);
         this.hero.setFloating(true);
-        
+
         pickNewRandomPosition();
         this.targetOrbitAngle = this.owner.yBodyRot;
         this.currentOrbitAngle = this.targetOrbitAngle;
@@ -68,7 +73,6 @@ public class HeroGodlyCompanionGoal extends Goal {
     @Override
     public void stop() {
         this.owner = null;
-        this.hero.getNavigation().stop(); // 停止时清除导航路径
         this.hero.setDeltaMovement(Vec3.ZERO);
     }
 
@@ -92,8 +96,6 @@ public class HeroGodlyCompanionGoal extends Goal {
         // 既然身体已经转过去了，头部只需要很小的调整
         // 增加垂直转动速度 (40.0F) 以应对高度变化，水平速度 (30.0F) 保持平滑
         this.hero.getLookControl().setLookAt(this.owner, 30.0F, 40.0F);
-
-
         double distToOwnerSqr = this.hero.distanceToSqr(this.owner);
         if (distToOwnerSqr > 400.0D) {
             if (this.teleportCooldown-- <= 0) {
@@ -102,23 +104,23 @@ public class HeroGodlyCompanionGoal extends Goal {
             }
             return;
         }
-        
+
         boolean isOwnerMoving = this.owner.getDeltaMovement().horizontalDistanceSqr() > 0.001;
         if (!isOwnerMoving && --this.changePositionTimer <= 0) {
             pickNewRandomPosition();
         }
 
-        // 2. 计算角度
+        // 1. 计算角度
         updateTargetAngle(isOwnerMoving);
         this.currentOrbitAngle = rotlerp(this.currentOrbitAngle, this.targetOrbitAngle, 1.5F);
 
-        // 3. 计算目标位置
+        // 2. 计算目标位置
         Vec3 targetPos = calculateTargetPos(this.currentOrbitAngle);
-        
-        // === 4. 核心修复：状态切换判定 ===
+
+        // === 3. 核心修复：状态切换判定 ===
         double heightDiff = this.hero.getY() - targetPos.y; // 正数表示 Hero 在目标上方
         boolean ownerIsFlying = !this.owner.onGround() && this.owner.getAbilities().flying;
-        
+
         // 如果高度差 > 阈值，或者玩家在飞，则保持飞行
         boolean shouldFly = ownerIsFlying || heightDiff > LANDING_THRESHOLD;
 
@@ -129,14 +131,14 @@ public class HeroGodlyCompanionGoal extends Goal {
             this.hero.getNavigation().stop();
         }
 
-        // === 5. 移动逻辑修复 ===
+        // === 4. 移动逻辑修复 ===
         // 分别计算水平距离和垂直距离，不要混在一起
         double dx = this.hero.getX() - targetPos.x;
         double dz = this.hero.getZ() - targetPos.z;
         double distHorizontalSqr = dx * dx + dz * dz;
-        
+
         double speed = this.speedModifier;
-        if (distHorizontalSqr > 25.0D) speed *= 1.5D; 
+        if (distHorizontalSqr > 25.0D) speed *= 1.5D;
 
         if (this.hero.isFloating()) {
             // [飞行状态]
@@ -174,22 +176,22 @@ public class HeroGodlyCompanionGoal extends Goal {
 
     private Vec3 calculateTargetPos(float angleDegrees) {
         double targetAngleRad = Math.toRadians(angleDegrees);
-        
+
         double tx = this.owner.getX() + Math.sin(-targetAngleRad) * FOLLOW_DISTANCE;
         double tz = this.owner.getZ() + Math.cos(-targetAngleRad) * FOLLOW_DISTANCE;
 
         double targetY;
         if (this.owner.getAbilities().flying || !this.owner.onGround()) {
-            targetY = this.owner.getY() + HOVER_HEIGHT_AIR; 
+            targetY = this.owner.getY() + HOVER_HEIGHT_AIR;
         } else {
             // 目标就是脚底板地面
-            targetY = this.owner.getY(); 
-            
+            targetY = this.owner.getY();
+
             BlockPos blockPos = new BlockPos((int)tx, (int)targetY, (int)tz);
             // 只有当目标点真的是实体方块内部时，才抬高
-            if (this.hero.level().getBlockState(blockPos).isSolid() && 
-                this.hero.level().getBlockState(blockPos.above()).isSolid()) {
-                 targetY = this.owner.getY() + 3.0; 
+            if (this.hero.level().getBlockState(blockPos).isSolid() &&
+                    this.hero.level().getBlockState(blockPos.above()).isSolid()) {
+                targetY = this.owner.getY() + 3.0;
             }
         }
         return new Vec3(tx, targetY, tz);
@@ -197,7 +199,7 @@ public class HeroGodlyCompanionGoal extends Goal {
 
     private void pickNewRandomPosition() {
         this.randomOffset = this.hero.getRandom().nextFloat() * 360.0F;
-        this.changePositionTimer = 400 + this.hero.getRandom().nextInt(200); 
+        this.changePositionTimer = 400 + this.hero.getRandom().nextInt(200);
     }
 
     private void teleportNearOwner() {
@@ -208,7 +210,7 @@ public class HeroGodlyCompanionGoal extends Goal {
         this.hero.teleportTo(target.x, target.y, target.z);
         this.hero.setDeltaMovement(Vec3.ZERO);
     }
-    
+
     protected float rotlerp(float pStart, float pEnd, float pMaxIncrease) {
         float f = Mth.wrapDegrees(pEnd - pStart);
         if (f > pMaxIncrease) f = pMaxIncrease;

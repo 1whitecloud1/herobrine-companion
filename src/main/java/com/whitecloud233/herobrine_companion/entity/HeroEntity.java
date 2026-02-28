@@ -200,6 +200,23 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     public void tick() {
         super.tick();
 
+        // [新增] 持续性唯一性检查 (每秒一次)
+        if (!this.level().isClientSide && this.tickCount % 10 == 0) {
+            HeroWorldData data = HeroWorldData.get((ServerLevel) this.level());
+            UUID activeUUID = data.getActiveHeroUUID();
+            
+            // 如果我是“旧皇”，且“新皇”已经登基（UUID不匹配），我必须死
+            if (activeUUID != null && !activeUUID.equals(this.getUUID())) {
+                this.discard();
+                return; // 立即停止执行后续逻辑
+            }
+            
+            // 如果我是“新皇”，但 WorldData 还没记录我（可能数据丢失），我再次声明主权
+            if (activeUUID == null) {
+                data.setActiveHeroUUID(this.getUUID());
+            }
+        }
+
         // 动画计时器逻辑
         if (this.scytheAnimTick > 0) {
             this.scytheAnimTick--;

@@ -31,6 +31,9 @@ public class HeroTeleportToPlayerGoal extends Goal {
         // [新增] 如果正在骑乘 (比如在船上)，禁止传送，防止下车
         if (this.hero.isPassenger()) return false;
 
+        // [新增] 如果正在交易，禁止传送
+        if (this.hero.getTradingPlayer() != null) return false;
+
         if (this.cooldown > 0) {
             this.cooldown--;
             return false;
@@ -41,7 +44,7 @@ public class HeroTeleportToPlayerGoal extends Goal {
             this.targetPlayer = this.hero.level().getPlayerByUUID(this.hero.getOwnerUUID());
         }
 
-        // 如果没有主人，或者主人不在附近，才找最近的玩家 (可选，或者直接返回 false)
+        // 如果没有主人，或者主人不在附近，才找最近的玩家
         if (this.targetPlayer == null) {
             this.targetPlayer = this.hero.level().getNearestPlayer(this.hero, 64.0D);
         }
@@ -57,6 +60,7 @@ public class HeroTeleportToPlayerGoal extends Goal {
 
         if (canSpookyTeleport) {
             // 恶作剧者状态下，概率翻倍
+            // [修改] 降低触发概率：PRANKSTER 1/100, OBSERVER 1/300
             int chance = (state == SimpleNeuralNetwork.MindState.PRANKSTER) ? 100 : 500;
 
             if (this.hero.tickCount > 60 &&
@@ -69,8 +73,7 @@ public class HeroTeleportToPlayerGoal extends Goal {
 
         // [修改] 正常的跟随传送逻辑 (必须是陪伴模式)
         if (this.hero.isCompanionMode()) {
-            // 触发距离：如果距离太远 (> 25格)，或者玩家传送走了 (距离突然变得非常远)，就触发传送
-            return distSqr > 25.0D * 25.0D; // 超过 25 格就传送
+            return distSqr > 25.0D * 25.0D;
         }
 
         return false;
@@ -158,6 +161,8 @@ public class HeroTeleportToPlayerGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
+        // [新增] 如果正在交易，立即停止
+        if (this.hero.getTradingPlayer() != null) return false;
         return this.isStaring && this.stareTimer > 0 && this.targetPlayer != null && this.targetPlayer.isAlive();
     }
 
@@ -176,6 +181,7 @@ public class HeroTeleportToPlayerGoal extends Goal {
     @Override
     public void stop() {
         this.isStaring = false;
-        this.cooldown = 40; // 2秒冷却
+        // [修改] 增加冷却时间，从 40 ticks (2s) 增加到 200 ticks (10s)
+        this.cooldown = 200;
     }
 }
