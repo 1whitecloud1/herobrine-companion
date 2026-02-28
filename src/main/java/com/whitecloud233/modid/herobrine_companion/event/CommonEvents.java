@@ -12,6 +12,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
@@ -123,6 +124,12 @@ public class CommonEvents {
             if (player.getPersistentData().getBoolean("herobrine_companion.transcendence_permit_active")) {
                 player.getPersistentData().putBoolean("herobrine_companion.transcendence_permit_flying", player.getAbilities().flying);
             }
+        }
+
+        // 检查是否是玩家击杀了实体
+        DamageSource source = event.getSource();
+        if (source.getEntity() instanceof ServerPlayer player) {
+            HeroQuestHandler.onMobKill(player, event.getEntity());
         }
     }
 

@@ -48,6 +48,18 @@ public class HeroRequestScreen extends Screen {
                 null
         ));
 
+        // Cancel Button
+        this.addRenderableWidget(new HeroScreen.ThemedButton(
+                startX + PANEL_WIDTH - 170, startY + PANEL_HEIGHT - 25, 80, 20,
+                Component.translatable("gui.herobrine_companion.request_cancel"),
+                button -> {
+                    // Send packet to cancel the current quest
+                    PacketHandler.sendToServer(new RequestActionPacket(this.entityId, 0, RequestActionPacket.Action.CANCEL));
+                    this.onClose();
+                },
+                null
+        ));
+
         // Back Button
         this.addRenderableWidget(new HeroScreen.ThemedButton(
                 startX + 5, startY + PANEL_HEIGHT - 25, 60, 20,

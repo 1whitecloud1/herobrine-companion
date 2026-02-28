@@ -2,8 +2,10 @@ package com.whitecloud233.modid.herobrine_companion.entity.ai.learning;
 
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.network.HeroWorldData;
+import com.whitecloud233.modid.herobrine_companion.world.structure.ModStructures;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -16,6 +18,8 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.StructureStart;
 
 import java.util.Comparator;
 import java.util.HashMap;
@@ -49,7 +53,7 @@ public class HeroBrain {
 
     public void rememberBrokenBlock(BlockPos pos, BlockState state) {
         long now = hero.level().getGameTime();
-        
+
         // 【防无限掉落/卡顿核心】
         // 如果这个坐标在过去 100 tick (5秒) 内刚刚碎过，说明发生了物理崩塌死循环。
         // 神不屑于做无用功，直接抛弃这个方块的修复。
@@ -61,15 +65,29 @@ public class HeroBrain {
 
         // 将记忆容量大幅提升到 8192，足以容纳核弹级爆炸
         if (brokenBlocksMemory.size() >= 8192) {
-            return; 
+            return;
         }
-        
+
+        // [新增] 如果在 Unstable Zone 内，不记录方块破坏
+        if (hero.level() instanceof ServerLevel serverLevel && isInUnstableZone(serverLevel, pos)) {
+            return;
+        }
+
         brokenBlocksMemory.offer(new BrokenBlockRecord(pos, state, now));
-        
+
         if (hero.getOwnerUUID() != null) {
             getNetwork(hero.getOwnerUUID()).input("ENTROPY", 0.05f);
         }
     }
+
+    private boolean isInUnstableZone(ServerLevel level, BlockPos pos) {
+        Structure structure = level.registryAccess().registryOrThrow(Registries.STRUCTURE).get(ModStructures.UNSTABLE_ZONE_KEY);
+        if (structure == null) return false;
+
+        StructureStart start = level.structureManager().getStructureAt(pos, structure);
+        return start.isValid();
+    }
+
 
     private SimpleNeuralNetwork getNetwork(UUID playerUUID) {
         if (playerUUID == null) return defaultNetwork;
