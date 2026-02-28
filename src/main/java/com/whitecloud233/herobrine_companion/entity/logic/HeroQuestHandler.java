@@ -1,10 +1,7 @@
 package com.whitecloud233.herobrine_companion.entity.logic;
 
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
-import com.whitecloud233.herobrine_companion.entity.GhostCreeperEntity;
-import com.whitecloud233.herobrine_companion.entity.GhostSkeletonEntity;
-import com.whitecloud233.herobrine_companion.entity.GhostZombieEntity;
-import com.whitecloud233.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.herobrine_companion.entity.*;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -106,7 +103,7 @@ public class HeroQuestHandler {
         int questId = data.getInt(TAG_QUEST_ID);
 
         if (questId == QUEST_CLEAR_UNSTABLE_ZONE) {
-            if (killedEntity instanceof GhostZombieEntity || killedEntity instanceof GhostCreeperEntity || killedEntity instanceof GhostSkeletonEntity) {
+            if (killedEntity instanceof GhostZombieEntity || killedEntity instanceof GhostCreeperEntity || killedEntity instanceof GhostSkeletonEntity || killedEntity instanceof GhostSteveEntity) {
                 int progress = data.getInt(TAG_QUEST_PROGRESS) + 1;
                 data.putInt(TAG_QUEST_PROGRESS, progress);
 
