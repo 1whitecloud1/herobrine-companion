@@ -2,8 +2,10 @@ package com.whitecloud233.herobrine_companion.entity.ai.learning;
 
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.network.HeroWorldData;
+import com.whitecloud233.herobrine_companion.world.structure.ModStructures;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -16,6 +18,8 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.StructureStart;
 
 import java.util.Comparator;
 import java.util.HashMap;
@@ -64,11 +68,24 @@ public class HeroBrain {
             return; 
         }
         
+        // [新增] 如果在 Unstable Zone 内，不记录方块破坏
+        if (hero.level() instanceof ServerLevel serverLevel && isInUnstableZone(serverLevel, pos)) {
+            return;
+        }
+        
         brokenBlocksMemory.offer(new BrokenBlockRecord(pos, state, now));
         
         if (hero.getOwnerUUID() != null) {
             getNetwork(hero.getOwnerUUID()).input("ENTROPY", 0.05f);
         }
+    }
+
+    private boolean isInUnstableZone(ServerLevel level, BlockPos pos) {
+        Structure structure = level.registryAccess().registryOrThrow(Registries.STRUCTURE).get(ModStructures.UNSTABLE_ZONE_KEY);
+        if (structure == null) return false;
+
+        StructureStart start = level.structureManager().getStructureAt(pos, structure);
+        return start.isValid();
     }
 
     private SimpleNeuralNetwork getNetwork(UUID playerUUID) {
