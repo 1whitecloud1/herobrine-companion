@@ -58,6 +58,11 @@
   "gui.herobrine_companion.config.restart_required": " (Restart Required)",
   "gui.herobrine_companion.config.restart_note": "* Requires Game Restart to take effect",
 
+  "item.herobrine_companion.source_flow": "Source Flow",
+  "item.herobrine_companion.source_flow.desc": "Right-click to force teleport to Herobrine's side",
+  "message.herobrine_companion.source_flow_teleport": "You feel a powerful force pulling you towards the abyss...",
+
+
 
   "book.herobrine_companion.book.lore.title": "The Borderland Journal",
   "book.herobrine_companion.book.lore.author": "LordHerobrine",

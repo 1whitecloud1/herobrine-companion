@@ -34,6 +34,7 @@ public class ModItemTagsProvider extends ItemTagsProvider {
                 .add(HerobrineCompanion.POEM_OF_THE_END.get())
                 .add(HerobrineCompanion.LORE_FRAGMENT.get())
                 .add(HerobrineCompanion.LORE_HANDBOOK.get())
+                .add(HerobrineCompanion.SOURCE_FLOW.get())
                 .add(HerobrineCompanion.END_RING_PORTAL_ITEM.get())
                 .add(HerobrineCompanion.GHOST_CREEPER_SPAWN_EGG.get())
                 .add(HerobrineCompanion.GHOST_ZOMBIE_SPAWN_EGG.get())

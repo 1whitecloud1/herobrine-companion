@@ -281,6 +281,11 @@
   "message.herobrine_companion.abyssal_gaze.enabled": "§b[系统] §f幽邃之视已启用。",
   "message.herobrine_companion.abyssal_gaze.disabled": "§b[系统] §f幽邃之视已禁用。",
 
+  "item.herobrine_companion.source_flow": "源流涌现",
+  "item.herobrine_companion.source_flow.desc": "右键使用强行迁跃至 Herobrine 身侧",
+  "message.herobrine_companion.source_flow_teleport": "你感觉到一股强大的力量将你拉向深渊...",
+
+
   "item.herobrine_companion.soul_bound_pact": "魂缚之契",
   "item.herobrine_companion.soul_bound_pact.desc": "与灵魂绑定的契约。启用后，死亡时物品与经验将不再掉落。",
   "message.herobrine_companion.soul_bound_pact.enabled": "§b[系统] §f魂缚之契已启用。你的灵魂已锚定。",
