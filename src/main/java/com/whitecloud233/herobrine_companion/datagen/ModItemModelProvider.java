@@ -24,7 +24,7 @@ public class ModItemModelProvider extends ItemModelProvider {
         basicItem(HerobrineCompanion.ABYSSAL_GAZE.get());
         basicItem(HerobrineCompanion.SOUL_BOUND_PACT.get());
         basicItem(HerobrineCompanion.TRANSCENDENCE_PERMIT.get());
-        
+        basicItem(HerobrineCompanion.SOURCE_FLOW.get());
         // Lore System Items
         basicItem(HerobrineCompanion.LORE_HANDBOOK.get());
         basicItem(HerobrineCompanion.LORE_FRAGMENT.get());

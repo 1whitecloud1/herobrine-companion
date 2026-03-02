@@ -1,4 +1,4 @@
-// 1.21.1	2026-02-10T15:21:50.8150555	Item Models: herobrine_companion
+// 1.21.1	2026-03-02T14:13:40.0369965	Item Models: herobrine_companion
 47747fcff8ef9bfdffbedb4bf907993a3e19f834 assets/herobrine_companion/models/item/abyssal_gaze.json
 f9d924b256d8177a53f82b10ffaf04e7e8249ce4 assets/herobrine_companion/models/item/corrupted_code.json
 c3bfd219d194f188c6ef9f94c747e77ae2c85298 assets/herobrine_companion/models/item/eternal_key.json
@@ -14,6 +14,7 @@ c2adcfef2637a05f1631c42c4497b1b9b8808cf6 assets/herobrine_companion/models/item/
 25017d8e7a01ede0bf8a20a1a799f61bc3f7ef2c assets/herobrine_companion/models/item/recall_stone.json
 9056682621ca874ab7e6a3c891e4e3bd0742dad9 assets/herobrine_companion/models/item/soul_bound_pact.json
 ec274c8d757e0469ae05a598acfb014f4e60675a assets/herobrine_companion/models/item/source_code_fragment.json
+aae9b89f260db2f274386976868a92df81de2fd2 assets/herobrine_companion/models/item/source_flow.json
 b5f33537096ea74668a96e3aff79ebc75579fe7e assets/herobrine_companion/models/item/transcendence_permit.json
 27dc3ff2d622d717554eb19996ebcf51ff47e008 assets/herobrine_companion/models/item/unstable_gunpowder.json
 11287cefd91e821ef3d3a29285edb53672218c36 assets/herobrine_companion/models/item/void_marrow.json
