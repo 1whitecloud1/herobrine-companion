@@ -1,10 +1,14 @@
 package com.whitecloud233.herobrine_companion.network;
 
+import net.minecraft.core.GlobalPos;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtUtils;
 import net.minecraft.nbt.Tag;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.saveddata.SavedData;
 
@@ -28,6 +32,9 @@ public class HeroWorldData extends SavedData {
 
     // [新增] 记录全局唯一的活跃 Hero UUID
     private UUID activeHeroUUID = null;
+    
+    // [新增] 记录 Hero 最后已知的位置 (用于 SourceFlowItem 跨维度定位)
+    private GlobalPos lastKnownHeroPos = null;
 
     public static class PlayerProfile {
         private int trustLevel = 0;
@@ -79,6 +86,10 @@ public class HeroWorldData extends SavedData {
             compound.putUUID("ActiveHeroUUID", this.activeHeroUUID);
         }
         
+        if (this.lastKnownHeroPos != null) {
+            compound.put("LastKnownHeroPos", writeGlobalPos(this.lastKnownHeroPos));
+        }
+        
         return compound;
     }
 
@@ -128,7 +139,29 @@ public class HeroWorldData extends SavedData {
             data.activeHeroUUID = compound.getUUID("ActiveHeroUUID");
         }
         
+        if (compound.contains("LastKnownHeroPos")) {
+            data.lastKnownHeroPos = readGlobalPos(compound.getCompound("LastKnownHeroPos"));
+        }
+        
         return data;
+    }
+    
+    // Helper methods for GlobalPos serialization (since NbtUtils.readGlobalPos might not be available or stable across versions)
+    private static CompoundTag writeGlobalPos(GlobalPos pos) {
+        CompoundTag tag = new CompoundTag();
+        tag.putString("Dimension", pos.dimension().location().toString());
+        tag.put("Pos", NbtUtils.writeBlockPos(pos.pos()));
+        return tag;
+    }
+    
+    private static GlobalPos readGlobalPos(CompoundTag tag) {
+        try {
+            ResourceLocation dimLoc = ResourceLocation.parse(tag.getString("Dimension"));
+            ResourceKey<Level> dimKey = ResourceKey.create(Registries.DIMENSION, dimLoc);
+            return GlobalPos.of(dimKey, NbtUtils.readBlockPos(tag, "Pos").orElse(net.minecraft.core.BlockPos.ZERO));
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     // --- Player Profile Access ---
@@ -237,6 +270,15 @@ public class HeroWorldData extends SavedData {
 
     public void setActiveHeroUUID(UUID uuid) {
         this.activeHeroUUID = uuid;
+        this.setDirty();
+    }
+    
+    public GlobalPos getLastKnownHeroPos() {
+        return this.lastKnownHeroPos;
+    }
+    
+    public void setLastKnownHeroPos(GlobalPos pos) {
+        this.lastKnownHeroPos = pos;
         this.setDirty();
     }
 

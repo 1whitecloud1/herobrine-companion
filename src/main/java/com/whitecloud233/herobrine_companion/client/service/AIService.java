@@ -4,15 +4,22 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.herobrine_companion.item.HeroSummonItem;
+import com.whitecloud233.herobrine_companion.item.SourceFlowItem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.core.GlobalPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -96,7 +103,7 @@ public class AIService {
 
         String divineSpellbook =
                 "动用创世神力干涉Minecraft 1.20.1 的底层代码。你可以生成原版指令或特殊动作码(返回的command绝不带'/')。请根据玩家请求灵活使用神力：" +
-                        "1.【同行与降临】：若请求跟随，输出动作码：'action:toggle_companion'。若祈求你降临到他身边，将你传送到玩家处：'tp @e[type=herobrine_companion:herobrine,limit=1,sort=nearest] @s'。" +
+                        "1.【同行与降临】：若请求跟随，输出动作码：'action:toggle_companion'。若祈求你降临到他身边，将你传送到玩家处：'tp @e[type=herobrine_companion:hero,limit=1,sort=nearest] @s'。" +
                         "2.【空间维度法则】：将玩家传送到其他维度(如'minecraft:the_nether')：'execute in 维度ID run tp @s ~ 100 ~'。寻找群系使用：'locate biome 群系ID'；寻找常规建筑或结构使用：'locate structure 结构ID'。**特别且绝对注意：若玩家明确寻找【不稳定区域】或【神罚领域】，你必须精准提取系统注入数据中的神罚领域结构ID（如 'herobrine_companion:unstable_zone'）来进行 locate，绝不能用原版结构敷衍。** 执行后告诉他坐标已注入视觉终端，让他自己走过去。" +
                         "3.【物质重构与恩赐】：注意1.20.1语法！生成单个房屋必须用：'place template minecraft:village/plains/houses/plains_small_house_1 ~5 ~ ~'；生成大型村庄用：'place structure minecraft:village_plains ~10 ~ ~'。修改数据流赐予物品：'give @s 物品ID 数量'。" +
                         "4.【惩戒与神罚】：你不喜欢用低级的'kill'指令。若需要普通惩戒，使用降下雷击('summon lightning_bolt ^ ^ ^10')或高空传送('tp @s ~ 100 ~')。若玩家极度狂妄，要求见识大规模雷电或毁灭性力量，请输出动作码：'action:massive_lightning'，并在台词中宣告天罚降临。" +
@@ -281,6 +288,113 @@ public class AIService {
                     });
                 } else {
                     future.complete(false);
+                }
+            }
+            // === [新增] 拦截 Herobrine 传送指令，改用更可靠的 UUID 传送 ===
+            else if (command.equals("tp @e[type=herobrine_companion:hero,limit=1,sort=nearest] @s")) {
+                LOGGER.info("Herobrine is being teleported via robust UUID method.");
+                if (mc.hasSingleplayerServer() && mc.getSingleplayerServer() != null) {
+                    var server = mc.getSingleplayerServer();
+                    server.execute(() -> {
+                        try {
+                            ServerPlayer serverPlayer = server.getPlayerList().getPlayer(mc.player.getUUID());
+                            if (serverPlayer != null) {
+                                // 模拟使用 HeroSummonItem (召唤/传送 Hero 到玩家)
+                                // 创建一个虚拟的 HeroSummonItem 实例并调用其 useOn 方法逻辑
+                                // 由于 useOn 需要 UseOnContext，这里我们直接复用 HeroSummonItem 内部的核心逻辑
+                                // 为了方便，我们实例化一个 HeroSummonItem 并手动触发其核心逻辑
+                                // 但更好的方式是直接调用 HeroSummonItem 的静态方法（如果提取出来的话）
+                                // 或者直接复制那段逻辑。鉴于我们已经有了 HeroSummonItem，我们可以尝试模拟玩家使用它。
+                                
+                                // 这里我们直接复用 HeroSummonItem 的逻辑，通过创建一个临时的 ItemStack
+                                HeroSummonItem summonItem = (HeroSummonItem) HerobrineCompanion.HERO_SHELTER.get();
+                                
+                                // 我们需要模拟一个 UseOnContext，但这比较麻烦。
+                                // 更简单的方法是：直接调用我们在 HeroSummonItem 中实现的逻辑。
+                                // 但由于该逻辑是 private/protected 或者是实例方法，我们无法直接调用。
+                                // 所以，我们在这里重新实现一遍“召唤/传送 Hero 到玩家”的逻辑，这与 HeroSummonItem 的逻辑一致。
+                                
+                                // 1. 尝试查找实体 (如果已加载)
+                                com.whitecloud233.herobrine_companion.network.HeroWorldData data = com.whitecloud233.herobrine_companion.network.HeroWorldData.get(server.overworld());
+                                UUID heroUUID = data.getActiveHeroUUID();
+                                GlobalPos lastKnownPos = data.getLastKnownHeroPos();
+                                
+                                Entity hero = null;
+                                if (heroUUID != null) {
+                                    for (net.minecraft.server.level.ServerLevel level : server.getAllLevels()) {
+                                        hero = level.getEntity(heroUUID);
+                                        if (hero != null) break;
+                                    }
+                                }
+
+                                if (hero instanceof com.whitecloud233.herobrine_companion.entity.HeroEntity) {
+                                    // A. 实体已加载：直接传送
+                                    hero.teleportTo(serverPlayer.serverLevel(), serverPlayer.getX(), serverPlayer.getY(), serverPlayer.getZ(), java.util.Collections.emptySet(), serverPlayer.getYRot(), serverPlayer.getXRot());
+                                    future.complete(true);
+                                } else {
+                                    // B. 实体未加载 (跨维度/远距离) 或 不存在
+                                    // 既然是 AI 操作，我们可以"作弊"一下。
+                                    // 如果找不到实体，我们在玩家身边生成一个新的，并利用 HeroEntity 的唯一性检查机制自动清理旧的。
+                                    // 这与 HeroSummonItem 的逻辑一致。
+                                    
+                                    ServerLevel playerLevel = serverPlayer.serverLevel();
+                                    com.whitecloud233.herobrine_companion.entity.HeroEntity newHero = com.whitecloud233.herobrine_companion.event.ModEvents.HERO.get().create(playerLevel);
+                                    if (newHero != null) {
+                                        newHero.moveTo(serverPlayer.getX(), serverPlayer.getY(), serverPlayer.getZ(), serverPlayer.getYRot(), serverPlayer.getXRot());
+                                        
+                                        // 恢复信任度
+                                        newHero.setOwnerUUID(serverPlayer.getUUID());
+                                        com.whitecloud233.herobrine_companion.entity.logic.HeroDataHandler.restoreTrustFromPlayer(newHero);
+                                        com.whitecloud233.herobrine_companion.entity.logic.HeroDataHandler.syncGlobalTrust(newHero);
+                                        
+                                        playerLevel.addFreshEntity(newHero);
+                                        future.complete(true);
+                                    } else {
+                                        future.complete(false);
+                                    }
+                                }
+                            } else {
+                                future.complete(false);
+                            }
+                        } catch (Exception e) {
+                            LOGGER.error("UUID teleport execution error", e);
+                            future.complete(false);
+                        }
+                    });
+                } else {
+                    mc.player.connection.sendCommand(command);
+                    future.complete(true); 
+                }
+            }
+            // === [新增] 拦截 玩家传送指令 (tp @s @e[type=hero])，改用 SourceFlowItem 逻辑 ===
+            // 注意：AI 生成的指令可能是 "tp @s @e[type=herobrine_companion:hero,limit=1,sort=nearest]"
+            // 我们需要拦截这个指令，并调用 SourceFlowItem 的逻辑
+            else if (command.startsWith("tp @s @e[type=herobrine_companion:hero")) {
+                LOGGER.info("Player is being teleported to Herobrine via SourceFlow logic.");
+                if (mc.hasSingleplayerServer() && mc.getSingleplayerServer() != null) {
+                    var server = mc.getSingleplayerServer();
+                    server.execute(() -> {
+                        try {
+                            ServerPlayer serverPlayer = server.getPlayerList().getPlayer(mc.player.getUUID());
+                            if (serverPlayer != null) {
+                                // 模拟使用 SourceFlowItem (传送玩家到 Hero)
+                                SourceFlowItem sourceFlowItem = (SourceFlowItem) HerobrineCompanion.SOURCE_FLOW.get();
+                                // 创建一个虚拟的 ItemStack
+                                ItemStack stack = new ItemStack(sourceFlowItem);
+                                // 调用 use 方法
+                                sourceFlowItem.use(serverPlayer.level(), serverPlayer, InteractionHand.MAIN_HAND);
+                                future.complete(true);
+                            } else {
+                                future.complete(false);
+                            }
+                        } catch (Exception e) {
+                            LOGGER.error("SourceFlow teleport execution error", e);
+                            future.complete(false);
+                        }
+                    });
+                } else {
+                    mc.player.connection.sendCommand(command);
+                    future.complete(true);
                 }
             }
             // === 拦截 3：绝对生效的模式切换 ===
