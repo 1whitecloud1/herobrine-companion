@@ -41,5 +41,15 @@ public class ModRecipeProvider extends RecipeProvider implements IConditionBuild
                 .define('E', Items.EXPERIENCE_BOTTLE)
                 .unlockedBy("has_totem_of_undying", has(Items.TOTEM_OF_UNDYING))
                 .save(consumer);
+
+        ShapedRecipeBuilder.shaped(RecipeCategory.TOOLS, HerobrineCompanion.SOURCE_FLOW.get())
+                .pattern("ESE")
+                .pattern("SGS")
+                .pattern("ESE")
+                .define('E', Items.ENDER_EYE) // 末影之眼：维持空间与维度的坐标指引
+                .define('S', HerobrineCompanion.SOURCE_CODE_FRAGMENT.get()) // 源代码碎片：创世权柄的核心
+                .define('G', Items.GHAST_TEAR) // 恶魂之泪：替换下界之星，提供纯白的驱动能量
+                .unlockedBy("has_source_code_fragment", has(HerobrineCompanion.SOURCE_CODE_FRAGMENT.get()))
+                .save(consumer);
     }
 }

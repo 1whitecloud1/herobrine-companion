@@ -94,7 +94,7 @@ public class GhostSteveEntity extends Monster {
         }
 
         // [修改] 将生成概率调整为 100% (1.0F)
-        return random.nextFloat() < 0.25F &&
+        return random.nextFloat() < 0.05F &&
                 level.getBlockState(pos.below()).isSolid() &&
                 level.getBlockState(pos).isAir();
     }
