@@ -79,6 +79,7 @@ public class HerobrineCompanion {
     public static final DeferredItem<SoulBoundPactItem> SOUL_BOUND_PACT = ITEMS.register("soul_bound_pact", () -> new SoulBoundPactItem(new Item.Properties().stacksTo(1).rarity(net.minecraft.world.item.Rarity.EPIC)));
     public static final DeferredItem<TranscendencePermitItem> TRANSCENDENCE_PERMIT = ITEMS.register("transcendence_permit", () -> new TranscendencePermitItem(new Item.Properties().stacksTo(1).rarity(net.minecraft.world.item.Rarity.EPIC)));
     public static final DeferredItem<PoemOfTheEndItem> POEM_OF_THE_END = ITEMS.register("poem_of_the_end", () -> new PoemOfTheEndItem(Tiers.NETHERITE, 5.0F, -3.0F, new Item.Properties().durability(2031).rarity(net.minecraft.world.item.Rarity.EPIC)));
+    public static final DeferredItem<SourceFlowItem> SOURCE_FLOW = ITEMS.register("source_flow", () -> new SourceFlowItem(new Item.Properties().stacksTo(1).rarity(net.minecraft.world.item.Rarity.EPIC)));
     
     // Lore Items
     public static final DeferredItem<LoreHandbookItem> LORE_HANDBOOK = ITEMS.register("lore_handbook", () -> new LoreHandbookItem(new Item.Properties().stacksTo(1).rarity(net.minecraft.world.item.Rarity.UNCOMMON)));
@@ -116,6 +117,7 @@ public class HerobrineCompanion {
         output.accept(SOUL_BOUND_PACT.get());
         output.accept(TRANSCENDENCE_PERMIT.get());
         output.accept(POEM_OF_THE_END.get());
+        output.accept(SOURCE_FLOW.get());
         output.accept(LORE_HANDBOOK.get());
         
         for (int i = 1; i <= 11; i++) {

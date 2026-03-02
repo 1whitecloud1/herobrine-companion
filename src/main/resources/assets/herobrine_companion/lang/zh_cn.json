@@ -47,6 +47,11 @@
   "message.herobrine_companion.abyssal_gaze.enabled": "§b[系统] §f幽邃之视已启用。",
   "message.herobrine_companion.abyssal_gaze.disabled": "§b[系统] §f幽邃之视已禁用。",
 
+  "item.herobrine_companion.source_flow": "源流涌现",
+  "item.herobrine_companion.source_flow.desc": "右键使用强行迁跃至 Herobrine 身侧",
+  "message.herobrine_companion.source_flow_teleport": "你感觉到一股强大的力量将你拉向深渊...",
+
+
   "message.herobrine_companion.chat_hero": "%s",
   "message.herobrine_companion.chat_you": "§b[你] §f%s",
   "message.herobrine_companion.chat_exit": "§7[系统] 已退出聊天模式。",

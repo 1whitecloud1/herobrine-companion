@@ -25,6 +25,11 @@
   "message.herobrine_companion.soul_bound_pact.enabled": "§b[System] §fSoul Bound Pact enabled. Your soul is anchored.",
   "message.herobrine_companion.soul_bound_pact.disabled": "§b[System] §fSoul Bound Pact disabled. Your soul is free.",
 
+  "item.herobrine_companion.source_flow": "Source Flow",
+  "item.herobrine_companion.source_flow.desc": "Right-click to force teleport to Herobrine's side",
+  "message.herobrine_companion.source_flow_teleport": "You feel a powerful force pulling you towards the abyss...",
+
+
   "item.herobrine_companion.transcendence_permit": "Transcendence Permit",
   "item.herobrine_companion.transcendence_permit.desc": "Permission to transcend the mundane. Grants permanent flight when active.",
   "message.herobrine_companion.transcendence_permit.enabled": "§b[System] §fTranscendence Permit enabled. Gravity no longer binds you.",
