@@ -31,13 +31,36 @@ public class HeroOtherProtection {
         Level level = hero.level();
         // 确保传送逻辑只在服务端执行
         if (!level.isClientSide) {
+            // 👉 就是这一行！必须在这里调用，方法才算被“使用”
+            checkAutoFly(hero, level);
             // 当 Herobrine 掉落到世界最低建筑高度以下 10 格时触发
             if (hero.getY() < level.getMinBuildHeight() - 10) {
                 rescueFromVoid(hero, (ServerLevel) level);
             }
         }
     }
+    // [新增方法] 检测脚底是否悬空并自动切换飞行状态
+    private static void checkAutoFly(HeroEntity hero, Level level) {
+        // 获取脚下1格和2格的方块位置
+        BlockPos posBelow = hero.blockPosition().below();
+        BlockPos posBelow2 = posBelow.below();
 
+        // 检查脚下两格是否都是空气（往下多看一格可以防止下楼梯或走半砖时频繁触发起飞）
+        boolean isAirBelow = level.getBlockState(posBelow).isAir() && level.getBlockState(posBelow2).isAir();
+
+        if (!hero.onGround() && isAirBelow) {
+            // 如果不在地面且脚下是悬空的，强制开启飞行
+            if (!hero.isFloating()) {
+                hero.setFloating(true); // ⚠️注意：这要求你的 HeroEntity 类中有 setFloating(boolean) 方法
+            }
+        }
+        // [可选逻辑] 如果落地了，且脚下有方块，自动取消飞行恢复行走动画
+        else if (hero.onGround() && !isAirBelow) {
+            if (hero.isFloating()) {
+                hero.setFloating(false);
+            }
+        }
+    }
     private static void rescueFromVoid(HeroEntity hero, ServerLevel level) {
         boolean rescued = false;
 
@@ -90,7 +113,7 @@ public class HeroOtherProtection {
         }
 
         // 简单的十字/井字扫描（半径 16格 到 32格）寻找最近的岛屿边缘
-        int[] offsets = {16, -16, 32, -32};
+        int[] offsets = {128, -128, 128, -128};
         for (int dx : offsets) {
             for (int dz : offsets) {
                 BlockPos testPos = new BlockPos(center.getX() + dx, 0, center.getZ() + dz);
