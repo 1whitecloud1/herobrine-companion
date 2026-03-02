@@ -46,11 +46,18 @@ public class HeroLogic {
     }
 
     private static void serverTick(HeroEntity hero) {
-        // 1. 唯一性检查
-        if (hero.tickCount == 20) {
+        // 1. 唯一性检查 (生成初期)
+        // [优化] 在第 1 tick 就立即检查，减少重复实体存在的视觉时间
+        if (hero.tickCount == 1 || hero.tickCount == 20) {
             HeroLifecycleHandler.checkUniqueness(hero);
+            
+            // 如果在 checkUniqueness 中被 discard 了，就不要继续执行了
+            if (!hero.isAlive()) return;
+
             // [修复] 只有在全新生成（非读取）时，才从全局同步数据，防止覆盖存档原有数据
-            if (!hero.isLoadedFromDisk() && hero.getOwnerUUID() != null) {
+            // 这个逻辑保留在第 20 tick 执行或者第 1 tick 执行都可以，但为了保险起见，
+            // 数据恢复逻辑最好不要太早，以免 WorldData 还没准备好，这里保持原样或稍微提前
+            if (hero.tickCount == 20 && !hero.isLoadedFromDisk() && hero.getOwnerUUID() != null) {
                 HeroDataHandler.restoreTrustFromPlayer(hero);
             }
         }
@@ -58,6 +65,7 @@ public class HeroLogic {
         // [新增] 持续性唯一性检查 (每5秒检查一次，防止跨维度传送后旧实体未清除)
         if (hero.tickCount % 100 == 0) {
             HeroLifecycleHandler.checkUniqueness(hero);
+            if (!hero.isAlive()) return;
         }
 
         // 2. 自动绑定逻辑

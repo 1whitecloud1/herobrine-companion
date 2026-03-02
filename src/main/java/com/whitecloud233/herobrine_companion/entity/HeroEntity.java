@@ -12,6 +12,7 @@ import com.whitecloud233.herobrine_companion.entity.logic.HeroDimensionHandler;
 import com.whitecloud233.herobrine_companion.network.HeroWorldData;
 import com.whitecloud233.herobrine_companion.world.structure.ModStructures;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.GlobalPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -200,21 +201,46 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     public void tick() {
         super.tick();
 
-        // [新增] 持续性唯一性检查 (每秒一次)
-        if (!this.level().isClientSide && this.tickCount % 10 == 0) {
+        // [新增] 持续性唯一性检查
+        // 优化：刚生成时检查频繁(0.5s)以快速纠错，稳定后降低频率(5s)以节省性能
+        int checkInterval = this.tickCount < 200 ? 10 : 100;
+        
+        if (!this.level().isClientSide && this.tickCount % checkInterval == 0) {
             HeroWorldData data = HeroWorldData.get((ServerLevel) this.level());
             UUID activeUUID = data.getActiveHeroUUID();
             
             // 如果我是“旧皇”，且“新皇”已经登基（UUID不匹配），我必须死
             if (activeUUID != null && !activeUUID.equals(this.getUUID())) {
-                this.discard();
-                return; // 立即停止执行后续逻辑
+                // 再次确认：如果 activeUUID 指向的实体已经不存在了（比如被 /kill 了但没清数据），那我就是合法的
+                net.minecraft.server.MinecraftServer server = this.level().getServer();
+                if (server != null) {
+                    boolean activeExists = false;
+                    for (ServerLevel lvl : server.getAllLevels()) {
+                        if (lvl.getEntity(activeUUID) != null) {
+                            activeExists = true;
+                            break;
+                        }
+                    }
+                    
+                    if (activeExists) {
+                        // [新增] 在自杀前，强制保存一次数据，防止信任度丢失
+                        HeroDataHandler.updateGlobalTrust(this);
+                        this.discard();
+                        return; // 立即停止执行后续逻辑
+                    } else {
+                        // 旧皇已死，我即新皇 (自动修复数据)
+                        data.setActiveHeroUUID(this.getUUID());
+                    }
+                }
             }
             
             // 如果我是“新皇”，但 WorldData 还没记录我（可能数据丢失），我再次声明主权
             if (activeUUID == null) {
                 data.setActiveHeroUUID(this.getUUID());
             }
+            
+            // [新增] 定期更新位置到 WorldData，用于跨维度定位
+            data.setLastKnownHeroPos(GlobalPos.of(this.level().dimension(), this.blockPosition()));
         }
 
         // 动画计时器逻辑
@@ -350,9 +376,7 @@ public class HeroEntity extends PathfinderMob implements Merchant {
                 double pX = this.getX() + Math.cos(angle) * radius;
                 double pZ = this.getZ() + Math.sin(angle) * radius;
 
-                this.level().addParticle(ParticleTypes.FIREWORK,
-                        pX, this.getY() + height, pZ,
-                        0, 0.1, 0);
+                // Removed FIREWORK particles
             }
         }
     }
@@ -415,6 +439,13 @@ public class HeroEntity extends PathfinderMob implements Merchant {
 
     @Override
     public void die(DamageSource damageSource) {
+        if (!this.level().isClientSide) {
+            HeroWorldData data = HeroWorldData.get((ServerLevel) this.level());
+            if (this.getUUID().equals(data.getActiveHeroUUID())) {
+                data.setActiveHeroUUID(null);
+                data.setLastKnownHeroPos(null); // [新增] 清除位置记录
+            }
+        }
         if (!this.isRemoved()) {
             return;
         }
