@@ -210,7 +210,6 @@ public class HeroBrain {
                     if (p != null && p.distanceToSqr(hero) < 64 * 64) {
                         p.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 300, 0, false, false));
                         p.addEffect(new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, 300, 0, false, false));
-                        level.sendParticles(ParticleTypes.HEART, p.getX(), p.getY() + 2, p.getZ(), 3, 0.5, 0.5, 0.5, 0.1);
                     }
                 }
             }

@@ -6,6 +6,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.entity.ai.goal.Goal;
+import net.minecraft.world.entity.player.Player;
 
 import java.util.EnumSet;
 
@@ -56,7 +57,14 @@ public class HeroIdleActionGoal extends Goal {
         // 3. 跟随模式下的特殊检查
         if (this.hero.isCompanionMode()) {
             if (this.hero.getOwnerUUID() != null) {
+                // 只有在几乎静止时才触发
                 if (this.hero.getDeltaMovement().horizontalDistanceSqr() > 0.02) {
+                    return false;
+                }
+                
+                // [新增] 如果距离玩家太远，不触发待机动作，优先跟随
+                Player owner = this.hero.level().getPlayerByUUID(this.hero.getOwnerUUID());
+                if (owner != null && this.hero.distanceToSqr(owner) > 25.0D) { // 5格以外不发呆
                     return false;
                 }
             }
@@ -141,6 +149,16 @@ public class HeroIdleActionGoal extends Goal {
         if (this.hero.getTradingPlayer() != null) {
             return false;
         }
+        
+        // [新增] 关键修复：如果处于跟随模式且玩家跑远了，立即停止待机动作，去追玩家
+        if (this.hero.isCompanionMode() && this.hero.getOwnerUUID() != null) {
+            Player owner = this.hero.level().getPlayerByUUID(this.hero.getOwnerUUID());
+            // 距离阈值设为 6格 (36.0)，比开始跟随的阈值 (4.0) 稍大，避免频繁打断
+            if (owner != null && this.hero.distanceToSqr(owner) > 36.0D) {
+                return false;
+            }
+        }
+
         return this.idleTime > 0;
     }
     @Override
