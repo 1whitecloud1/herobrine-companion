@@ -1,8 +1,13 @@
 package com.whitecloud233.modid.herobrine_companion.network;
 
+import net.minecraft.core.GlobalPos;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtUtils;
 import net.minecraft.nbt.Tag;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.saveddata.SavedData;
@@ -39,6 +44,12 @@ public class HeroWorldData extends SavedData {
     private long respawnReadyTime = 0;
     private boolean useHerobrineSkin = true;
     private CompoundTag tempBrainData = null;
+    
+    // [新增] 存储当前活跃的 Hero 实体 UUID
+    private UUID activeHeroUUID = null;
+
+    // [新增] 记录 Hero 最后已知的位置 (用于 SourceFlowItem 跨维度定位)
+    private GlobalPos lastKnownHeroPos = null;
 
     @Override
     public CompoundTag save(CompoundTag compound) {
@@ -46,6 +57,12 @@ public class HeroWorldData extends SavedData {
         compound.putBoolean("UseHerobrineSkin", this.useHerobrineSkin);
         if (this.tempBrainData != null) {
             compound.put("TempBrainData", this.tempBrainData);
+        }
+        if (this.activeHeroUUID != null) {
+            compound.putUUID("ActiveHeroUUID", this.activeHeroUUID);
+        }
+        if (this.lastKnownHeroPos != null) {
+            compound.put("LastKnownHeroPos", writeGlobalPos(this.lastKnownHeroPos));
         }
 
         // 保存玩家档案
@@ -72,6 +89,12 @@ public class HeroWorldData extends SavedData {
         if (compound.contains("TempBrainData")) {
             data.tempBrainData = compound.getCompound("TempBrainData");
         }
+        if (compound.hasUUID("ActiveHeroUUID")) {
+            data.activeHeroUUID = compound.getUUID("ActiveHeroUUID");
+        }
+        if (compound.contains("LastKnownHeroPos")) {
+            data.lastKnownHeroPos = readGlobalPos(compound.getCompound("LastKnownHeroPos"));
+        }
 
         // 加载玩家档案
         if (compound.contains("PlayerProfiles", Tag.TAG_LIST)) {
@@ -87,7 +110,23 @@ public class HeroWorldData extends SavedData {
 
         return data;
     }
+    // Helper methods for GlobalPos serialization (since NbtUtils.readGlobalPos might not be available or stable across versions)
+    private static CompoundTag writeGlobalPos(GlobalPos pos) {
+        CompoundTag tag = new CompoundTag();
+        tag.putString("Dimension", pos.dimension().location().toString());
+        tag.put("Pos", NbtUtils.writeBlockPos(pos.pos()));
+        return tag;
+    }
 
+    private static GlobalPos readGlobalPos(CompoundTag tag) {
+        try {
+            ResourceLocation dimLoc = new ResourceLocation(tag.getString("Dimension"));
+            ResourceKey<Level> dimKey = ResourceKey.create(Registries.DIMENSION, dimLoc);
+            return GlobalPos.of(dimKey, NbtUtils.readBlockPos(tag.getCompound("Pos")));
+        } catch (Exception e) {
+            return null;
+        }
+    }
     // --- API ---
 
     public PlayerProfile getProfile(UUID uuid) {
@@ -142,6 +181,24 @@ public class HeroWorldData extends SavedData {
 
     public void setTempBrainData(CompoundTag data) {
         this.tempBrainData = data;
+        this.setDirty();
+    }
+    
+    public UUID getActiveHeroUUID() {
+        return this.activeHeroUUID;
+    }
+
+    public void setActiveHeroUUID(UUID uuid) {
+        this.activeHeroUUID = uuid;
+        this.setDirty();
+    }
+
+    public GlobalPos getLastKnownHeroPos() {
+        return this.lastKnownHeroPos;
+    }
+
+    public void setLastKnownHeroPos(GlobalPos pos) {
+        this.lastKnownHeroPos = pos;
         this.setDirty();
     }
 
