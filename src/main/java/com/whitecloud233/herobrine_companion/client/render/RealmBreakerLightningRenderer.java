@@ -13,7 +13,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 
 public class RealmBreakerLightningRenderer extends EntityRenderer<RealmBreakerLightningEntity> {
-    private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath(HerobrineCompanion.MODID, "textures/entity/realm_breaker_lightning.png");
+    private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath(HerobrineCompanion.MODID, "textures/entity/projectile/realm_breaker_lightning.png");
 
     public RealmBreakerLightningRenderer(EntityRendererProvider.Context context) {
         super(context);
