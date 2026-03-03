@@ -129,15 +129,15 @@ public class RealmBreakerLightningEntity extends Projectile {
                 serverLevel.addFreshEntity(lightning);
             }
 
-            // 爆炸
-            // 检查配置是否启用爆炸
-            if (Config.poemOfTheEndExplosion) {
-                // 使用 this 作为 source，以便在 ExplosionEvent 中识别
-                // 同时指定 DamageSource 为 explosion(this, owner)，确保击杀信息正确
-                serverLevel.explode(this, this.damageSources().explosion(this, this.getOwner()), null,
-                        this.getX(), this.getY(), this.getZ(),
-                        this.getExplosionRadius(), false, Level.ExplosionInteraction.BLOCK);
-            }
+            // 【核心修复】：动态决定地形破坏模式
+            // 如果配置允许爆炸，则使用 BLOCK 模式（破坏方块）；否则使用 NONE 模式（仅产生范围伤害和击退，不破坏方块）
+            Level.ExplosionInteraction interaction = Config.poemOfTheEndExplosion ?
+                    Level.ExplosionInteraction.BLOCK : Level.ExplosionInteraction.NONE;
+
+            // 移除外层的 if 判断，无论配置如何都执行爆炸，以保证破境模式始终拥有 AoE 范围伤害
+            serverLevel.explode(this, this.damageSources().explosion(this, this.getOwner()), null,
+                    this.getX(), this.getY(), this.getZ(),
+                    this.getExplosionRadius(), false, interaction);
 
             // 播放声音
             serverLevel.playSound(null, pos, SoundEvents.TRIDENT_THUNDER, SoundSource.WEATHER, 5.0F, 1.0F);
