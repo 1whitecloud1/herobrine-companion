@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "key": {
+    "E": {
+      "item": "minecraft:ender_eye"
+    },
+    "G": {
+      "item": "minecraft:ghast_tear"
+    },
+    "S": {
+      "item": "herobrine_companion:source_code_fragment"
+    }
+  },
+  "pattern": [
+    "ESE",
+    "SGS",
+    "ESE"
+  ],
+  "result": {
+    "count": 1,
+    "id": "herobrine_companion:source_flow"
+  }
+}

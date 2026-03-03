@@ -102,6 +102,10 @@
   "gui.herobrine_companion.config.hero_aura.tooltip": "是否启用 Herobrine 的怪物臣服 AI。",
   "gui.herobrine_companion.config.restart_required": " (需要重启)",
   "gui.herobrine_companion.config.restart_note": "* 此选项需要重启游戏才能生效",
+  "gui.herobrine_companion.config.block_restoration": "神迹复原: %s",
+  "gui.herobrine_companion.config.block_restoration.tooltip": "开启后，Herobrine 会自动使用神力修复周围被破坏的地形和方块。",
+  "gui.herobrine_companion.config.clean_items": "清理掉落物: %s",
+  "gui.herobrine_companion.config.clean_items.tooltip": "开启后，处于维护者状态的 Herobrine 会自动清理周围掉落时间较长的垃圾物品（会避开贵重物品）。",
 
 
 

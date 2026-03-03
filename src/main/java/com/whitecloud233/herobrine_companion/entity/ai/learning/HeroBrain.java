@@ -4,6 +4,7 @@ import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.network.HeroWorldData;
 import com.whitecloud233.herobrine_companion.world.structure.ModStructures;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
@@ -15,7 +16,12 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.monster.Monster;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.Rarity;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.structure.Structure;
@@ -31,32 +37,36 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class HeroBrain {
-    // 在 HeroBrain 类的开头，添加一个全局的活跃 Herobrine 集合
+    // 全局的活跃 Herobrine 集合
     public static final Set<HeroEntity> ACTIVE_HEROES = ConcurrentHashMap.newKeySet();
 
     private final HeroEntity hero;
-    
+
     private final Map<UUID, SimpleNeuralNetwork> networks = new HashMap<>();
     private final SimpleNeuralNetwork defaultNetwork = new SimpleNeuralNetwork();
 
     public record BrokenBlockRecord(BlockPos pos, BlockState state, long timestamp) {}
-    
-    // 【修改1】使用优先队列，按 Y 轴高度从小到大排序。确保他总是从坑底往上修！
+
+    // 使用优先队列，按 Y 轴高度从小到大排序。确保他总是从坑底往上修！
     private final PriorityQueue<BrokenBlockRecord> brokenBlocksMemory = new PriorityQueue<>(Comparator.comparingInt(r -> r.pos().getY()));
-    
-    // 【修改2】防死循环追踪器，记录每个坐标最近一次损坏的时间
+
+    // 防死循环追踪器，记录每个坐标最近一次损坏的时间
     private final Map<BlockPos, Long> recentBreaks = new ConcurrentHashMap<>();
 
     public HeroBrain(HeroEntity hero) {
         this.hero = hero;
     }
 
+    // 在 HeroBrain.java 中找到这个方法
     public void rememberBrokenBlock(BlockPos pos, BlockState state) {
+        // 【新增】如果玩家在配置中关闭了方块修复，直接返回，不再记录任何方块破坏
+        if (!com.whitecloud233.herobrine_companion.config.Config.heroBlockRestoration) {
+            return;
+        }
+
         long now = hero.level().getGameTime();
-        
-        // 【防无限掉落/卡顿核心】
-        // 如果这个坐标在过去 100 tick (5秒) 内刚刚碎过，说明发生了物理崩塌死循环。
-        // 神不屑于做无用功，直接抛弃这个方块的修复。
+
+        // 防无限掉落/卡顿核心
         Long lastBreak = recentBreaks.get(pos);
         if (lastBreak != null && now - lastBreak < 100) {
             return;
@@ -65,16 +75,16 @@ public class HeroBrain {
 
         // 将记忆容量大幅提升到 8192，足以容纳核弹级爆炸
         if (brokenBlocksMemory.size() >= 8192) {
-            return; 
+            return;
         }
-        
-        // [新增] 如果在 Unstable Zone 内，不记录方块破坏
+
+        // 如果在 Unstable Zone 内，不记录方块破坏
         if (hero.level() instanceof ServerLevel serverLevel && isInUnstableZone(serverLevel, pos)) {
             return;
         }
-        
+
         brokenBlocksMemory.offer(new BrokenBlockRecord(pos, state, now));
-        
+
         if (hero.getOwnerUUID() != null) {
             getNetwork(hero.getOwnerUUID()).input("ENTROPY", 0.05f);
         }
@@ -87,6 +97,7 @@ public class HeroBrain {
         StructureStart start = level.structureManager().getStructureAt(pos, structure);
         return start.isValid();
     }
+
 
     private SimpleNeuralNetwork getNetwork(UUID playerUUID) {
         if (playerUUID == null) return defaultNetwork;
@@ -110,7 +121,7 @@ public class HeroBrain {
     public void tick() {
         if (hero.level().isClientSide) return;
 
-        // 【新增】雷达注册：如果他死了或者被移除了，从全局雷达中注销
+        // 雷达注册：如果他死了或者被移除了，从全局雷达中注销
         if (hero.isRemoved() || !hero.isAlive()) {
             ACTIVE_HEROES.remove(hero);
             return;
@@ -130,13 +141,13 @@ public class HeroBrain {
             hero.setCustomName(Component.literal(getCurrentNetwork().getDebugInfo()));
             hero.setCustomNameVisible(true);
         }
-        
-        if (hero.tickCount % 1200 == 0) { 
+
+        if (hero.tickCount % 1200 == 0) {
             saveMemories();
             recentBreaks.clear(); // 定期清理防卡顿缓存，防止内存泄漏
         }
     }
-    
+
     private void saveMemories() {
         if (hero.level().isClientSide) return;
         HeroWorldData data = HeroWorldData.get((ServerLevel) hero.level());
@@ -147,19 +158,54 @@ public class HeroBrain {
         }
     }
 
+    // 【修复】神之鉴定：判断地上的物品是否为贵重物品
+    private boolean isValuableItem(ItemStack stack) {
+        if (stack.isEmpty()) return false;
+
+        // 保护层 1：玩家自定义命名的物品
+        if (stack.has(DataComponents.CUSTOM_NAME)) {
+            return true;
+        }
+
+        // 保护层 2：带有任何附魔的物品
+        if (stack.isEnchanted()) {
+            return true;
+        }
+
+        // 保护层 3：高稀有度物品 (1.21.1 必须使用组件，避免运行时崩溃断开 AI)
+        Rarity rarity = stack.getOrDefault(DataComponents.RARITY, Rarity.COMMON);
+        if (rarity == Rarity.EPIC || rarity == Rarity.RARE) {
+            return true;
+        }
+
+        // 保护层 4：硬编码的绝对核心贵重物品白名单
+        Item item = stack.getItem();
+        if (item == Items.DIAMOND ||
+                item == Items.DIAMOND_BLOCK ||
+                item == Items.NETHERITE_INGOT ||
+                item == Items.NETHERITE_BLOCK ||
+                item == Items.NETHERITE_SCRAP ||
+                item == Items.NETHER_STAR ||
+                item == Items.TOTEM_OF_UNDYING ||
+                item == Items.ENCHANTED_GOLDEN_APPLE ||
+                item == Items.BEACON) {
+            return true;
+        }
+
+        return false;
+    }
+
     private void executeStateBehavior() {
         SimpleNeuralNetwork.MindState state = getCurrentNetwork().getCurrentState();
         ServerLevel level = (ServerLevel) hero.level();
-        
+
         // ==========================================
         // 【高频执行区】 神力重组
         // ==========================================
-        // 【核心修复】删除了 state == MAINTAINER 的限制！
         // 只要有方块碎了，神之本能就会驱使他复原，哪怕他现在正处于其他状态。
-        // 这保证了队列一定会被清空，地表绝对会被完美修复。
         if (!brokenBlocksMemory.isEmpty()) {
-            
-            int repairSpeed = Math.max(5, Math.min(64, brokenBlocksMemory.size() / 10)); 
+            // 动态修复速度：积压的方块越多，修得越快。最快每 tick 修复 64 个方块
+            int repairSpeed = Math.max(5, Math.min(64, brokenBlocksMemory.size() / 10));
             int blocksRepairedThisTick = 0;
 
             while (blocksRepairedThisTick < repairSpeed && !brokenBlocksMemory.isEmpty()) {
@@ -169,10 +215,10 @@ public class HeroBrain {
                 if (level.getBlockState(record.pos()).canBeReplaced()) {
                     int flags = Block.UPDATE_CLIENTS | Block.UPDATE_INVISIBLE;
                     level.setBlock(record.pos(), record.state(), flags);
-                    
-                    level.sendParticles(ParticleTypes.REVERSE_PORTAL, 
-                        record.pos().getX() + 0.5, record.pos().getY() + 0.5, record.pos().getZ() + 0.5, 
-                        10, 0.3, 0.3, 0.3, 0.05);
+
+                    level.sendParticles(ParticleTypes.REVERSE_PORTAL,
+                            record.pos().getX() + 0.5, record.pos().getY() + 0.5, record.pos().getZ() + 0.5,
+                            10, 0.3, 0.3, 0.3, 0.05);
 
                     if (hero.getRandom().nextFloat() < 0.005f && hero.getOwnerUUID() != null) {
                         ServerPlayer owner = (ServerPlayer) level.getPlayerByUUID(hero.getOwnerUUID());
@@ -182,7 +228,7 @@ public class HeroBrain {
                     if (hero.getOwnerUUID() != null) {
                         getNetwork(hero.getOwnerUUID()).input("ENTROPY", -0.01f);
                     }
-                    
+
                     blocksRepairedThisTick++;
                 }
             }
@@ -192,6 +238,9 @@ public class HeroBrain {
         // 【低频执行区】
         // ==========================================
         if (hero.tickCount % 20 != 0) return;
+
+        // 如果正在交易，禁止执行任何状态行为 (除了上面的方块修复)
+        if (hero.getTradingPlayer() != null) return;
 
         switch (state) {
             case OBSERVER -> {
@@ -231,18 +280,40 @@ public class HeroBrain {
                 }
             }
             case MAINTAINER -> {
+                // 【新增】如果玩家在配置中关闭了掉落物清理，直接跳出该状态的执行
+                if (!com.whitecloud233.herobrine_companion.config.Config.heroCleanItems) {
+                    break;
+                }
+
                 if (hero.tickCount % 100 == 0) {
-                    List<Entity> items = level.getEntities(hero, hero.getBoundingBox().inflate(32), e -> e instanceof net.minecraft.world.entity.item.ItemEntity);
+                    // 只获取 ItemEntity 类型的实体
+                    List<ItemEntity> items = level.getEntitiesOfClass(ItemEntity.class, hero.getBoundingBox().inflate(32));
+
                     if (items.size() > 5) {
-                        for (Entity item : items) {
-                            level.sendParticles(ParticleTypes.PORTAL, item.getX(), item.getY() + 0.2, item.getZ(), 10, 0.2, 0.2, 0.2, 0.1);
-                            item.discard(); 
+                        int clearedCount = 0;
+                        for (ItemEntity itemEntity : items) {
+                            // 1. 时间保护：存在时间少于 1 分钟 (1200 tick) 的物品暂不清理
+                            if (itemEntity.getAge() <1200) {
+                                continue;
+                            }
+
+                            // 2. 价值保护：如果是钻石、下界合金或附魔物品等，不清理
+                            if (isValuableItem(itemEntity.getItem())) {
+                                continue;
+                            }
+
+                            // 确认为垃圾后清除
+                            level.sendParticles(ParticleTypes.PORTAL, itemEntity.getX(), itemEntity.getY() + 0.2, itemEntity.getZ(), 10, 0.2, 0.2, 0.2, 0.1);
+                            itemEntity.discard();
+                            clearedCount++;
                         }
-                        if (hero.getOwnerUUID() != null) {
+
+                        // 只有清理了真正的垃圾，才触发对话和熵减
+                        if (clearedCount > 0 && hero.getOwnerUUID() != null) {
                             ServerPlayer owner = (ServerPlayer) level.getPlayerByUUID(hero.getOwnerUUID());
                             if (owner != null) {
                                 HeroDialogueHandler.onCleanseArea(hero, owner);
-                                getNetwork(owner.getUUID()).input("ENTROPY", -0.5f); 
+                                getNetwork(owner.getUUID()).input("ENTROPY", -0.5f);
                             }
                         }
                     }
@@ -298,7 +369,7 @@ public class HeroBrain {
             networksTag.add(netTag);
         }
         tag.put("Networks", networksTag);
-        
+
         CompoundTag defaultTag = new CompoundTag();
         defaultNetwork.save(defaultTag);
         tag.put("DefaultNetwork", defaultTag);

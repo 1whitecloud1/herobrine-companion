@@ -183,6 +183,11 @@
   "gui.herobrine_companion.config.hero_aura.tooltip": "Whether the Hero King Aura goal is enabled for Herobrine.",
   "gui.herobrine_companion.config.restart_required": " (Restart Required)",
   "gui.herobrine_companion.config.restart_note": "* Requires Game Restart to take effect",
+  "gui.herobrine_companion.config.block_restoration": "Divine Restoration: %s",
+  "gui.herobrine_companion.config.block_restoration.tooltip": "If enabled, Herobrine will automatically repair broken blocks and terrain around him.",
+  "gui.herobrine_companion.config.clean_items": "Clean Dropped Items: %s",
+  "gui.herobrine_companion.config.clean_items.tooltip": "If enabled, Herobrine (in Maintainer state) will automatically clean up old item drops around him (ignores valuable items).",
+
 
 
   "message.herobrine_companion.state_protector_1": "I see potential in this world... and in you.",

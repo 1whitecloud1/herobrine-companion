@@ -13,6 +13,7 @@ import org.jetbrains.annotations.NotNull;
 public class ConfigScreen extends Screen {
     private final Screen lastScreen;
 
+    // NeoForge 1.21.1 专用的构造函数，必须传入 ModContainer
     public ConfigScreen(ModContainer container, Screen lastScreen) {
         super(Component.translatable("gui.herobrine_companion.config.title"));
         this.lastScreen = lastScreen;
@@ -23,61 +24,95 @@ public class ConfigScreen extends Screen {
         super.init();
 
         int centerX = this.width / 2;
-        int startY = this.height / 4;
+        int startY = this.height / 4 - 20; // 稍微整体往上挪一点，给4个按钮腾出空间
         int buttonWidth = 200;
         int buttonHeight = 20;
         int spacing = 24;
 
-        // Poem of the End Explosion Toggle
+        // 1. Poem of the End Explosion
         this.addRenderableWidget(Button.builder(
-                Component.translatable("gui.herobrine_companion.config.poem_explosion", Config.POEM_OF_THE_END_EXPLOSION.get()),
-                button -> {
-                    boolean current = Config.POEM_OF_THE_END_EXPLOSION.get();
-                    boolean newValue = !current;
-                    Config.POEM_OF_THE_END_EXPLOSION.set(newValue);
-                    Config.poemOfTheEndExplosion = newValue; // Update static field immediately
-                    Config.SPEC.save(); // Force save to disk
-                    button.setMessage(Component.translatable("gui.herobrine_companion.config.poem_explosion", newValue));
-                })
+                        Component.translatable("gui.herobrine_companion.config.poem_explosion", Config.POEM_OF_THE_END_EXPLOSION.get()),
+                        button -> {
+                            boolean current = Config.POEM_OF_THE_END_EXPLOSION.get();
+                            boolean newValue = !current;
+                            Config.POEM_OF_THE_END_EXPLOSION.set(newValue);
+                            Config.poemOfTheEndExplosion = newValue;
+                            Config.SPEC.save();
+                            button.setMessage(Component.translatable("gui.herobrine_companion.config.poem_explosion", newValue));
+                        })
                 .pos(centerX - buttonWidth / 2, startY)
                 .size(buttonWidth, buttonHeight)
                 .tooltip(Tooltip.create(Component.translatable("gui.herobrine_companion.config.poem_explosion.tooltip")))
                 .build()
         );
 
-        // Hero King Aura Toggle
+        // 2. Hero King Aura
         this.addRenderableWidget(Button.builder(
-                Component.translatable("gui.herobrine_companion.config.hero_aura", Config.HERO_KING_AURA_ENABLED.get()).append(Component.literal(" *").withStyle(ChatFormatting.RED)),
-                button -> {
-                    boolean current = Config.HERO_KING_AURA_ENABLED.get();
-                    boolean newValue = !current;
-                    Config.HERO_KING_AURA_ENABLED.set(newValue);
-                    Config.SPEC.save(); // Force save to disk
-                    // Do NOT update static field immediately for this one, as it requires restart
-                    // Config.heroKingAuraEnabled = newValue; 
-                    button.setMessage(Component.translatable("gui.herobrine_companion.config.hero_aura", newValue).append(Component.literal(" *").withStyle(ChatFormatting.RED)));
-                })
+                        Component.translatable("gui.herobrine_companion.config.hero_aura", Config.HERO_KING_AURA_ENABLED.get()).append(Component.literal(" *").withStyle(ChatFormatting.RED)),
+                        button -> {
+                            boolean current = Config.HERO_KING_AURA_ENABLED.get();
+                            boolean newValue = !current;
+                            Config.HERO_KING_AURA_ENABLED.set(newValue);
+                            Config.SPEC.save();
+                            button.setMessage(Component.translatable("gui.herobrine_companion.config.hero_aura", newValue).append(Component.literal(" *").withStyle(ChatFormatting.RED)));
+                        })
                 .pos(centerX - buttonWidth / 2, startY + spacing)
                 .size(buttonWidth, buttonHeight)
                 .tooltip(Tooltip.create(Component.translatable("gui.herobrine_companion.config.hero_aura.tooltip").append(Component.translatable("gui.herobrine_companion.config.restart_required").withStyle(ChatFormatting.RED))))
                 .build()
         );
 
+        // 3. Block Restoration Toggle
+        this.addRenderableWidget(Button.builder(
+                        Component.translatable("gui.herobrine_companion.config.block_restoration", Config.HERO_BLOCK_RESTORATION.get()),
+                        button -> {
+                            boolean current = Config.HERO_BLOCK_RESTORATION.get();
+                            boolean newValue = !current;
+                            Config.HERO_BLOCK_RESTORATION.set(newValue);
+                            Config.heroBlockRestoration = newValue;
+                            Config.SPEC.save();
+                            button.setMessage(Component.translatable("gui.herobrine_companion.config.block_restoration", newValue));
+                        })
+                .pos(centerX - buttonWidth / 2, startY + spacing * 2)
+                .size(buttonWidth, buttonHeight)
+                .tooltip(Tooltip.create(Component.translatable("gui.herobrine_companion.config.block_restoration.tooltip")))
+                .build()
+        );
+
+        // 4. Clean Items Toggle
+        this.addRenderableWidget(Button.builder(
+                        Component.translatable("gui.herobrine_companion.config.clean_items", Config.HERO_CLEAN_ITEMS.get()),
+                        button -> {
+                            boolean current = Config.HERO_CLEAN_ITEMS.get();
+                            boolean newValue = !current;
+                            Config.HERO_CLEAN_ITEMS.set(newValue);
+                            Config.heroCleanItems = newValue; // 立即更新静态变量
+                            Config.SPEC.save();
+                            button.setMessage(Component.translatable("gui.herobrine_companion.config.clean_items", newValue));
+                        })
+                .pos(centerX - buttonWidth / 2, startY + spacing * 3) // 排在第4位
+                .size(buttonWidth, buttonHeight)
+                .tooltip(Tooltip.create(Component.translatable("gui.herobrine_companion.config.clean_items.tooltip")))
+                .build()
+        );
+
+        // 返回按钮
         this.addRenderableWidget(Button.builder(Component.translatable("gui.done"), button -> this.onClose())
                 .pos(centerX - buttonWidth / 2, this.height - 40)
                 .size(buttonWidth, buttonHeight)
                 .build());
-        
-        // Add a label explaining the asterisk
+
+        // 重启提示标签 (排在第4个按钮的下方)
         this.addRenderableWidget(Button.builder(Component.translatable("gui.herobrine_companion.config.restart_note").withStyle(ChatFormatting.RED), button -> {})
-                .pos(centerX - buttonWidth / 2, startY + spacing + 25)
+                .pos(centerX - buttonWidth / 2, startY + spacing * 4 + 5)
                 .size(buttonWidth, 10)
                 .build()
-        ).active = false; // Just a label
+        ).active = false;
     }
 
     @Override
     public void render(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        // 1.21.1 渲染背景的标准参数
         this.renderBackground(guiGraphics, mouseX, mouseY, partialTick);
         guiGraphics.drawCenteredString(this.font, this.title, this.width / 2, 20, 0xFFFFFF);
         super.render(guiGraphics, mouseX, mouseY, partialTick);
@@ -87,7 +122,7 @@ public class ConfigScreen extends Screen {
     public void onClose() {
         this.minecraft.setScreen(this.lastScreen);
     }
-    
-    // Factory for NeoForge
+
+    // NeoForge 1.21.1 专用的工厂方法注册
     public static final IConfigScreenFactory FACTORY = (container, screen) -> new ConfigScreen(container, screen);
 }
