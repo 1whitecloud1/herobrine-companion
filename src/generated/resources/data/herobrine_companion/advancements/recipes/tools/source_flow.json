@@ -1,0 +1,35 @@
+{
+  "parent": "minecraft:recipes/root",
+  "criteria": {
+    "has_source_code_fragment": {
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "herobrine_companion:source_code_fragment"
+            ]
+          }
+        ]
+      },
+      "trigger": "minecraft:inventory_changed"
+    },
+    "has_the_recipe": {
+      "conditions": {
+        "recipe": "herobrine_companion:source_flow"
+      },
+      "trigger": "minecraft:recipe_unlocked"
+    }
+  },
+  "requirements": [
+    [
+      "has_source_code_fragment",
+      "has_the_recipe"
+    ]
+  ],
+  "rewards": {
+    "recipes": [
+      "herobrine_companion:source_flow"
+    ]
+  },
+  "sends_telemetry_event": false
+}
