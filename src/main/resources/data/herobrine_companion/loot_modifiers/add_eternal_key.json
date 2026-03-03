@@ -20,7 +20,7 @@
     },
     {
       "condition": "minecraft:random_chance",
-      "chance": 1.0
+      "chance": 0.5
     }
   ],
   "item": "herobrine_companion:eternal_key"
