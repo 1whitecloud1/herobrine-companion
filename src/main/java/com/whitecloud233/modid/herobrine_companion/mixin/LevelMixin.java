@@ -20,19 +20,25 @@ public abstract class LevelMixin {
         Level level = (Level) (Object) this;
         if (level.isClientSide) return;
 
+        // 如果目标是将方块替换为空气（破坏方块）
         if (newState.isAir()) {
+            // 1. 玩家主动挖掘的白名单拦截（结合你之前加的双格方块逻辑）
             if (WorldAnomalyEventHandler.PLAYER_BROKEN_BLOCKS.contains(pos)) {
-                return; 
+                return;
             }
 
             BlockState oldState = level.getBlockState(pos);
             if (oldState.isAir() || oldState.is(Blocks.FIRE)) return;
 
-            // 【终极性能优化】：不再扫描区块实体！
-            // 直接遍历全局注册的 Herobrine（通常只有 1 个），然后计算纯数学距离。
-            // 将爆炸时的 O(N) 几何级卡顿，瞬间化为 O(1) 的极速响应。
+            // 2. 【新增：附着物与合法物理掉落拦截】
+            // 如果这个方块在当前的环境下已经无法存活（例如支撑它的方块刚刚被挖走），
+            // 这属于原版世界的正常物理运转，不属于异常熵增，创世神无需修复。
+            if (!oldState.canSurvive(level, pos)) {
+                return;
+            }
+
+            // 3. 全局雷达扫描并触发神力重组
             for (HeroEntity hero : HeroBrain.ACTIVE_HEROES) {
-                // 确保他们在同一个维度，并且距离在 64 格之内 (64的平方是4096)
                 if (hero.level() == level && hero.distanceToSqr(pos.getX(), pos.getY(), pos.getZ()) < 4096) {
                     hero.getHeroBrain().rememberBrokenBlock(pos.immutable(), oldState);
                 }
