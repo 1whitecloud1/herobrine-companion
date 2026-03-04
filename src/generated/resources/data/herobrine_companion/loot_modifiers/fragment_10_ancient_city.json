@@ -3,13 +3,13 @@
   "conditions": [
     {
       "condition": "forge:loot_table_id",
-      "loot_table_id": "minecraft:chests/stronghold_library"
+      "loot_table_id": "minecraft:chests/ancient_city"
     },
     {
-      "condition": "minecraft:random_chance",
-      "chance": 1
+      "chance": 0.3,
+      "condition": "minecraft:random_chance"
     }
   ],
   "item": "herobrine_companion:lore_fragment",
-  "nbt": "{lore_id:\"fragment_2\"}"
+  "nbt": "{lore_id:\"fragment_10\"}"
 }

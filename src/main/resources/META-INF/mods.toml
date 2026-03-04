@@ -1,0 +1,27 @@
+modLoader="javafml"
+loaderVersion="[47,)"
+license="All Rights Reserved"
+issueTrackerURL="https://github.com/WhiteCloud233/herobrine-companion-mod/issues"
+
+[[mods]]
+modId="herobrine_companion"
+version="1.0.0"
+displayName="Herobrine Companion"
+authors="WhiteCloud233"
+description='''
+A companion mod for Herobrine.
+'''
+
+[[dependencies.herobrine_companion]]
+    modId="forge"
+    mandatory=true
+    versionRange="[47,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.herobrine_companion]]
+    modId="minecraft"
+    mandatory=true
+    versionRange="[1.20.1,1.21)"
+    ordering="NONE"
+    side="BOTH"

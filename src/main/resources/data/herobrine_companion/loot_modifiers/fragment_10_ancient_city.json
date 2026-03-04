@@ -7,7 +7,7 @@
     },
     {
       "condition": "minecraft:random_chance",
-      "chance": 0.2
+      "chance": 1
     }
   ],
   "item": "herobrine_companion:lore_fragment",
