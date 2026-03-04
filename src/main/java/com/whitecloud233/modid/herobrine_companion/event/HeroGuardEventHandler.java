@@ -69,4 +69,63 @@ public class HeroGuardEventHandler {
             }
         }
     }
+    /**
+     * 神之领域 - 绝对禁锢 (拦截右键交互)
+     * 监听玩家右键点击方块的瞬间。
+     * 如果点击的是 Herobrine 正在守卫的方块，且玩家不是被认可的主人，
+     * 直接在事件层抹除该交互，阻止任何容器界面的打开、声音或动画。
+     */
+    @SubscribeEvent
+    public static void onPlayerRightClickBlock(net.minecraftforge.event.entity.player.PlayerInteractEvent.RightClickBlock event) {
+        net.minecraft.world.entity.player.Player player = event.getEntity();
+        if (player == null || player.isSpectator()) return;
+
+        BlockPos clickedPos = event.getPos();
+
+        // 1. 快速检索：划定一个检测范围 (例如 32 格) 寻找 Herobrine
+        double searchRadius = 32.0;
+        AABB searchBox = new AABB(clickedPos).inflate(searchRadius);
+        List<HeroEntity> heroes = event.getLevel().getEntitiesOfClass(HeroEntity.class, searchBox);
+
+        for (HeroEntity hero : heroes) {
+            // 2. 确认 Herobrine 处于守卫模式 (Action 3) 且目标存在
+            if (hero.getInvitedAction() == 3 && hero.getInvitedPos() != null) {
+                BlockPos guardedPos = hero.getInvitedPos();
+
+                // 3. 精准判定：玩家点击的正是被守卫的方块
+                if (clickedPos.equals(guardedPos)) {
+
+                    // 4. 灵魂级甄别：比对 UUID 判断是否为主人
+                    if (!player.getUUID().equals(hero.getOwnerUUID())) {
+
+                        // 5. 规则级抹除：彻底取消这次交互事件
+                        event.setCanceled(true);
+                        // 强制拒绝方块和物品的使用逻辑，防止漏网之鱼
+                        event.setUseBlock(net.minecraftforge.eventbus.api.Event.Result.DENY);
+                        event.setUseItem(net.minecraftforge.eventbus.api.Event.Result.DENY);
+
+                        // 6. 神罚反馈 (仅在服务端执行，给予入侵者视觉和听觉的压迫感)
+                        if (!event.getLevel().isClientSide) {
+                            net.minecraft.server.level.ServerLevel serverLevel = (net.minecraft.server.level.ServerLevel) event.getLevel();
+
+                            // 播放沉闷的心跳警告音和末影人瞬移的低频音
+                            serverLevel.playSound(null, clickedPos, net.minecraft.sounds.SoundEvents.WARDEN_HEARTBEAT, net.minecraft.sounds.SoundSource.HOSTILE, 1.0F, 0.5F);
+                            serverLevel.playSound(null, clickedPos, net.minecraft.sounds.SoundEvents.ENDERMAN_TELEPORT, net.minecraft.sounds.SoundSource.HOSTILE, 0.5F, 0.5F);
+
+                            // 在箱子上方爆发幽匿灵魂粒子，警告入侵者
+                            serverLevel.sendParticles(net.minecraft.core.particles.ParticleTypes.SCULK_SOUL,
+                                    clickedPos.getX() + 0.5, clickedPos.getY() + 1.0, clickedPos.getZ() + 0.5,
+                                    15, 0.3, 0.3, 0.3, 0.02);
+
+                            // 创世神的轻微威压：给入侵者施加瞬间的盲目效果 (可选)
+                            player.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.BLINDNESS, 40, 0, true, false));
+                        }
+
+                        // 既然已经成功拦截，跳出循环即可
+                        return;
+                    }
+                }
+            }
+        }
+    }
 }

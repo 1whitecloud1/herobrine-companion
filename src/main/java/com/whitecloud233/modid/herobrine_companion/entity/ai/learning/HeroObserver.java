@@ -187,7 +187,7 @@ public class HeroObserver {
 
             // [Learning] Nostalgia items
             if (currentItem.is(Items.ENCHANTED_GOLDEN_APPLE)) {
-                hero.getHeroBrain().inputNostalgia(player.getUUID(), 0.5f);
+                hero.getHeroBrain().inputNostalgia(player.getUUID(), 0.05f);
             }
 
             if (isOnCooldown(player, "item", 1200)) return; // 1 minute cooldown for item comments

@@ -5,33 +5,58 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.EnumSet;
-
 public class HeroTeleportToPlayerGoal extends Goal {
     private final HeroEntity hero;
     private Player targetPlayer;
     private int cooldown;
-    
-    // [新增] 凝视相关变量
+
+    // 凝视相关变量
     private boolean isStaring;
     private int stareTimer;
+
+    // 战斗判定超时时间
+    private static final int COMBAT_TIMEOUT = 100;
 
     public HeroTeleportToPlayerGoal(HeroEntity hero) {
         this.hero = hero;
         this.setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
     }
 
+    /**
+     * 判断玩家是否处于战斗状态
+     */
+    private boolean isInCombat(Player player) {
+        int currentTick = player.tickCount;
+        int lastHurtByMobTime = player.getLastHurtByMobTimestamp();
+        int lastHurtMobTime = player.getLastHurtMobTimestamp();
+
+        boolean recentlyHurt = lastHurtByMobTime > 0 && (currentTick - lastHurtByMobTime) < COMBAT_TIMEOUT;
+        boolean recentlyAttacked = lastHurtMobTime > 0 && (currentTick - lastHurtMobTime) < COMBAT_TIMEOUT;
+
+        if (!recentlyHurt && !recentlyAttacked) return false;
+
+        LivingEntity attacker = player.getLastHurtByMob();
+        LivingEntity target = player.getLastHurtMob();
+
+        boolean hasValidAttacker = attacker != null && attacker.isAlive() && attacker.distanceToSqr(player) < 900.0D;
+        boolean hasValidTarget = target != null && target.isAlive() && target.distanceToSqr(player) < 900.0D;
+
+        return hasValidAttacker || hasValidTarget;
+    }
+
     @Override
     public boolean canUse() {
-        // [新增] 如果正在骑乘 (比如在船上)，禁止传送，防止下车
+        // 如果正在骑乘 (比如在船上)，禁止传送，防止下车
         if (this.hero.isPassenger()) return false;
-        
-        // [新增] 如果正在交易，禁止传送
+
+        // 如果正在交易，禁止传送
         if (this.hero.getTradingPlayer() != null) return false;
 
         if (this.cooldown > 0) {
@@ -52,15 +77,15 @@ public class HeroTeleportToPlayerGoal extends Goal {
         if (this.targetPlayer == null) return false;
 
         double distSqr = this.hero.distanceToSqr(this.targetPlayer);
+        boolean playerInCombat = isInCombat(this.targetPlayer);
 
         // [深度学习] Spooky Teleport (惊吓传送) 逻辑
         // 只有在 观察者 (OBSERVER) 或 恶作剧者 (PRANKSTER) 状态下才触发
+        // 【关键修复】如果玩家正在战斗中，绝对不触发惊吓传送，以免干扰玩家战斗
         SimpleNeuralNetwork.MindState state = this.hero.getHeroBrain().getState();
         boolean canSpookyTeleport = state == SimpleNeuralNetwork.MindState.OBSERVER || state == SimpleNeuralNetwork.MindState.PRANKSTER;
 
-        if (canSpookyTeleport) {
-            // 恶作剧者状态下，概率翻倍
-            // [修改] 降低触发概率：PRANKSTER 1/100, OBSERVER 1/300
+        if (canSpookyTeleport && !playerInCombat) {
             int chance = (state == SimpleNeuralNetwork.MindState.PRANKSTER) ? 100 : 500;
 
             if (this.hero.tickCount > 60 &&
@@ -71,11 +96,18 @@ public class HeroTeleportToPlayerGoal extends Goal {
             }
         }
 
-        // [修改] 正常的跟随传送逻辑 (必须是陪伴模式)
+        // 正常的跟随传送逻辑 (必须是陪伴模式)
         if (this.hero.isCompanionMode()) {
-            return distSqr > 25.0D * 25.0D; 
+            if (playerInCombat) {
+                // 【关键修复】战斗中放宽传送距离：
+                // 只要你没跑出 40 格外(1600.0D)，他就会靠腿走路和避让，而不是一直瞬移到你身边
+                return distSqr > 1600.0D;
+            } else {
+                // 非战斗状态下，拉开 25 格(625.0D)就正常传送
+                return distSqr > 625.0D;
+            }
         }
-        
+
         return false;
     }
 
@@ -86,22 +118,18 @@ public class HeroTeleportToPlayerGoal extends Goal {
 
         if (this.targetPlayer != null) {
             RandomSource random = this.hero.getRandom();
-            
+
             double distSqr = this.hero.distanceToSqr(this.targetPlayer);
             boolean isSpookyTeleport = !this.hero.isCompanionMode() || distSqr < 25.0D * 25.0D;
-            
+
             // Spooky 模式下，距离稍微近一点 (3-6格)
             double distance = isSpookyTeleport ? 3.0 + random.nextDouble() * 3.0 : 2.0 + random.nextDouble() * 2.0;
-            
-            // [修改] 位置计算逻辑
+
             float angleOffset;
             float baseAngle = this.targetPlayer.getYRot();
-            
+
             if (isSpookyTeleport) {
-                // [修改] 降低背后出现的概率，增加侧面出现的概率
-                // 20% 前方 (Jumpscare)
-                // 40% 侧面 (+/- 90度)
-                // 40% 背后 (+/- 180度)
+                // 降低背后出现的概率，增加侧面出现的概率
                 float roll = random.nextFloat();
                 if (roll < 0.2F) {
                     // 前方 +/- 30 度
@@ -119,7 +147,7 @@ public class HeroTeleportToPlayerGoal extends Goal {
             }
 
             Vec3 offsetVec = Vec3.directionFromRotation(0, baseAngle + angleOffset).scale(distance);
-            
+
             double x = this.targetPlayer.getX() + offsetVec.x;
             double z = this.targetPlayer.getZ() + offsetVec.z;
             double y = this.targetPlayer.getY();
@@ -146,13 +174,13 @@ public class HeroTeleportToPlayerGoal extends Goal {
             this.hero.setDeltaMovement(0, 0, 0);
 
             if (isSpookyTeleport) {
-                 this.isStaring = true;
-                 this.stareTimer = 60 + random.nextInt(40); // 3-5秒
-                 this.hero.setFloating(false);
-                 this.hero.setNoGravity(false);
-                 
-                 // [新增] 播放音效，增加惊吓感 (音调调低一点，更恐怖)
-                 this.hero.level().playSound(null, this.hero.blockPosition(), SoundEvents.ENDERMAN_TELEPORT, SoundSource.HOSTILE, 1.0F, 0.5F);
+                this.isStaring = true;
+                this.stareTimer = 60 + random.nextInt(40); // 3-5秒
+                this.hero.setFloating(false);
+                this.hero.setNoGravity(false);
+
+                // 播放音效，增加惊吓感
+                this.hero.level().playSound(null, this.hero.blockPosition(), SoundEvents.ENDERMAN_TELEPORT, SoundSource.HOSTILE, 1.0F, 0.5F);
             } else {
                 this.hero.level().playSound(null, this.hero.blockPosition(), SoundEvents.ENDERMAN_TELEPORT, SoundSource.HOSTILE, 1.0F, 0.8F);
             }
@@ -161,7 +189,6 @@ public class HeroTeleportToPlayerGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
-        // [新增] 如果正在交易，立即停止
         if (this.hero.getTradingPlayer() != null) return false;
         return this.isStaring && this.stareTimer > 0 && this.targetPlayer != null && this.targetPlayer.isAlive();
     }
@@ -181,7 +208,7 @@ public class HeroTeleportToPlayerGoal extends Goal {
     @Override
     public void stop() {
         this.isStaring = false;
-        // [修改] 增加冷却时间，从 40 ticks (2s) 增加到 200 ticks (10s)
-        this.cooldown = 200; 
+        // 增加冷却时间，从 40 ticks (2s) 增加到 200 ticks (10s)
+        this.cooldown = 200;
     }
 }

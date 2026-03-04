@@ -19,7 +19,9 @@ public class HeroAI {
 
         // 1. [Lore] 修复异常 (最高优先级)
         hero.getGoalSelector().addGoal(1, new HeroFixAnomalyGoal(hero));
-
+        //1.5 [Lore] 战斗旁观与危机救援 (优先级 1，高于平时的跟随 2)
+// 当玩家进入战斗时，这个 Goal 会抢占移动控制权，迫使 Herobrine 拉开距离不干涉
+        hero.getGoalSelector().addGoal(1, new HeroObserveAndRescueGoal(hero));
         // 2. [Lore] 陪伴跟随 AI (优先级 2)
         // 使用新的 GodlyCompanionGoal，速度设为 1.2D
         hero.getGoalSelector().addGoal(2, new HeroGodlyCompanionGoal(hero, 1.2D));

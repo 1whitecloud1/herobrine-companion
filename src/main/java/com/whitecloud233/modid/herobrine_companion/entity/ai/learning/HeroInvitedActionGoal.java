@@ -347,9 +347,10 @@ public class HeroInvitedActionGoal extends Goal {
         }
     }
 
+
     /**
      * 容器守卫逻辑
-     * 游荡 + 瞬间凝视 + 灭火
+     * 游荡 + 瞬间凝视 + 灭火 + 强制防盗
      */
     private void performContainerGuardLogic(Vec3 chestPos) {
         // [灭火]
@@ -367,13 +368,21 @@ public class HeroInvitedActionGoal extends Goal {
         Vec3 moveDir = this.wanderTarget.subtract(this.hero.position()).normalize().scale(0.02);
         this.hero.setDeltaMovement(this.hero.getDeltaMovement().add(moveDir).scale(0.9));
 
-        // 2. 威胁检测与凝视
+        // 2. 威胁检测、凝视与界面压制
         boolean staringAtThreat = false;
         List<Player> nearbyPlayers = this.hero.level().getEntitiesOfClass(Player.class, new AABB(this.targetPos).inflate(5.0));
 
         for (Player p : nearbyPlayers) {
             if (!p.getUUID().equals(this.hero.getOwnerUUID()) && !p.isCreative()) {
-                if (p.distanceToSqr(chestPos) < 12.25) {
+                double distToChest = p.distanceToSqr(chestPos);
+
+                // [新增] 创世神的绝对压制：当非主人玩家进入箱子约 6 格（距离平方 36）范围内时，
+                // 强制关闭该玩家的容器界面，使其无法打开箱子。
+                if (distToChest < 9.0) {
+                    p.closeContainer();
+                }
+
+                if (distToChest < 12.25) {
                     staringAtThreat = true;
                     this.hero.getLookControl().setLookAt(p, 100.0f, 100.0f);
 
@@ -406,6 +415,7 @@ public class HeroInvitedActionGoal extends Goal {
             }
         }
     }
+
 
     /**
      * 神之领域 - 仅灭火

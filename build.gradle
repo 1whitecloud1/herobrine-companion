@@ -180,20 +180,11 @@ tasks.named('processResources', ProcessResources).configure {
     ]
     inputs.properties replaceProperties
     filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) { expand(replaceProperties) }
-    exclude 'herobrine_companion.mixins.json'
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
-// 复制 Mixin 配置
-task copyMixins(type: Copy) {
-    from 'src/main/resources/herobrine_companion.mixins.json'
-    into 'build/resources/main'
-}
-processResources.finalizedBy(copyMixins)
-
 // === Jar 构建逻辑 (包含 H2 植入) ===
 tasks.named('jar', Jar).configure {
-    dependsOn 'copyMixins'
     manifest {
         attributes([
                 "Specification-Title": mod_id,

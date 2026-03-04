@@ -160,7 +160,9 @@ public class HeroSummonItem extends Item {
                             HeroDataHandler.syncGlobalTrust(newHero);
 
                             serverLevel.addFreshEntity(newHero);
-                            
+                            // 【新增】更新召唤时间 (跨维度)
+                            newHero.setLastSummonedTime(currentTime);
+
                             if (player != null) {
                                 player.sendSystemMessage(Component.translatable("message.herobrine_companion.hero_teleported"));
                                 setLastUseTime(stack, currentTime);
@@ -171,7 +173,9 @@ public class HeroSummonItem extends Item {
                         existingHero.teleportTo(serverLevel, targetPos.x, targetPos.y, targetPos.z, Collections.emptySet(), existingHero.getYRot(), existingHero.getXRot());
                         existingHero.getNavigation().stop();
                         existingHero.setTarget(null);
-                        
+                        // 【新增】更新召唤时间 (同维度)
+                        existingHero.setLastSummonedTime(currentTime);
+
                         if (player != null) {
                             player.sendSystemMessage(Component.translatable("message.herobrine_companion.hero_teleported"));
                             setLastUseTime(stack, currentTime);
@@ -195,7 +199,8 @@ public class HeroSummonItem extends Item {
                         }
 
                         serverLevel.addFreshEntity(hero);
-                        
+                        // 【新增】更新召唤时间 (新召唤)
+                        hero.setLastSummonedTime(currentTime);
                         if (player != null) {
                             player.sendSystemMessage(Component.translatable("message.herobrine_companion.hero_summoned"));
                             setLastUseTime(stack, currentTime);
