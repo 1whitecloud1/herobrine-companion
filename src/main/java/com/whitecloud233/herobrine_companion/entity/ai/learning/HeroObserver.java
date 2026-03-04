@@ -171,7 +171,7 @@ public class HeroObserver {
             lastHeldItem.put(player.getUUID(), currentItem);
             
             if (currentItem.is(Items.ENCHANTED_GOLDEN_APPLE)) {
-                hero.getHeroBrain().inputNostalgia(player.getUUID(), 0.5f);
+                hero.getHeroBrain().inputNostalgia(player.getUUID(), 0.05f);
             }
             
             if (isOnCooldown(player, "item", 1200)) return; 

@@ -326,9 +326,15 @@ public class HeroInvitedActionGoal extends Goal {
         }
     }
 
+    /**
+     * 容器守卫逻辑
+     * 游荡 + 瞬间凝视 + 灭火 + 强制防盗
+     */
     private void performContainerGuardLogic(Vec3 chestPos) {
+        // [灭火]
         extinguishFireAround(BlockPos.containing(chestPos));
 
+        // 1. 漫不经心的游荡
         if (this.hero.tickCount % 100 == 0 || this.wanderTarget == null || this.hero.distanceToSqr(this.wanderTarget) < 1.0) {
             double angle = this.hero.getRandom().nextDouble() * Math.PI * 2;
             double radius = 2.0 + this.hero.getRandom().nextDouble() * 2.0;
@@ -340,14 +346,24 @@ public class HeroInvitedActionGoal extends Goal {
         Vec3 moveDir = this.wanderTarget.subtract(this.hero.position()).normalize().scale(0.02);
         this.hero.setDeltaMovement(this.hero.getDeltaMovement().add(moveDir).scale(0.9));
 
+        // 2. 威胁检测、凝视与界面压制
         boolean staringAtThreat = false;
         List<Player> nearbyPlayers = this.hero.level().getEntitiesOfClass(Player.class, new AABB(this.targetPos).inflate(5.0));
 
         for (Player p : nearbyPlayers) {
             if (!p.getUUID().equals(this.hero.getOwnerUUID()) && !p.isCreative()) {
-                if (p.distanceToSqr(chestPos) < 12.25) {
+                double distToChest = p.distanceToSqr(chestPos);
+
+                // [新增] 创世神的绝对压制：当非主人玩家进入箱子约 3 格（距离平方 9）范围内时，
+                // 强制关闭该玩家的容器界面，使其无法打开箱子。
+                if (distToChest < 9.0) {
+                    p.closeContainer();
+                }
+
+                if (distToChest < 12.25) {
                     staringAtThreat = true;
                     this.hero.getLookControl().setLookAt(p, 100.0f, 100.0f);
+
                     if (this.hero.tickCount % 20 == 0) {
                         this.hero.level().playSound(null, this.hero.blockPosition(), SoundEvents.WARDEN_HEARTBEAT, SoundSource.HOSTILE, 1.0f, 0.5f);
                         p.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 20, 0, true, false));
@@ -365,6 +381,7 @@ public class HeroInvitedActionGoal extends Goal {
             }
         }
 
+        // 3. 标记粒子
         if (this.hero.tickCount % 15 == 0 && this.hero.level() instanceof ServerLevel serverLevel) {
             serverLevel.sendParticles(ParticleTypes.SCULK_SOUL,
                     chestPos.x, chestPos.y + 0.5, chestPos.z,
@@ -376,6 +393,7 @@ public class HeroInvitedActionGoal extends Goal {
             }
         }
     }
+
 
     private void performGenericGuardLogic(Vec3 targetVec) {
         Vec3 away = this.hero.position().add(this.hero.position().subtract(targetVec));

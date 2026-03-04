@@ -152,15 +152,18 @@ public class HeroSummonItem extends Item {
                             newHero.load(heroData);
                             newHero.moveTo(targetPos.x, targetPos.y, targetPos.z, existingHero.getYRot(), existingHero.getXRot());
                             newHero.setUUID(UUID.randomUUID());
-                            
+
                             // 添加特权标签，防止被误杀
                             newHero.addTag(EndRingContext.TAG_RESPAWNED_SAFE);
-                            
+
                             // 确保信任度同步
                             HeroDataHandler.syncGlobalTrust(newHero);
 
                             serverLevel.addFreshEntity(newHero);
-                            
+
+                            // 【新增】更新召唤时间 (跨维度)
+                            newHero.setLastSummonedTime(currentTime);
+
                             if (player != null) {
                                 player.sendSystemMessage(Component.translatable("message.herobrine_companion.hero_teleported"));
                                 setLastUseTime(stack, currentTime);
@@ -171,7 +174,10 @@ public class HeroSummonItem extends Item {
                         existingHero.teleportTo(serverLevel, targetPos.x, targetPos.y, targetPos.z, Collections.emptySet(), existingHero.getYRot(), existingHero.getXRot());
                         existingHero.getNavigation().stop();
                         existingHero.setTarget(null);
-                        
+
+                        // 【新增】更新召唤时间 (同维度)
+                        existingHero.setLastSummonedTime(currentTime);
+
                         if (player != null) {
                             player.sendSystemMessage(Component.translatable("message.herobrine_companion.hero_teleported"));
                             setLastUseTime(stack, currentTime);
@@ -179,14 +185,14 @@ public class HeroSummonItem extends Item {
                     }
 
                     level.playSound(null, context.getClickedPos(), SoundEvents.ENDERMAN_TELEPORT, SoundSource.PLAYERS, 1.0f, 1.0f);
-                    
+
                 } else {
                     // 召唤新 Hero
                     HeroEntity hero = ModEvents.HERO.get().create(serverLevel);
                     if (hero != null) {
                         hero.moveTo(targetPos);
                         hero.finalizeSpawn(serverLevel, serverLevel.getCurrentDifficultyAt(hero.blockPosition()), MobSpawnType.TRIGGERED, null);
-                        
+
                         // [修复] 绑定主人并同步信任度
                         if (player != null) {
                             hero.setOwnerUUID(player.getUUID());
@@ -195,6 +201,9 @@ public class HeroSummonItem extends Item {
                         }
 
                         serverLevel.addFreshEntity(hero);
+
+                        // 【新增】更新召唤时间 (新召唤)
+                        hero.setLastSummonedTime(currentTime);
 
                         if (player != null) {
                             player.sendSystemMessage(Component.translatable("message.herobrine_companion.hero_summoned"));

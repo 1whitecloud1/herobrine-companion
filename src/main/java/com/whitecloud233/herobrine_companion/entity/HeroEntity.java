@@ -96,8 +96,20 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     public int patrolTimer = 2400;
     private int outOfWaterTimer = 0;
 
+    // [新增] 记录上一次被物品强行召唤的时间，用于防止 AI 瞬间抢夺控制权
+    private long lastSummonedTime = 0;
+
+    public void setLastSummonedTime(long time) {
+        this.lastSummonedTime = time;
+    }
+
+    public long getLastSummonedTime() {
+        return this.lastSummonedTime;
+    }
+
     // [修复关键] 标记实体是否从磁盘加载，防止 Update 后逻辑误判
     private boolean loadedFromDisk = false;
+
 
     @Nullable private Player tradingPlayer;
     @Nullable private MerchantOffers offers;

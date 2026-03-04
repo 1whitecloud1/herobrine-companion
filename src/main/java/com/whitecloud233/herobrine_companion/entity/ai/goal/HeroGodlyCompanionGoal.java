@@ -3,11 +3,13 @@ package com.whitecloud233.herobrine_companion.entity.ai.goal;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.EnumSet;
+
 public class HeroGodlyCompanionGoal extends Goal {
     private final HeroEntity hero;
     private final double speedModifier;
@@ -16,9 +18,10 @@ public class HeroGodlyCompanionGoal extends Goal {
     // 参数配置
     private static final double HOVER_HEIGHT_AIR = 2.0D;
     private static final double FOLLOW_DISTANCE = 3.5D;
-
-    // [修复] 落地阈值稍微调高一点点，更容易触发
     private static final double LANDING_THRESHOLD = 0.8D;
+
+    // [新增] 战斗超时时间
+    private static final int COMBAT_TIMEOUT = 100;
 
     private int teleportCooldown;
 
@@ -35,26 +38,60 @@ public class HeroGodlyCompanionGoal extends Goal {
         this.setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
     }
 
+    /**
+     * [新增] 统一的战斗状态判定
+     * 与 ObserveAndRescueGoal 和 TeleportGoal 保持绝对一致，防止 AI 撕扯
+     */
+    /**
+     * 【重写】精准判断玩家是否处于战斗状态
+     */
+    private boolean isInCombat(Player player) {
+        // 1. 放宽伤害时间戳判定
+        // 只要近期 (5秒内) 造成或受到过伤害，就算战斗状态缓冲期。
+        // 【核心修复】：移除了对“攻击者必须还活着”的死板检测，防止秒杀怪物后立刻判定脱战。
+        int currentTick = player.tickCount;
+        if (player.getLastHurtByMobTimestamp() > 0 && (currentTick - player.getLastHurtByMobTimestamp()) < COMBAT_TIMEOUT) return true;
+        if (player.getLastHurtMobTimestamp() > 0 && (currentTick - player.getLastHurtMobTimestamp()) < COMBAT_TIMEOUT) return true;
+
+        // 2. 增加“仇恨感知”（主动预判）
+        // 不要等挨打了才算战斗！扫描周围 16 格，只要有怪物把仇恨目标(Target)锁定为你，神明就会立刻察觉并避让。
+        net.minecraft.world.phys.AABB searchBox = player.getBoundingBox().inflate(16.0D, 8.0D, 16.0D);
+        java.util.List<net.minecraft.world.entity.Mob> threats = player.level().getEntitiesOfClass(
+                net.minecraft.world.entity.Mob.class,
+                searchBox,
+                mob -> mob.getTarget() != null && mob.getTarget().getUUID().equals(player.getUUID())
+        );
+
+        return !threats.isEmpty();
+    }
+
     @Override
     public boolean canUse() {
         if (!this.hero.isCompanionMode()) return false;
-        // [新增] 如果正在交易，禁止跟随移动
+        // 如果正在交易，禁止跟随移动
         if (this.hero.getTradingPlayer() != null) return false;
 
         Player player = this.hero.level().getNearestPlayer(this.hero, 64.0D);
         if (player == null) return false;
         this.owner = player;
+
+        // 【关键修复】如果玩家进入战斗，立刻禁用贴身跟随
+        // 将身体的控制权完美移交给 HeroObserveAndRescueGoal
+        if (isInCombat(this.owner)) return false;
+
         return this.hero.distanceToSqr(player) > (FOLLOW_DISTANCE * FOLLOW_DISTANCE + 4.0D);
     }
 
     @Override
     public boolean canContinueToUse() {
         if (!this.hero.isCompanionMode()) return false;
-        // [新增] 如果正在交易，立即停止跟随
+        // 如果正在交易，立即停止跟随
         if (this.hero.getTradingPlayer() != null) return false;
-
         if (this.owner == null || !this.owner.isAlive()) return false;
-        // [修复] 当距离足够近时，停止该 Goal，允许 IdleGoal 执行
+
+        // 【关键修复】如果在日常跟随中突然爆发战斗，立刻打断当前步伐
+        if (isInCombat(this.owner)) return false;
+
         return this.hero.distanceToSqr(this.owner) > (FOLLOW_DISTANCE * FOLLOW_DISTANCE);
     }
 
@@ -79,23 +116,19 @@ public class HeroGodlyCompanionGoal extends Goal {
     @Override
     public void tick() {
         // === 1. 头部与身体转向修复 ===
-        // 始终让身体面向 Owner，避免身体背对 Owner 时头部受限导致的抽搐
         double d0 = this.owner.getX() - this.hero.getX();
         double d1 = this.owner.getZ() - this.hero.getZ();
         double distSqr = d0 * d0 + d1 * d1;
 
-        // 只有当水平距离足够时才调整身体朝向，防止在正上方/正下方时 atan2 导致的角度跳变
         if (distSqr > 0.1D) {
             float targetYRot = -((float)Mth.atan2(d0, d1)) * (180F / (float)Math.PI);
-            // 平滑转动身体，速度适中 (10.0F)
             this.hero.yBodyRot = rotlerp(this.hero.yBodyRot, targetYRot, 10.0F);
             this.hero.setYRot(this.hero.yBodyRot);
         }
 
-        // 头部看向 Owner
-        // 既然身体已经转过去了，头部只需要很小的调整
-        // 增加垂直转动速度 (40.0F) 以应对高度变化，水平速度 (30.0F) 保持平滑
         this.hero.getLookControl().setLookAt(this.owner, 30.0F, 40.0F);
+
+        // 兜底逻辑：如果你跑得太快(超过 20 格)，但又没处于战斗中，偶尔会触发传送
         double distToOwnerSqr = this.hero.distanceToSqr(this.owner);
         if (distToOwnerSqr > 400.0D) {
             if (this.teleportCooldown-- <= 0) {
@@ -118,21 +151,18 @@ public class HeroGodlyCompanionGoal extends Goal {
         Vec3 targetPos = calculateTargetPos(this.currentOrbitAngle);
 
         // === 3. 核心修复：状态切换判定 ===
-        double heightDiff = this.hero.getY() - targetPos.y; // 正数表示 Hero 在目标上方
+        double heightDiff = this.hero.getY() - targetPos.y;
         boolean ownerIsFlying = !this.owner.onGround() && this.owner.getAbilities().flying;
 
-        // 如果高度差 > 阈值，或者玩家在飞，则保持飞行
         boolean shouldFly = ownerIsFlying || heightDiff > LANDING_THRESHOLD;
 
         if (shouldFly != this.hero.isFloating()) {
             this.hero.setFloating(shouldFly);
             this.hero.setNoGravity(shouldFly);
-            // [重要] 切换状态时立刻重置导航路径，防止旧路径干扰
             this.hero.getNavigation().stop();
         }
 
         // === 4. 移动逻辑修复 ===
-        // 分别计算水平距离和垂直距离，不要混在一起
         double dx = this.hero.getX() - targetPos.x;
         double dz = this.hero.getZ() - targetPos.z;
         double distHorizontalSqr = dx * dx + dz * dz;
@@ -141,23 +171,15 @@ public class HeroGodlyCompanionGoal extends Goal {
         if (distHorizontalSqr > 25.0D) speed *= 1.5D;
 
         if (this.hero.isFloating()) {
-            // [飞行状态]
-            // 只要没对准（无论是水平没对准，还是垂直没对准），就继续移动
-            // 修复：之前只判断总距离 < 2.0 就停，导致高度差 1.0 时也停了
-
             boolean closeEnoughHorizontally = distHorizontalSqr < 1.0D;
             boolean closeEnoughVertically = Math.abs(heightDiff) < 0.2D;
 
             if (closeEnoughHorizontally && closeEnoughVertically) {
-                // 完全到位了才刹车
                 this.hero.setDeltaMovement(this.hero.getDeltaMovement().scale(0.6));
             } else {
-                // 没到位就继续飞
                 this.hero.getMoveControl().setWantedPosition(targetPos.x, targetPos.y, targetPos.z, speed);
             }
         } else {
-            // [走路状态]
-            // 如果水平距离太近，就停下来（避免原地踏步）
             if (distHorizontalSqr < 1.5D) {
                 this.hero.getNavigation().stop();
             } else {
@@ -184,11 +206,8 @@ public class HeroGodlyCompanionGoal extends Goal {
         if (this.owner.getAbilities().flying || !this.owner.onGround()) {
             targetY = this.owner.getY() + HOVER_HEIGHT_AIR;
         } else {
-            // 目标就是脚底板地面
             targetY = this.owner.getY();
-
             BlockPos blockPos = new BlockPos((int)tx, (int)targetY, (int)tz);
-            // 只有当目标点真的是实体方块内部时，才抬高
             if (this.hero.level().getBlockState(blockPos).isSolid() &&
                     this.hero.level().getBlockState(blockPos.above()).isSolid()) {
                 targetY = this.owner.getY() + 3.0;

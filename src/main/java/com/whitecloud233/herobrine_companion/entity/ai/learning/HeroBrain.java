@@ -338,7 +338,7 @@ public class HeroBrain {
                 }
             }
             case REMINISCING -> {
-                if (hero.getRandom().nextFloat() < 0.01f) {
+                if (hero.getRandom().nextFloat() < 0.001f) {
                     level.playSound(null, hero.blockPosition(), net.minecraft.sounds.SoundEvents.VILLAGER_NO, net.minecraft.sounds.SoundSource.NEUTRAL, 1.0f, 0.5f);
                 }
             }

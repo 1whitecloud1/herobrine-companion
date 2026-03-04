@@ -1,5 +1,6 @@
 package com.whitecloud233.herobrine_companion.client.gui;
 
+import com.mojang.blaze3d.systems.RenderSystem;
 import com.whitecloud233.herobrine_companion.network.ContractPacket;
 import com.whitecloud233.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.herobrine_companion.world.inventory.HeroContractMenu;
@@ -8,12 +9,14 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 
 public class HeroContractScreen extends AbstractContainerScreen<HeroContractMenu> {
 
     // 定义蓝白色系配色方案
     private static final int COL_BORDER_OUTER = 0xFF81D4FA; // 浅天蓝边框 (Light Blue)
-    private static final int COL_BG_MAIN      = 0xFF011826; //以此深蓝为底 (Dark Deep Blue)
+    private static final int COL_BG_MAIN      = 0xFF011826; // 以此深蓝为底 (Dark Deep Blue)
     private static final int COL_SLOT_BORDER  = 0xFF0277BD; // 插槽边框 (Medium Blue)
     private static final int COL_SLOT_BG      = 0xFF002538; // 插槽内部 (Darker Blue)
     private static final int COL_TEXT_TITLE   = 0xFFE1F5FE; // 标题白青色 (Ice White)
@@ -31,6 +34,8 @@ public class HeroContractScreen extends AbstractContainerScreen<HeroContractMenu
         super.init();
         // 按钮 (Sign Contract)
         this.addRenderableWidget(Button.builder(Component.translatable("gui.herobrine_companion.sign_contract"), button -> {
+                    // 注意：如果你的 PacketHandler 还没升级到 1.21.1 NeoForge，
+                    // 1.21.1 NeoForge 通常推荐使用 PacketDistributor.sendToServer(...)
                     PacketHandler.sendToServer(new ContractPacket());
                 })
                 .bounds(this.leftPos + 48, this.topPos + 55, 80, 20)
@@ -62,11 +67,26 @@ public class HeroContractScreen extends AbstractContainerScreen<HeroContractMenu
         guiGraphics.fill(x + 2, y + 2, x + this.imageWidth - 2, y + this.imageHeight - 2, COL_BG_MAIN);
 
         // 2. 绘制插槽背景
-        // 两个输入格子的特殊提示色也改为蓝/白色系的微调
-        // Slot 1 (Nether Star): 给他一点明亮的青色光晕
+        // Slot 1 (Nether Star): 明亮的青色光晕
         drawSlotBackground(guiGraphics, x + 60, y + 25, 0x3000FFFF);
-        // Slot 2 (Dragon Breath): 给他一点深邃的蓝紫色光晕
+        // Slot 2 (Dragon Breath): 深邃的蓝紫色光晕
         drawSlotBackground(guiGraphics, x + 100, y + 25, 0x305E35B1);
+
+        // --- 绘制半透明提示材料（下界之星 与 龙息） ---
+        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 0.5F); // 设置 50% 透明度
+        RenderSystem.enableBlend();
+
+        if (!this.menu.getSlot(0).hasItem()) {
+            guiGraphics.renderFakeItem(new ItemStack(Items.NETHER_STAR), x + 60, y + 25);
+        }
+
+        if (!this.menu.getSlot(1).hasItem()) {
+            guiGraphics.renderFakeItem(new ItemStack(Items.DRAGON_BREATH), x + 100, y + 25);
+        }
+
+        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F); // 重置透明度
+        RenderSystem.disableBlend();
+        // ------------------------------------
 
         // 玩家物品栏插槽背景
         for (int i = 0; i < 3; ++i) {
