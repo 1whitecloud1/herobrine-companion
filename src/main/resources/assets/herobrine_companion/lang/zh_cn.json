@@ -317,6 +317,10 @@
   "gui.herobrine_companion.config.clean_items": "清理掉落物: %s",
   "gui.herobrine_companion.config.clean_items.tooltip": "开启后，处于维护者状态的 Herobrine 会自动清理周围掉落时间较长的垃圾物品（会避开贵重物品）。",
 
+  "item.herobrine_companion.lore_fragment.added_to_new_handbook": "关于 %s 的知识已抄录至你的新图鉴中。",
+  "item.herobrine_companion.lore_fragment.already_collected": "你已经了解过关于 %s 的知识了。",
+  "message.herobrine_companion.inventory_full_lore_dropped": "你的背包满了，一块神秘的碎片掉落在了你脚边...",
+
 
   "item.herobrine_companion.poem_of_the_end.mode.0": "§6[模式] §f普通 (Normal)",
   "item.herobrine_companion.poem_of_the_end.mode.1": "§6[模式] §c破境 (Realm Breaker)",

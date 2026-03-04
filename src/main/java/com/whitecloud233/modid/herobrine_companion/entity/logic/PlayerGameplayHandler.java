@@ -170,30 +170,42 @@ public class PlayerGameplayHandler {
             }
             // [新增] 永恒誓约触发逻辑 (片段九)
             CompoundTag data = player.getPersistentData();
+
+            // 检查是否已经触发过
             if (!data.getBoolean("HasReceivedFragment9")) {
-                // 1% 概率触发 (或者你可以调高一点方便测试)
-                if (player.getRandom().nextFloat() < 0.99f) {
-                    // 给予物品
+
+                // 触发概率 (测试时用 0.2f，发布时可以改回 0.01f)
+                if (player.getRandom().nextFloat() < 0.2f) {
+
+                    // 1. 生成碎片物品
                     ItemStack fragment = new ItemStack(HerobrineCompanion.LORE_FRAGMENT.get());
                     CompoundTag tag = new CompoundTag();
                     tag.putString(LoreFragmentItem.LORE_ID_KEY, "fragment_9");
                     fragment.setTag(tag);
 
-                    // [修改] 只有成功放入背包才算获得
-                    if (player.getInventory().add(fragment)) {
-                        // 标记已获得
-                        data.putBoolean("HasReceivedFragment9", true);
-                        // 触发客户端屏幕
-                        PacketHandler.sendToPlayer(new TriggerEternalOathPacket(), player);
-                    } else {
-                        // 背包满了，提示玩家
-                        player.displayClientMessage(Component.translatable("message.herobrine_companion.inventory_full_lore").withStyle(ChatFormatting.RED), true);
+                    // 2. 尝试放入玩家背包
+                    boolean addedToInventory = player.getInventory().add(fragment);
+
+                    if (!addedToInventory) {
+                        // [修改] 如果背包满了，直接掉落在玩家脚下，而不是取消事件
+                        player.drop(fragment, false);
+                        // 提示玩家物品掉在地上了
+                        player.displayClientMessage(Component.translatable("message.herobrine_companion.inventory_full_lore_dropped").withStyle(ChatFormatting.YELLOW), true);
                     }
+
+                    // 3. 无论物品是进了背包还是掉在地上，都算作事件成功触发
+                    // 打上永久标记，保证整个存档只触发一次
+                    data.putBoolean("HasReceivedFragment9", true);
+
+                    // 4. 发送网络包触发客户端的史诗级屏幕演出
+                    // 最好确保 player 是 ServerPlayer 再发包，防止类型转换异常
+                    // 4. 发送网络包触发客户端的史诗级屏幕演出
+                    // [修改] 因为 player 已经是 ServerPlayer，直接传 player 即可！
+                    PacketHandler.sendToPlayer(new TriggerEternalOathPacket(), player);
                 }
             }
         }
     }
-
     // [新增] 怪物死亡事件 (用于触发战斗评论)
     @SubscribeEvent
     public static void onLivingDeath(LivingDeathEvent event) {

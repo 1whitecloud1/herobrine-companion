@@ -50,58 +50,78 @@ public class LoreFragmentItem extends Item {
 
         if (handbookStackOpt.isPresent()) {
             if (!level.isClientSide) {
-                LoreHandbookItem.addFragment(handbookStackOpt.get(), fragmentId);
-                // 使用标题 key 发送消息
+                // 写入图鉴 (返回 true 说明图鉴是第一次记录这个碎片)
+                boolean addedToHandbook = LoreHandbookItem.addFragment(handbookStackOpt.get(), fragmentId);
                 Component fragmentTitle = Component.translatable("lore.herobrine_companion." + fragmentId + ".title");
-                player.sendSystemMessage(Component.translatable("item.herobrine_companion.lore_fragment.collected", fragmentTitle).withStyle(ChatFormatting.GREEN));
 
-                // 触发进度 (1.20.1 写法)
                 if (player instanceof ServerPlayer serverPlayer) {
-                    ResourceLocation advancementId = new ResourceLocation(HerobrineCompanion.MODID, fragmentId);
-                    Advancement advancement = serverPlayer.server.getAdvancements().getAdvancement(advancementId);
-
-                    if (advancement != null) {
-                        AdvancementProgress progress = serverPlayer.getAdvancements().getOrStartProgress(advancement);
-                        if (!progress.isDone()) {
-                            for (String criterion : progress.getRemainingCriteria()) {
-                                serverPlayer.getAdvancements().award(advancement, criterion);
-                            }
-                        }
-                    }
-
-                    // [修改] 将碎片 ID 记录到玩家的 NBT 中，等待 Herobrine 读取
                     CompoundTag playerData = player.getPersistentData();
-                    ListTag pendingLore;
-                    if (playerData.contains("HeroPendingLore", Tag.TAG_LIST)) {
-                        pendingLore = playerData.getList("HeroPendingLore", Tag.TAG_STRING);
+
+                    // [新增] 获取玩家维度的永久解锁记录，防止换图鉴刷信任度
+                    ListTag collectedLore;
+                    if (playerData.contains("HeroCollectedLore", Tag.TAG_LIST)) {
+                        collectedLore = playerData.getList("HeroCollectedLore", Tag.TAG_STRING);
                     } else {
-                        pendingLore = new ListTag();
+                        collectedLore = new ListTag();
                     }
 
-                    // 避免在 pending 列表中重复添加同一个ID
-                    boolean alreadyPending = false;
-                    for (Tag t : pendingLore) {
+                    boolean alreadyCollectedByPlayer = false;
+                    for (Tag t : collectedLore) {
                         if (t.getAsString().equals(fragmentId)) {
-                            alreadyPending = true;
+                            alreadyCollectedByPlayer = true;
                             break;
                         }
                     }
 
-                    if (!alreadyPending) {
+                    if (!alreadyCollectedByPlayer) {
+                        // --- 玩家首次解锁该碎片 ---
+
+                        // 1. 加入玩家永久记录
+                        collectedLore.add(StringTag.valueOf(fragmentId));
+                        playerData.put("HeroCollectedLore", collectedLore);
+
+                        // 2. 发送成功收集消息
+                        player.sendSystemMessage(Component.translatable("item.herobrine_companion.lore_fragment.collected", fragmentTitle).withStyle(ChatFormatting.GREEN));
+
+                        // 3. 触发进度
+                        ResourceLocation advancementId = new ResourceLocation(HerobrineCompanion.MODID, fragmentId);
+                        Advancement advancement = serverPlayer.server.getAdvancements().getAdvancement(advancementId);
+                        if (advancement != null) {
+                            AdvancementProgress progress = serverPlayer.getAdvancements().getOrStartProgress(advancement);
+                            if (!progress.isDone()) {
+                                for (String criterion : progress.getRemainingCriteria()) {
+                                    serverPlayer.getAdvancements().award(advancement, criterion);
+                                }
+                            }
+                        }
+
+                        // 4. 加入 Herobrine 待处理队列
+                        ListTag pendingLore;
+                        if (playerData.contains("HeroPendingLore", Tag.TAG_LIST)) {
+                            pendingLore = playerData.getList("HeroPendingLore", Tag.TAG_STRING);
+                        } else {
+                            pendingLore = new ListTag();
+                        }
                         pendingLore.add(StringTag.valueOf(fragmentId));
                         playerData.put("HeroPendingLore", pendingLore);
-                    }
 
-                    // [新增] 增加 20 点信任度奖励 (HeroPendingTrustReward)
-                    // HeroLogic 会在下一次检测时自动读取此值并增加信任度
-                    int currentReward = 0;
-                    if (playerData.contains("HeroPendingTrustReward")) {
-                        currentReward = playerData.getInt("HeroPendingTrustReward");
+                        // 5. 增加 20 点信任度奖励
+                        int currentReward = playerData.getInt("HeroPendingTrustReward"); // 不存在默认返回 0
+                        playerData.putInt("HeroPendingTrustReward", currentReward + 20);
+
+                    } else {
+                        // --- 玩家已经解锁过该碎片 ---
+                        if (addedToHandbook) {
+                            // 碎片没解锁过当前这本图鉴（比如玩家换了本新书），但玩家以前解锁过了，只提示补全图鉴，不给信任度
+                            player.sendSystemMessage(Component.translatable("item.herobrine_companion.lore_fragment.added_to_new_handbook", fragmentTitle).withStyle(ChatFormatting.GREEN));
+                        } else {
+                            // 图鉴也有了，玩家也解锁过了
+                            player.sendSystemMessage(Component.translatable("item.herobrine_companion.lore_fragment.already_collected", fragmentTitle).withStyle(ChatFormatting.YELLOW));
+                        }
                     }
-                    playerData.putInt("HeroPendingTrustReward", currentReward + 20);
                 }
 
-                // 消耗物品 (即使是创造模式也消耗，防止刷屏)
+                // 无论是否重复，始终消耗物品 (防止刷屏/占格子)
                 fragmentStack.shrink(1);
             }
             return InteractionResultHolder.sidedSuccess(fragmentStack, level.isClientSide());
@@ -114,15 +134,12 @@ public class LoreFragmentItem extends Item {
     }
 
     private Optional<ItemStack> findHandbook(Player player) {
-        // 优先检查主手和副手
         if (player.getMainHandItem().getItem() == HerobrineCompanion.LORE_HANDBOOK.get()) {
             return Optional.of(player.getMainHandItem());
         }
         if (player.getOffhandItem().getItem() == HerobrineCompanion.LORE_HANDBOOK.get()) {
             return Optional.of(player.getOffhandItem());
         }
-        
-        // 然后检查背包
         for (int i = 0; i < player.getInventory().getContainerSize(); ++i) {
             ItemStack stack = player.getInventory().getItem(i);
             if (stack.getItem() == HerobrineCompanion.LORE_HANDBOOK.get()) {

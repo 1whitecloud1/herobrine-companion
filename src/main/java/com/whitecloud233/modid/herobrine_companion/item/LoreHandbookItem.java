@@ -27,7 +27,8 @@ public class LoreHandbookItem extends Item {
         return InteractionResultHolder.success(stack);
     }
 
-    public static void addFragment(ItemStack handbook, String fragmentId) {
+    // [修改] 返回 boolean 值，true 表示新添加，false 表示图鉴中已存在
+    public static boolean addFragment(ItemStack handbook, String fragmentId) {
         CompoundTag tag = handbook.getOrCreateTag();
 
         ListTag fragments;
@@ -38,17 +39,14 @@ public class LoreHandbookItem extends Item {
         }
 
         // Avoid duplicates
-        boolean alreadyHas = false;
         for (int i = 0; i < fragments.size(); i++) {
             if (fragments.getString(i).equals(fragmentId)) {
-                alreadyHas = true;
-                break;
+                return false; // 图鉴里已经有这个碎片了
             }
         }
 
-        if (!alreadyHas) {
-            fragments.add(StringTag.valueOf(fragmentId));
-            tag.put("collected_fragments", fragments);
-        }
+        fragments.add(StringTag.valueOf(fragmentId));
+        tag.put("collected_fragments", fragments);
+        return true; // 成功添加到图鉴
     }
 }
