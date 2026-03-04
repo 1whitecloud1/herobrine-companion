@@ -96,7 +96,7 @@ public class SimpleNeuralNetwork {
     public void inputLoreFragment(String fragmentId) {
         // 基础奖励：所有碎片都会增加一点尊重和怀旧
         this.respectWeight = clamp(this.respectWeight + 0.05f);
-        this.nostalgiaScore = clamp(this.nostalgiaScore + 0.1f);
+        this.nostalgiaScore = clamp(this.nostalgiaScore + 0.05f);
 
         // 根据碎片 ID 给予特殊奖励
         // 假设 fragmentId 格式为 "fragment_1", "fragment_2" 等
@@ -154,9 +154,9 @@ public class SimpleNeuralNetwork {
         this.explorationScore = Math.max(0, this.explorationScore - decayRate);
         this.failureScore = Math.max(0, this.failureScore - decayRate);
 
-        this.entropyScore = Math.max(0, this.entropyScore - 0.01f); // 混乱度衰减也减慢
+        this.entropyScore = Math.max(0, this.entropyScore - 0.02f); // 混乱度衰减也减慢
         this.metaScore = Math.max(0, this.metaScore - 0.0001f);      // Meta 感知极慢衰减
-        this.nostalgiaScore = Math.max(0, this.nostalgiaScore - 0.002f);
+        this.nostalgiaScore = Math.max(0, this.nostalgiaScore - 0.005f);
         this.monsterEmpathyScore = Math.max(0, this.monsterEmpathyScore - decayRate);
     }
 
