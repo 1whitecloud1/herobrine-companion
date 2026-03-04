@@ -188,6 +188,9 @@
   "gui.herobrine_companion.config.clean_items": "Clean Dropped Items: %s",
   "gui.herobrine_companion.config.clean_items.tooltip": "If enabled, Herobrine (in Maintainer state) will automatically clean up old item drops around him (ignores valuable items).",
 
+  "item.herobrine_companion.lore_fragment.added_to_new_handbook": "The knowledge of %s has been transcribed into your new handbook.",
+  "item.herobrine_companion.lore_fragment.already_collected": "You already possess the knowledge of %s.",
+  "message.herobrine_companion.inventory_full_lore_dropped": "Your inventory is full, a mysterious fragment dropped at your feet...",
 
 
   "message.herobrine_companion.state_protector_1": "I see potential in this world... and in you.",

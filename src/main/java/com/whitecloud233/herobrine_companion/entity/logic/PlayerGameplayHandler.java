@@ -171,28 +171,39 @@ public class PlayerGameplayHandler {
                     break;
                 }
             }
-            
+
             // [新增] 永恒誓约触发逻辑 (片段九)
             CompoundTag data = player.getPersistentData();
+            // 检查是否已经触发过
             if (!data.getBoolean("HasReceivedFragment9")) {
-                // 1% 概率触发
-                if (player.getRandom().nextFloat() < 0.01f) {
-                    // 给予物品
+
+                // 触发概率 (测试时用 0.2f，发布时可以改回 0.01f)
+                if (player.getRandom().nextFloat() < 0.2f) {
+
+                    // 1. 生成碎片物品
                     ItemStack fragment = new ItemStack(HerobrineCompanion.LORE_FRAGMENT.get());
                     CompoundTag tag = new CompoundTag();
                     tag.putString(LoreFragmentItem.LORE_ID_KEY, "fragment_9");
-                    fragment.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
-                    
-                    // [修改] 只有成功放入背包才算获得
-                    if (player.getInventory().add(fragment)) {
-                        // 标记已获得
-                        data.putBoolean("HasReceivedFragment9", true);
-                        // 触发客户端屏幕
-                        PacketHandler.sendToPlayer(new TriggerEternalOathPacket(), player);
-                    } else {
-                        // 背包满了，提示玩家
-                        player.displayClientMessage(Component.translatable("message.herobrine_companion.inventory_full_lore").withStyle(ChatFormatting.RED), true);
+
+                    // [修改] 1.21.1 不再使用 setTag，而是将 Tag 包装进 CustomData 并存入 DataComponents
+                    fragment.set(net.minecraft.core.component.DataComponents.CUSTOM_DATA, net.minecraft.world.item.component.CustomData.of(tag));
+
+                    // 2. 尝试放入玩家背包
+                    boolean addedToInventory = player.getInventory().add(fragment);
+
+                    if (!addedToInventory) {
+                        // 如果背包满了，直接掉落在玩家脚下，而不是取消事件
+                        player.drop(fragment, false);
+                        // 提示玩家物品掉在地上了
+                        player.displayClientMessage(Component.translatable("message.herobrine_companion.inventory_full_lore_dropped").withStyle(ChatFormatting.YELLOW), true);
                     }
+
+                    // 3. 无论物品是进了背包还是掉在地上，都算作事件成功触发
+                    // 打上永久标记，保证整个存档只触发一次
+                    data.putBoolean("HasReceivedFragment9", true);
+
+                    // 4. 发送网络包触发客户端的史诗级屏幕演出
+                    PacketHandler.sendToPlayer(new TriggerEternalOathPacket(), player);
                 }
             }
         }

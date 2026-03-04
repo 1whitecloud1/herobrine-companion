@@ -6,6 +6,7 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.entity.player.Player;
@@ -23,39 +24,34 @@ public class LoreHandbookItem extends Item {
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
         if (level.isClientSide) {
-            // 打开 GUI
             Minecraft.getInstance().setScreen(new LoreHandbookScreen(stack));
         }
         return InteractionResultHolder.success(stack);
     }
 
-    public static void addFragment(ItemStack handbook, String fragmentId) {
-        // 适配 1.20.5+ DataComponents
-        CustomData customData = handbook.get(DataComponents.CUSTOM_DATA);
-        CompoundTag tag = customData != null ? customData.copyTag() : new CompoundTag();
-        
+    // [修改] 1.21.1 使用 CustomData 读写数据
+    public static boolean addFragment(ItemStack handbook, String fragmentId) {
+        CustomData customData = handbook.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY);
+        CompoundTag tag = customData.copyTag();
+
         ListTag fragments;
-        if (tag.contains("collected_fragments", 9)) {
-            fragments = tag.getList("collected_fragments", 8);
+        if (tag.contains("collected_fragments", Tag.TAG_LIST)) {
+            fragments = tag.getList("collected_fragments", Tag.TAG_STRING);
         } else {
             fragments = new ListTag();
         }
 
-        // Avoid duplicates
-        boolean alreadyHas = false;
         for (int i = 0; i < fragments.size(); i++) {
             if (fragments.getString(i).equals(fragmentId)) {
-                alreadyHas = true;
-                break;
+                return false; // 图鉴里已存在
             }
         }
 
-        if (!alreadyHas) {
-            fragments.add(StringTag.valueOf(fragmentId));
-            tag.put("collected_fragments", fragments);
-            
-            // Save back to item
-            handbook.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
-        }
+        fragments.add(StringTag.valueOf(fragmentId));
+        tag.put("collected_fragments", fragments);
+
+        // 写回 DataComponent
+        handbook.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
+        return true;
     }
 }

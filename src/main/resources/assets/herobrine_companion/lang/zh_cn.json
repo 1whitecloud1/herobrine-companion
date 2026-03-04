@@ -106,6 +106,9 @@
   "gui.herobrine_companion.config.block_restoration.tooltip": "开启后，Herobrine 会自动使用神力修复周围被破坏的地形和方块。",
   "gui.herobrine_companion.config.clean_items": "清理掉落物: %s",
   "gui.herobrine_companion.config.clean_items.tooltip": "开启后，处于维护者状态的 Herobrine 会自动清理周围掉落时间较长的垃圾物品（会避开贵重物品）。",
+  "item.herobrine_companion.lore_fragment.added_to_new_handbook": "关于 %s 的知识已抄录至你的新图鉴中。",
+  "item.herobrine_companion.lore_fragment.already_collected": "你已经了解过关于 %s 的知识了。",
+  "message.herobrine_companion.inventory_full_lore_dropped": "你的背包满了，一块神秘的碎片掉落在了你脚边...",
 
 
 

@@ -34,7 +34,6 @@ public class LoreFragmentItem extends Item {
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
         ItemStack fragmentStack = player.getItemInHand(hand);
 
-        // 适配 1.20.5+ DataComponents
         CustomData customData = fragmentStack.get(DataComponents.CUSTOM_DATA);
         CompoundTag fragmentTag = customData != null ? customData.copyTag() : new CompoundTag();
 
@@ -46,46 +45,68 @@ public class LoreFragmentItem extends Item {
         }
 
         String fragmentId = fragmentTag.getString(LORE_ID_KEY);
-
         Optional<ItemStack> handbookStackOpt = findHandbook(player);
 
         if (handbookStackOpt.isPresent()) {
             if (!level.isClientSide) {
-                LoreHandbookItem.addFragment(handbookStackOpt.get(), fragmentId);
-                // Use the title key for the message
+                boolean addedToHandbook = LoreHandbookItem.addFragment(handbookStackOpt.get(), fragmentId);
                 Component fragmentTitle = Component.translatable("lore.herobrine_companion." + fragmentId + ".title");
-                player.sendSystemMessage(Component.translatable("item.herobrine_companion.lore_fragment.collected", fragmentTitle).withStyle(ChatFormatting.GREEN));
 
-                // Trigger advancement
                 if (player instanceof ServerPlayer serverPlayer) {
-                    ResourceLocation advancementId = ResourceLocation.fromNamespaceAndPath(HerobrineCompanion.MODID, fragmentId);
-                    AdvancementHolder advancement = serverPlayer.getServer().getAdvancements().get(advancementId);
-                    if (advancement != null) {
-                        serverPlayer.getAdvancements().award(advancement, "has_" + fragmentId);
-                    } else {
-                        System.out.println("Failed to find advancement: " + advancementId);
-                    }
-
-                    // [修改] 将碎片 ID 记录到玩家的 NBT 中，等待 Herobrine 读取
                     CompoundTag playerData = player.getPersistentData();
-                    ListTag pendingLore;
-                    if (playerData.contains("HeroPendingLore", Tag.TAG_LIST)) {
-                        pendingLore = playerData.getList("HeroPendingLore", Tag.TAG_STRING);
+
+                    ListTag collectedLore;
+                    if (playerData.contains("HeroCollectedLore", Tag.TAG_LIST)) {
+                        collectedLore = playerData.getList("HeroCollectedLore", Tag.TAG_STRING);
                     } else {
-                        pendingLore = new ListTag();
+                        collectedLore = new ListTag();
                     }
-                    pendingLore.add(StringTag.valueOf(fragmentId));
-                    playerData.put("HeroPendingLore", pendingLore);
 
-                    // [新增] 增加 20 点信任度奖励 (HeroPendingTrustReward)
-                    // HeroLogic 会在下一次检测时自动读取此值并增加信任度
-                    int currentReward = 0;
-                    if (playerData.contains("HeroPendingTrustReward")) {
-                        currentReward = playerData.getInt("HeroPendingTrustReward");
+                    boolean alreadyCollectedByPlayer = false;
+                    for (Tag t : collectedLore) {
+                        if (t.getAsString().equals(fragmentId)) {
+                            alreadyCollectedByPlayer = true;
+                            break;
+                        }
                     }
-                    playerData.putInt("HeroPendingTrustReward", currentReward + 20);
+
+                    if (!alreadyCollectedByPlayer) {
+                        // 1. 玩家首次收集
+                        collectedLore.add(StringTag.valueOf(fragmentId));
+                        playerData.put("HeroCollectedLore", collectedLore);
+
+                        player.sendSystemMessage(Component.translatable("item.herobrine_companion.lore_fragment.collected", fragmentTitle).withStyle(ChatFormatting.GREEN));
+
+                        // 2. 1.21.1 触发进度 (使用 AdvancementHolder)
+                        ResourceLocation advancementId = ResourceLocation.fromNamespaceAndPath(HerobrineCompanion.MODID, fragmentId);
+                        AdvancementHolder advancement = serverPlayer.getServer().getAdvancements().get(advancementId);
+                        if (advancement != null) {
+                            serverPlayer.getAdvancements().award(advancement, "has_" + fragmentId);
+                        }
+
+                        // 3. 加入待处理队列
+                        ListTag pendingLore;
+                        if (playerData.contains("HeroPendingLore", Tag.TAG_LIST)) {
+                            pendingLore = playerData.getList("HeroPendingLore", Tag.TAG_STRING);
+                        } else {
+                            pendingLore = new ListTag();
+                        }
+                        pendingLore.add(StringTag.valueOf(fragmentId));
+                        playerData.put("HeroPendingLore", pendingLore);
+
+                        // 4. 发放信任度
+                        int currentReward = playerData.contains("HeroPendingTrustReward") ? playerData.getInt("HeroPendingTrustReward") : 0;
+                        playerData.putInt("HeroPendingTrustReward", currentReward + 20);
+
+                    } else {
+                        // 玩家已收集过
+                        if (addedToHandbook) {
+                            player.sendSystemMessage(Component.translatable("item.herobrine_companion.lore_fragment.added_to_new_handbook", fragmentTitle).withStyle(ChatFormatting.GREEN));
+                        } else {
+                            player.sendSystemMessage(Component.translatable("item.herobrine_companion.lore_fragment.already_collected", fragmentTitle).withStyle(ChatFormatting.YELLOW));
+                        }
+                    }
                 }
-
                 fragmentStack.shrink(1);
             }
             return InteractionResultHolder.sidedSuccess(fragmentStack, level.isClientSide());
