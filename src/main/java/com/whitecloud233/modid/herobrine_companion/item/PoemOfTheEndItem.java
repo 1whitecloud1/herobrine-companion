@@ -3,7 +3,8 @@ package com.whitecloud233.modid.herobrine_companion.item;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Multimap;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
-import com.whitecloud233.modid.herobrine_companion.entity.VoidRiftEntity;
+import com.whitecloud233.modid.herobrine_companion.entity.projectile.CleaveBladeEntity;
+import com.whitecloud233.modid.herobrine_companion.entity.projectile.VoidRiftEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.projectile.RealmBreakerLightningEntity;
 import com.whitecloud233.modid.herobrine_companion.network.HeroWorldData;
 import net.minecraft.ChatFormatting;
@@ -14,11 +15,10 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.InteractionResultHolder;
-import net.minecraft.world.effect.MobEffectInstance;
-import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
@@ -57,7 +57,7 @@ public class PoemOfTheEndItem extends DiggerItem {
 
     private static final String TAG_MODE = "PoemMode";
     private final Random random = new Random();
-    
+
     // 使用固定的 UUID，确保属性修饰符的一致性
     private static final UUID BASE_ATTACK_DAMAGE_UUID = UUID.fromString("CB3F55D3-645C-4F38-A497-9C13A33DB5CF");
     private static final UUID BASE_ATTACK_SPEED_UUID = UUID.fromString("FA233E1C-4180-4865-B01B-BCCE9785ACA3");
@@ -139,7 +139,7 @@ public class PoemOfTheEndItem extends DiggerItem {
                 return InteractionResultHolder.pass(stack);
             }
         }
-        
+
         // 确保客户端也播放挥手动画
         player.swing(usedHand);
 
@@ -149,7 +149,7 @@ public class PoemOfTheEndItem extends DiggerItem {
     // 技能：破境 (发射实体雷枪)
     private void performRealmBreaker(Level level, Player player, int trust) {
         float damage = 25.0F + (trust / 4.0F);
-        
+
         // 计算锋利附魔加成
         int sharpnessLevel = EnchantmentHelper.getItemEnchantmentLevel(Enchantments.SHARPNESS, player.getMainHandItem());
         if (sharpnessLevel > 0) {
@@ -245,11 +245,11 @@ public class PoemOfTheEndItem extends DiggerItem {
     private void updateAttributes(ItemStack stack, ServerLevel level, Player player) {
         HeroWorldData data = HeroWorldData.get(level);
         int trust = data.getTrust(player.getUUID());
-        
+
         int mode = getMode(stack);
         float attackSpeed = -2.4F; // 默认攻速 (类似剑 1.6)
         float damage = 8.0F + (trust / 5.0F); // 默认伤害
-        
+
         if (mode == MODE_VOID_SHATTER) {
             attackSpeed = 100.0F; // 极快攻速，实现连击
             damage = 2.0F + (trust / 20.0F); // [平衡] 碎空模式普攻伤害极低，主要靠裂痕
@@ -260,22 +260,22 @@ public class PoemOfTheEndItem extends DiggerItem {
             damage = 5.0F + (trust / 5.0F);
             attackSpeed = -3.0F;
         }
-        
+
         // 将计算出的属性存储在 NBT 中
         CompoundTag tag = stack.getOrCreateTag();
         tag.putFloat("TrustDamage", damage);
         tag.putFloat("TrustSpeed", attackSpeed);
     }
-    
+
     @Override
     public Multimap<Attribute, AttributeModifier> getAttributeModifiers(EquipmentSlot slot, ItemStack stack) {
         if (slot == EquipmentSlot.MAINHAND) {
             ImmutableMultimap.Builder<Attribute, AttributeModifier> builder = ImmutableMultimap.builder();
-            
+
             // 默认值
             float damage = this.getAttackDamage();
             float speed = -2.4F;
-            
+
             // 从 NBT 读取额外伤害和速度
             if (stack.hasTag()) {
                 CompoundTag tag = stack.getTag();
@@ -286,10 +286,10 @@ public class PoemOfTheEndItem extends DiggerItem {
                     speed = tag.getFloat("TrustSpeed");
                 }
             }
-            
+
             builder.put(Attributes.ATTACK_DAMAGE, new AttributeModifier(BASE_ATTACK_DAMAGE_UUID, "Tool modifier", damage, AttributeModifier.Operation.ADDITION));
             builder.put(Attributes.ATTACK_SPEED, new AttributeModifier(BASE_ATTACK_SPEED_UUID, "Tool modifier", speed, AttributeModifier.Operation.ADDITION));
-            
+
             return builder.build();
         }
         return super.getAttributeModifiers(slot, stack);
@@ -423,7 +423,7 @@ public class PoemOfTheEndItem extends DiggerItem {
         }
         return super.canApplyAtEnchantingTable(stack, enchantment);
     }
-    
+
     @Override
     public boolean isEnchantable(ItemStack stack) {
         return true;
@@ -432,5 +432,66 @@ public class PoemOfTheEndItem extends DiggerItem {
     @Override
     public int getEnchantmentValue() {
         return 22; // 设置附魔能力值，越高越容易获得好附魔 (金是22，钻石是10)
+    }
+
+    public void triggerWorldCleave(ServerLevel level, Player player) {
+        // ==========================================
+        // 【新增】：检查配置，如果关闭则直接取消技能
+        // ==========================================
+        if (!com.whitecloud233.modid.herobrine_companion.config.Config.cleaveSkillEnabled) {
+            player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§c[系统] 服务器已禁用此终极技能！"));
+            return;
+        }
+
+        if (player.getCooldowns().isOnCooldown(this)) {
+            // 【提示：如果按了没反应，可能是这里被拦截了】
+            player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§c[提示] 技能正在冷却中！"));
+            return;
+        }
+
+        double maxLength = 250.0;
+        int halfWidth = 10;
+        int minY = level.getMinBuildHeight();
+        int startY = level.getMaxBuildHeight();
+
+        float yRot = player.getYRot() * ((float) Math.PI / 180F);
+        double dirX = -Mth.sin(yRot);
+        double dirZ = Mth.cos(yRot);
+
+        com.whitecloud233.modid.herobrine_companion.event.CleaveTickManager.CleaveTask task =
+                new com.whitecloud233.modid.herobrine_companion.event.CleaveTickManager.CleaveTask(
+                        level, player.getX(), player.getZ(), dirX, dirZ, halfWidth, startY, minY, maxLength
+                );
+
+        com.whitecloud233.modid.herobrine_companion.event.CleaveTickManager.startCleave(task);
+
+        // ==========================================
+        // 【防穿模终极修改】
+        // 让刀光直接生成在玩家前方 3 格的位置，绝对防止卡视野！
+        // 并且保持在胸口的高度
+        // ==========================================
+        double spawnX = player.getX() + dirX * 3.0;
+        double spawnZ = player.getZ() + dirZ * 3.0;
+        double startSurfaceY = player.getY() + 1.0;
+        int lifeTicks = (int) maxLength;
+
+        CleaveBladeEntity visualBlade =
+                new CleaveBladeEntity(
+                        com.whitecloud233.modid.herobrine_companion.event.ModEvents.CLEAVE_BLADE.get(),
+                        level, spawnX, startSurfaceY, spawnZ, dirX, dirZ, lifeTicks);
+
+        // 【探头3】实体生成检测
+        player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§b[Debug] 服务端：实体创建完毕，准备加入世界..."));
+
+        boolean success = level.addFreshEntity(visualBlade);
+        if (success) {
+            player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§b[Debug] 服务端：实体加入成功！坐标: " + visualBlade.position()));
+        } else {
+            player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§c[Debug] 服务端严重错误：实体加入失败！"));
+        }
+
+        level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.WARDEN_SONIC_BOOM, SoundSource.PLAYERS, 5.0F, 0.5F);
+
+        player.getCooldowns().addCooldown(this, 400);
     }
 }

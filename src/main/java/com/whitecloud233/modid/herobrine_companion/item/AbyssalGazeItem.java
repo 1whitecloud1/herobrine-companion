@@ -28,7 +28,17 @@ public class AbyssalGazeItem extends Item {
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
+
+        // 【新增】配置检查
+        if (!com.whitecloud233.modid.herobrine_companion.config.Config.abyssalGazeEnabled) {
+            if (!level.isClientSide) {
+                player.sendSystemMessage(Component.translatable("message.herobrine_companion.item_disabled_in_config").withStyle(net.minecraft.ChatFormatting.RED));
+            }
+            return InteractionResultHolder.fail(stack);
+        }
+
         if (!level.isClientSide) {
+// ... 后续原有逻辑保持不变
             // 根据玩家身上的 Tag 判断当前状态，而不是物品 NBT
             boolean isPlayerActive = player.getTags().contains(TAG_ACTIVE);
 

@@ -6,10 +6,14 @@ buildscript {
         maven { url = 'https://maven.minecraftforge.net' }
         maven { url = 'https://repo.spongepowered.org/repository/maven-public/' }
         mavenCentral()
+        // 添加 Gradle 插件仓库以获取 Shadow 插件
+        maven { url = "https://plugins.gradle.org/m2/" }
     }
     dependencies {
         classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: '[6.0.16,6.2)', changing: true
         classpath 'org.spongepowered:mixingradle:0.7-SNAPSHOT'
+        // 引入 Shadow 插件
+        classpath 'com.github.johnrengelman.shadow:com.github.johnrengelman.shadow.gradle.plugin:8.1.1'
     }
 }
 
@@ -18,6 +22,8 @@ apply plugin: 'org.spongepowered.mixin'
 apply plugin: 'eclipse'
 apply plugin: 'maven-publish'
 apply plugin: 'java'
+// 应用 Shadow 插件
+apply plugin: 'com.github.johnrengelman.shadow'
 
 version = mod_version
 group = mod_group_id
@@ -149,12 +155,18 @@ repositories {
     mavenCentral()
 }
 
+// 定义 shade 配置用于独立打包依赖
+configurations {
+    shade
+    implementation.extendsFrom shade
+}
+
 dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 
-    // H2 Database (本地 libs)
-    implementation files('libs/h2-2.2.224.jar')
+    // H2 Database (本地 libs) - 改用 shade 引入
+    shade files('libs/h2-2.2.224.jar')
 
     // JEI
     compileOnly fg.deobf("mezz.jei:jei-1.20.1-common-api:15.20.0.106")
@@ -182,9 +194,9 @@ tasks.named('processResources', ProcessResources).configure {
     filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) { expand(replaceProperties) }
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
-
-// === Jar 构建逻辑 (包含 H2 植入) ===
+// === 原生 Jar 构建逻辑 ===
 tasks.named('jar', Jar).configure {
+    archiveClassifier.set('slim') // 💡 新增：给原生 jar 加上 slim 后缀，避免与 shadowJar 产物文件冲突
     manifest {
         attributes([
                 "Specification-Title": mod_id,
@@ -197,20 +209,34 @@ tasks.named('jar', Jar).configure {
                 "MixinConfigs": "herobrine_companion.mixins.json"
         ])
     }
-    // 植入 H2
-    from {
-        files('libs/h2-2.2.224.jar').collect { it.isDirectory() ? it : zipTree(it) }
-    }
+
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    finalizedBy 'reobfJar'
+}
+
+// === ShadowJar 构建逻辑 (负责重定位 H2 包名) ===
+shadowJar {
+    archiveClassifier.set('') // 覆盖默认生成的 jar，作为最终发布的模组
+    configurations = [project.configurations.shade]
+
+    // 核心重定位规则，将 org.h2 转移到模组专属包下以避免冲突
+    relocate 'org.h2', 'herobrine_companion.shadow.h2'
+
     exclude 'META-INF/*.RSA', 'META-INF/*.SF', 'META-INF/*.DSA', 'module-info.class'
-    
+// 👇 新增：排除多版本 JAR 中高版本的 Java 类文件（解决 version 65 报错）
+    exclude 'META-INF/versions/**'
     // 排除被审核标记为敏感的 H2 工具类
     exclude 'org/h2/tools/Upgrade.class'
     exclude 'org/h2/tools/Shell.class'
     exclude 'org/h2/tools/RunScript.class'
     exclude 'org/h2/tools/Console.class'
 
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-    finalizedBy 'reobfJar'
+    finalizedBy 'reobfShadowJar' // 💡 新增：打完 Shadow 包后，明确指定执行针对 Shadow 的重混淆任务
+}
+
+// 配置 Forge 重混淆处理 shadowJar 的产物
+reobf {
+    shadowJar {}
 }
 
 // 避免编码错误

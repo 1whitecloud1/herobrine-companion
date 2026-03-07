@@ -2,7 +2,9 @@ package com.whitecloud233.modid.herobrine_companion.event;
 
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.modid.herobrine_companion.entity.*;
+import com.whitecloud233.modid.herobrine_companion.entity.projectile.CleaveBladeEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.projectile.RealmBreakerLightningEntity;
+import com.whitecloud233.modid.herobrine_companion.entity.projectile.VoidRiftEntity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.entity.SpawnPlacements;
@@ -69,6 +71,13 @@ public class ModEvents {
                     .clientTrackingRange(4)
                     .updateInterval(20)
                     .build("void_rift"));
+
+    public static final RegistryObject<EntityType<CleaveBladeEntity>> CLEAVE_BLADE = ENTITY_TYPES.register("cleave_blade",
+            () -> EntityType.Builder.<CleaveBladeEntity>of(CleaveBladeEntity::new, MobCategory.MISC)
+                    .sized(1.0F, 1.0F)
+                    .clientTrackingRange(80) // 80格追踪范围，确保飞远了客户端也能看见
+                    .updateInterval(1) // 每tick更新，确保运动平滑
+                    .build("cleave_blade"));
 
     public static final RegistryObject<EntityType<GlitchVillagerEntity>> GLITCH_VILLAGER = ENTITY_TYPES.register("glitch_villager",
             () -> EntityType.Builder.of(GlitchVillagerEntity::new, MobCategory.MISC)
