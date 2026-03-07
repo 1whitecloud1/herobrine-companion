@@ -54,6 +54,7 @@ public class ClientEvents {
         event.registerEntityRenderer(ModEvents.REALM_BREAKER_LIGHTNING.get(), RealmBreakerLightningRenderer::new);
         event.registerEntityRenderer(ModEvents.VOID_RIFT.get(), VoidRiftRenderer::new);
         event.registerEntityRenderer(ModEvents.GLITCH_VILLAGER.get(), GlitchVillagerRenderer::new);
+        event.registerEntityRenderer(ModEvents.CLEAVE_BLADE.get(), CleaveBladeRenderer::new);
 
         // 尝试正常注册
         event.registerEntityRenderer(EntityType.ENDER_DRAGON, DragonRendererWrapper::new);

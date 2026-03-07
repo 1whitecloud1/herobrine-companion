@@ -109,6 +109,20 @@
   "item.herobrine_companion.lore_fragment.added_to_new_handbook": "关于 %s 的知识已抄录至你的新图鉴中。",
   "item.herobrine_companion.lore_fragment.already_collected": "你已经了解过关于 %s 的知识了。",
   "message.herobrine_companion.inventory_full_lore_dropped": "你的背包满了，一块神秘的碎片掉落在了你脚边...",
+  "gui.herobrine_companion.config.cleave_skill": "存档毁灭术(5键): %s",
+  "gui.herobrine_companion.config.cleave_skill.tooltip": "启用或禁用绑定在 5 键上的“毁天灭地”终极技能。",
+  "key.categories.herobrine_companion": "Herobrine的陪伴",
+  "key.herobrine_companion.cleave_skill": "存档毁灭术",
+  "message.herobrine_companion.item_disabled_in_config": "该物品已在配置文件中被禁用。",
+
+  "gui.herobrine_companion.config.soul_bound_pact": "灵魂之契: %s",
+  "gui.herobrine_companion.config.soul_bound_pact.tooltip": "启用/禁用灵魂之契物品的使用。",
+
+  "gui.herobrine_companion.config.abyssal_gaze": "幽邃之视: %s",
+  "gui.herobrine_companion.config.abyssal_gaze.tooltip": "启用/禁用幽邃之视物品的使用。",
+
+  "gui.herobrine_companion.config.transcendence_permit": "凌越之允: %s",
+  "gui.herobrine_companion.config.transcendence_permit.tooltip": "启用/禁用凌越之允物品的使用。",
 
 
 

@@ -187,6 +187,22 @@
   "gui.herobrine_companion.config.block_restoration.tooltip": "If enabled, Herobrine will automatically repair broken blocks and terrain around him.",
   "gui.herobrine_companion.config.clean_items": "Clean Dropped Items: %s",
   "gui.herobrine_companion.config.clean_items.tooltip": "If enabled, Herobrine (in Maintainer state) will automatically clean up old item drops around him (ignores valuable items).",
+  "gui.herobrine_companion.config.cleave_skill": "World Cleave Skill (5 Key): %s",
+  "gui.herobrine_companion.config.cleave_skill.tooltip": "Enable or disable the devastating World Cleave skill bound to the 5 key.",
+  "key.categories.herobrine_companion": "Herobrine Companion",
+  "key.herobrine_companion.cleave_skill": "World Cleave Skill",
+  "message.herobrine_companion.item_disabled_in_config": "This item has been disabled in the configuration.",
+  "gui.herobrine_companion.config.soul_bound_pact": "Soul Bound Pact: %s",
+  "gui.herobrine_companion.config.soul_bound_pact.tooltip": "Enable/Disable the Soul Bound Pact item usage.",
+
+  "gui.herobrine_companion.config.abyssal_gaze": "Abyssal Gaze: %s",
+  "gui.herobrine_companion.config.abyssal_gaze.tooltip": "Enable/Disable the Abyssal Gaze item usage.",
+
+  "gui.herobrine_companion.config.transcendence_permit": "Transcendence Permit: %s",
+  "gui.herobrine_companion.config.transcendence_permit.tooltip": "Enable/Disable the Transcendence Permit item usage.",
+
+
+
 
   "item.herobrine_companion.lore_fragment.added_to_new_handbook": "The knowledge of %s has been transcribed into your new handbook.",
   "item.herobrine_companion.lore_fragment.already_collected": "You already possess the knowledge of %s.",

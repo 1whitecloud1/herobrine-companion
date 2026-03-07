@@ -1,6 +1,7 @@
 package com.whitecloud233.herobrine_companion.event;
 
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.herobrine_companion.entity.CleaveBladeEntity;
 import com.whitecloud233.herobrine_companion.entity.GhostCreeperEntity;
 import com.whitecloud233.herobrine_companion.entity.GhostSkeletonEntity;
 import com.whitecloud233.herobrine_companion.entity.GhostSteveEntity;
@@ -95,6 +96,13 @@ public class ModEvents {
             () -> EntityType.Builder.of(GlitchVillagerEntity::new, MobCategory.MISC)
                     .sized(0.6F, 1.95F)
                     .build("glitch_villager"));
+
+    public static final DeferredHolder<EntityType<?>, EntityType<CleaveBladeEntity>> CLEAVE_BLADE = ENTITY_TYPES.register("cleave_blade",
+            () -> EntityType.Builder.<CleaveBladeEntity>of(CleaveBladeEntity::new, MobCategory.MISC)
+                    .sized(1.0F, 1.0F)
+                    .clientTrackingRange(80) // 80格追踪范围，确保飞远了客户端也能看见
+                    .updateInterval(1) // 每tick更新，确保运动平滑
+                    .build("cleave_blade"));
 
     public static void entityAttributeEvent(EntityAttributeCreationEvent event) {
         event.put(HERO.get(), HeroEntity.createAttributes().build());

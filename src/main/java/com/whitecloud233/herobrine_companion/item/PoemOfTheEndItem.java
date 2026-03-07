@@ -1,5 +1,6 @@
 package com.whitecloud233.herobrine_companion.item;
 
+import com.whitecloud233.herobrine_companion.entity.CleaveBladeEntity;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.VoidRiftEntity;
 import com.whitecloud233.herobrine_companion.entity.projectile.RealmBreakerLightningEntity;
@@ -14,6 +15,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.InteractionResultHolder;
@@ -406,5 +408,66 @@ public class PoemOfTheEndItem extends DiggerItem {
     @Override
     public boolean isEnchantable(ItemStack stack) {
         return true; // 强制允许附魔，即使是 Unbreakable
+    }
+
+    public void triggerWorldCleave(ServerLevel level, Player player) {
+        // ==========================================
+        // 【新增】：检查配置，如果关闭则直接取消技能
+        // ==========================================
+        if (!com.whitecloud233.herobrine_companion.config.Config.cleaveSkillEnabled) {
+            player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§c[系统] 服务器已禁用此终极技能！"));
+            return;
+        }
+
+        if (player.getCooldowns().isOnCooldown(this)) {
+            // 【提示：如果按了没反应，可能是这里被拦截了】
+            player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§c[提示] 技能正在冷却中！"));
+            return;
+        }
+
+        double maxLength = 250.0;
+        int halfWidth = 10;
+        int minY = level.getMinBuildHeight();
+        int startY = level.getMaxBuildHeight();
+
+        float yRot = player.getYRot() * ((float) Math.PI / 180F);
+        double dirX = -Mth.sin(yRot);
+        double dirZ = Mth.cos(yRot);
+
+        com.whitecloud233.herobrine_companion.event.CleaveTickManager.CleaveTask task =
+                new com.whitecloud233.herobrine_companion.event.CleaveTickManager.CleaveTask(
+                        level, player.getX(), player.getZ(), dirX, dirZ, halfWidth, startY, minY, maxLength
+                );
+
+        com.whitecloud233.herobrine_companion.event.CleaveTickManager.startCleave(task);
+
+        // ==========================================
+        // 【防穿模终极修改】
+        // 让刀光直接生成在玩家前方 3 格的位置，绝对防止卡视野！
+        // 并且保持在胸口的高度
+        // ==========================================
+        double spawnX = player.getX() + dirX * 3.0;
+        double spawnZ = player.getZ() + dirZ * 3.0;
+        double startSurfaceY = player.getY() + 1.0;
+        int lifeTicks = (int) maxLength;
+
+        CleaveBladeEntity visualBlade =
+                new CleaveBladeEntity(
+                        com.whitecloud233.herobrine_companion.event.ModEvents.CLEAVE_BLADE.get(),
+                        level, spawnX, startSurfaceY, spawnZ, dirX, dirZ, lifeTicks);
+
+        // 【探头3】实体生成检测
+        player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§b[Debug] 服务端：实体创建完毕，准备加入世界..."));
+
+        boolean success = level.addFreshEntity(visualBlade);
+        if (success) {
+            player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§b[Debug] 服务端：实体加入成功！坐标: " + visualBlade.position()));
+        } else {
+            player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§c[Debug] 服务端严重错误：实体加入失败！"));
+        }
+
+        level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.WARDEN_SONIC_BOOM, SoundSource.PLAYERS, 5.0F, 0.5F);
+
+        player.getCooldowns().addCooldown(this, 400);
     }
 }

@@ -69,7 +69,11 @@ public class PacketHandler {
                 TriggerEternalOathPacket.STREAM_CODEC,
                 TriggerEternalOathPacket::handle
         );
-
+        registrar.playToServer(
+                CleaveSkillPacket.TYPE,
+                CleaveSkillPacket.STREAM_CODEC,
+                CleaveSkillPacket::handle
+        );
     }
 
     public static void sendToServer(PeacefulPacket packet) {
@@ -121,5 +125,9 @@ public class PacketHandler {
     // [新增] 发送给玩家
     public static void sendToPlayer(TriggerEternalOathPacket packet, ServerPlayer player) {
         PacketDistributor.sendToPlayer(player, packet);
+    }
+
+    public static void sendToServer(CleaveSkillPacket packet) {
+        PacketDistributor.sendToServer(packet);
     }
 }
