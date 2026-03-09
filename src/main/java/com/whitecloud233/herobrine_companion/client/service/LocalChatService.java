@@ -19,6 +19,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.regex.Pattern;
+import java.nio.file.StandardCopyOption; // 新增导入
+
 
 public class LocalChatService {
     private static final Logger LOGGER = LoggerFactory.getLogger(LocalChatService.class);
@@ -87,15 +89,17 @@ public class LocalChatService {
             Path dbFilePath = configDir.resolve(DB_FILE_NAME + ".mv.db");
 
             // === 【关键步骤】自动释放数据库文件 ===
+            // 只要文件不存在就释放（配合后面的强制覆盖功能）
             if (!Files.exists(dbFilePath)) {
-                LOGGER.info("检测到首次运行，正在释放默认数据库...");
+                LOGGER.info("检测到未找到数据库，正在释放默认数据库...");
 
                 // 这是你放在 resources 下的路径
                 String resourcePath = "/assets/herobrine_companion/database/hero_brain.mv.db";
 
                 try (InputStream in = getClass().getResourceAsStream(resourcePath)) {
                     if (in != null) {
-                        Files.copy(in, dbFilePath);
+                        // 使用 StandardCopyOption.REPLACE_EXISTING 确保能安全覆盖
+                        Files.copy(in, dbFilePath, StandardCopyOption.REPLACE_EXISTING);
                         LOGGER.info("数据库释放成功！路径: {}", dbFilePath);
                     } else {
                         // 如果这里报错，说明你忘了把文件放进 src/main/resources 里
@@ -109,7 +113,8 @@ public class LocalChatService {
 
             // 连接字符串 (去掉了 MODE=SQLite)
             String dbPathStr = configDir.resolve(DB_FILE_NAME).toAbsolutePath().toString();
-            String url = "jdbc:h2:file:" + dbPathStr + ";AUTO_SERVER=TRUE";
+            // 移除 ;AUTO_SERVER=TRUE 以减少对 org.h2.tools.Server 的依赖，避免因排除 Server 类导致连接失败
+            String url = "jdbc:h2:file:" + dbPathStr;
 
             LOGGER.info("正在连接数据库: {}", url);
 
@@ -173,6 +178,46 @@ public class LocalChatService {
             return matches.get(random.nextInt(matches.size()));
         }
         return null;
+    }
+
+    /**
+     * =========================================
+     * 新增功能：强制重新覆盖源文件并重载配置
+     * =========================================
+     */
+    public boolean forceRestoreDefaultDatabase() {
+        LOGGER.info("开始强制覆盖并恢复默认数据库...");
+
+        try {
+            // 1. 关闭现有连接（非常重要，不关的话文件被占用无法删除）
+            if (connection != null && !connection.isClosed()) {
+                connection.close();
+                connection = null;
+            }
+
+            // 2. 找到要删除的文件路径
+            Path configDir = FMLPaths.CONFIGDIR.get().resolve("herobrine_companion");
+            Path dbFilePath = configDir.resolve(DB_FILE_NAME + ".mv.db");
+            Path traceFilePath = configDir.resolve(DB_FILE_NAME + ".trace.db"); // H2 可能会生成 trace 缓存文件，一并删掉
+
+            // 3. 强制删除现有的数据库文件
+            Files.deleteIfExists(dbFilePath);
+            Files.deleteIfExists(traceFilePath);
+            LOGGER.info("已成功清理旧的数据库文件。");
+
+            // 4. 重新走一遍初始化流程（会自动释放新文件并连接）
+            initDatabase();
+
+            // 5. 重新读取数据库里的聊天规则到内存
+            loadChatRules();
+
+            LOGGER.info("强制覆盖数据库完成！");
+            return true;
+
+        } catch (Exception e) {
+            LOGGER.error("强制覆盖数据库时发生异常", e);
+            return false;
+        }
     }
 
     public void close() {
