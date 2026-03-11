@@ -449,7 +449,7 @@ public class PoemOfTheEndItem extends DiggerItem {
             return;
         }
 
-        double maxLength = 250.0;
+        double maxLength = 350.0;
         int halfWidth = 10;
         int minY = level.getMinBuildHeight();
         int startY = level.getMaxBuildHeight();
@@ -481,15 +481,6 @@ public class PoemOfTheEndItem extends DiggerItem {
                         level, spawnX, startSurfaceY, spawnZ, dirX, dirZ, lifeTicks);
 
         // 【探头3】实体生成检测
-        player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§b[Debug] 服务端：实体创建完毕，准备加入世界..."));
-
-        boolean success = level.addFreshEntity(visualBlade);
-        if (success) {
-            player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§b[Debug] 服务端：实体加入成功！坐标: " + visualBlade.position()));
-        } else {
-            player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§c[Debug] 服务端严重错误：实体加入失败！"));
-        }
-
         level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.WARDEN_SONIC_BOOM, SoundSource.PLAYERS, 5.0F, 0.5F);
 
         player.getCooldowns().addCooldown(this, 400);

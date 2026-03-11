@@ -39,8 +39,12 @@ public class HeroMoveControl extends MoveControl {
             
             // === 分离轴向平滑 ===
             
-            // 水平轴 (XZ): 0.1D (响应较快)
+            // [优化] 动态水平响应系数 (XZ)
+            // 基础响应 0.1，距离越远响应越快，防止卡顿（低TPS）导致移动迟缓
             double lerpXZ = 0.1D;
+            if (distSq > 4.0D) lerpXZ = 0.3D;   // 距离 > 2格，提升响应
+            if (distSq > 16.0D) lerpXZ = 0.8D;  // 距离 > 4格，几乎瞬间响应，抵抗卡顿
+
             double newX = Mth.lerp(lerpXZ, currentVelocity.x, desiredVelocity.x);
             double newZ = Mth.lerp(lerpXZ, currentVelocity.z, desiredVelocity.z);
             
@@ -49,7 +53,7 @@ public class HeroMoveControl extends MoveControl {
             
             // 如果距离很远(>5格)，Y轴加速响应
             if (Math.abs(targetVec.y) > 5.0D) {
-                lerpY = 0.1D; 
+                lerpY = 0.2D; 
             }
             
             double newY = Mth.lerp(lerpY, currentVelocity.y, desiredVelocity.y);
@@ -71,11 +75,6 @@ public class HeroMoveControl extends MoveControl {
                 // 如果没有 LookControl 正在工作（例如没有 LookAtPlayerGoal），
                 // 那么头部可能会保持之前的角度（例如之前在看地上的东西）。
                 // 我们在这里缓慢地将头部抬起，使其平视前方。
-                // 注意：LookControl 没有 isHasWanted() 方法，我们通过检查 lookAt 状态来判断
-                // 或者直接无条件缓慢复位，如果有 LookControl 覆盖它会自动生效
-
-                // 简单方案：直接每 tick 尝试复位，如果 LookControl 激活，它会在稍后的 tick 中覆盖这个值
-                // 但为了保险，我们只在 XRot 偏差较大时才复位
                 if (Math.abs(this.hero.getXRot()) > 1.0F) {
                     this.hero.setXRot(rotlerp(this.hero.getXRot(), 0.0F, 5.0F));
                 }
@@ -86,4 +85,3 @@ public class HeroMoveControl extends MoveControl {
         }
     }
 }
-

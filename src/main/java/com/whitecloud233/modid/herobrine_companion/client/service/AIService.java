@@ -3,14 +3,31 @@ package com.whitecloud233.modid.herobrine_companion.client.service;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.whitecloud233.modid.herobrine_companion.compat.curios.HeroCuriosCompat;
+import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.modid.herobrine_companion.entity.logic.HeroDataHandler;
+import com.whitecloud233.modid.herobrine_companion.event.ModEvents;
 import com.whitecloud233.modid.herobrine_companion.item.HeroSummonItem;
 import com.whitecloud233.modid.herobrine_companion.item.SourceFlowItem;
+import com.whitecloud233.modid.herobrine_companion.network.HeroWorldData;
+import com.whitecloud233.modid.herobrine_companion.util.EndRingContext;
+import net.minecraft.client.Minecraft;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.GlobalPos;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraftforge.fml.ModList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,22 +35,12 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 
 
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
-import net.minecraft.client.Minecraft;
-import net.minecraft.commands.CommandSourceStack;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.level.Level;
-import java.util.concurrent.ConcurrentHashMap;
 
 public class AIService {
     private static final Logger LOGGER = LoggerFactory.getLogger(AIService.class);
@@ -229,6 +236,17 @@ public class AIService {
         });
     }
 
+    private static HeroEntity findHeroInAnyDimension(net.minecraft.server.MinecraftServer server) {
+        for (ServerLevel level : server.getAllLevels()) {
+            for (Entity entity : level.getEntities().getAll()) {
+                if (entity instanceof HeroEntity hero) {
+                    return hero; // Found it
+                }
+            }
+        }
+        return null; // Not found in any dimension
+    }
+
     /**
      * 带结果反馈的指令执行器
      */
@@ -293,74 +311,74 @@ public class AIService {
                     future.complete(false);
                 }
             }
-            // === [新增] 拦截 Herobrine 传送指令，改用更可靠的 UUID 传送 ===
+            // === [修复] 拦截 Herobrine 传送指令，改用更可靠的、来自 HeroSummonItem 的逻辑 ===
             else if (command.equals("tp @e[type=herobrine_companion:hero,limit=1,sort=nearest] @s")) {
-                LOGGER.info("Herobrine is being teleported via robust UUID method.");
+                LOGGER.info("Herobrine is being teleported via robust logic from HeroSummonItem.");
                 if (mc.hasSingleplayerServer() && mc.getSingleplayerServer() != null) {
                     var server = mc.getSingleplayerServer();
                     server.execute(() -> {
                         try {
                             ServerPlayer serverPlayer = server.getPlayerList().getPlayer(mc.player.getUUID());
-                            if (serverPlayer != null) {
-                                // 模拟使用 HeroSummonItem (召唤/传送 Hero 到玩家)
-                                // 创建一个虚拟的 HeroSummonItem 实例并调用其 useOn 方法逻辑
-                                // 由于 useOn 需要 UseOnContext，这里我们直接复用 HeroSummonItem 内部的核心逻辑
-                                // 为了方便，我们实例化一个 HeroSummonItem 并手动触发其核心逻辑
-                                // 但更好的方式是直接调用 HeroSummonItem 的静态方法（如果提取出来的话）
-                                // 或者直接复制那段逻辑。鉴于我们已经有了 HeroSummonItem，我们可以尝试模拟玩家使用它。
+                            if (serverPlayer == null) {
+                                future.complete(false);
+                                return;
+                            }
 
-                                // 这里我们直接复用 HeroSummonItem 的逻辑，通过创建一个临时的 ItemStack
-                                HeroSummonItem summonItem = (HeroSummonItem) HerobrineCompanion.HERO_SHELTER.get();
+                            HeroEntity existingHero = findHeroInAnyDimension(server);
+                            ServerLevel targetLevel = serverPlayer.serverLevel();
+                            double targetX = serverPlayer.getX();
+                            double targetY = serverPlayer.getY();
+                            double targetZ = serverPlayer.getZ();
 
-                                // 我们需要模拟一个 UseOnContext，但这比较麻烦。
-                                // 更简单的方法是：直接调用我们在 HeroSummonItem 中实现的逻辑。
-                                // 但由于该逻辑是 private/protected 或者是实例方法，我们无法直接调用。
-                                // 所以，我们在这里重新实现一遍“召唤/传送 Hero 到玩家”的逻辑，这与 HeroSummonItem 的逻辑一致。
+                            if (existingHero != null) {
+                                // 实体已存在，执行传送
+                                if (existingHero.level().dimension() != targetLevel.dimension()) {
+                                    // --- 跨维度传送 ---
+                                    CompoundTag heroData = new CompoundTag();
+                                    existingHero.saveWithoutId(heroData);
+                                    ListTag armorTags = existingHero.getArmorItemsTag();
+                                    ListTag handTags = existingHero.getHandItemsTag();
+                                    CompoundTag curiosTag = ModList.get().isLoaded("curios") ? existingHero.getCuriosBackItemTag() : new CompoundTag();
 
-                                // 1. 尝试查找实体 (如果已加载)
-                                com.whitecloud233.modid.herobrine_companion.network.HeroWorldData data = com.whitecloud233.modid.herobrine_companion.network.HeroWorldData.get(server.overworld());
-                                UUID heroUUID = data.getActiveHeroUUID();
-                                GlobalPos lastKnownPos = data.getLastKnownHeroPos();
+                                    HeroDataHandler.updateGlobalTrust(existingHero);
+                                    existingHero.discard();
 
-                                Entity hero = null;
-                                if (heroUUID != null) {
-                                    for (net.minecraft.server.level.ServerLevel level : server.getAllLevels()) {
-                                        hero = level.getEntity(heroUUID);
-                                        if (hero != null) break;
-                                    }
-                                }
-
-                                if (hero instanceof com.whitecloud233.modid.herobrine_companion.entity.HeroEntity) {
-                                    // A. 实体已加载：直接传送
-                                    hero.teleportTo(serverPlayer.serverLevel(), serverPlayer.getX(), serverPlayer.getY(), serverPlayer.getZ(), java.util.Collections.emptySet(), serverPlayer.getYRot(), serverPlayer.getXRot());
-                                    future.complete(true);
-                                } else {
-                                    // B. 实体未加载 (跨维度/远距离) 或 不存在
-                                    // 既然是 AI 操作，我们可以"作弊"一下。
-                                    // 如果找不到实体，我们在玩家身边生成一个新的，并利用 HeroEntity 的唯一性检查机制自动清理旧的。
-                                    // 这与 HeroSummonItem 的逻辑一致。
-
-                                    ServerLevel playerLevel = serverPlayer.serverLevel();
-                                    com.whitecloud233.modid.herobrine_companion.entity.HeroEntity newHero = com.whitecloud233.modid.herobrine_companion.event.ModEvents.HERO.get().create(playerLevel);
+                                    HeroEntity newHero = ModEvents.HERO.get().create(targetLevel);
                                     if (newHero != null) {
-                                        newHero.moveTo(serverPlayer.getX(), serverPlayer.getY(), serverPlayer.getZ(), serverPlayer.getYRot(), serverPlayer.getXRot());
-
-                                        // 恢复信任度
-                                        newHero.setOwnerUUID(serverPlayer.getUUID());
-                                        com.whitecloud233.modid.herobrine_companion.entity.logic.HeroDataHandler.restoreTrustFromPlayer(newHero);
-                                        com.whitecloud233.modid.herobrine_companion.entity.logic.HeroDataHandler.syncGlobalTrust(newHero);
-
-                                        playerLevel.addFreshEntity(newHero);
-                                        future.complete(true);
-                                    } else {
-                                        future.complete(false);
+                                        heroData.remove("UUID");
+                                        newHero.load(heroData);
+                                        newHero.moveTo(targetX, targetY, targetZ, serverPlayer.getYRot(), serverPlayer.getXRot());
+                                        newHero.loadEquipmentFromTag(armorTags, handTags);
+                                        if (!curiosTag.isEmpty()) newHero.setCuriosBackItemFromTag(curiosTag);
+                                        newHero.addTag(EndRingContext.TAG_RESPAWNED_SAFE);
+                                        targetLevel.addFreshEntity(newHero);
                                     }
+                                } else {
+                                    // --- 同维度传送 ---
+                                    existingHero.teleportTo(targetLevel, targetX, targetY, targetZ, Collections.emptySet(), serverPlayer.getYRot(), serverPlayer.getXRot());
                                 }
                             } else {
-                                future.complete(false);
+                                // --- 实体不存在，执行召唤 ---
+                                HeroEntity newHero = ModEvents.HERO.get().create(targetLevel);
+                                if (newHero != null) {
+                                    newHero.moveTo(targetX, targetY, targetZ, serverPlayer.getYRot(), serverPlayer.getXRot());
+                                    newHero.finalizeSpawn(targetLevel, targetLevel.getCurrentDifficultyAt(newHero.blockPosition()), MobSpawnType.TRIGGERED, null, null);
+                                    newHero.setOwnerUUID(serverPlayer.getUUID());
+                                    HeroDataHandler.restoreTrustFromPlayer(newHero);
+
+                                    HeroWorldData worldData = HeroWorldData.get(targetLevel);
+                                    newHero.setSkinVariant(worldData.getSkinVariant());
+                                    newHero.setCustomSkinName(worldData.getCustomSkinName());
+                                    newHero.loadEquipmentFromTag(worldData.getArmorItems(serverPlayer.getUUID()), worldData.getHandItems(serverPlayer.getUUID()));
+                                    if (ModList.get().isLoaded("curios")) {
+                                        newHero.setCuriosBackItemFromTag(worldData.getCuriosBackItem(serverPlayer.getUUID()));
+                                    }
+                                    targetLevel.addFreshEntity(newHero);
+                                }
                             }
+                            future.complete(true);
                         } catch (Exception e) {
-                            LOGGER.error("UUID teleport execution error", e);
+                            LOGGER.error("Robust teleport execution error", e);
                             future.complete(false);
                         }
                     });
@@ -398,7 +416,7 @@ public class AIService {
                 } else {
                     mc.player.connection.sendCommand(command);
                     future.complete(true);
-                    }
+                }
             }
             // === 拦截 3：绝对生效的模式切换 ===
             else if (command.contains("gamemode creative") || command.contains("gamemode 1")) {

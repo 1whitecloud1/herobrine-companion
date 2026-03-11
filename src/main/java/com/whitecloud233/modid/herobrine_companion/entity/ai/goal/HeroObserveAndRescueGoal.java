@@ -7,14 +7,12 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.EnumSet;
-import java.util.List;
 
 public class HeroObserveAndRescueGoal extends Goal {
     private final HeroEntity hero;
@@ -82,19 +80,27 @@ public class HeroObserveAndRescueGoal extends Goal {
         return isInCombat(this.targetPlayer) || (isCompanionOwner && this.targetPlayer.getHealth() <= RESCUE_HEALTH_THRESHOLD && (currentTime - this.lastRescueTime) > RESCUE_COOLDOWN);
     }
 
+    /**
+     * [关键修复] 统一战斗判定逻辑，与 HeroGodlyCompanionGoal 保持一致。
+     * 只有在玩家实际受伤或攻击时才判定为战斗，而不是有怪物盯上就算。
+     */
     private boolean isInCombat(Player player) {
         int currentTick = player.tickCount;
-        if (player.getLastHurtByMobTimestamp() > 0 && (currentTick - player.getLastHurtByMobTimestamp()) < COMBAT_TIMEOUT) return true;
-        if (player.getLastHurtMobTimestamp() > 0 && (currentTick - player.getLastHurtMobTimestamp()) < COMBAT_TIMEOUT) return true;
+        int lastHurtByMobTime = player.getLastHurtByMobTimestamp();
+        int lastHurtMobTime = player.getLastHurtMobTimestamp();
 
-        net.minecraft.world.phys.AABB searchBox = player.getBoundingBox().inflate(16.0D, 8.0D, 16.0D);
-        List<Mob> threats = player.level().getEntitiesOfClass(
-                net.minecraft.world.entity.Mob.class,
-                searchBox,
-                mob -> mob.getTarget() != null && mob.getTarget().getUUID().equals(player.getUUID())
-        );
+        boolean recentlyHurt = lastHurtByMobTime > 0 && (currentTick - lastHurtByMobTime) < COMBAT_TIMEOUT;
+        boolean recentlyAttacked = lastHurtMobTime > 0 && (currentTick - lastHurtMobTime) < COMBAT_TIMEOUT;
 
-        return !threats.isEmpty();
+        if (!recentlyHurt && !recentlyAttacked) return false;
+
+        LivingEntity attacker = player.getLastHurtByMob();
+        LivingEntity target = player.getLastHurtMob();
+
+        boolean hasValidAttacker = attacker != null && attacker.isAlive() && attacker.distanceToSqr(player) < 900.0D;
+        boolean hasValidTarget = target != null && target.isAlive() && target.distanceToSqr(player) < 900.0D;
+
+        return hasValidAttacker || hasValidTarget;
     }
 
     @Override
