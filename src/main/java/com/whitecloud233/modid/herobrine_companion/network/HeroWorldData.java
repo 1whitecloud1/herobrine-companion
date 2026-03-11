@@ -21,11 +21,20 @@ public class HeroWorldData extends SavedData {
         public int trust = 0;
         public Set<Integer> claimedRewards = new HashSet<>();
         public CompoundTag brainMemory = new CompoundTag(); // 存储神经网络权重
+        
+        // [修改] 存储原生的护甲、手持数据 以及 背部槽
+        public ListTag armorItems = new ListTag();
+        public ListTag handItems = new ListTag();
+        public CompoundTag curiosBackItem = new CompoundTag(); // [新增]
 
         public void save(CompoundTag tag) {
             tag.putInt("Trust", trust);
             tag.putIntArray("ClaimedRewards", claimedRewards.stream().mapToInt(i -> i).toArray());
             tag.put("BrainMemory", brainMemory);
+            // 保存
+            tag.put("ArmorItems", armorItems);
+            tag.put("HandItems", handItems);
+            tag.put("CuriosBackItem", curiosBackItem);
         }
 
         public void load(CompoundTag tag) {
@@ -35,6 +44,11 @@ public class HeroWorldData extends SavedData {
             if (tag.contains("BrainMemory")) {
                 brainMemory = tag.getCompound("BrainMemory");
             }
+            
+            // 读取
+            if (tag.contains("ArmorItems", 9)) armorItems = tag.getList("ArmorItems", 10);
+            if (tag.contains("HandItems", 9)) handItems = tag.getList("HandItems", 10);
+            if (tag.contains("CuriosBackItem", 10)) curiosBackItem = tag.getCompound("CuriosBackItem");
         }
     }
 
@@ -42,7 +56,11 @@ public class HeroWorldData extends SavedData {
     private final Map<UUID, PlayerProfile> playerProfiles = new HashMap<>();
 
     private long respawnReadyTime = 0;
-    private boolean useHerobrineSkin = true;
+    // [修改] 废弃 useHerobrineSkin，改为 skinVariant
+    // private boolean useHerobrineSkin = true;
+    private int skinVariant = 0; // 0 = Herobrine, 1 = Hero, ...
+    private String customSkinName = ""; // 自定义皮肤名称
+
     private CompoundTag tempBrainData = null;
     
     // [新增] 存储当前活跃的 Hero 实体 UUID
@@ -54,7 +72,8 @@ public class HeroWorldData extends SavedData {
     @Override
     public CompoundTag save(CompoundTag compound) {
         compound.putLong("RespawnReadyTime", this.respawnReadyTime);
-        compound.putBoolean("UseHerobrineSkin", this.useHerobrineSkin);
+        compound.putInt("SkinVariant", this.skinVariant);
+        compound.putString("CustomSkinName", this.customSkinName);
         if (this.tempBrainData != null) {
             compound.put("TempBrainData", this.tempBrainData);
         }
@@ -83,9 +102,17 @@ public class HeroWorldData extends SavedData {
         if (compound.contains("RespawnReadyTime")) {
             data.respawnReadyTime = compound.getLong("RespawnReadyTime");
         }
-        if (compound.contains("UseHerobrineSkin")) {
-            data.useHerobrineSkin = compound.getBoolean("UseHerobrineSkin");
+        if (compound.contains("SkinVariant")) {
+            data.skinVariant = compound.getInt("SkinVariant");
+        } else if (compound.contains("UseHerobrineSkin")) {
+            // 兼容旧数据
+            data.skinVariant = compound.getBoolean("UseHerobrineSkin") ? 0 : 1;
         }
+        
+        if (compound.contains("CustomSkinName")) {
+            data.customSkinName = compound.getString("CustomSkinName");
+        }
+
         if (compound.contains("TempBrainData")) {
             data.tempBrainData = compound.getCompound("TempBrainData");
         }
@@ -166,12 +193,22 @@ public class HeroWorldData extends SavedData {
         this.setDirty();
     }
 
-    public boolean shouldUseHerobrineSkin() {
-        return useHerobrineSkin;
+    // 兼容旧方法
+    public int getSkinVariant() {
+        return skinVariant;
     }
 
-    public void setUseHerobrineSkin(boolean use) {
-        this.useHerobrineSkin = use;
+    public void setSkinVariant(int variant) {
+        this.skinVariant = variant;
+        this.setDirty();
+    }
+    
+    public String getCustomSkinName() {
+        return customSkinName;
+    }
+
+    public void setCustomSkinName(String name) {
+        this.customSkinName = name;
         this.setDirty();
     }
 
@@ -199,6 +236,23 @@ public class HeroWorldData extends SavedData {
 
     public void setLastKnownHeroPos(GlobalPos pos) {
         this.lastKnownHeroPos = pos;
+        this.setDirty();
+    }
+    
+    // [新增] 装备存取
+    public ListTag getArmorItems(UUID uuid) { return getProfile(uuid).armorItems; }
+    public ListTag getHandItems(UUID uuid) { return getProfile(uuid).handItems; }
+
+    public void setEquipment(UUID uuid, ListTag armor, ListTag hands) {
+        getProfile(uuid).armorItems = armor;
+        getProfile(uuid).handItems = hands;
+        this.setDirty();
+    }
+    
+    public CompoundTag getCuriosBackItem(UUID uuid) { return getProfile(uuid).curiosBackItem; }
+
+    public void setCuriosBackItem(UUID uuid, CompoundTag tag) {
+        getProfile(uuid).curiosBackItem = tag;
         this.setDirty();
     }
 

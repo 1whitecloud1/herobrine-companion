@@ -4,6 +4,7 @@ import com.mojang.logging.LogUtils;
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.modid.herobrine_companion.client.gui.HeroContractScreen;
 import com.whitecloud233.modid.herobrine_companion.client.gui.HeroTradeScreen;
+import com.whitecloud233.modid.herobrine_companion.client.gui.HeroWardrobeScreen;
 
 import com.whitecloud233.modid.herobrine_companion.client.model.HeroDragonModel;
 import com.whitecloud233.modid.herobrine_companion.client.model.HeroModel;
@@ -39,12 +40,12 @@ public class ClientEvents {
     private static final Logger LOGGER = LogUtils.getLogger();
 
     static {
-        LOGGER.error(">>> [CLIENT EVENTS] 类加载确认！ <<<");
+        LOGGER.info(">>> [CLIENT EVENTS] 类加载确认！ <<<");
     }
 
     @SubscribeEvent
     public static void registerRenderers(EntityRenderersEvent.RegisterRenderers event) {
-        LOGGER.error(">>> [RENDERER REGISTER] 正在注册渲染器... <<<");
+        LOGGER.info(">>> [RENDERER REGISTER] 正在注册渲染器... <<<");
 
         event.registerEntityRenderer(ModEvents.HERO.get(), HeroRenderer::new);
         event.registerBlockEntityRenderer(HerobrineCompanion.END_RING_PORTAL_BE.get(), EndRingPortalRenderer::new);
@@ -76,6 +77,7 @@ public class ClientEvents {
         event.enqueueWork(() -> {
             MenuScreens.register(ModMenus.HERO_CONTRACT_MENU.get(), HeroContractScreen::new);
             MenuScreens.register(ModMenus.HERO_TRADE_MENU.get(), HeroTradeScreen::new);
+            MenuScreens.register(ModMenus.HERO_WARDROBE.get(), HeroWardrobeScreen::new);
         });
     }
 
@@ -169,7 +171,7 @@ public class ClientEvents {
                     return; // 已经是我们的了
                 }
 
-                LOGGER.error(">>> [RUNTIME INJECTION] 检测到渲染器丢失或未注入，正在执行注入... <<<");
+                LOGGER.info(">>> [RENDERER INJECTION] 检测到渲染器丢失或未注入，正在执行注入... <<<");
 
                 // 创建新的可变 Map
                 Map<EntityType<?>, net.minecraft.client.renderer.entity.EntityRenderer<?>> newRenderers =
@@ -182,7 +184,7 @@ public class ClientEvents {
                 // 把新 Map 赋值回字段
                 renderersField.set(dispatcher, newRenderers);
 
-                LOGGER.error(">>> [RUNTIME INJECTION] 成功替换了 renderers 实例！(通过新建 Map) <<<");
+                LOGGER.info(">>> [RENDERER INJECTION] 成功替换了 renderers 实例！(通过新建 Map) <<<");
             }
 
             if (providersField != null) {
@@ -199,11 +201,11 @@ public class ClientEvents {
                 // 把新 Map 赋值回字段
                 providersField.set(dispatcher, newProviders);
 
-                LOGGER.error(">>> [RUNTIME INJECTION] 成功替换了 providers 工厂！(通过新建 Map) <<<");
+                LOGGER.info(">>> [RENDERER INJECTION] 成功替换了 providers 工厂！(通过新建 Map) <<<");
             }
 
         } catch (Exception e) {
-            LOGGER.error(">>> [RUNTIME INJECTION] 失败: ", e);
+            LOGGER.error(">>> [RENDERER INJECTION] 失败: ", e);
         }
     }
 }

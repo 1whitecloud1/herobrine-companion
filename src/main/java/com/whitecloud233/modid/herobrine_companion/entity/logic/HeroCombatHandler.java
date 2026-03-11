@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.entity.logic;
 
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.modid.herobrine_companion.network.HeroWorldData;
 import com.whitecloud233.modid.herobrine_companion.world.structure.ModStructures;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -56,8 +57,29 @@ public class HeroCombatHandler {
                     if (player instanceof ServerPlayer serverPlayer) {
                         CompoundTag data = serverPlayer.getPersistentData();
                         CompoundTag heroData = new CompoundTag();
-                        heroData.putBoolean("UseHerobrineSkin", hero.shouldUseHerobrineSkin());
+                        // [关键修复] 使用新的皮肤变体和自定义名称，而不是旧的 boolean
+                        heroData.putInt("SkinVariant", hero.getSkinVariant());
+                        if (hero.getSkinVariant() == HeroEntity.SKIN_CUSTOM) {
+                            heroData.putString("CustomSkinName", hero.getCustomSkinName());
+                        }
+                        
+                        // ============== [修复] 打包所有装备 ==============
+                        heroData.put("ArmorItems", hero.getArmorItemsTag());
+                        heroData.put("HandItems", hero.getHandItemsTag());
+                        heroData.put("CuriosBackItem", hero.getCuriosBackItemTag()); // [新增]
                         data.put("HeroCombatRespawnData", heroData);
+                    }
+                    
+                    // [新增] 强制更新一次全局数据，作为双重保险
+                    if (hero.level() instanceof ServerLevel serverLevel) {
+                        HeroWorldData data = HeroWorldData.get(serverLevel);
+                        data.setSkinVariant(hero.getSkinVariant());
+                        if (hero.getSkinVariant() == HeroEntity.SKIN_CUSTOM) {
+                            data.setCustomSkinName(hero.getCustomSkinName());
+                        }
+                        
+                        data.setEquipment(player.getUUID(), hero.getArmorItemsTag(), hero.getHandItemsTag());
+                        data.setCuriosBackItem(player.getUUID(), hero.getCuriosBackItemTag()); // [新增]
                     }
 
                     HeroDimensionHandler.leaveWorld(hero, null);

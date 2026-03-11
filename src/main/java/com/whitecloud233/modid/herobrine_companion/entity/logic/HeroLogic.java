@@ -4,12 +4,14 @@ import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.HeroDialogueHandler;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.HeroObserver;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.HeroPrankHandler;
+import com.whitecloud233.modid.herobrine_companion.network.HeroWorldData;
 import com.whitecloud233.modid.herobrine_companion.world.structure.ModStructures;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -81,6 +83,16 @@ public class HeroLogic {
             } else {
                 // 如果信任度为 0，尝试恢复
                 HeroDataHandler.restoreTrustFromPlayer(hero);
+            }
+            
+            // [新增] 定期同步皮肤状态到全局数据，防止丢失
+            if (hero.level() instanceof ServerLevel serverLevel) {
+                HeroWorldData data = HeroWorldData.get(serverLevel);
+                // 如果当前实体有自定义皮肤，且全局数据没有，则更新全局
+                if (hero.getSkinVariant() == HeroEntity.SKIN_CUSTOM && !hero.getCustomSkinName().isEmpty()) {
+                    data.setSkinVariant(HeroEntity.SKIN_CUSTOM);
+                    data.setCustomSkinName(hero.getCustomSkinName());
+                }
             }
         }
 

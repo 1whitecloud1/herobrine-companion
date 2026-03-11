@@ -7,9 +7,10 @@ import com.whitecloud233.modid.herobrine_companion.event.ModEvents;
 import com.whitecloud233.modid.herobrine_companion.world.inventory.HeroContractMenu;
 import com.whitecloud233.modid.herobrine_companion.world.structure.ModStructures;
 import com.whitecloud233.modid.herobrine_companion.util.EndRingContext;
+import com.whitecloud233.modid.herobrine_companion.network.HeroWorldData;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -32,24 +33,24 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.*;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
-import net.minecraft.world.phys.shapes.VoxelShape;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.fml.loading.FMLEnvironment;
 import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraftforge.fml.ModList;
 
 import java.util.Collections;
 import java.util.Random;
 import java.util.UUID;
 
 public class HeroSummonItem extends Item {
-    
+
     private static final Random random = new Random();
     private static final String[] MOCKERY_MESSAGES = {
-        "message.herobrine_companion.mockery_1",
-        "message.herobrine_companion.mockery_2",
-        "message.herobrine_companion.mockery_3",
-        "message.herobrine_companion.mockery_4",
-        "message.herobrine_companion.mockery_5"
+            "message.herobrine_companion.mockery_1",
+            "message.herobrine_companion.mockery_2",
+            "message.herobrine_companion.mockery_3",
+            "message.herobrine_companion.mockery_4",
+            "message.herobrine_companion.mockery_5"
     };
 
     private static final long COOLDOWN_TICKS = 100;
@@ -66,11 +67,11 @@ public class HeroSummonItem extends Item {
     public InteractionResult interactLivingEntity(ItemStack stack, Player player, LivingEntity interactionTarget, InteractionHand hand) {
         if (interactionTarget instanceof HeroEntity) {
             Level level = player.level();
-            
+
             if (level.dimension() == ModStructures.END_RING_DIMENSION_KEY) {
                 return InteractionResult.PASS;
             }
-            
+
             if (isBound(stack)) {
                 if (!level.isClientSide) {
                     player.sendSystemMessage(Component.translatable("message.herobrine_companion.shelter_bound", getOwnerName(stack)));
@@ -98,7 +99,7 @@ public class HeroSummonItem extends Item {
             if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
                 long currentTime = level.getGameTime();
                 long lastUseTime = getLastUseTime(stack);
-                
+
                 if (currentTime < lastUseTime + COOLDOWN_TICKS) {
                     String mockery = MOCKERY_MESSAGES[random.nextInt(MOCKERY_MESSAGES.length)];
                     player.sendSystemMessage(Component.translatable(mockery));
@@ -106,10 +107,10 @@ public class HeroSummonItem extends Item {
                 }
 
                 HeroEntity existingHero = findHeroInAnyDimension(serverLevel.getServer());
-                
+
                 // [新增] 检查是否是特殊互动方块
                 int actionType = getInteractionType(level, clickedPos);
-                
+
                 // 如果是特殊方块，且 Hero 存在，则触发邀请
                 if (actionType > 0 && existingHero != null) {
                     // 只有当 Hero 在同一个维度时才能互动
@@ -138,6 +139,20 @@ public class HeroSummonItem extends Item {
                         // 1. 保存旧实体数据
                         CompoundTag heroData = new CompoundTag();
                         existingHero.saveWithoutId(heroData);
+
+                        // ============== [修复装扮丢失] 提前提取所有装备数据 ==============
+                        ListTag armorTags = existingHero.getArmorItemsTag();
+                        ListTag handTags = existingHero.getHandItemsTag();
+                        float oldYRot = existingHero.getYRot();
+                        float oldXRot = existingHero.getXRot();
+
+                        // [软依赖安全检查]
+                        CompoundTag curiosTag = null;
+                        if (ModList.get().isLoaded("curios")) {
+                            curiosTag = existingHero.getCuriosBackItemTag();
+                        }
+                        // ===============================================================
+
                         HeroDataHandler.updateGlobalTrust(existingHero); // 确保信任度保存
                         existingHero.discard(); // 销毁旧实体
 
@@ -150,12 +165,43 @@ public class HeroSummonItem extends Item {
                             if (heroData.contains("UUIDLeast")) heroData.remove("UUIDLeast");
 
                             newHero.load(heroData);
-                            newHero.moveTo(targetPos.x, targetPos.y, targetPos.z, existingHero.getYRot(), existingHero.getXRot());
+                            newHero.moveTo(targetPos.x, targetPos.y, targetPos.z, oldYRot, oldXRot);
                             newHero.setUUID(UUID.randomUUID());
-                            
+
+                            // ============== [修复装扮丢失] 强制穿上装备并进行全局双保险托底 ==============
+                            newHero.loadEquipmentFromTag(armorTags, handTags);
+
+                            // [软依赖安全检查]
+                            if (ModList.get().isLoaded("curios") && curiosTag != null) {
+                                newHero.setCuriosBackItemFromTag(curiosTag);
+                            }
+
+                            if (player != null) {
+                                HeroWorldData worldData = HeroWorldData.get(serverLevel);
+
+                                // 托底保护：如果转移意外失败，从玩家的全局存档中再次拉取
+                                boolean isNaked = true;
+                                for (ItemStack item : newHero.getArmorSlots()) if (!item.isEmpty()) isNaked = false;
+                                for (ItemStack item : newHero.getHandSlots()) if (!item.isEmpty()) isNaked = false;
+
+                                if (isNaked) {
+                                    newHero.loadEquipmentFromTag(worldData.getArmorItems(player.getUUID()), worldData.getHandItems(player.getUUID()));
+                                }
+                                worldData.setEquipment(player.getUUID(), newHero.getArmorItemsTag(), newHero.getHandItemsTag());
+
+                                // [软依赖安全检查]
+                                if (ModList.get().isLoaded("curios")) {
+                                    if (newHero.isCuriosBackSlotEmpty()) {
+                                        newHero.setCuriosBackItemFromTag(worldData.getCuriosBackItem(player.getUUID()));
+                                    }
+                                    worldData.setCuriosBackItem(player.getUUID(), newHero.getCuriosBackItemTag());
+                                }
+                            }
+                            // =======================================================================
+
                             // 添加特权标签，防止被误杀
                             newHero.addTag(EndRingContext.TAG_RESPAWNED_SAFE);
-                            
+
                             // 确保信任度同步
                             HeroDataHandler.syncGlobalTrust(newHero);
 
@@ -183,19 +229,42 @@ public class HeroSummonItem extends Item {
                     }
 
                     level.playSound(null, context.getClickedPos(), SoundEvents.ENDERMAN_TELEPORT, SoundSource.PLAYERS, 1.0f, 1.0f);
-                    
+
                 } else {
-                    // 召唤新 Hero
+                    // 召唤新 Hero (当旧实体处于未加载区块时会触发此分支)
                     HeroEntity hero = ModEvents.HERO.get().create(serverLevel);
                     if (hero != null) {
                         hero.moveTo(targetPos);
                         hero.finalizeSpawn(serverLevel, serverLevel.getCurrentDifficultyAt(hero.blockPosition()), MobSpawnType.TRIGGERED, null, null);
-                        
+
                         // [修复] 绑定主人并同步信任度
                         if (player != null) {
                             hero.setOwnerUUID(player.getUUID());
                             HeroDataHandler.restoreTrustFromPlayer(hero); // 恢复信任度
                             HeroDataHandler.syncGlobalTrust(hero);
+
+                            // ============== [终极防丢修复] 跨世界新生成，必须从全局恢复衣服 ==============
+                            HeroWorldData worldData = HeroWorldData.get(serverLevel);
+
+                            // 1. 恢复皮肤状态
+                            hero.setSkinVariant(worldData.getSkinVariant());
+                            if (worldData.getSkinVariant() == HeroEntity.SKIN_CUSTOM) {
+                                hero.setCustomSkinName(worldData.getCustomSkinName());
+                            }
+
+                            // 2. 恢复原生装备 (头胸腿脚、主副手)
+                            ListTag savedArmor = worldData.getArmorItems(player.getUUID());
+                            ListTag savedHands = worldData.getHandItems(player.getUUID());
+                            hero.loadEquipmentFromTag(savedArmor, savedHands);
+
+                            // 3. 恢复 Curios 背部翅膀 [软依赖安全检查]
+                            if (ModList.get().isLoaded("curios")) {
+                                CompoundTag savedCurios = worldData.getCuriosBackItem(player.getUUID());
+                                if (savedCurios != null && !savedCurios.isEmpty()) {
+                                    hero.setCuriosBackItemFromTag(savedCurios);
+                                }
+                            }
+                            // =========================================================================
                         }
 
                         serverLevel.addFreshEntity(hero);
@@ -216,7 +285,7 @@ public class HeroSummonItem extends Item {
             return InteractionResult.FAIL;
         }
     }
-    
+
     // [新增] 判断方块互动类型 (增强版)
     private int getInteractionType(Level level, BlockPos pos) {
         BlockState state = level.getBlockState(pos);
@@ -227,10 +296,10 @@ public class HeroSummonItem extends Item {
         if (state.is(BlockTags.BEDS) || block instanceof BedBlock) return 2;
         if (state.is(BlockTags.STAIRS) || block instanceof StairBlock) return 2;
         if (state.is(BlockTags.SLABS) || block instanceof SlabBlock) return 2;
-        
+
         // 模组兼容：检查标签
         if (state.is(FORGE_CHAIRS) || state.is(C_CHAIRS)) return 2;
-        
+
         // 模组兼容：检查名称关键词
         ResourceLocation key = ForgeRegistries.BLOCKS.getKey(block);
         if (key != null) {
@@ -239,13 +308,13 @@ public class HeroSummonItem extends Item {
                 return 2;
             }
         }
-        
+
         // 3 = Guard (守卫)
         if (state.is(BlockTags.DOORS) || block instanceof DoorBlock) return 3;
         if (state.is(BlockTags.TRAPDOORS) || block instanceof TrapDoorBlock) return 3;
         if (state.is(BlockTags.FENCE_GATES) || block instanceof FenceGateBlock) return 3;
         if (state.is(Blocks.CHEST) || state.is(Blocks.TRAPPED_CHEST) || state.is(Blocks.ENDER_CHEST) || state.is(Blocks.BARREL) || state.is(Blocks.SHULKER_BOX)) return 3;
-        
+
         // 1 = Inspect (查看)
         if (state.is(Blocks.SPAWNER)) return 1;
         if (state.is(Blocks.ENCHANTING_TABLE)) return 1;
@@ -253,7 +322,7 @@ public class HeroSummonItem extends Item {
         if (state.is(Blocks.COMMAND_BLOCK) || state.is(Blocks.CHAIN_COMMAND_BLOCK) || state.is(Blocks.REPEATING_COMMAND_BLOCK)) return 1;
         if (state.is(BlockTags.DIAMOND_ORES) || state.is(BlockTags.EMERALD_ORES) || state.is(BlockTags.GOLD_ORES)) return 1;
         if (state.is(Blocks.ANCIENT_DEBRIS)) return 1;
-        
+
         return 0; // 普通方块
     }
 
@@ -278,7 +347,7 @@ public class HeroSummonItem extends Item {
         CompoundTag tag = stack.getOrCreateTag();
         return tag.getString("OwnerName");
     }
-    
+
     private long getLastUseTime(ItemStack stack) {
         CompoundTag tag = stack.getOrCreateTag();
         return tag.getLong("LastHeroSummonTime");
@@ -306,14 +375,14 @@ public class HeroSummonItem extends Item {
 
     private float getClientCooldownProgress(ItemStack stack) {
         if (FMLEnvironment.dist == Dist.CLIENT) {
-             net.minecraft.client.multiplayer.ClientLevel level = net.minecraft.client.Minecraft.getInstance().level;
-             if (level != null) {
-                 long currentTime = level.getGameTime();
-                 long lastUseTime = getLastUseTime(stack);
-                 long timePassed = currentTime - lastUseTime;
-                 if (timePassed < 0 || timePassed >= COOLDOWN_TICKS) return 0.0F;
-                 return (float)(COOLDOWN_TICKS - timePassed) / (float)COOLDOWN_TICKS;
-             }
+            net.minecraft.client.multiplayer.ClientLevel level = net.minecraft.client.Minecraft.getInstance().level;
+            if (level != null) {
+                long currentTime = level.getGameTime();
+                long lastUseTime = getLastUseTime(stack);
+                long timePassed = currentTime - lastUseTime;
+                if (timePassed < 0 || timePassed >= COOLDOWN_TICKS) return 0.0F;
+                return (float)(COOLDOWN_TICKS - timePassed) / (float)COOLDOWN_TICKS;
+            }
         }
         return 0.0F;
     }

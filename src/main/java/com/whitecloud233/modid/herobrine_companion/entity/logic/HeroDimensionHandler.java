@@ -10,11 +10,13 @@ import com.whitecloud233.modid.herobrine_companion.util.EndRingContext;
 import com.whitecloud233.modid.herobrine_companion.world.structure.ModStructures;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -281,18 +283,63 @@ public class HeroDimensionHandler {
             HeroDataHandler.syncGlobalTrust(hero);
             
             HeroWorldData worldData = HeroWorldData.get(level);
-            if (worldData.shouldUseHerobrineSkin()) {
-                hero.setUseHerobrineSkin(true);
-            } else {
-                CompoundTag data = player.getPersistentData();
-                if (data.contains("HeroCombatRespawnData")) {
-                    CompoundTag heroData = data.getCompound("HeroCombatRespawnData");
-                    if (heroData.contains("UseHerobrineSkin")) {
-                        hero.setUseHerobrineSkin(heroData.getBoolean("UseHerobrineSkin"));
+            
+            // [修复] 优先从玩家数据恢复皮肤状态 (因为玩家可能在战斗中切换了皮肤但还没同步到全局)
+            boolean skinRestored = false;
+            CompoundTag data = player.getPersistentData();
+            if (data.contains("HeroCombatRespawnData")) {
+                CompoundTag heroData = data.getCompound("HeroCombatRespawnData");
+                if (heroData.contains("SkinVariant")) {
+                    int variant = heroData.getInt("SkinVariant");
+                    hero.setSkinVariant(variant);
+                    if (variant == HeroEntity.SKIN_CUSTOM && heroData.contains("CustomSkinName")) {
+                        hero.setCustomSkinName(heroData.getString("CustomSkinName"));
                     }
-                    data.remove("HeroCombatRespawnData");
+                    skinRestored = true;
+                }
+                
+                // ============== [修复] 从玩家挂起的数据中恢复原生装备 ==============
+                if (heroData.contains("ArmorItems", 9) || heroData.contains("HandItems", 9)) {
+                    hero.loadEquipmentFromTag(
+                            heroData.getList("ArmorItems", 10),
+                            heroData.getList("HandItems", 10)
+                    );
+                }
+                
+                // ============== [修复] 从挂起的数据恢复背部槽 ==============
+                if (heroData.contains("CuriosBackItem", 10)) {
+                    hero.setCuriosBackItemFromTag(heroData.getCompound("CuriosBackItem"));
+                }
+                
+                data.remove("HeroCombatRespawnData");
+            }
+            
+            // 如果玩家数据没有，则使用全局数据
+            if (!skinRestored) {
+                hero.setSkinVariant(worldData.getSkinVariant());
+                if (worldData.getSkinVariant() == HeroEntity.SKIN_CUSTOM) {
+                    hero.setCustomSkinName(worldData.getCustomSkinName());
                 }
             }
+
+            // ============== [修复] 全局数据托底恢复 ==============
+            ListTag savedArmor = worldData.getArmorItems(player.getUUID());
+            ListTag savedHands = worldData.getHandItems(player.getUUID());
+            // 简单判断身上是否为空
+            boolean isNaked = true;
+            for (ItemStack stack : hero.getArmorSlots()) if (!stack.isEmpty()) isNaked = false;
+            for (ItemStack stack : hero.getHandSlots()) if (!stack.isEmpty()) isNaked = false;
+
+            if (isNaked) {
+                hero.loadEquipmentFromTag(savedArmor, savedHands);
+            }
+            
+            // ============== [修复] 全局数据托底恢复 Curios 背部 ==============
+            CompoundTag savedCurios = worldData.getCuriosBackItem(player.getUUID());
+            if (savedCurios != null && !savedCurios.isEmpty() && hero.isCuriosBackSlotEmpty()) {
+                hero.setCuriosBackItemFromTag(savedCurios);
+            }
+            // ==============================================================
 
             if (worldData.getTempBrainData() != null) {
                 hero.getHeroBrain().load(worldData.getTempBrainData());

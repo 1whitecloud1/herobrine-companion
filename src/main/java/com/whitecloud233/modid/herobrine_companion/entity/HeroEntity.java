@@ -11,6 +11,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
@@ -51,7 +52,11 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     private static final EntityDataAccessor<Boolean> IS_FLOATING = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Integer> TRUST_LEVEL = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Boolean> IS_COMPANION_MODE = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.BOOLEAN);
-    private static final EntityDataAccessor<Boolean> USE_HEROBRINE_SKIN = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.BOOLEAN);
+    // [修改] 废弃 USE_HEROBRINE_SKIN，改为 SKIN_VARIANT
+    // private static final EntityDataAccessor<Boolean> USE_HEROBRINE_SKIN = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Integer> SKIN_VARIANT = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.INT);
+    // [新增] 自定义皮肤名称同步 (现在用于存储 URL 或 文件名)
+    private static final EntityDataAccessor<String> CUSTOM_SKIN_NAME = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.STRING);
 
     private static final EntityDataAccessor<Optional<UUID>> OWNER_UUID = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.OPTIONAL_UUID);
 
@@ -102,6 +107,12 @@ public class HeroEntity extends PathfinderMob implements Merchant {
 
     public int shockTicks = 0;
     public static final int MAX_SHOCK_TICKS = 60;
+
+    // 皮肤常量定义
+    public static final int SKIN_HEROBRINE = 0;
+    public static final int SKIN_HERO = 1;
+    public static final int SKIN_CUSTOM = 999; // 自定义皮肤标识 (URL/本地文件)
+    // 预留更多皮肤ID...
 
     public HeroEntity(EntityType<? extends PathfinderMob> type, Level level) {
         super(type, level);
@@ -212,9 +223,23 @@ public class HeroEntity extends PathfinderMob implements Merchant {
                         // Skin update (every 20 ticks)
                         if (this.tickCount % 20 == 0) {
                             HeroWorldData data = HeroWorldData.get(serverLevel);
-                            boolean globalSkin = data.shouldUseHerobrineSkin();
-                            if (this.shouldUseHerobrineSkin() != globalSkin) {
-                                this.entityData.set(USE_HEROBRINE_SKIN, globalSkin);
+                            int globalSkin = data.getSkinVariant();
+                            if (this.getSkinVariant() != globalSkin) {
+                                this.entityData.set(SKIN_VARIANT, globalSkin);
+                            }
+                            // 同步自定义皮肤名
+                            if (globalSkin == SKIN_CUSTOM) {
+                                String customName = data.getCustomSkinName();
+                                if (!this.getCustomSkinName().equals(customName)) {
+                                    this.entityData.set(CUSTOM_SKIN_NAME, customName);
+                                }
+                            }
+                            
+                            // ============== [修复] 定时备份 ==============
+                            if (this.getOwnerUUID() != null) {
+                                data.setEquipment(this.getOwnerUUID(), this.getArmorItemsTag(), this.getHandItemsTag());
+                                // 加上背部槽！
+                                data.setCuriosBackItem(this.getOwnerUUID(), this.getCuriosBackItemTag());
                             }
                         }
 
@@ -429,7 +454,8 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         this.entityData.define(IS_FLOATING, true);
         this.entityData.define(TRUST_LEVEL, 0);
         this.entityData.define(IS_COMPANION_MODE, false);
-        this.entityData.define(USE_HEROBRINE_SKIN, true);
+        this.entityData.define(SKIN_VARIANT, SKIN_HEROBRINE);
+        this.entityData.define(CUSTOM_SKIN_NAME, "");
         this.entityData.define(OWNER_UUID, Optional.empty());
         this.entityData.define(INVITED_POS, Optional.empty());
         this.entityData.define(INVITED_ACTION, 0);
@@ -446,13 +472,15 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         compound.putInt("TrustLevel", getTrustLevel());
         compound.putInt("PatrolTimer", patrolTimer);
         compound.putBoolean("CompanionMode", isCompanionMode());
-        compound.putBoolean("UseHerobrineSkin", shouldUseHerobrineSkin());
+        compound.putInt("SkinVariant", getSkinVariant());
+        compound.putString("CustomSkinName", getCustomSkinName());
 
         // [修复] UUID 备份保存 (防止二进制格式变动)
         if (getOwnerUUID() != null) {
             compound.putUUID("OwnerUUID", getOwnerUUID());
             compound.putString("OwnerUUID_String", getOwnerUUID().toString());
         }
+
     }
 
     @Override
@@ -466,10 +494,19 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         if (compound.contains("PatrolTimer")) patrolTimer = compound.getInt("PatrolTimer");
         if (compound.contains("CompanionMode")) setCompanionMode(compound.getBoolean("CompanionMode"));
 
-        boolean localSkin = false;
-        if (compound.contains("UseHerobrineSkin")) {
-            localSkin = compound.getBoolean("UseHerobrineSkin");
-            this.entityData.set(USE_HEROBRINE_SKIN, localSkin);
+        int localSkin = SKIN_HEROBRINE;
+        if (compound.contains("SkinVariant")) {
+            localSkin = compound.getInt("SkinVariant");
+            this.entityData.set(SKIN_VARIANT, localSkin);
+        } else if (compound.contains("UseHerobrineSkin")) {
+            // 兼容旧数据
+            boolean useHerobrine = compound.getBoolean("UseHerobrineSkin");
+            localSkin = useHerobrine ? SKIN_HEROBRINE : SKIN_HERO;
+            this.entityData.set(SKIN_VARIANT, localSkin);
+        }
+        
+        if (compound.contains("CustomSkinName")) {
+            this.entityData.set(CUSTOM_SKIN_NAME, compound.getString("CustomSkinName"));
         }
 
         // [修复] 读取 UUID - 优先二进制，失败则读取字符串
@@ -488,13 +525,83 @@ public class HeroEntity extends PathfinderMob implements Merchant {
 
         if (!this.level().isClientSide && this.level() instanceof ServerLevel serverLevel) {
             HeroWorldData data = HeroWorldData.get(serverLevel);
-            if (data.shouldUseHerobrineSkin()) {
-                this.entityData.set(USE_HEROBRINE_SKIN, true);
-            } else if (localSkin) {
-                data.setUseHerobrineSkin(true);
+            // 同步全局皮肤设置
+            if (data.getSkinVariant() != localSkin) {
+                // 如果全局有设置，优先使用全局（或者这里可以加逻辑判断谁优先）
+                // 这里假设加载时如果本地有记录，先用本地的，然后 tick 会同步
+                // 但为了保持一致性，通常以 WorldData 为准，除非 WorldData 还没初始化
+                // 简单起见，这里不做强制覆盖，依靠 tick 中的同步逻辑
             }
         }
     }
+
+    // ================= [新增] 原生装备序列化 =================
+    public ListTag getArmorItemsTag() {
+        ListTag tag = new ListTag();
+        for (ItemStack stack : this.getArmorSlots()) tag.add(stack.save(new CompoundTag()));
+        return tag;
+    }
+
+    public ListTag getHandItemsTag() {
+        ListTag tag = new ListTag();
+        for (ItemStack stack : this.getHandSlots()) tag.add(stack.save(new CompoundTag()));
+        return tag;
+    }
+
+    public void loadEquipmentFromTag(ListTag armor, ListTag hands) {
+        if (armor != null && !armor.isEmpty()) {
+            for(int i = 0; i < armor.size(); ++i) {
+                this.setItemSlot(net.minecraft.world.entity.EquipmentSlot.byTypeAndIndex(net.minecraft.world.entity.EquipmentSlot.Type.ARMOR, i), ItemStack.of(armor.getCompound(i)));
+            }
+        }
+        if (hands != null && !hands.isEmpty()) {
+            for(int i = 0; i < hands.size(); ++i) {
+                this.setItemSlot(net.minecraft.world.entity.EquipmentSlot.byTypeAndIndex(net.minecraft.world.entity.EquipmentSlot.Type.HAND, i), ItemStack.of(hands.getCompound(i)));
+            }
+        }
+    }
+    // =======================================================
+
+    // ================= [新增] Curios 背部槽序列化 (防崩溃安全版) =================
+    public CompoundTag getCuriosBackItemTag() {
+        if (net.minecraftforge.fml.ModList.get().isLoaded("curios")) {
+            return CuriosSafeInvoker.getBackItemTag(this);
+        }
+        return new CompoundTag();
+    }
+
+    public void setCuriosBackItemFromTag(CompoundTag tag) {
+        if (tag == null || tag.isEmpty()) return;
+        if (net.minecraftforge.fml.ModList.get().isLoaded("curios")) {
+            CuriosSafeInvoker.setBackItemFromTag(this, tag);
+        }
+    }
+
+    public boolean isCuriosBackSlotEmpty() {
+        if (!net.minecraftforge.fml.ModList.get().isLoaded("curios")) return true;
+        return CuriosSafeInvoker.isBackSlotEmpty(this);
+    }
+
+    // 【核心防御机制】安全隔离内部类！
+    // 只要 Curios 没加载，外层的 if 进不来，JVM 就绝对不会加载这个类！
+    private static class CuriosSafeInvoker {
+        static CompoundTag getBackItemTag(HeroEntity hero) {
+            CompoundTag tag = new CompoundTag();
+            ItemStack stack = com.whitecloud233.modid.herobrine_companion.compat.curios.HeroCuriosCompat.getBackSlotItem(hero);
+            if (!stack.isEmpty()) stack.save(tag);
+            return tag;
+        }
+        
+        static void setBackItemFromTag(HeroEntity hero, CompoundTag tag) {
+            ItemStack stack = ItemStack.of(tag);
+            com.whitecloud233.modid.herobrine_companion.compat.curios.HeroCuriosCompat.setBackSlotItem(hero, stack);
+        }
+        
+        static boolean isBackSlotEmpty(HeroEntity hero) {
+            return com.whitecloud233.modid.herobrine_companion.compat.curios.HeroCuriosCompat.getBackSlotItem(hero).isEmpty();
+        }
+    }
+    // =======================================================================
 
     // [新增] Getter
     public boolean isLoadedFromDisk() {
@@ -514,11 +621,26 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     public void increaseTrust(int amount) { setTrustLevel(getTrustLevel() + amount); }
     public boolean isCompanionMode() { return entityData.get(IS_COMPANION_MODE); }
     public void setCompanionMode(boolean active) { entityData.set(IS_COMPANION_MODE, active); }
-    public boolean shouldUseHerobrineSkin() { return entityData.get(USE_HEROBRINE_SKIN); }
+    
+    // 兼容旧方法
+    public boolean shouldUseHerobrineSkin() { return getSkinVariant() == SKIN_HEROBRINE; }
     public void setUseHerobrineSkin(boolean use) {
-        entityData.set(USE_HEROBRINE_SKIN, use);
+        setSkinVariant(use ? SKIN_HEROBRINE : SKIN_HERO);
+    }
+
+    public int getSkinVariant() { return entityData.get(SKIN_VARIANT); }
+    public void setSkinVariant(int variant) {
+        entityData.set(SKIN_VARIANT, variant);
         if (!this.level().isClientSide && this.level() instanceof ServerLevel serverLevel) {
-            HeroWorldData.get(serverLevel).setUseHerobrineSkin(use);
+            HeroWorldData.get(serverLevel).setSkinVariant(variant);
+        }
+    }
+    
+    public String getCustomSkinName() { return entityData.get(CUSTOM_SKIN_NAME); }
+    public void setCustomSkinName(String name) {
+        entityData.set(CUSTOM_SKIN_NAME, name);
+        if (!this.level().isClientSide && this.level() instanceof ServerLevel serverLevel) {
+            HeroWorldData.get(serverLevel).setCustomSkinName(name);
         }
     }
 
