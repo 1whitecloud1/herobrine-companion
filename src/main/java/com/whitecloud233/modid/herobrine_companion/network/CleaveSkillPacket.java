@@ -21,11 +21,9 @@ public class CleaveSkillPacket {
             ServerPlayer player = ctx.getSender();
             if (player != null) {
                 // 【加入 Debug 提示 1】
-                player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§a[Debug] 服务端：已收到客户端的 R 键数据包！"));
 
                 if (player.getMainHandItem().getItem() instanceof PoemOfTheEndItem poemItem) {
                     // 【加入 Debug 提示 2】
-                    player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§a[Debug] 服务端：武器校验通过，准备执行 triggerWorldCleave！"));
                     poemItem.triggerWorldCleave(player.serverLevel(), player);
                 } else {
                     player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§c[Debug] 服务端错误：你主手里拿的不是镰刀！"));

@@ -1,5 +1,6 @@
 package com.whitecloud233.modid.herobrine_companion.event;
 
+import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.projectile.CleaveBladeEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -108,21 +109,17 @@ public class CleaveTickManager {
                 // ==========================================
                 // 2. 同步湮灭实体 (无情抹除范围内的所有东西)
                 // ==========================================
-                // ==========================================
-                // 2. 同步湮灭实体 (无情抹除范围内的所有东西)
-                // ==========================================
                 AABB sliceBox = new AABB(
                         cX - task.halfWidth - 1, task.minY, cZ - task.halfWidth - 1,
                         cX + task.halfWidth + 2, task.startY + 2, cZ + task.halfWidth + 2
                 );
                 List<Entity> entitiesToErase = task.level.getEntities(null, sliceBox);
                 for (Entity e : entitiesToErase) {
-                    // 【终极修复】：除了玩家，也不能删掉刀光实体本身！
-                    if (!(e instanceof Player) && !(e instanceof CleaveBladeEntity)) {
+                    // 【终极修复】：除了玩家和刀光，绝对不能抹杀创世神！
+                    if (!(e instanceof Player) && !(e instanceof CleaveBladeEntity) && !(e instanceof HeroEntity)) {
                         e.discard();
                     }
                 }
-
                 double currentBladeBaseY = task.minY;
 
                 // ==========================================
@@ -140,7 +137,7 @@ public class CleaveTickManager {
                         int blockMinY = task.minY;
 
                         int depth = task.targetY - task.minY;
-                        double slopeLength = Math.max(30.0, depth * 1.5);
+                        double slopeLength = Math.max(20.0, depth * 2);
 
                         if (remaining <= slopeLength && remaining >= 0) {
                             double progress = (slopeLength - remaining) / slopeLength;

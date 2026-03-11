@@ -43,7 +43,7 @@ public class Config {
     // ==========================================
     public static final ForgeConfigSpec.BooleanValue SOUL_BOUND_PACT_ENABLED = BUILDER
             .comment("Whether the Soul Bound Pact item is enabled")
-            .comment("是否启用灵魂之契物品")
+            .comment("是否启用魂缚之契物品")
             .define("soulBoundPactEnabled_v2", true);
 
     public static final ForgeConfigSpec.BooleanValue ABYSSAL_GAZE_ENABLED = BUILDER
