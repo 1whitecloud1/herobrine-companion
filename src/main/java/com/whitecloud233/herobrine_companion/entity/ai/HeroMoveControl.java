@@ -37,17 +37,21 @@ public class HeroMoveControl extends MoveControl {
             Vec3 currentVelocity = this.hero.getDeltaMovement();
             
             // XZ轴平滑 (0.1D)
+            // [优化] 动态水平响应系数 (XZ)
+            // 基础响应 0.1，距离越远响应越快，防止卡顿（低TPS）导致移动迟缓
             double lerpXZ = 0.1D;
+            if (distSq > 4.0D) lerpXZ = 0.3D;   // 距离 > 2格，提升响应
+            if (distSq > 16.0D) lerpXZ = 0.8D;  // 距离 > 4格，几乎瞬间响应，抵抗卡顿
+
             double newX = Mth.lerp(lerpXZ, currentVelocity.x, desiredVelocity.x);
             double newZ = Mth.lerp(lerpXZ, currentVelocity.z, desiredVelocity.z);
-            
-            // Y轴极度平滑 (0.03D)
-            // 这种慢速插值会让 Hero 落地前有一段明显的减速缓冲，像气垫一样，直到 AI Goal 判定落地
-            double lerpY = 0.03D; 
-            
-            // 如果垂直距离很大，加速反应以免跟丢
-            if (Math.abs(targetVec.y) > 3.0D) {
-                lerpY = 0.1D; 
+
+            // 垂直轴 (Y): 0.03D (响应极慢，营造漂浮感)
+            double lerpY = 0.03D;
+
+            // 如果距离很远(>5格)，Y轴加速响应
+            if (Math.abs(targetVec.y) > 5.0D) {
+                lerpY = 0.2D;
             }
             
             double newY = Mth.lerp(lerpY, currentVelocity.y, desiredVelocity.y);

@@ -46,18 +46,18 @@ public class Config {
     // ==========================================
     public static final ModConfigSpec.BooleanValue SOUL_BOUND_PACT_ENABLED = BUILDER
             .comment("Whether the Soul Bound Pact item is enabled")
-            .comment("是否启用灵魂之契物品")
-            .define("soulBoundPactEnabled_v2", true);
+            .comment("是否启用魂缚之契物品")
+            .define("soulBoundPactEnabled", true);
 
     public static final ModConfigSpec.BooleanValue ABYSSAL_GAZE_ENABLED = BUILDER
             .comment("Whether the Abyssal Gaze item is enabled")
             .comment("是否启用幽邃之视物品")
-            .define("abyssalGazeEnabled_v2", true);
+            .define("abyssalGazeEnabled", true);
 
     public static final ModConfigSpec.BooleanValue TRANSCENDENCE_PERMIT_ENABLED = BUILDER
             .comment("Whether the Transcendence Permit item is enabled")
             .comment("是否启用凌越之允物品")
-            .define("transcendencePermitEnabled_v2", true);
+            .define("transcendencePermitEnabled", true);
 
     // 1.21.1 更新：对应修改为 ModConfigSpec
     public static final ModConfigSpec SPEC = BUILDER.build();

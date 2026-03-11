@@ -1,6 +1,7 @@
 package com.whitecloud233.herobrine_companion.entity.projectile;
 
 import com.whitecloud233.herobrine_companion.config.Config;
+import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.event.ModEvents;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
@@ -20,10 +21,13 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.entity.projectile.ProjectileUtil;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
+
+import java.util.List;
 
 public class RealmBreakerLightningEntity extends Projectile {
     private static final EntityDataAccessor<Float> DAMAGE = SynchedEntityData.defineId(RealmBreakerLightningEntity.class, EntityDataSerializers.FLOAT);
@@ -130,15 +134,34 @@ public class RealmBreakerLightningEntity extends Projectile {
                 serverLevel.addFreshEntity(lightning);
             }
 
-            // 【核心修复】：动态决定地形破坏模式
-            // 如果配置允许爆炸，则使用 BLOCK 模式（破坏方块）；否则使用 NONE 模式（仅产生范围伤害和击退，不破坏方块）
+            // 【核心修改】手动实现爆炸伤害，以排除 HeroEntity
+            float radius = this.getExplosionRadius();
+            AABB aabb = new AABB(pos).inflate(radius);
+            List<LivingEntity> entities = serverLevel.getEntitiesOfClass(LivingEntity.class, aabb);
+            DamageSource damageSource = this.damageSources().explosion(this, this.getOwner());
+
+            for (LivingEntity entity : entities) {
+                // 如果是 HeroEntity，则跳过，不造成伤害
+                if (entity instanceof HeroEntity) {
+                    continue;
+                }
+                // 计算伤害衰减
+                double distance = entity.position().distanceTo(Vec3.atCenterOf(pos));
+                if (distance < radius) {
+                    float damage = this.getDamage() * (1.0F - (float)(distance / radius));
+                    entity.hurt(damageSource, damage);
+                }
+            }
+
+            // 地形破坏逻辑保持不变
             Level.ExplosionInteraction interaction = Config.poemOfTheEndExplosion ?
                     Level.ExplosionInteraction.BLOCK : Level.ExplosionInteraction.NONE;
-
-            // 移除外层的 if 判断，无论配置如何都执行爆炸，以保证破境模式始终拥有 AoE 范围伤害
-            serverLevel.explode(this, this.damageSources().explosion(this, this.getOwner()), null,
+            
+            // 创建一个没有伤害的爆炸，只用于方块破坏和击退效果
+            serverLevel.explode(null, null, null,
                     this.getX(), this.getY(), this.getZ(),
-                    this.getExplosionRadius(), false, interaction);
+                    radius, false, interaction);
+
 
             // 播放声音
             serverLevel.playSound(null, pos, SoundEvents.TRIDENT_THUNDER.value(), SoundSource.WEATHER, 5.0F, 1.0F);

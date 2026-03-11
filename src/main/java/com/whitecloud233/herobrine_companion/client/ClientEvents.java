@@ -4,6 +4,7 @@ import com.mojang.logging.LogUtils;
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.client.gui.HeroContractScreen;
 import com.whitecloud233.herobrine_companion.client.gui.HeroTradeScreen;
+import com.whitecloud233.herobrine_companion.client.gui.HeroWardrobeScreen;
 import com.whitecloud233.herobrine_companion.client.model.HeroDragonModel;
 import com.whitecloud233.herobrine_companion.client.model.HeroModel;
 import com.whitecloud233.herobrine_companion.client.render.*;
@@ -76,6 +77,8 @@ public class ClientEvents {
         // ScreenConstructor<M, U extends Screen & MenuAccess<M>>
         // 这意味着 Screen 必须实现 MenuAccess 接口
         event.register(ModMenus.HERO_TRADE_MENU.get(), HeroTradeScreen::new);
+        // 新增这一行：将 Menu 和 Screen 绑定起来
+        event.register(ModMenus.HERO_WARDROBE_MENU.get(), HeroWardrobeScreen::new);
     }
 
     @SubscribeEvent

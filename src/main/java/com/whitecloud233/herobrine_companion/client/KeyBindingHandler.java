@@ -18,10 +18,10 @@ import org.lwjgl.glfw.GLFW;
 @EventBusSubscriber(modid = "herobrine_companion", value = Dist.CLIENT)
 public class KeyBindingHandler {
 
-    // 注册 5 键
+    // 注册 5 键 (主键盘)
     public static final KeyMapping SKILL_KEY = new KeyMapping(
             "key.herobrine_companion.cleave_skill", // 语言文件中的本地化键值
-            GLFW.GLFW_KEY_KP_5,                        // 默认按键 5
+            GLFW.GLFW_KEY_5,                        // [修改] 默认按键 主键盘5
             "key.categories.herobrine_companion"    // 按键设置里的分类名
     );
 
@@ -44,7 +44,7 @@ public class KeyBindingHandler {
         Player player = mc.player;
         if (player == null) return;
 
-        // 判断：按下了R键，且主手里拿着镰刀
+        // 判断：按下了技能键，且主手里拿着镰刀
         if (SKILL_KEY.isDown() && player.getMainHandItem().getItem() instanceof PoemOfTheEndItem) {
             chargeTicks++;
 
@@ -55,8 +55,8 @@ public class KeyBindingHandler {
 
             // 20 Ticks = 1 秒
             if (chargeTicks == 20) {
-                // 【加入 Debug 提示】直接导入了 Component 增强代码易读性
-                player.sendSystemMessage(Component.literal("§e[Debug] 客户端：R键蓄力1秒完成，正在向服务端发送数据包..."));
+                // [修改] 修正错误的调试信息
+                player.sendSystemMessage(Component.literal("§e[Debug] 客户端：技能键蓄力1秒完成，正在向服务端发送数据包..."));
                 // 蓄力完成！发送数据包给服务端触发技能
                 PacketHandler.sendToServer(new CleaveSkillPacket());
 

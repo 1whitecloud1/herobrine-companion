@@ -2,6 +2,7 @@ package com.whitecloud233.herobrine_companion.event;
 
 // 修正了包名，去掉了多余的 .modid
 import com.whitecloud233.herobrine_companion.entity.CleaveBladeEntity;
+import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
@@ -118,8 +119,8 @@ public class CleaveTickManager {
                 );
                 List<Entity> entitiesToErase = task.level.getEntities(null, sliceBox);
                 for (Entity e : entitiesToErase) {
-                    // 【终极修复】：排除了我们自己导入的 CleaveBladeEntity 和玩家
-                    if (!(e instanceof Player) && !(e instanceof CleaveBladeEntity)) {
+                    // 【终极修复】：除了玩家和刀光，绝对不能抹杀创世神！
+                    if (!(e instanceof Player) && !(e instanceof CleaveBladeEntity) && !(e instanceof HeroEntity)) {
                         e.discard();
                     }
                 }
@@ -141,7 +142,7 @@ public class CleaveTickManager {
                         int blockMinY = task.minY;
 
                         int depth = task.targetY - task.minY;
-                        double slopeLength = Math.max(30.0, depth * 1.5);
+                        double slopeLength = Math.max(20.0, depth * 2);
 
                         if (remaining <= slopeLength && remaining >= 0) {
                             double progress = (slopeLength - remaining) / slopeLength;

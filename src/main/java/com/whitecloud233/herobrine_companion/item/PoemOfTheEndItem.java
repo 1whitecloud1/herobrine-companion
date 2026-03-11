@@ -425,7 +425,7 @@ public class PoemOfTheEndItem extends DiggerItem {
             return;
         }
 
-        double maxLength = 250.0;
+        double maxLength = 350.0;
         int halfWidth = 10;
         int minY = level.getMinBuildHeight();
         int startY = level.getMaxBuildHeight();

@@ -15,6 +15,10 @@ ${mod_description}
 [[mixins]]
 config = "${mod_id}.mixins.json"
 
+# ==================================
+# 必需依赖项 (Required Dependencies)
+# ==================================
+
 [[dependencies."${mod_id}"]]
 modId = "neoforge"
 type = "required"
@@ -27,4 +31,40 @@ modId = "minecraft"
 type = "required"
 versionRange = "${minecraft_version_range}"
 ordering = "NONE"
+side = "BOTH"
+
+# ==================================
+# 可选依赖项 (Optional Dependencies)
+# ==================================
+
+# 时装工坊 (Armourer's Workshop)
+[[dependencies."${mod_id}"]]
+modId = "armourers_workshop"
+type = "optional"
+versionRange = "*"
+ordering = "AFTER"
+side = "BOTH"
+
+# 饰品栏 (Curios API)
+[[dependencies."${mod_id}"]]
+modId = "curios"
+type = "optional"
+versionRange = "*"
+ordering = "AFTER"
+side = "BOTH"
+
+# JEI 物品管理器 (Just Enough Items)
+[[dependencies."${mod_id}"]]
+modId = "jei"
+type = "optional"
+versionRange = "*"
+ordering = "AFTER"
+side = "BOTH"
+
+# KubeJS 脚本自定义
+[[dependencies."${mod_id}"]]
+modId = "kubejs"
+type = "optional"
+versionRange = "*"
+ordering = "AFTER"
 side = "BOTH"
