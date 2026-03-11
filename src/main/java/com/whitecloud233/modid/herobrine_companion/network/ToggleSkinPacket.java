@@ -10,17 +10,33 @@ import java.util.function.Supplier;
 
 public class ToggleSkinPacket {
     private final int entityId;
+    private final int skinVariant;
+    private final String customSkinName;
 
-    public ToggleSkinPacket(int entityId) {
+    public ToggleSkinPacket(int entityId, boolean useHerobrineSkin) {
+        this(entityId, useHerobrineSkin ? HeroEntity.SKIN_HEROBRINE : HeroEntity.SKIN_HERO, "");
+    }
+
+    public ToggleSkinPacket(int entityId, int skinVariant) {
+        this(entityId, skinVariant, "");
+    }
+
+    public ToggleSkinPacket(int entityId, int skinVariant, String customSkinName) {
         this.entityId = entityId;
+        this.skinVariant = skinVariant;
+        this.customSkinName = customSkinName;
     }
 
     public ToggleSkinPacket(FriendlyByteBuf buf) {
         this.entityId = buf.readInt();
+        this.skinVariant = buf.readInt();
+        this.customSkinName = buf.readUtf();
     }
 
     public void encode(FriendlyByteBuf buf) {
         buf.writeInt(this.entityId);
+        buf.writeInt(this.skinVariant);
+        buf.writeUtf(this.customSkinName);
     }
 
     public boolean handle(Supplier<NetworkEvent.Context> supplier) {
@@ -30,7 +46,10 @@ public class ToggleSkinPacket {
             if (player != null) {
                 Entity entity = player.level().getEntity(this.entityId);
                 if (entity instanceof HeroEntity hero) {
-                    hero.setUseHerobrineSkin(!hero.shouldUseHerobrineSkin());
+                    hero.setSkinVariant(this.skinVariant);
+                    if (this.skinVariant == HeroEntity.SKIN_CUSTOM) {
+                        hero.setCustomSkinName(this.customSkinName);
+                    }
                 }
             }
         });

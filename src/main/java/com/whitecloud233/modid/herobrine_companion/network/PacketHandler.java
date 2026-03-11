@@ -31,6 +31,8 @@ public class PacketHandler {
         INSTANCE.registerMessage(id++, ToggleSkinPacket.class, ToggleSkinPacket::encode, ToggleSkinPacket::new, ToggleSkinPacket::handle);
         INSTANCE.registerMessage(id++, SyncRewardsPacket.class, SyncRewardsPacket::encode, SyncRewardsPacket::new, SyncRewardsPacket::handle);
         INSTANCE.registerMessage(id++, TriggerEternalOathPacket.class, TriggerEternalOathPacket::encode, TriggerEternalOathPacket::new, TriggerEternalOathPacket::handle);
+        INSTANCE.registerMessage(id++, CleaveSkillPacket.class, CleaveSkillPacket::encode, CleaveSkillPacket::new, CleaveSkillPacket::handle);
+        INSTANCE.registerMessage(id, OpenWardrobePacket.class, OpenWardrobePacket::toBytes, OpenWardrobePacket::new, OpenWardrobePacket::handle);
     }
 
 

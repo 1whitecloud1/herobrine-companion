@@ -15,4 +15,8 @@ public class ModMenus {
 
     public static final RegistryObject<MenuType<HeroMerchantMenu>> HERO_TRADE_MENU = MENUS.register("hero_trade",
             () -> IForgeMenuType.create((windowId, inv, data) -> new HeroMerchantMenu(windowId, inv)));
+
+    // 新增：把之前在 ModMenuTypes 里的注册直接挪过来
+    public static final RegistryObject<MenuType<HeroWardrobeMenu>> HERO_WARDROBE = MENUS.register("hero_wardrobe",
+            () -> IForgeMenuType.create(HeroWardrobeMenu::new));
 }

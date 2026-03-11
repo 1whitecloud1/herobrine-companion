@@ -8,10 +8,10 @@ import com.whitecloud233.modid.herobrine_companion.network.ClearAreaPacket;
 import com.whitecloud233.modid.herobrine_companion.network.DesolateAreaPacket;
 import com.whitecloud233.modid.herobrine_companion.network.FlattenAreaPacket;
 import com.whitecloud233.modid.herobrine_companion.network.OpenTradePacket;
+import com.whitecloud233.modid.herobrine_companion.network.OpenWardrobePacket;
 import com.whitecloud233.modid.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.modid.herobrine_companion.network.PeacefulPacket;
 import com.whitecloud233.modid.herobrine_companion.network.ToggleCompanionPacket;
-import com.whitecloud233.modid.herobrine_companion.network.ToggleSkinPacket;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -66,7 +66,10 @@ public class HeroScreen extends Screen {
             // 同步皮肤状态到 dummyHero 以便预览
             Entity realEntity = this.minecraft.level.getEntity(this.entityId);
             if (realEntity instanceof HeroEntity realHero) {
-                this.dummyHero.setUseHerobrineSkin(realHero.shouldUseHerobrineSkin());
+                this.dummyHero.setSkinVariant(realHero.getSkinVariant());
+                if (realHero.getSkinVariant() == HeroEntity.SKIN_CUSTOM) {
+                    this.dummyHero.setCustomSkinName(realHero.getCustomSkinName());
+                }
             }
         }
 
@@ -101,43 +104,15 @@ public class HeroScreen extends Screen {
         int skinBtnX = startX + 5; // 左侧边距
         int skinBtnY = startY + 4; // 顶部边距，与 API 按钮对齐
         
-        // 动态获取当前皮肤状态用于初始显示
-        boolean currentSkin = false;
-        if (this.minecraft.level != null) {
-            Entity e = this.minecraft.level.getEntity(this.entityId);
-            if (e instanceof HeroEntity h) {
-                currentSkin = h.shouldUseHerobrineSkin();
-            }
-        }
-        // 文本保持 "切换皮肤" 不变
-        Component skinBtnText = Component.translatable("gui.herobrine_companion.switch_skin_tooltip"); // 使用 tooltip 的文本 "点击切换外观" 或者直接硬编码 "切换皮肤"
-        // 根据用户要求 "文本保持“切换皮肤“不变"，这里假设用户指的是之前动态显示的文本逻辑，或者是一个固定的文本。
-        // 如果用户指的是之前动态显示的 "切换为 Hero 皮肤" / "切换为 Herobrine 皮肤"，那么逻辑不变。
-        // 如果用户指的是按钮上显示的文字固定为 "切换皮肤"，那么需要修改。
-        // 根据 "文本保持“切换皮肤“不变" 这句话，最合理的理解是保持之前的动态文本逻辑，只是位置变了。
-        // 但如果用户指的是按钮上显示的文字就是 "切换皮肤" 这四个字，那之前的代码里并没有这个键。
-        // 让我们回顾一下之前的代码：
-        // String key = currentSkin ? "gui.herobrine_companion.switch_skin_hero" : "gui.herobrine_companion.switch_skin_herobrine";
-        // 这两个键对应的值分别是 "切换为 Hero 皮肤" 和 "切换为 Herobrine 皮肤"。
-        // 用户说 "文本保持“切换皮肤“不变"，可能是指保持这个动态切换的文本逻辑。
-
-        String skinKey = currentSkin ? "gui.herobrine_companion.switch_skin_hero" : "gui.herobrine_companion.switch_skin_herobrine";
-
+        // [修改] 按钮名称改为 "皮肤更改" (使用 key: gui.herobrine_companion.change_skin)
         Button skinBtn = new ThemedButton(
             skinBtnX, 
             skinBtnY, 
             90, 16, // 宽度稍微调整以适应左侧空间
-            Component.translatable(skinKey),
+            Component.translatable("gui.herobrine_companion.change_skin"),
             button -> {
-                PacketHandler.sendToServer(new ToggleSkinPacket(this.entityId));
-                // 更新本地 dummy 实体以便立即预览
-                if (this.dummyHero != null) {
-                    boolean newSkinState = !this.dummyHero.shouldUseHerobrineSkin();
-                    this.dummyHero.setUseHerobrineSkin(newSkinState);
-                    // 更新按钮文字
-                    String newKey = newSkinState ? "gui.herobrine_companion.switch_skin_hero" : "gui.herobrine_companion.switch_skin_herobrine";
-                    button.setMessage(Component.translatable(newKey));
-                }
+                // 打开新的皮肤切换界面
+                Minecraft.getInstance().setScreen(new HeroSkinScreen(this.entityId));
             },
             Tooltip.create(Component.translatable("gui.herobrine_companion.switch_skin_tooltip"))
         );
@@ -213,6 +188,14 @@ public class HeroScreen extends Screen {
             // this.onClose(); 
             // 让服务端打开新菜单时自动覆盖当前屏幕
         }, Tooltip.create(Component.translatable("gui.herobrine_companion.trade_tooltip")));
+        
+        // 👇 [新增] 装扮(衣柜)按钮
+        this.actionList.addAction(Component.translatable("gui.herobrine_companion.wardrobe"), button -> {
+            // 向服务端发送打开装扮界面的请求
+            PacketHandler.sendToServer(new OpenWardrobePacket(this.entityId));
+        }, Tooltip.create(Component.translatable("gui.herobrine_companion.wardrobe_tooltip")));
+        // 👆 [新增结束]
+
         // [新增] 委托按钮
         this.actionList.addAction(Component.translatable("gui.herobrine_companion.requests"), button -> {
             // 打开委托界面
@@ -371,7 +354,10 @@ public class HeroScreen extends Screen {
                 trust = hero.getTrustLevel();
                 uuid = hero.getUUID();
                 // 同步皮肤状态给 dummyHero 以正确渲染预览
-                this.dummyHero.setUseHerobrineSkin(hero.shouldUseHerobrineSkin());
+                this.dummyHero.setSkinVariant(hero.getSkinVariant());
+                if (hero.getSkinVariant() == HeroEntity.SKIN_CUSTOM) {
+                    this.dummyHero.setCustomSkinName(hero.getCustomSkinName());
+                }
             }
         }
 
@@ -428,13 +414,23 @@ public class HeroScreen extends Screen {
     }
 
     private void renderEntityWithMouseFollow(GuiGraphics guiGraphics, int x, int y, int scale, float mouseX, float mouseY, HeroEntity entity) {
+        // 修复 Dummy 实体的 "驱魔人" 扭曲 Bug
+        float f = (float)Math.atan(mouseX / 40.0F);
+        float f1 = (float)Math.atan(mouseY / 40.0F);
+
+        // 强行对齐上一帧数据，抹杀掉从 0 开始插值造成的万向节死锁
+        entity.yBodyRotO = 180.0F + f * 20.0F;
+        entity.yRotO = 180.0F + f * 40.0F;
+        entity.xRotO = -f1 * 20.0F;
+        entity.yHeadRotO = entity.yRotO;
+
         InventoryScreen.renderEntityInInventoryFollowsMouse(
                 guiGraphics,
-                x, 
-                y, 
+                x,
+                y,
                 scale,
-                mouseX, 
-                mouseY, 
+                mouseX,
+                mouseY,
                 entity
         );
     }
