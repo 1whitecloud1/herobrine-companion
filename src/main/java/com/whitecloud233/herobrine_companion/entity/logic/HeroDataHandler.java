@@ -10,7 +10,6 @@ public class HeroDataHandler {
 
     /**
      * 从全局存档同步信任度到实体 (Read)
-     * [修改] 现在只同步 Owner 的数据到实体，用于显示和交互
      */
     public static void syncGlobalTrust(HeroEntity hero) {
         if (hero.level() instanceof ServerLevel serverLevel) {
@@ -18,20 +17,25 @@ public class HeroDataHandler {
             if (ownerUUID == null) return;
 
             HeroWorldData data = HeroWorldData.get(serverLevel);
+
+            // 1. 同步信任度
             int trust = data.getTrust(ownerUUID);
-            
-            // 同步到实体
             hero.setTrustLevel(trust);
-            
-            // 同步奖励状态
+
+            // 2. 同步奖励状态：将 WorldData 的 int[] 转换为实体的位掩码 (int)
             int[] rewards = data.getClaimedRewards(ownerUUID);
-            hero.setClaimedRewards(rewards);
+            int flags = 0;
+            for (int r : rewards) {
+                if (r >= 0 && r < 32) {
+                    flags |= (1 << r);
+                }
+            }
+            hero.setClaimedRewards(flags);
         }
     }
 
     /**
      * 将实体信任度更新到全局存档 (Write)
-     * [修改] 将实体的当前信任度写回 Owner 的 Profile
      */
     public static void updateGlobalTrust(HeroEntity hero) {
         if (hero.level() instanceof ServerLevel serverLevel) {
@@ -39,18 +43,19 @@ public class HeroDataHandler {
             if (ownerUUID == null) return;
 
             HeroWorldData data = HeroWorldData.get(serverLevel);
-            int current = hero.getTrustLevel();
-            
-            // 更新 Owner 的信任度
-            if (current != data.getTrust(ownerUUID)) {
-                data.setTrust(ownerUUID, current);
+
+            // 1. 更新信任度
+            int currentTrust = hero.getTrustLevel();
+            if (currentTrust != data.getTrust(ownerUUID)) {
+                data.setTrust(ownerUUID, currentTrust);
             }
-            
-            // 更新奖励状态
-            int[] rewards = hero.getClaimedRewards();
-            for (int reward : rewards) {
-                if (!data.hasClaimedReward(ownerUUID, reward)) {
-                    data.claimReward(ownerUUID, reward);
+
+            // 2. 更新奖励状态：解析实体的位掩码 (int)，更新到 WorldData
+            int flags = hero.getClaimedRewards();
+            for (int i = 0; i < 32; i++) {
+                if ((flags & (1 << i)) != 0) {
+                    // 如果实体中该位为 1，则将其记录到 WorldData
+                    data.claimReward(ownerUUID, i);
                 }
             }
         }
@@ -61,19 +66,7 @@ public class HeroDataHandler {
      * [Deprecated] 现在使用 HeroWorldData，此方法仅用于兼容旧存档迁移
      */
     public static void restoreTrustFromPlayer(HeroEntity hero) {
-        if (hero.level() instanceof ServerLevel serverLevel) {
-            UUID ownerUUID = hero.getOwnerUUID();
-            if (ownerUUID == null) return;
-
-            HeroWorldData data = HeroWorldData.get(serverLevel);
-            int trust = data.getTrust(ownerUUID);
-            
-            // 同步到实体
-            hero.setTrustLevel(trust);
-            
-            // 同步奖励状态
-            int[] rewards = data.getClaimedRewards(ownerUUID);
-            hero.setClaimedRewards(rewards);
-        }
+        // 直接复用新的全局同步逻辑即可
+        syncGlobalTrust(hero);
     }
 }

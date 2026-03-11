@@ -4,20 +4,19 @@ import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.ai.learning.HeroDialogueHandler;
 import com.whitecloud233.herobrine_companion.entity.ai.learning.HeroObserver;
 import com.whitecloud233.herobrine_companion.entity.ai.learning.HeroPrankHandler;
+import com.whitecloud233.herobrine_companion.network.HeroWorldData;
 import com.whitecloud233.herobrine_companion.world.structure.ModStructures;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.scores.PlayerTeam;
-import net.minecraft.world.scores.Scoreboard;
-import net.minecraft.world.scores.Team;
 
 import java.util.List;
 
@@ -46,31 +45,41 @@ public class HeroLogic {
     }
 
     private static void serverTick(HeroEntity hero) {
-        // 1. 唯一性检查 (生成初期)
-        // [优化] 在第 1 tick 就立即检查，减少重复实体存在的视觉时间
-        if (hero.tickCount == 1 || hero.tickCount == 20) {
+        // 1. 唯一性检查 和 关键数据恢复
+        if (hero.tickCount == 20) {
             HeroLifecycleHandler.checkUniqueness(hero);
-            
-            // 如果在 checkUniqueness 中被 discard 了，就不要继续执行了
-            if (!hero.isAlive()) return;
+            if (!hero.isAlive()) return; // Stop if removed
 
-            // [修复] 只有在全新生成（非读取）时，才从全局同步数据，防止覆盖存档原有数据
-            // 这个逻辑保留在第 20 tick 执行或者第 1 tick 执行都可以，但为了保险起见，
-            // 数据恢复逻辑最好不要太早，以免 WorldData 还没准备好，这里保持原样或稍微提前
-            if (hero.tickCount == 20 && !hero.isLoadedFromDisk() && hero.getOwnerUUID() != null) {
+            // [修复] 无论实体是新生成的还是从磁盘加载的，都应从全局数据恢复状态，确保数据一致性
+            if (hero.getOwnerUUID() != null) {
+                // 恢复信任度
                 HeroDataHandler.restoreTrustFromPlayer(hero);
+                
+                // [新增] 恢复皮肤和装扮
+                if (hero.level() instanceof ServerLevel serverLevel) {
+                    HeroWorldData data = HeroWorldData.get(serverLevel);
+                    int globalSkinVariant = data.getGlobalSkinVariant();
+                    String globalCustomSkin = data.getGlobalCustomSkinName();
+
+                    // 将全局皮肤数据应用到实体上
+                    hero.setSkinVariant(globalSkinVariant);
+                    if (globalSkinVariant == HeroEntity.SKIN_CUSTOM) {
+                        hero.setCustomSkinName(globalCustomSkin);
+                    } else {
+                        hero.setCustomSkinName(""); // 清空非自定义皮肤的名称
+                    }
+                }
             }
         }
-        
+
         // [新增] 持续性唯一性检查 (每5秒检查一次，防止跨维度传送后旧实体未清除)
-        if (hero.tickCount % 100 == 0) {
+        if (hero.tickCount > 20 && hero.tickCount % 100 == 0) {
             HeroLifecycleHandler.checkUniqueness(hero);
             if (!hero.isAlive()) return;
         }
 
         // 2. 自动绑定逻辑
         if (hero.getOwnerUUID() == null) {
-            // 如果是从磁盘加载的(isLoadedFromDisk)，且 tick 小于 600 (30秒)，则禁止自动绑定
             boolean isFreshSpawn = !hero.isLoadedFromDisk();
             boolean safeToBind = isFreshSpawn ? (hero.tickCount > 20) : (hero.tickCount > 600);
 
@@ -79,23 +88,33 @@ public class HeroLogic {
             }
         }
 
-        // 3. 数据同步与保存
+        // 客户端同步
         if (hero.tickCount == 5) {
-            HeroDataHandler.syncGlobalTrust(hero); // S2C 包，同步给客户端显示
+            HeroDataHandler.syncGlobalTrust(hero);
         }
 
-        // [警告] 这是一个危险操作：将 Entity 数据保存到 Disk
-        // 我们必须确保在此之前，Entity 数据已经从 Disk 恢复了，否则会用 0 覆盖存档
+        // 3. 定期数据保存
         if (hero.tickCount % 100 == 0) {
-            HeroDataHandler.updateGlobalTrust(hero);
+            if (hero.getOwnerUUID() != null) {
+                // [修复] 保存信任度，如果信任度为0则尝试再次恢复，防止意外覆盖
+                if (hero.getTrustLevel() > 0) {
+                    HeroDataHandler.updateGlobalTrust(hero);
+                } else {
+                    HeroDataHandler.restoreTrustFromPlayer(hero);
+                }
+
+                // [修复] 定期将实体当前的皮肤状态完整同步到全局数据
+                if (hero.level() instanceof ServerLevel serverLevel) {
+                    HeroWorldData data = HeroWorldData.get(serverLevel);
+                    data.setGlobalSkinVariant(hero.getSkinVariant());
+                    data.setGlobalCustomSkinName(hero.getCustomSkinName());
+                }
+            }
         }
 
-        // 4. 动态名字
         if (hero.tickCount % 20 == 0) {
             boolean isEndRing = hero.level().dimension() == ModStructures.END_RING_DIMENSION_KEY;
             String key = isEndRing ? "entity.herobrine_companion.herobrine" : "entity.herobrine_companion.hero";
-            // 这里简化处理，根据需求可以加回 Variant 判断
-
             Component expectedName = Component.translatable(key);
             if (!hero.getCustomName().equals(expectedName)) {
                 hero.setCustomName(expectedName);
@@ -103,6 +122,7 @@ public class HeroLogic {
         }
 
         HeroDimensionHandler.handleVoidProtection(hero);
+
         HeroDialogueHandler.tick(hero);
         HeroPrankHandler.tick(hero);
         HeroObserver.tick(hero);
@@ -133,12 +153,21 @@ public class HeroLogic {
             if (closestPlayer != null) {
                 hero.setOwnerUUID(closestPlayer.getUUID());
 
-                // [BUG 修复核心] 认主成功后，立即从存档恢复该玩家的信任度
-                // 注意：这里用 restoreTrustFromPlayer (Load from disk)，而不是 sync (Send packet)
+                // [关键修复] 自动认主后，必须立即从该玩家/全局存档中恢复数据！
                 HeroDataHandler.restoreTrustFromPlayer(hero);
 
-                // 恢复完数据后，再同步给客户端
-                HeroDataHandler.syncGlobalTrust(hero);
+                // [新增] 恢复皮肤状态
+                if (hero.level() instanceof ServerLevel serverLevel) {
+                    HeroWorldData data = HeroWorldData.get(serverLevel);
+                    int globalSkinVariant = data.getGlobalSkinVariant();
+                    String globalCustomSkin = data.getGlobalCustomSkinName();
+                    hero.setSkinVariant(globalSkinVariant);
+                    if (globalSkinVariant == HeroEntity.SKIN_CUSTOM) {
+                        hero.setCustomSkinName(globalCustomSkin);
+                    } else {
+                        hero.setCustomSkinName("");
+                    }
+                }
             }
         }
     }
@@ -152,9 +181,6 @@ public class HeroLogic {
         if (data.contains("HeroPendingTrustReward")) {
             int reward = data.getInt("HeroPendingTrustReward");
             hero.increaseTrust(reward);
-            // 立即保存
-            HeroDataHandler.updateGlobalTrust(hero);
-
             owner.sendSystemMessage(Component.translatable("message.herobrine_companion.trust_increase", reward, hero.getTrustLevel()));
             data.remove("HeroPendingTrustReward");
         }
@@ -194,18 +220,16 @@ public class HeroLogic {
         return HeroCombatHandler.onHurt(hero, source, amount);
     }
 
-    // --- 1.21.1 Client Utils ---
     public static void setupHiddenTeam(HeroEntity hero) {
         net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
         if (mc.level == null) return;
-        Scoreboard scoreboard = mc.level.getScoreboard();
+        net.minecraft.world.scores.Scoreboard scoreboard = mc.level.getScoreboard();
         String teamName = "hero_hidden_hud";
-        PlayerTeam team = scoreboard.getPlayerTeam(teamName);
+        net.minecraft.world.scores.PlayerTeam team = scoreboard.getPlayerTeam(teamName);
         if (team == null) {
             team = scoreboard.addPlayerTeam(teamName);
-            // 1.21 名字标签可见性设置
-            team.setNameTagVisibility(Team.Visibility.NEVER);
-            team.setCollisionRule(Team.CollisionRule.NEVER);
+            team.setNameTagVisibility(net.minecraft.world.scores.Team.Visibility.NEVER);
+            team.setCollisionRule(net.minecraft.world.scores.Team.CollisionRule.NEVER);
         }
         scoreboard.addPlayerToTeam(hero.getStringUUID(), team);
     }
@@ -226,12 +250,14 @@ public class HeroLogic {
 
         hero.setInvitedPos(pos);
         hero.setInvitedAction(actionType);
+
         if (actionType == 2) {
             if (hero.isFloating()) {
                 hero.setFloating(false);
                 hero.setNoGravity(false);
             }
         }
+
         hero.playSound(net.minecraft.sounds.SoundEvents.EXPERIENCE_ORB_PICKUP, 1.0F, 1.0F);
 
         String baseKey = switch (actionType) {

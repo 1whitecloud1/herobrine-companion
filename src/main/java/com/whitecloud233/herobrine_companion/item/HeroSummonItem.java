@@ -4,6 +4,7 @@ import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.logic.HeroDataHandler;
 import com.whitecloud233.herobrine_companion.entity.logic.HeroLogic;
 import com.whitecloud233.herobrine_companion.event.ModEvents;
+import com.whitecloud233.herobrine_companion.network.HeroWorldData;
 import com.whitecloud233.herobrine_companion.util.EndRingContext;
 import com.whitecloud233.herobrine_companion.world.inventory.HeroContractMenu;
 import com.whitecloud233.herobrine_companion.world.structure.ModStructures;
@@ -11,6 +12,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -35,6 +37,7 @@ import net.minecraft.world.level.block.*;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
+import net.neoforged.fml.ModList;
 import net.neoforged.fml.loading.FMLEnvironment;
 
 import java.util.Collections;
@@ -138,6 +141,20 @@ public class HeroSummonItem extends Item {
                         // 1. 保存旧实体数据
                         CompoundTag heroData = new CompoundTag();
                         existingHero.saveWithoutId(heroData);
+
+                        // ============== [修复装扮丢失] 提前提取所有装备数据 ==============
+                        ListTag armorTags = existingHero.getArmorItemsTag();
+                        ListTag handTags = existingHero.getHandItemsTag();
+                        float oldYRot = existingHero.getYRot();
+                        float oldXRot = existingHero.getXRot();
+
+                        // [软依赖安全检查]
+                        CompoundTag curiosTag = null;
+                        if (ModList.get().isLoaded("curios")) {
+                            curiosTag = existingHero.getCuriosBackItemTag();
+                        }
+                        // ===============================================================
+
                         HeroDataHandler.updateGlobalTrust(existingHero); // 确保信任度保存
                         existingHero.discard(); // 销毁旧实体
 
@@ -150,8 +167,39 @@ public class HeroSummonItem extends Item {
                             if (heroData.contains("UUIDLeast")) heroData.remove("UUIDLeast");
 
                             newHero.load(heroData);
-                            newHero.moveTo(targetPos.x, targetPos.y, targetPos.z, existingHero.getYRot(), existingHero.getXRot());
+                            newHero.moveTo(targetPos.x, targetPos.y, targetPos.z, oldYRot, oldXRot);
                             newHero.setUUID(UUID.randomUUID());
+
+                            // ============== [修复装扮丢失] 强制穿上装备并进行全局双保险托底 ==============
+                            newHero.loadEquipmentFromTag(armorTags, handTags);
+
+                            // [软依赖安全检查]
+                            if (ModList.get().isLoaded("curios") && curiosTag != null) {
+                                newHero.setCuriosBackItemFromTag(curiosTag);
+                            }
+
+                            if (player != null) {
+                                HeroWorldData worldData = HeroWorldData.get(serverLevel);
+
+                                // 托底保护：如果转移意外失败，从玩家的全局存档中再次拉取
+                                boolean isNaked = true;
+                                for (ItemStack item : newHero.getArmorSlots()) if (!item.isEmpty()) isNaked = false;
+                                for (ItemStack item : newHero.getHandSlots()) if (!item.isEmpty()) isNaked = false;
+
+                                if (isNaked) {
+                                    newHero.loadEquipmentFromTag(worldData.getArmorItems(player.getUUID()), worldData.getHandItems(player.getUUID()));
+                                }
+                                worldData.setEquipment(player.getUUID(), newHero.getArmorItemsTag(), newHero.getHandItemsTag());
+
+                                // [软依赖安全检查]
+                                if (ModList.get().isLoaded("curios")) {
+                                    if (newHero.isCuriosBackSlotEmpty()) {
+                                        newHero.setCuriosBackItemFromTag(worldData.getCuriosBackItem(player.getUUID()));
+                                    }
+                                    worldData.setCuriosBackItem(player.getUUID(), newHero.getCuriosBackItemTag());
+                                }
+                            }
+                            // =======================================================================
 
                             // 添加特权标签，防止被误杀
                             newHero.addTag(EndRingContext.TAG_RESPAWNED_SAFE);
@@ -198,6 +246,29 @@ public class HeroSummonItem extends Item {
                             hero.setOwnerUUID(player.getUUID());
                             HeroDataHandler.restoreTrustFromPlayer(hero); // 恢复信任度
                             HeroDataHandler.syncGlobalTrust(hero);
+
+                            // ============== [终极防丢修复] 跨世界新生成，必须从全局恢复衣服 ==============
+                            HeroWorldData worldData = HeroWorldData.get(serverLevel);
+
+                            // 1. 恢复皮肤状态
+                            hero.setSkinVariant(worldData.getGlobalSkinVariant());
+                            if (worldData.getGlobalSkinVariant() == HeroEntity.SKIN_CUSTOM) {
+                                hero.setCustomSkinName(worldData.getGlobalCustomSkinName());
+                            }
+
+                            // 2. 恢复原生装备 (头胸腿脚、主副手)
+                            ListTag savedArmor = worldData.getArmorItems(player.getUUID());
+                            ListTag savedHands = worldData.getHandItems(player.getUUID());
+                            hero.loadEquipmentFromTag(savedArmor, savedHands);
+
+                            // 3. 恢复 Curios 背部翅膀 [软依赖安全检查]
+                            if (ModList.get().isLoaded("curios")) {
+                                CompoundTag savedCurios = worldData.getCuriosBackItem(player.getUUID());
+                                if (savedCurios != null && !savedCurios.isEmpty()) {
+                                    hero.setCuriosBackItemFromTag(savedCurios);
+                                }
+                            }
+                            // =========================================================================
                         }
 
                         serverLevel.addFreshEntity(hero);

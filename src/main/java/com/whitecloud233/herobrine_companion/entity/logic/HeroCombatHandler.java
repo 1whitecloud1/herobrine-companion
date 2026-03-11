@@ -3,6 +3,7 @@ package com.whitecloud233.herobrine_companion.entity.logic;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.network.HeroWorldData;
 import com.whitecloud233.herobrine_companion.world.structure.ModStructures;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -61,6 +62,34 @@ public class HeroCombatHandler {
                     player.sendSystemMessage(Component.translatable("message.herobrine_companion.end_ring_attack"));
                 } 
                 else {
+                    // [新增] 保存数据到玩家身上，以便 respawnNearPlayer 恢复
+                    CompoundTag data = player.getPersistentData();
+                    CompoundTag heroData = new CompoundTag();
+                    
+                    // [关键修复] 使用新的皮肤变体和自定义名称，而不是旧的 boolean
+                    heroData.putInt("SkinVariant", hero.getSkinVariant());
+                    if (hero.getSkinVariant() == HeroEntity.SKIN_CUSTOM) {
+                        heroData.putString("CustomSkinName", hero.getCustomSkinName());
+                    }
+                    
+                    // ============== [修复] 打包所有装备 ==============
+                    heroData.put("ArmorItems", hero.getArmorItemsTag());
+                    heroData.put("HandItems", hero.getHandItemsTag());
+                    heroData.put("CuriosBackItem", hero.getCuriosBackItemTag()); // [新增]
+                    data.put("HeroCombatRespawnData", heroData);
+
+                    // [新增] 强制更新一次全局数据，作为双重保险
+                    if (hero.level() instanceof ServerLevel serverLevel) {
+                        HeroWorldData worldData = HeroWorldData.get(serverLevel);
+                        worldData.setGlobalSkinVariant(hero.getSkinVariant());
+                        if (hero.getSkinVariant() == HeroEntity.SKIN_CUSTOM) {
+                            worldData.setGlobalCustomSkinName(hero.getCustomSkinName());
+                        }
+                        
+                        worldData.setEquipment(player.getUUID(), hero.getArmorItemsTag(), hero.getHandItemsTag());
+                        worldData.setCuriosBackItem(player.getUUID(), hero.getCuriosBackItemTag()); // [新增]
+                    }
+
                     player.sendSystemMessage(Component.translatable("message.herobrine_companion.attack_disappoint"));
                     HeroDimensionHandler.leaveWorld(hero, null);
                     if (hero.level() instanceof ServerLevel serverLevel) {

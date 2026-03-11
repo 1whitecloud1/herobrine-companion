@@ -10,11 +10,13 @@ import com.whitecloud233.herobrine_companion.util.EndRingContext;
 import com.whitecloud233.herobrine_companion.world.structure.ModStructures;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -185,9 +187,6 @@ public class HeroDimensionHandler {
         // 目前 HeroWorldData 只存了 TrustLevel 和 SkinVariant
         // 为了简单起见，我们让他在重生时保留记忆，这需要修改 respawnNearPlayer 方法
         
-        // 暂时先保存到 hero 自身，如果 respawnNearPlayer 能获取到旧数据最好
-        // 但目前的逻辑是 create 新实体。
-        
         // 既然是“失望离开”，那他重生时应该带着这份“失望” (记忆)
         // 我们可以把大脑数据临时存到 HeroWorldData 的一个临时字段里
         if (hero.level() instanceof ServerLevel serverLevel) {
@@ -195,6 +194,17 @@ public class HeroDimensionHandler {
             CompoundTag brainData = new CompoundTag();
             hero.getHeroBrain().save(brainData);
             data.setTempBrainData(brainData); // 需要在 HeroWorldData 中添加此方法
+            
+            // [新增] 强制更新一次全局数据，作为双重保险
+            data.setGlobalSkinVariant(hero.getSkinVariant());
+            if (hero.getSkinVariant() == HeroEntity.SKIN_CUSTOM) {
+                data.setGlobalCustomSkinName(hero.getCustomSkinName());
+            }
+            
+            if (hero.getOwnerUUID() != null) {
+                data.setEquipment(hero.getOwnerUUID(), hero.getArmorItemsTag(), hero.getHandItemsTag());
+                data.setCuriosBackItem(hero.getOwnerUUID(), hero.getCuriosBackItemTag()); // [新增]
+            }
         }
 
         HeroDataHandler.updateGlobalTrust(hero);
@@ -250,14 +260,67 @@ public class HeroDimensionHandler {
             // 同步信任度
             HeroDataHandler.syncGlobalTrust(hero);
             
-            // [修复] 强制同步皮肤状态
-            HeroWorldData data = HeroWorldData.get(level);
-            hero.setSkinVariant(data.getGlobalSkinVariant());
+            HeroWorldData worldData = HeroWorldData.get(level);
+
+            // [修复] 优先从玩家数据恢复皮肤状态 (因为玩家可能在战斗中切换了皮肤但还没同步到全局)
+            boolean skinRestored = false;
+            CompoundTag data = player.getPersistentData();
+            if (data.contains("HeroCombatRespawnData")) {
+                CompoundTag heroData = data.getCompound("HeroCombatRespawnData");
+                if (heroData.contains("SkinVariant")) {
+                    int variant = heroData.getInt("SkinVariant");
+                    hero.setSkinVariant(variant);
+                    if (variant == HeroEntity.SKIN_CUSTOM && heroData.contains("CustomSkinName")) {
+                        hero.setCustomSkinName(heroData.getString("CustomSkinName"));
+                    }
+                    skinRestored = true;
+                }
+                
+                // ============== [修复] 从玩家挂起的数据中恢复原生装备 ==============
+                if (heroData.contains("ArmorItems", 9) || heroData.contains("HandItems", 9)) {
+                    hero.loadEquipmentFromTag(
+                            heroData.getList("ArmorItems", 10),
+                            heroData.getList("HandItems", 10)
+                    );
+                }
+                
+                // ============== [修复] 从挂起的数据恢复背部槽 ==============
+                if (heroData.contains("CuriosBackItem", 10)) {
+                    hero.setCuriosBackItemFromTag(heroData.getCompound("CuriosBackItem"));
+                }
+                
+                data.remove("HeroCombatRespawnData");
+            }
+            
+            // 如果玩家数据没有，则使用全局数据
+            if (!skinRestored) {
+                hero.setSkinVariant(worldData.getGlobalSkinVariant());
+                if (worldData.getGlobalSkinVariant() == HeroEntity.SKIN_CUSTOM) {
+                    hero.setCustomSkinName(worldData.getGlobalCustomSkinName());
+                }
+            }
             
             // [新增] 尝试恢复大脑记忆
-            if (data.getTempBrainData() != null) {
-                hero.getHeroBrain().load(data.getTempBrainData());
-                // 恢复后清除临时数据，或者保留以防再次消失？保留比较安全
+            if (worldData.getTempBrainData() != null) {
+                hero.getHeroBrain().load(worldData.getTempBrainData());
+            }
+
+            // ============== [修复] 全局数据托底恢复 ==============
+            ListTag savedArmor = worldData.getArmorItems(player.getUUID());
+            ListTag savedHands = worldData.getHandItems(player.getUUID());
+            // 简单判断身上是否为空
+            boolean isNaked = true;
+            for (ItemStack stack : hero.getArmorSlots()) if (!stack.isEmpty()) isNaked = false;
+            for (ItemStack stack : hero.getHandSlots()) if (!stack.isEmpty()) isNaked = false;
+
+            if (isNaked) {
+                hero.loadEquipmentFromTag(savedArmor, savedHands);
+            }
+            
+            // ============== [修复] 全局数据托底恢复 Curios 背部 ==============
+            CompoundTag savedCurios = worldData.getCuriosBackItem(player.getUUID());
+            if (savedCurios != null && !savedCurios.isEmpty() && hero.isCuriosBackSlotEmpty()) {
+                hero.setCuriosBackItemFromTag(savedCurios);
             }
 
             // 添加防重复生成的标签 (可选)
