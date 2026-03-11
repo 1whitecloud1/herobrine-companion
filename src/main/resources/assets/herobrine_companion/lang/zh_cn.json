@@ -180,9 +180,35 @@
   "message.herobrine_companion.meta_comment_2": "我能看到区块边界。你能吗？",
   "message.herobrine_companion.meta_comment_3": "有时候我觉得这个世界的物理引擎很可笑。",
 
+  "gui.herobrine_companion.change_skin": "皮肤更改",
+  "gui.herobrine_companion.skin_title": "皮肤选择",
+  "gui.herobrine_companion.skin.selected": "已选择",
+  "gui.herobrine_companion.skin.select": "选择",
+  "gui.herobrine_companion.skin.herobrine_name": "Herobrine",
+  "gui.herobrine_companion.skin.hero_name": "Hero",
+  "gui.herobrine_companion.skin.custom_name": "自定义",
+  "gui.herobrine_companion.skin.custom_input": "输入路径或选择文件",
+  "gui.herobrine_companion.skin.select_file": "选择文件",
+  "gui.herobrine_companion.confirm": "确认",
+  "gui.herobrine_companion.wardrobe": "装扮",
+  "gui.herobrine_companion.wardrobe_tooltip": "管理装备与饰品",
 
   "message.herobrine_companion.notch_comment": "他离开了。但我还在。",
 
+  "gui.herobrine_companion.config.cleave_skill": "存档毁灭术(5键): %s",
+  "gui.herobrine_companion.config.cleave_skill.tooltip": "启用或禁用绑定在 5 键上的“毁天灭地”终极技能。",
+  "key.categories.herobrine_companion": "Herobrine的陪伴",
+  "key.herobrine_companion.cleave_skill": "存档毁灭术",
+  "message.herobrine_companion.item_disabled_in_config": "该物品已在配置文件中被禁用。",
+
+  "gui.herobrine_companion.config.soul_bound_pact": "灵魂之契: %s",
+  "gui.herobrine_companion.config.soul_bound_pact.tooltip": "启用/禁用灵魂之契物品的使用。",
+
+  "gui.herobrine_companion.config.abyssal_gaze": "幽邃之视: %s",
+  "gui.herobrine_companion.config.abyssal_gaze.tooltip": "启用/禁用幽邃之视物品的使用。",
+
+  "gui.herobrine_companion.config.transcendence_permit": "凌越之允: %s",
+  "gui.herobrine_companion.config.transcendence_permit.tooltip": "启用/禁用凌越之允物品的使用。",
 
   "message.herobrine_companion.sleep_watch_1": "睡吧。我会看着你的。",
   "message.herobrine_companion.sleep_watch_2": "你休息吧。我不需要睡眠。",

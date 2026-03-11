@@ -65,6 +65,34 @@
   "item.herobrine_companion.lore_fragment.added_to_new_handbook": "The knowledge of %s has been transcribed into your new handbook.",
   "item.herobrine_companion.lore_fragment.already_collected": "You already possess the knowledge of %s.",
   "message.herobrine_companion.inventory_full_lore_dropped": "Your inventory is full, a mysterious fragment dropped at your feet...",
+  "gui.herobrine_companion.change_skin": "Change Skin",
+  "gui.herobrine_companion.skin_title": "Skin Selection",
+  "gui.herobrine_companion.skin.selected": "Selected",
+  "gui.herobrine_companion.skin.select": "Select",
+  "gui.herobrine_companion.skin.herobrine_name": "Herobrine",
+  "gui.herobrine_companion.skin.hero_name": "Hero",
+  "gui.herobrine_companion.skin.custom_name": "Custom",
+  "gui.herobrine_companion.skin.custom_input": "Enter path or select file",
+  "gui.herobrine_companion.skin.select_file": "Select File",
+  "gui.herobrine_companion.confirm": "Confirm",
+  "gui.herobrine_companion.wardrobe": "Wardrobe",
+  "gui.herobrine_companion.wardrobe_tooltip": "Manage Equipment & Cosmetics",
+
+  "gui.herobrine_companion.config.cleave_skill": "World Cleave Skill (5 Key): %s",
+  "gui.herobrine_companion.config.cleave_skill.tooltip": "Enable or disable the devastating World Cleave skill bound to the 5 key.",
+  "key.categories.herobrine_companion": "Herobrine Companion",
+  "key.herobrine_companion.cleave_skill": "World Cleave Skill",
+  "message.herobrine_companion.item_disabled_in_config": "This item has been disabled in the configuration.",
+
+  "gui.herobrine_companion.config.soul_bound_pact": "Soul Bound Pact: %s",
+  "gui.herobrine_companion.config.soul_bound_pact.tooltip": "Enable/Disable the Soul Bound Pact item usage.",
+
+  "gui.herobrine_companion.config.abyssal_gaze": "Abyssal Gaze: %s",
+  "gui.herobrine_companion.config.abyssal_gaze.tooltip": "Enable/Disable the Abyssal Gaze item usage.",
+
+  "gui.herobrine_companion.config.transcendence_permit": "Transcendence Permit: %s",
+  "gui.herobrine_companion.config.transcendence_permit.tooltip": "Enable/Disable the Transcendence Permit item usage.",
+
 
   "item.herobrine_companion.source_flow": "Source Flow",
   "item.herobrine_companion.source_flow.desc": "Right-click to force teleport to Herobrine's side",

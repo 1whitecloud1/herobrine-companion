@@ -34,7 +34,7 @@ public class GlitchVillagerSpawner {
 
             RandomSource random = level.getRandom();
             // Small chance to spawn (e.g., 10% every 10 seconds if conditions met)
-            if (random.nextFloat() < 0.1F) {
+            if (random.nextFloat() < 0.05F) {
                 for (ServerPlayer player : players) {
                     attemptSpawn(level, player, random);
                 }

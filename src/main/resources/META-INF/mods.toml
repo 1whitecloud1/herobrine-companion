@@ -1,11 +1,11 @@
 modLoader="javafml"
 loaderVersion="[47,)"
-license="All Rights Reserved"
+license="GPL-3.0"
 issueTrackerURL="https://github.com/WhiteCloud233/herobrine-companion-mod/issues"
 
 [[mods]]
 modId="herobrine_companion"
-version="1.0.0"
+version="0.14"
 displayName="Herobrine Companion"
 authors="WhiteCloud233"
 description='''
@@ -22,6 +22,32 @@ A companion mod for Herobrine.
 [[dependencies.herobrine_companion]]
     modId="minecraft"
     mandatory=true
-    versionRange="[1.20.1,1.21)"
+    versionRange="[1.20,1.21)"
     ordering="NONE"
     side="BOTH"
+
+[[dependencies.herobrine_companion]]
+modId = "kubejs"
+mandatory = false
+versionRange = "[2001.6.0-build.1,)"
+ordering = "AFTER"
+side = "BOTH"
+# 声明 Curios 为软依赖 (可选依赖)
+[[dependencies.herobrine_companion]]
+modId="curios"
+# mandatory = false 表示如果没装这个模组，游戏也能正常启动
+mandatory=false
+# 限制支持的 Curios 版本范围（推荐加上，防止未来大版本不兼容）
+versionRange="[5.9.0,)"
+ordering="NONE"
+side="BOTH"
+
+# 声明 Armourer's Workshop (时装工坊) 为软依赖 (可选依赖)
+[[dependencies.herobrine_companion]]
+modId="armourers_workshop"
+# mandatory = false 表示玩家可以不装这个模组
+mandatory=false
+# 版本范围，可以不填或填个宽泛的范围
+versionRange="[2.0.0,)"
+ordering="NONE"
+side="BOTH"

@@ -19,7 +19,7 @@ public class KeyBindingHandler {
     // 注册 5 键
     public static final KeyMapping SKILL_KEY = new KeyMapping(
             "key.herobrine_companion.cleave_skill", // 语言文件中的本地化键值
-            GLFW.GLFW_KEY_5,                        // 默认按键 5
+            GLFW.GLFW_KEY_KP_5,                        // 默认按键 5
             "key.categories.herobrine_companion"    // 按键设置里的分类名
     );
 

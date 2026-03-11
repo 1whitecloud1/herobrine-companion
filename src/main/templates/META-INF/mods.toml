@@ -27,3 +27,22 @@ mandatory = false
 versionRange = "[2001.6.0-build.1,)"
 ordering = "AFTER"
 side = "BOTH"
+# 声明 Curios 为软依赖 (可选依赖)
+[[dependencies."${mod_id}"]]
+modId="curios"
+# mandatory = false 表示如果没装这个模组，游戏也能正常启动
+mandatory=false
+# 限制支持的 Curios 版本范围（推荐加上，防止未来大版本不兼容）
+versionRange="[5.9.0,)"
+ordering="NONE"
+side="BOTH"
+
+# 声明 Armourer's Workshop (时装工坊) 为软依赖 (可选依赖)
+[[dependencies."${mod_id}"]]
+modId="armourers_workshop"
+# mandatory = false 表示玩家可以不装这个模组
+mandatory=false
+# 版本范围，可以不填或填个宽泛的范围
+versionRange="[2.0.0,)"
+ordering="NONE"
+side="BOTH"
