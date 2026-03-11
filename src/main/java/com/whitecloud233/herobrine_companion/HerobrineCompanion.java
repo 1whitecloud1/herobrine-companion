@@ -181,7 +181,12 @@ public class HerobrineCompanion {
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {
-        LOGGER.info("HELLO FROM COMMON SETUP");
+        // ...
+        if (com.whitecloud233.herobrine_companion.compat.ArmourerWorkshop.HeroAWCompat.isLoaded()) {
+            LOGGER.info(">>> [DEBUG] 检测到 Armourer's Workshop 已加载，准备对接渲染系统 <<<");
+        } else {
+            LOGGER.warn(">>> [DEBUG] 未检测到 Armourer's Workshop，时装功能将不可用 <<<");
+        }
     }
     
     private void clientSetup(final FMLClientSetupEvent event) {

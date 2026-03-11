@@ -176,6 +176,20 @@
   "gui.herobrine_companion.jei.hero_reward": "Heroine's Trust Rewards",
   "item.herobrine_companion.tab_icon": "Right-click Herobrine",
 
+  "gui.herobrine_companion.change_skin": "Change Skin",
+  "gui.herobrine_companion.skin_title": "Skin Selection",
+  "gui.herobrine_companion.skin.selected": "Selected",
+  "gui.herobrine_companion.skin.select": "Select",
+  "gui.herobrine_companion.skin.herobrine_name": "Herobrine",
+  "gui.herobrine_companion.skin.hero_name": "Hero",
+  "gui.herobrine_companion.skin.custom_name": "Custom",
+  "gui.herobrine_companion.skin.custom_input": "Enter path or select file",
+  "gui.herobrine_companion.skin.select_file": "Select File",
+  "gui.herobrine_companion.confirm": "Confirm",
+  "gui.herobrine_companion.wardrobe": "Wardrobe",
+  "gui.herobrine_companion.wardrobe_tooltip": "Manage Equipment & Cosmetics",
+
+
   "gui.herobrine_companion.config.title": "Herobrine Companion Config",
   "gui.herobrine_companion.config.poem_explosion": "Poem of the End Explosion: %s",
   "gui.herobrine_companion.config.poem_explosion.tooltip": "Whether the Poem of the End weapon causes explosions in its broken state.",

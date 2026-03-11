@@ -16,4 +16,6 @@ public class ModMenus {
     public static final DeferredHolder<MenuType<?>, MenuType<HeroMerchantMenu>> HERO_TRADE_MENU = MENUS.register("hero_trade",
             () -> IMenuTypeExtension.create((windowId, inv, data) -> new HeroMerchantMenu(windowId, inv)));
 
+    public static final DeferredHolder<MenuType<?>, MenuType<HeroWardrobeMenu>> HERO_WARDROBE_MENU = MENUS.register("hero_wardrobe",
+            () -> IMenuTypeExtension.create(HeroWardrobeMenu::new));
 }

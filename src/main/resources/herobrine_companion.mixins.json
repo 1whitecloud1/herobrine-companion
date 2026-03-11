@@ -10,7 +10,8 @@
     "DragonSittingScanningPhaseMixin",
     "EnderDragonMixin",
     "MobSubmissionMixin",
-    "LevelMixin"
+    "LevelMixin",
+    "MixinModEntityProfiles"
   ],
   "client": [
   ],

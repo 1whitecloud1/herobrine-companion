@@ -55,14 +55,15 @@ public class HeroScreen extends Screen {
     protected void init() {
         if (this.minecraft == null) return;
         super.init();
-        int currentSkin = HeroEntity.SKIN_AUTO;
         if (this.minecraft.level != null) {
             this.dummyHero = ModEvents.HERO.get().create(this.minecraft.level);
             // 同步皮肤状态到 dummyHero 以便预览
             Entity realEntity = this.minecraft.level.getEntity(this.entityId);
             if (realEntity instanceof HeroEntity realHero) {
                 this.dummyHero.setSkinVariant(realHero.getSkinVariant());
-                currentSkin = realHero.getSkinVariant();
+                if (realHero.getSkinVariant() == HeroEntity.SKIN_CUSTOM) {
+                    this.dummyHero.setCustomSkinName(realHero.getCustomSkinName());
+                }
             }
         }
 
@@ -95,17 +96,15 @@ public class HeroScreen extends Screen {
         // [新增] 皮肤切换按钮 (左上角)
         int skinBtnX = startX + 4;
         int skinBtnY = startY + 4;
-        int finalCurrentSkin = currentSkin;
+        // [修改] 按钮名称改为 "皮肤更改" (使用 key: gui.herobrine_companion.change_skin)
         Button skinBtn = new ThemedButton(
-                skinBtnX, skinBtnY, 90, 16,
-                Component.translatable(finalCurrentSkin == HeroEntity.SKIN_HEROBRINE ? "gui.herobrine_companion.switch_skin_hero" : "gui.herobrine_companion.switch_skin_herobrine"),
+                skinBtnX,
+                skinBtnY,
+                90, 16, // 宽度稍微调整以适应左侧空间
+                Component.translatable("gui.herobrine_companion.change_skin"),
                 button -> {
-                    int newSkin = (finalCurrentSkin == HeroEntity.SKIN_HEROBRINE) ? HeroEntity.SKIN_HERO : HeroEntity.SKIN_HEROBRINE;
-                    PacketHandler.sendToServer(new SwitchSkinPacket(this.entityId, newSkin));
-                    if (this.dummyHero != null) {
-                        this.dummyHero.setSkinVariant(newSkin);
-                    }
-                    this.onClose();
+                    // 打开新的皮肤切换界面
+                    Minecraft.getInstance().setScreen(new HeroSkinScreen(this.entityId));
                 },
                 Tooltip.create(Component.translatable("gui.herobrine_companion.switch_skin_tooltip"))
         );
@@ -174,6 +173,15 @@ public class HeroScreen extends Screen {
             PacketHandler.sendToServer(new OpenTradePacket(this.entityId));
             this.onClose();
         }, Tooltip.create(Component.translatable("gui.herobrine_companion.trade_tooltip")));
+
+
+        // 👇 [新增] 装扮(衣柜)按钮
+        this.actionList.addAction(Component.translatable("gui.herobrine_companion.wardrobe"), button -> {
+            // 向服务端发送打开装扮界面的请求
+            PacketHandler.sendToServer(new OpenWardrobePacket(this.entityId));
+        }, Tooltip.create(Component.translatable("gui.herobrine_companion.wardrobe_tooltip")));
+        // 👆 [新增结束]
+
         // [新增] 委托按钮
         this.actionList.addAction(Component.translatable("gui.herobrine_companion.requests"), button -> {
             // 打开委托界面
@@ -338,6 +346,11 @@ public class HeroScreen extends Screen {
             if (realEntity instanceof HeroEntity hero) {
                 trust = hero.getTrustLevel();
                 uuid = hero.getUUID();
+                // 同步皮肤状态给 dummyHero 以正确渲染预览
+                this.dummyHero.setSkinVariant(hero.getSkinVariant());
+                if (hero.getSkinVariant() == HeroEntity.SKIN_CUSTOM) {
+                    this.dummyHero.setCustomSkinName(hero.getCustomSkinName());
+                }
             }
         }
 

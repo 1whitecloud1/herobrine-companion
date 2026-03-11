@@ -59,9 +59,9 @@ public class PacketHandler {
                 ClaimRewardPacket::handle
         );
         registrar.playToServer(
-                SwitchSkinPacket.TYPE,
-                SwitchSkinPacket.STREAM_CODEC,
-                SwitchSkinPacket::handle
+                ToggleSkinPacket.TYPE,
+                ToggleSkinPacket.STREAM_CODEC,
+                ToggleSkinPacket::handle
         );
         // [新增] 注册触发永恒誓约的数据包 (S2C)
         registrar.playToClient(
@@ -73,6 +73,11 @@ public class PacketHandler {
                 CleaveSkillPacket.TYPE,
                 CleaveSkillPacket.STREAM_CODEC,
                 CleaveSkillPacket::handle
+        );
+        registrar.playToServer(
+                OpenWardrobePacket.TYPE,
+                OpenWardrobePacket.STREAM_CODEC,
+                OpenWardrobePacket::handle
         );
     }
 
@@ -118,7 +123,7 @@ public class PacketHandler {
         PacketDistributor.sendToServer(packet);
     }
 
-    public static void sendToServer(SwitchSkinPacket packet) {
+    public static void sendToServer(ToggleSkinPacket packet) {
         PacketDistributor.sendToServer(packet);
     }
 
@@ -128,6 +133,10 @@ public class PacketHandler {
     }
 
     public static void sendToServer(CleaveSkillPacket packet) {
+        PacketDistributor.sendToServer(packet);
+    }
+    // [补上缺失的这一个发送方法]
+    public static void sendToServer(OpenWardrobePacket packet) {
         PacketDistributor.sendToServer(packet);
     }
 }
