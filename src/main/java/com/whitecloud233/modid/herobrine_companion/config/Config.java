@@ -13,6 +13,7 @@ public class Config {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final ForgeConfigSpec.Builder BUILDER = new ForgeConfigSpec.Builder();
 
+    // 修改：默认值为 false
     public static final ForgeConfigSpec.BooleanValue POEM_OF_THE_END_EXPLOSION = BUILDER
             .comment("Whether the Poem of the End weapon causes explosions in its broken state")
             .comment("终末之诗在破境状态下是否启用爆炸")

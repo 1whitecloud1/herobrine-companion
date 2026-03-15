@@ -1,6 +1,5 @@
 package com.whitecloud233.modid.herobrine_companion.network;
 
-import net.minecraft.client.Minecraft;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.fml.DistExecutor;
@@ -26,10 +25,9 @@ public class SyncHeroVisitPacket {
     public void handle(Supplier<NetworkEvent.Context> contextSupplier) {
         NetworkEvent.Context context = contextSupplier.get();
         context.enqueueWork(() -> {
+            // [安全修改] 删除了文件头部的 import，使用 ClientHooks 代理执行
             DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> {
-                if (Minecraft.getInstance().player != null) {
-                    Minecraft.getInstance().player.getPersistentData().putBoolean("HasVisitedHeroDimension", visited);
-                }
+                com.whitecloud233.modid.herobrine_companion.client.ClientHooks.setVisitedHeroDimension(this.visited);
             });
         });
         context.setPacketHandled(true);

@@ -8,8 +8,6 @@ import com.whitecloud233.modid.herobrine_companion.entity.logic.*;
 import com.whitecloud233.modid.herobrine_companion.network.HeroWorldData;
 import com.whitecloud233.modid.herobrine_companion.world.structure.ModStructures;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.GlobalPos;
-import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.network.chat.Component;
@@ -19,14 +17,12 @@ import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.util.Mth;
-import net.minecraft.util.RandomSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.LightningBolt;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
@@ -49,70 +45,44 @@ import java.util.UUID;
 
 public class HeroEntity extends PathfinderMob implements Merchant {
 
-    private static final EntityDataAccessor<Boolean> IS_FLOATING = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.BOOLEAN);
-    private static final EntityDataAccessor<Integer> TRUST_LEVEL = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.INT);
-    private static final EntityDataAccessor<Boolean> IS_COMPANION_MODE = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.BOOLEAN);
-    // [修改] 废弃 USE_HEROBRINE_SKIN，改为 SKIN_VARIANT
-    // private static final EntityDataAccessor<Boolean> USE_HEROBRINE_SKIN = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.BOOLEAN);
-    private static final EntityDataAccessor<Integer> SKIN_VARIANT = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.INT);
-    // [新增] 自定义皮肤名称同步 (现在用于存储 URL 或 文件名)
-    private static final EntityDataAccessor<String> CUSTOM_SKIN_NAME = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.STRING);
-
-    private static final EntityDataAccessor<Optional<UUID>> OWNER_UUID = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.OPTIONAL_UUID);
-
-    // 邀请状态同步数据
-    private static final EntityDataAccessor<Optional<BlockPos>> INVITED_POS = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.OPTIONAL_BLOCK_POS);
-    private static final EntityDataAccessor<Integer> INVITED_ACTION = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.INT);
-
-    // 大脑状态同步
-    private static final EntityDataAccessor<Integer> MIND_STATE = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.INT);
-    // 动画状态同步
-    private static final EntityDataAccessor<Boolean> INSPECTING_SCYTHE = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.BOOLEAN);
-    private static final EntityDataAccessor<Boolean> IS_GLITCHING = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.BOOLEAN);
-    private static final EntityDataAccessor<Boolean> IS_DEBUGGING = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.BOOLEAN);
-    private static final EntityDataAccessor<Boolean> IS_CASTING_THUNDER = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.BOOLEAN);
+    public static final EntityDataAccessor<Boolean> IS_FLOATING = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.BOOLEAN);
+    public static final EntityDataAccessor<Integer> TRUST_LEVEL = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.INT);
+    public static final EntityDataAccessor<Boolean> IS_COMPANION_MODE = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.BOOLEAN);
+    public static final EntityDataAccessor<Integer> SKIN_VARIANT = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.INT);
+    public static final EntityDataAccessor<String> CUSTOM_SKIN_NAME = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.STRING);
+    public static final EntityDataAccessor<Optional<UUID>> OWNER_UUID = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.OPTIONAL_UUID);
+    public static final EntityDataAccessor<Optional<BlockPos>> INVITED_POS = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.OPTIONAL_BLOCK_POS);
+    public static final EntityDataAccessor<Integer> INVITED_ACTION = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.INT);
+    public static final EntityDataAccessor<Integer> MIND_STATE = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.INT);
+    public static final EntityDataAccessor<Boolean> INSPECTING_SCYTHE = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.BOOLEAN);
+    public static final EntityDataAccessor<Boolean> IS_GLITCHING = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.BOOLEAN);
+    public static final EntityDataAccessor<Boolean> IS_DEBUGGING = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.BOOLEAN);
+    public static final EntityDataAccessor<Boolean> IS_CASTING_THUNDER = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.BOOLEAN);
 
     private final Set<Integer> claimedRewards = new HashSet<>();
-
     public float clientFloatingAmount;
     public float clientFloatingAmountO;
     public boolean clientSideSetupDone = false;
     public int patrolTimer = 2400;
     private int outOfWaterTimer = 0;
-    // [新增] 记录上一次被物品强行召唤的时间，用于防止 AI 瞬间抢夺控制权
     private long lastSummonedTime = 0;
-
-    public void setLastSummonedTime(long time) {
-        this.lastSummonedTime = time;
-    }
-
-    public long getLastSummonedTime() {
-        return this.lastSummonedTime;
-    }
-
-    // [修复关键] 标记实体是否从磁盘加载
     private boolean isLoadedFromDisk = false;
 
     @Nullable private Player tradingPlayer;
     @Nullable private MerchantOffers offers;
-
     private final HeroBrain brain;
     private final GroundPathNavigation groundNavigation;
 
     public int scytheAnimTick = 0;
     public int debugAnimTick = 0;
-
     public int thunderTicks = 0;
-    public static final int MAX_THUNDER_TICKS = 60;
-
     public int shockTicks = 0;
+    public static final int MAX_THUNDER_TICKS = 60;
     public static final int MAX_SHOCK_TICKS = 60;
 
-    // 皮肤常量定义
     public static final int SKIN_HEROBRINE = 0;
     public static final int SKIN_HERO = 1;
-    public static final int SKIN_CUSTOM = 999; // 自定义皮肤标识 (URL/本地文件)
-    // 预留更多皮肤ID...
+    public static final int SKIN_CUSTOM = 999;
 
     public HeroEntity(EntityType<? extends PathfinderMob> type, Level level) {
         super(type, level);
@@ -121,15 +91,11 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         this.setPersistenceRequired();
         this.moveControl = new HeroMoveControl(this);
         this.brain = new HeroBrain(this);
-
         this.groundNavigation = new GroundPathNavigation(this, level);
         this.groundNavigation.setCanFloat(false);
     }
 
-    @Override
-    protected void registerGoals() {
-        HeroAI.registerGoals(this);
-    }
+    @Override protected void registerGoals() { HeroAI.registerGoals(this); }
 
     @Override
     protected PathNavigation createNavigation(Level level) {
@@ -142,32 +108,17 @@ public class HeroEntity extends PathfinderMob implements Merchant {
 
     @Override
     public PathNavigation getNavigation() {
-        if (this.isFloating()) {
-            return this.navigation;
-        } else {
-            return this.groundNavigation;
-        }
+        return this.isFloating() ? this.navigation : this.groundNavigation;
     }
 
     @Override
     public void onSyncedDataUpdated(EntityDataAccessor<?> key) {
         super.onSyncedDataUpdated(key);
-        if (INSPECTING_SCYTHE.equals(key)) {
-            if (this.entityData.get(INSPECTING_SCYTHE)) {
-                this.scytheAnimTick = 160;
-            }
-        }
-        if (IS_DEBUGGING.equals(key)) {
-            if (this.entityData.get(IS_DEBUGGING)) {
-                this.debugAnimTick = 100;
-            }
-        }
+        if (INSPECTING_SCYTHE.equals(key) && this.entityData.get(INSPECTING_SCYTHE)) this.scytheAnimTick = 160;
+        if (IS_DEBUGGING.equals(key) && this.entityData.get(IS_DEBUGGING)) this.debugAnimTick = 100;
         if (IS_CASTING_THUNDER.equals(key)) {
-            if (this.entityData.get(IS_CASTING_THUNDER)) {
-                this.thunderTicks = MAX_THUNDER_TICKS;
-            } else {
-                this.shockTicks = MAX_SHOCK_TICKS;
-            }
+            if (this.entityData.get(IS_CASTING_THUNDER)) this.thunderTicks = MAX_THUNDER_TICKS;
+            else this.shockTicks = MAX_SHOCK_TICKS;
         }
     }
 
@@ -175,112 +126,24 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     public void tick() {
         super.tick();
 
-        if (this.scytheAnimTick > 0) this.scytheAnimTick--;
-        if (this.debugAnimTick > 0) {
-            this.debugAnimTick--;
-            if (this.level().isClientSide && this.debugAnimTick > 10 && this.debugAnimTick < 90) {
-                spawnDebugParticles();
-            }
-        }
-        if (this.shockTicks > 0) this.shockTicks--;
-
-        if (this.thunderTicks > 0) {
-            this.thunderTicks--;
-            spawnThunderParticles();
-
-            if (!this.level().isClientSide && this.thunderTicks == 1) {
-                LightningBolt bolt = EntityType.LIGHTNING_BOLT.create(this.level());
-                if (bolt != null) {
-                    bolt.moveTo(this.getX(), this.getY(), this.getZ());
-                    bolt.setVisualOnly(true);
-                    this.level().addFreshEntity(bolt);
-                }
-                this.shockTicks = MAX_SHOCK_TICKS;
-            }
-        }
+        // 委托视觉层处理客户端动画
+        HeroVisuals.tickClientAnimations(this);
 
         if (!this.level().isClientSide) {
-            if (this.scytheAnimTick == 0 && this.entityData.get(INSPECTING_SCYTHE)) {
-                this.entityData.set(INSPECTING_SCYTHE, false);
-            }
-            if (this.debugAnimTick == 0 && this.entityData.get(IS_DEBUGGING)) {
-                this.entityData.set(IS_DEBUGGING, false);
-            }
-            if (this.thunderTicks == 0 && this.entityData.get(IS_CASTING_THUNDER)) {
-                this.entityData.set(IS_CASTING_THUNDER, false);
-            }
+            // 重置服务端动画标记
+            if (this.scytheAnimTick == 0 && this.entityData.get(INSPECTING_SCYTHE)) this.entityData.set(INSPECTING_SCYTHE, false);
+            if (this.debugAnimTick == 0 && this.entityData.get(IS_DEBUGGING)) this.entityData.set(IS_DEBUGGING, false);
+            if (this.thunderTicks == 0 && this.entityData.get(IS_CASTING_THUNDER)) this.entityData.set(IS_CASTING_THUNDER, false);
 
             if (this.level().dimension() != ModStructures.END_RING_DIMENSION_KEY) {
                 HeroLogic.tick(this);
                 if (this.isAlive()) {
                     this.brain.tick();
-                    SimpleNeuralNetwork.MindState currentState = this.brain.getState();
-                    if (this.getMindState() != currentState) {
-                        this.setMindState(currentState);
-                    }
-                    
-                    if (this.level() instanceof ServerLevel serverLevel) {
-                        // Skin update (every 20 ticks)
-                        if (this.tickCount % 20 == 0) {
-                            HeroWorldData data = HeroWorldData.get(serverLevel);
-                            int globalSkin = data.getSkinVariant();
-                            if (this.getSkinVariant() != globalSkin) {
-                                this.entityData.set(SKIN_VARIANT, globalSkin);
-                            }
-                            // 同步自定义皮肤名
-                            if (globalSkin == SKIN_CUSTOM) {
-                                String customName = data.getCustomSkinName();
-                                if (!this.getCustomSkinName().equals(customName)) {
-                                    this.entityData.set(CUSTOM_SKIN_NAME, customName);
-                                }
-                            }
-                            
-                            // ============== [修复] 定时备份 ==============
-                            if (this.getOwnerUUID() != null) {
-                                data.setEquipment(this.getOwnerUUID(), this.getArmorItemsTag(), this.getHandItemsTag());
-                                // 加上背部槽！
-                                data.setCuriosBackItem(this.getOwnerUUID(), this.getCuriosBackItemTag());
-                            }
-                        }
+                    if (this.getMindState() != this.brain.getState()) this.setMindState(this.brain.getState());
 
-                        // [新增] 持续性唯一性检查
-                        // 优化：刚生成时检查频繁(0.5s)以快速纠错，稳定后降低频率(5s)以节省性能
-                        int checkInterval = this.tickCount < 200 ? 10 : 100;
-                        
-                        if (this.tickCount % checkInterval == 0) {
-                            HeroWorldData data = HeroWorldData.get(serverLevel);
-                            UUID activeUUID = data.getActiveHeroUUID();
-                            
-                            // 如果我是“旧皇”，且“新皇”已经登基（UUID不匹配），我必须死
-                            if (activeUUID != null && !activeUUID.equals(this.getUUID())) {
-                                // 再次确认：如果 activeUUID 指向的实体已经不存在了（比如被 /kill 了但没清数据），那我就是合法的
-                                net.minecraft.server.MinecraftServer server = serverLevel.getServer();
-                                boolean activeExists = false;
-                                for (ServerLevel lvl : server.getAllLevels()) {
-                                    if (lvl.getEntity(activeUUID) != null) {
-                                        activeExists = true;
-                                        break;
-                                    }
-                                }
-                                
-                                if (activeExists) {
-                                    // [新增] 在自杀前，强制保存一次数据，防止信任度丢失
-                                    HeroDataHandler.updateGlobalTrust(this);
-                                    this.discard();
-                                    return; // 立即停止执行后续逻辑
-                                } else {
-                                    // 旧皇已死，我即新皇 (自动修复数据)
-                                    data.setActiveHeroUUID(this.getUUID());
-                                }
-                            }
-                            
-                            // 如果我是“新皇”，但 WorldData 还没记录我（可能数据丢失），我再次声明主权
-                            if (activeUUID == null) {
-                                data.setActiveHeroUUID(this.getUUID());
-                            }
-                            // [新增] 定期更新位置到 WorldData，用于跨维度定位
-                            data.setLastKnownHeroPos(GlobalPos.of(this.level().dimension(), this.blockPosition()));
-                        }
+                    if (this.level() instanceof ServerLevel serverLevel) {
+                        // 委托服务端层处理同步与防伪验证
+                        if (!HeroServerTick.handleTick(this, serverLevel)) return;
                     }
                 }
             } else {
@@ -291,83 +154,10 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         HeroOtherProtection.tick(this);
 
         if (!this.level().isClientSide && this.level().dimension() == ModStructures.END_RING_DIMENSION_KEY) {
-            if (this.isCompanionMode()) {
-                this.setCompanionMode(false);
-            }
+            if (this.isCompanionMode()) this.setCompanionMode(false);
         }
 
-        if (this.level().isClientSide) {
-            if (this.getMindState() == SimpleNeuralNetwork.MindState.JUDGE) {
-                if (this.random.nextInt(3) == 0) {
-                    double x = this.getX() + (this.random.nextDouble() - 0.5) * 1.5;
-                    double y = this.getY() + this.random.nextDouble() * 2.0;
-                    double z = this.getZ() + (this.random.nextDouble() - 0.5) * 1.5;
-                    this.level().addParticle(ParticleTypes.ELECTRIC_SPARK, x, y, z, 0, 0, 0);
-                }
-            }
-        }
-    }
-
-    private void spawnDebugParticles() {
-        if (this.random.nextInt(5) != 0) return;
-
-        double yawRad = Math.toRadians(this.yBodyRot);
-        double offsetX = -Math.sin(yawRad) * 0.8 + Math.cos(yawRad) * 0.3;
-        double offsetZ = Math.cos(yawRad) * 0.8 + Math.sin(yawRad) * 0.3;
-        double offsetY = 1.4;
-
-        double x = this.getX() + offsetX;
-        double y = this.getY() + offsetY;
-        double z = this.getZ() + offsetZ;
-
-        double pX = x + (this.random.nextDouble() - 0.5) * 0.5;
-        double pY = y + (this.random.nextDouble() - 0.5) * 0.4;
-        double pZ = z + (this.random.nextDouble() - 0.5) * 0.5;
-
-        this.level().addParticle(ParticleTypes.ENCHANT, pX, pY, pZ, 0, 0.01, 0);
-    }
-
-    private void spawnThunderParticles() {
-        if (!this.level().isClientSide) return;
-
-        double yaw = Math.toRadians(this.yBodyRot + 90);
-        double handX = this.getX() + Math.cos(yaw) * 0.6;
-        double handY = this.getY() + 2.8;
-        double handZ = this.getZ() + Math.sin(yaw) * 0.6;
-
-        RandomSource rand = this.random;
-
-        for(int i=0; i<3; i++) {
-            this.level().addParticle(ParticleTypes.ELECTRIC_SPARK,
-                    handX + (rand.nextDouble()-0.5)*0.5,
-                    handY + (rand.nextDouble()-0.5)*0.5,
-                    handZ + (rand.nextDouble()-0.5)*0.5,
-                    0, 0, 0);
-        }
-
-        float progress = 1.0F - (float)this.thunderTicks / MAX_THUNDER_TICKS;
-        if (progress > 0.3F) {
-            for(int i=0; i<2; i++) {
-                double height = rand.nextDouble() * 10.0 * progress;
-                double angle = (this.tickCount * 0.5 + height) * 0.5;
-                double radius = 1.0 - (height * 0.05);
-                if (radius < 0) radius = 0;
-
-                double pX = this.getX() + Math.cos(angle) * radius;
-                double pZ = this.getZ() + Math.sin(angle) * radius;
-
-                this.level().addParticle(ParticleTypes.FIREWORK,
-                        pX, this.getY() + height, pZ,
-                        0, 0.1, 0);
-            }
-        }
-    }
-
-    public float getThunderProgress(float partialTick) {
-        if (this.thunderTicks <= 0) return 0.0F;
-        float current = (MAX_THUNDER_TICKS - this.thunderTicks) + partialTick;
-        float progress = current / (float)MAX_THUNDER_TICKS;
-        return Mth.clamp(progress, 0.0F, 1.0F);
+        if (this.level().isClientSide) HeroVisuals.tickClientAmbient(this);
     }
 
     @Override
@@ -380,9 +170,7 @@ public class HeroEntity extends PathfinderMob implements Merchant {
                     this.outOfWaterTimer = 40;
                     if (!this.isFloating()) this.setFloating(true);
                     if (!this.isNoGravity()) this.setNoGravity(true);
-                    if (this.getDeltaMovement().y < 0.1) {
-                        this.setDeltaMovement(this.getDeltaMovement().add(0, 0.05, 0));
-                    }
+                    if (this.getDeltaMovement().y < 0.1) this.setDeltaMovement(this.getDeltaMovement().add(0, 0.05, 0));
                 } else if (this.outOfWaterTimer > 0) {
                     this.outOfWaterTimer--;
                     if (!this.isFloating()) this.setFloating(true);
@@ -396,27 +184,24 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     public void rideTick() {
         super.rideTick();
         Entity vehicle = this.getVehicle();
-        if (vehicle != null) {
-            this.yBodyRot = vehicle.getYRot();
-        }
+        if (vehicle != null) this.yBodyRot = vehicle.getYRot();
     }
 
     @Override
     public InteractionResult mobInteract(Player player, InteractionHand hand) {
         InteractionResult result = HeroLogic.onInteract(this, player, hand);
-        if (result != InteractionResult.PASS) return result;
-        return super.mobInteract(player, hand);
+        return result != InteractionResult.PASS ? result : super.mobInteract(player, hand);
     }
 
     @Override
     public boolean hurt(DamageSource source, float amount) {
+        if (source.is(net.minecraft.tags.DamageTypeTags.IS_EXPLOSION) || source.is(net.minecraft.tags.DamageTypeTags.IS_FALL) || source.is(net.minecraft.tags.DamageTypeTags.IS_FIRE)) {
+            return false;
+        }
         return HeroLogic.onHurt(this, source, amount) || super.hurt(source, amount);
     }
 
-    @Override
-    public void setHealth(float health) {
-        super.setHealth(this.getMaxHealth());
-    }
+    @Override public void setHealth(float health) { super.setHealth(this.getMaxHealth()); }
 
     @Override
     public void die(DamageSource damageSource) {
@@ -430,16 +215,8 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         super.die(damageSource);
     }
 
-    @Override
-    public boolean canBeAffected(MobEffectInstance instance) {
-        return HeroOtherProtection.canBeAffected(this, instance) && super.canBeAffected(instance);
-    }
-
-    // [API 适配] 1.20.1 中 canBeLeashed 需要参数
-    @Override
-    public boolean canBeLeashed(Player player) {
-        return HeroOtherProtection.canBeLeashed(this) && super.canBeLeashed(player);
-    }
+    @Override public boolean canBeAffected(MobEffectInstance instance) { return HeroOtherProtection.canBeAffected(this, instance) && super.canBeAffected(instance); }
+    @Override public boolean canBeLeashed(Player player) { return HeroOtherProtection.canBeLeashed(this) && super.canBeLeashed(player); }
 
     public static AttributeSupplier.Builder createAttributes() {
         return PathfinderMob.createMobAttributes()
@@ -474,334 +251,133 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         compound.putBoolean("CompanionMode", isCompanionMode());
         compound.putInt("SkinVariant", getSkinVariant());
         compound.putString("CustomSkinName", getCustomSkinName());
-
-        // [修复] UUID 备份保存 (防止二进制格式变动)
         if (getOwnerUUID() != null) {
             compound.putUUID("OwnerUUID", getOwnerUUID());
             compound.putString("OwnerUUID_String", getOwnerUUID().toString());
         }
-
     }
 
     @Override
     public void readAdditionalSaveData(CompoundTag compound) {
         super.readAdditionalSaveData(compound);
-
-        // [修复] 标记此实体为“从磁盘加载”，防止 Logic 误判为新生成实体
         this.isLoadedFromDisk = true;
-
         if (compound.contains("TrustLevel")) setTrustLevel(compound.getInt("TrustLevel"));
         if (compound.contains("PatrolTimer")) patrolTimer = compound.getInt("PatrolTimer");
         if (compound.contains("CompanionMode")) setCompanionMode(compound.getBoolean("CompanionMode"));
 
         int localSkin = SKIN_HEROBRINE;
-        if (compound.contains("SkinVariant")) {
-            localSkin = compound.getInt("SkinVariant");
-            this.entityData.set(SKIN_VARIANT, localSkin);
-        } else if (compound.contains("UseHerobrineSkin")) {
-            // 兼容旧数据
-            boolean useHerobrine = compound.getBoolean("UseHerobrineSkin");
-            localSkin = useHerobrine ? SKIN_HEROBRINE : SKIN_HERO;
-            this.entityData.set(SKIN_VARIANT, localSkin);
-        }
-        
-        if (compound.contains("CustomSkinName")) {
-            this.entityData.set(CUSTOM_SKIN_NAME, compound.getString("CustomSkinName"));
-        }
+        if (compound.contains("SkinVariant")) localSkin = compound.getInt("SkinVariant");
+        else if (compound.contains("UseHerobrineSkin")) localSkin = compound.getBoolean("UseHerobrineSkin") ? SKIN_HEROBRINE : SKIN_HERO;
+        this.entityData.set(SKIN_VARIANT, localSkin);
 
-        // [修复] 读取 UUID - 优先二进制，失败则读取字符串
+        if (compound.contains("CustomSkinName")) this.entityData.set(CUSTOM_SKIN_NAME, compound.getString("CustomSkinName"));
+
         UUID ownerUUID = null;
-        if (compound.hasUUID("OwnerUUID")) {
-            ownerUUID = compound.getUUID("OwnerUUID");
-        } else if (compound.contains("OwnerUUID_String")) {
-            try {
-                ownerUUID = UUID.fromString(compound.getString("OwnerUUID_String"));
-            } catch (Exception ignored) {}
+        if (compound.hasUUID("OwnerUUID")) ownerUUID = compound.getUUID("OwnerUUID");
+        else if (compound.contains("OwnerUUID_String")) {
+            try { ownerUUID = UUID.fromString(compound.getString("OwnerUUID_String")); } catch (Exception ignored) {}
         }
-
-        if (ownerUUID != null) {
-            setOwnerUUID(ownerUUID);
-        }
-
-        if (!this.level().isClientSide && this.level() instanceof ServerLevel serverLevel) {
-            HeroWorldData data = HeroWorldData.get(serverLevel);
-            // 同步全局皮肤设置
-            if (data.getSkinVariant() != localSkin) {
-                // 如果全局有设置，优先使用全局（或者这里可以加逻辑判断谁优先）
-                // 这里假设加载时如果本地有记录，先用本地的，然后 tick 会同步
-                // 但为了保持一致性，通常以 WorldData 为准，除非 WorldData 还没初始化
-                // 简单起见，这里不做强制覆盖，依靠 tick 中的同步逻辑
-            }
-        }
+        if (ownerUUID != null) setOwnerUUID(ownerUUID);
     }
 
-    // ================= [新增] 原生装备序列化 =================
-    public ListTag getArmorItemsTag() {
-        ListTag tag = new ListTag();
-        for (ItemStack stack : this.getArmorSlots()) tag.add(stack.save(new CompoundTag()));
-        return tag;
-    }
+    // 委托装备与NBT处理
+    public ListTag getArmorItemsTag() { return HeroEquipment.getArmorItemsTag(this); }
+    public ListTag getHandItemsTag() { return HeroEquipment.getHandItemsTag(this); }
+    public void loadEquipmentFromTag(ListTag armor, ListTag hands) { HeroEquipment.loadEquipmentFromTag(this, armor, hands); }
+    public CompoundTag getCuriosBackItemTag() { return HeroEquipment.getCuriosBackItemTag(this); }
+    public void setCuriosBackItemFromTag(CompoundTag tag) { HeroEquipment.setCuriosBackItemFromTag(this, tag); }
+    public boolean isCuriosBackSlotEmpty() { return HeroEquipment.isCuriosBackSlotEmpty(this); }
 
-    public ListTag getHandItemsTag() {
-        ListTag tag = new ListTag();
-        for (ItemStack stack : this.getHandSlots()) tag.add(stack.save(new CompoundTag()));
-        return tag;
-    }
-
-    public void loadEquipmentFromTag(ListTag armor, ListTag hands) {
-        if (armor != null && !armor.isEmpty()) {
-            for(int i = 0; i < armor.size(); ++i) {
-                this.setItemSlot(net.minecraft.world.entity.EquipmentSlot.byTypeAndIndex(net.minecraft.world.entity.EquipmentSlot.Type.ARMOR, i), ItemStack.of(armor.getCompound(i)));
-            }
-        }
-        if (hands != null && !hands.isEmpty()) {
-            for(int i = 0; i < hands.size(); ++i) {
-                this.setItemSlot(net.minecraft.world.entity.EquipmentSlot.byTypeAndIndex(net.minecraft.world.entity.EquipmentSlot.Type.HAND, i), ItemStack.of(hands.getCompound(i)));
-            }
-        }
-    }
-    // =======================================================
-
-    // ================= [新增] Curios 背部槽序列化 (防崩溃安全版) =================
-    public CompoundTag getCuriosBackItemTag() {
-        if (net.minecraftforge.fml.ModList.get().isLoaded("curios")) {
-            return CuriosSafeInvoker.getBackItemTag(this);
-        }
-        return new CompoundTag();
-    }
-
-    public void setCuriosBackItemFromTag(CompoundTag tag) {
-        if (tag == null || tag.isEmpty()) return;
-        if (net.minecraftforge.fml.ModList.get().isLoaded("curios")) {
-            CuriosSafeInvoker.setBackItemFromTag(this, tag);
-        }
-    }
-
-    public boolean isCuriosBackSlotEmpty() {
-        if (!net.minecraftforge.fml.ModList.get().isLoaded("curios")) return true;
-        return CuriosSafeInvoker.isBackSlotEmpty(this);
-    }
-
-    // 【核心防御机制】安全隔离内部类！
-    // 只要 Curios 没加载，外层的 if 进不来，JVM 就绝对不会加载这个类！
-    private static class CuriosSafeInvoker {
-        static CompoundTag getBackItemTag(HeroEntity hero) {
-            CompoundTag tag = new CompoundTag();
-            ItemStack stack = com.whitecloud233.modid.herobrine_companion.compat.curios.HeroCuriosCompat.getBackSlotItem(hero);
-            if (!stack.isEmpty()) stack.save(tag);
-            return tag;
-        }
-        
-        static void setBackItemFromTag(HeroEntity hero, CompoundTag tag) {
-            ItemStack stack = ItemStack.of(tag);
-            com.whitecloud233.modid.herobrine_companion.compat.curios.HeroCuriosCompat.setBackSlotItem(hero, stack);
-        }
-        
-        static boolean isBackSlotEmpty(HeroEntity hero) {
-            return com.whitecloud233.modid.herobrine_companion.compat.curios.HeroCuriosCompat.getBackSlotItem(hero).isEmpty();
-        }
-    }
-    // =======================================================================
-
-    // [新增] Getter
-    public boolean isLoadedFromDisk() {
-        return this.isLoadedFromDisk;
-    }
-
+    // Getters & Setters
+    public boolean isLoadedFromDisk() { return this.isLoadedFromDisk; }
     public boolean isFloating() { return entityData.get(IS_FLOATING); }
     public void setFloating(boolean floating) { entityData.set(IS_FLOATING, floating); }
     public int getTrustLevel() { return entityData.get(TRUST_LEVEL); }
     public void setTrustLevel(int level) {
         entityData.set(TRUST_LEVEL, level);
-        // [修复] 信任度变化时立即同步到全局数据，防止跨维度丢失
-        if (!this.level().isClientSide) {
-            HeroDataHandler.updateGlobalTrust(this);
-        }
+        if (!this.level().isClientSide) HeroDataHandler.updateGlobalTrust(this);
     }
     public void increaseTrust(int amount) { setTrustLevel(getTrustLevel() + amount); }
     public boolean isCompanionMode() { return entityData.get(IS_COMPANION_MODE); }
     public void setCompanionMode(boolean active) { entityData.set(IS_COMPANION_MODE, active); }
-    
-    // 兼容旧方法
-    public boolean shouldUseHerobrineSkin() { return getSkinVariant() == SKIN_HEROBRINE; }
-    public void setUseHerobrineSkin(boolean use) {
-        setSkinVariant(use ? SKIN_HEROBRINE : SKIN_HERO);
-    }
-
     public int getSkinVariant() { return entityData.get(SKIN_VARIANT); }
     public void setSkinVariant(int variant) {
         entityData.set(SKIN_VARIANT, variant);
-        if (!this.level().isClientSide && this.level() instanceof ServerLevel serverLevel) {
-            HeroWorldData.get(serverLevel).setSkinVariant(variant);
-        }
+        if (!this.level().isClientSide && this.level() instanceof ServerLevel serverLevel) HeroWorldData.get(serverLevel).setSkinVariant(variant);
     }
-    
     public String getCustomSkinName() { return entityData.get(CUSTOM_SKIN_NAME); }
     public void setCustomSkinName(String name) {
         entityData.set(CUSTOM_SKIN_NAME, name);
-        if (!this.level().isClientSide && this.level() instanceof ServerLevel serverLevel) {
-            HeroWorldData.get(serverLevel).setCustomSkinName(name);
-        }
+        if (!this.level().isClientSide && this.level() instanceof ServerLevel serverLevel) HeroWorldData.get(serverLevel).setCustomSkinName(name);
     }
+    @Nullable public UUID getOwnerUUID() { return this.entityData.get(OWNER_UUID).orElse(null); }
+    public void setOwnerUUID(@Nullable UUID uuid) { this.entityData.set(OWNER_UUID, Optional.ofNullable(uuid)); }
+    @Nullable public BlockPos getInvitedPos() { return this.entityData.get(INVITED_POS).orElse(null); }
+    public void setInvitedPos(@Nullable BlockPos pos) { this.entityData.set(INVITED_POS, Optional.ofNullable(pos)); }
+    public int getInvitedAction() { return this.entityData.get(INVITED_ACTION); }
+    public void setInvitedAction(int action) { this.entityData.set(INVITED_ACTION, action); }
+    public void setLastSummonedTime(long time) { this.lastSummonedTime = time; }
+    public long getLastSummonedTime() { return this.lastSummonedTime; }
+    public GoalSelector getGoalSelector() { return this.goalSelector; }
+    public void setFallDistance(float distance) { this.fallDistance = distance; }
+    public HeroBrain getHeroBrain() { return this.brain; }
 
-    @Nullable
-    public UUID getOwnerUUID() {
-        return this.entityData.get(OWNER_UUID).orElse(null);
+    public SimpleNeuralNetwork.MindState getMindState() {
+        int index = this.entityData.get(MIND_STATE);
+        SimpleNeuralNetwork.MindState[] states = SimpleNeuralNetwork.MindState.values();
+        return (index >= 0 && index < states.length) ? states[index] : SimpleNeuralNetwork.MindState.OBSERVER;
     }
-
-    public void setOwnerUUID(@Nullable UUID uuid) {
-        this.entityData.set(OWNER_UUID, Optional.ofNullable(uuid));
-    }
-
-    @Nullable
-    public BlockPos getInvitedPos() {
-        return this.entityData.get(INVITED_POS).orElse(null);
-    }
-
-    public void setInvitedPos(@Nullable BlockPos pos) {
-        this.entityData.set(INVITED_POS, Optional.ofNullable(pos));
-    }
-
-    public int getInvitedAction() {
-        return this.entityData.get(INVITED_ACTION);
-    }
-
-    public void setInvitedAction(int action) {
-        this.entityData.set(INVITED_ACTION, action);
-    }
+    public void setMindState(SimpleNeuralNetwork.MindState state) { this.entityData.set(MIND_STATE, state.ordinal()); }
 
     public boolean hasClaimedReward(int id) {
-        if (!this.level().isClientSide && this.level() instanceof ServerLevel serverLevel) {
-            UUID owner = getOwnerUUID();
-            if (owner != null) {
-                return HeroWorldData.get(serverLevel).isRewardClaimed(owner, id);
-            }
+        if (!this.level().isClientSide && this.level() instanceof ServerLevel serverLevel && getOwnerUUID() != null) {
+            return HeroWorldData.get(serverLevel).isRewardClaimed(getOwnerUUID(), id);
         }
         return claimedRewards.contains(id);
     }
 
     public void claimReward(int id) {
-        if (!this.level().isClientSide && this.level() instanceof ServerLevel serverLevel) {
-            UUID owner = getOwnerUUID();
-            if (owner != null) {
-                HeroWorldData.get(serverLevel).setRewardClaimed(owner, id, true);
-            }
+        if (!this.level().isClientSide && this.level() instanceof ServerLevel serverLevel && getOwnerUUID() != null) {
+            HeroWorldData.get(serverLevel).setRewardClaimed(getOwnerUUID(), id, true);
         }
         claimedRewards.add(id);
     }
 
-    public GoalSelector getGoalSelector() {
-        return this.goalSelector;
-    }
-
-    public void setFallDistance(float distance) {
-        this.fallDistance = distance;
-    }
-
-    public SimpleNeuralNetwork.MindState getMindState() {
-        int index = this.entityData.get(MIND_STATE);
-        SimpleNeuralNetwork.MindState[] states = SimpleNeuralNetwork.MindState.values();
-        if (index >= 0 && index < states.length) {
-            return states[index];
-        }
-        return SimpleNeuralNetwork.MindState.OBSERVER;
-    }
-
-    public void setMindState(SimpleNeuralNetwork.MindState state) {
-        this.entityData.set(MIND_STATE, state.ordinal());
-    }
-
-    public HeroBrain getHeroBrain() {
-        return this.brain;
-    }
-
-    @Override
-    public boolean isNoGravity() {
-        if (level().dimension() == ModStructures.END_RING_DIMENSION_KEY && getTags().contains("hero_intro_sequence")) return true;
-        return isFloating();
-    }
-
-    public float getFloatingAmount(float partialTick) {
-        return net.minecraft.util.Mth.lerp(partialTick, clientFloatingAmountO, clientFloatingAmount);
+    @Override public boolean isNoGravity() { return (level().dimension() == ModStructures.END_RING_DIMENSION_KEY && getTags().contains("hero_intro_sequence")) || isFloating(); }
+    public float getFloatingAmount(float partialTick) { return net.minecraft.util.Mth.lerp(partialTick, clientFloatingAmountO, clientFloatingAmount); }
+    public float getThunderProgress(float partialTick) {
+        if (this.thunderTicks <= 0) return 0.0F;
+        return Mth.clamp(((MAX_THUNDER_TICKS - this.thunderTicks) + partialTick) / (float)MAX_THUNDER_TICKS, 0.0F, 1.0F);
     }
 
     @Override public boolean shouldShowName() { return false; }
     @Override public boolean isCustomNameVisible() { return false; }
     @Override public boolean isInvulnerable() { return true; }
+    @Override public boolean isClientSide() { return this.level().isClientSide; }
+    @Override public boolean removeWhenFarAway(double dist) { return false; }
+    @Override public boolean requiresCustomPersistence() { return true; }
 
+    // 动画控制
+    public void playScytheInspectAnim() { this.scytheAnimTick = 160; this.entityData.set(INSPECTING_SCYTHE, true); this.playSound(SoundEvents.TRIDENT_HIT_GROUND, 1.0F, 0.5F); }
+    public boolean isInspectingScythe() { return this.scytheAnimTick > 0; }
+    public void setGlitching(boolean glitching) { this.entityData.set(IS_GLITCHING, glitching); }
+    public boolean isGlitching() { return this.entityData.get(IS_GLITCHING); }
+    public void playDebugAnim() { this.debugAnimTick = 100; this.entityData.set(IS_DEBUGGING, true); this.playSound(SoundEvents.BEACON_AMBIENT, 1.0F, 2.0F); }
+    public boolean isDebugAnim() { return this.debugAnimTick > 0; }
+    public void castThunder() { this.thunderTicks = MAX_THUNDER_TICKS; this.entityData.set(IS_CASTING_THUNDER, true); this.playSound(SoundEvents.TRIDENT_THUNDER, 5.0F, 0.8F); }
+    public boolean isCastingThunder() { return this.thunderTicks > 0; }
+
+    // 交易系统 (Merchant)
     @Override public void setTradingPlayer(@Nullable Player player) { this.tradingPlayer = player; }
     @Nullable @Override public Player getTradingPlayer() { return this.tradingPlayer; }
-
-    @Override
-    public MerchantOffers getOffers() {
-        if (this.offers == null) this.offers = HeroTrades.getOffers(this);
-        return this.offers;
-    }
-
-    @Override
-    public void notifyTrade(MerchantOffer offer) {
-        this.ambientSoundTime = -this.getAmbientSoundInterval();
-        HeroTrades.onTrade(this, offer);
-    }
-
-    public void resetOffers() {
-        this.offers = null;
-        if (this.tradingPlayer != null) {
-            this.tradingPlayer.sendMerchantOffers(getContainerId(), getOffers(), 0, getVillagerXp(), showProgressBar(), canRestock());
-        }
-    }
-
+    @Override public MerchantOffers getOffers() { if (this.offers == null) this.offers = HeroTrades.getOffers(this); return this.offers; }
+    @Override public void notifyTrade(MerchantOffer offer) { this.ambientSoundTime = -this.getAmbientSoundInterval(); HeroTrades.onTrade(this, offer); }
+    public void resetOffers() { this.offers = null; if (this.tradingPlayer != null) this.tradingPlayer.sendMerchantOffers(getContainerId(), getOffers(), 0, getVillagerXp(), showProgressBar(), canRestock()); }
     @Override public void overrideOffers(@Nullable MerchantOffers offers) { this.offers = offers; }
     @Override public void notifyTradeUpdated(ItemStack stack) {}
     @Override public int getVillagerXp() { return 0; }
     @Override public void overrideXp(int xp) {}
     @Override public boolean showProgressBar() { return false; }
     @Override public net.minecraft.sounds.SoundEvent getNotifyTradeSound() { return net.minecraft.sounds.SoundEvents.VILLAGER_YES; }
-    @Override public boolean isClientSide() { return this.level().isClientSide; }
-    @Override public boolean removeWhenFarAway(double dist) { return false; }
-    @Override public boolean requiresCustomPersistence() { return true; }
-
-    private int getContainerId() {
-        if (this.tradingPlayer != null && this.tradingPlayer.containerMenu != null) return this.tradingPlayer.containerMenu.containerId;
-        return 0;
-    }
-
-    public void playScytheInspectAnim() {
-        this.scytheAnimTick = 160;
-        this.entityData.set(INSPECTING_SCYTHE, true);
-        this.playSound(SoundEvents.TRIDENT_HIT_GROUND, 1.0F, 0.5F);
-    }
-
-    public boolean isInspectingScythe() {
-        return this.scytheAnimTick > 0;
-    }
-
-    public void setGlitching(boolean glitching) {
-        this.entityData.set(IS_GLITCHING, glitching);
-    }
-
-    public boolean isGlitching() {
-        return this.entityData.get(IS_GLITCHING);
-    }
-
-    public void playDebugAnim() {
-        this.debugAnimTick = 100;
-        this.entityData.set(IS_DEBUGGING, true);
-        this.playSound(SoundEvents.BEACON_AMBIENT, 1.0F, 2.0F);
-    }
-
-    public boolean isDebugAnim() {
-        return this.debugAnimTick > 0;
-    }
-
-    public void castThunder() {
-        this.thunderTicks = MAX_THUNDER_TICKS;
-        this.entityData.set(IS_CASTING_THUNDER, true);
-        // [API 适配] 1.20.1 中 SoundEvents.TRIDENT_THUNDER 是 SoundEvent 类型，无需 .value()
-        this.playSound(SoundEvents.TRIDENT_THUNDER, 5.0F, 0.8F);
-    }
-
-    public boolean isCastingThunder() {
-        return this.thunderTicks > 0;
-    }
+    private int getContainerId() { return (this.tradingPlayer != null && this.tradingPlayer.containerMenu != null) ? this.tradingPlayer.containerMenu.containerId : 0; }
 }

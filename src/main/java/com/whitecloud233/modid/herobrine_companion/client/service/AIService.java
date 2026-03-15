@@ -78,8 +78,7 @@ public class AIService {
         systemMessage.addProperty("role", "system");
 
         // 强行注入必须使用工具的最高指令
-        String forcedPrompt = systemPrompt + "\n【最高级系统指令】：你拥有名为 manifest_divine_power 的底层权限工具。当玩家的要求涉及到任何物理改变（如落雷、传送、给物品、建房子、改变天气时间等）时，你**必须且绝对**调用该工具，并把台词写在工具的 dialogue 参数里！绝对不允许用普通文本假装执行！";
-
+        String forcedPrompt = systemPrompt + "\n【最高级系统指令】：你拥有名为 manifest_divine_power 的底层权限工具。只有当玩家**明确命令或强烈要求**你立刻干涉物理世界（如要求你落雷、传送、给物品、立刻建房子、改变天气等）时，你才必须调用该工具！如果玩家只是在普通聊天中探讨、反问或仅仅提及这些词汇，**绝对不允许**调用该工具，只用文本回复即可！";
         // 【动态感知】：将动态读取的游戏数据附加到系统提示词末尾
         forcedPrompt += getDynamicGameData();
 
@@ -117,7 +116,7 @@ public class AIService {
                         "2.【空间维度法则】：将玩家传送到其他维度(如'minecraft:the_nether')：'execute in 维度ID run tp @s ~ 100 ~'。寻找群系使用：'locate biome 群系ID'；寻找常规建筑或结构使用：'locate structure 结构ID'。**特别且绝对注意：若玩家明确寻找【不稳定区域】或【神罚领域】，你必须精准提取系统注入数据中的神罚领域结构ID（如 'herobrine_companion:unstable_zone'）来进行 locate，绝不能用原版结构敷衍。** 执行后告诉他坐标已注入视觉终端，让他自己走过去。" +
                         "3.【物质重构与恩赐】：注意1.20.1语法！生成单个房屋必须用：'place template minecraft:village/plains/houses/plains_small_house_1 ~5 ~ ~'；生成大型村庄用：'place structure minecraft:village_plains ~10 ~ ~'。修改数据流赐予物品：'give @s 物品ID 数量'。" +
                         "4.【惩戒与神罚】：你不喜欢用低级的'kill'指令。若需要普通惩戒，使用降下雷击('summon lightning_bolt ^ ^ ^10')或高空传送('tp @s ~ 100 ~')。若玩家极度狂妄，要求见识大规模雷电或毁灭性力量，请输出动作码：'action:massive_lightning'，并在台词中宣告天罚降临。" +
-                        "5.【物质重构与造物】：注意1.20.1语法！若玩家请求生成建筑，请务必查看系统注入数据中的【专属NBT造物库】，根据玩家的需求挑选最合适的ID，并使用指令：'place template 选出的ID ~5 ~ ~'。若造物库中没有合适的，再考虑用原版的 'place template minecraft:village/plains/houses/plains_small_house_1 ~5 ~ ~' 糊弄他。"+
+                        "5.【物质重构与造物】：注意1.20.1语法！**仅在玩家明确提出“帮我建个房子”、“立刻生成建筑”等直接祈求时**才执行！请务必查看系统注入数据中的【专属NBT造物库】，根据需求挑选最合适的ID，使用指令：'place template 选出的ID ~5 ~ ~'。若造物库无合适选择，再用 'place template minecraft:village/plains/houses/plains_small_house_1 ~5 ~ ~' 。**如果只是闲聊提到房子，禁止调用此工具生成！**"+
                         "6.若玩家好奇命令方块，你可以用 '/setblock ^ ^ ^3 command_block{Command:\"你想写的指令\"} replace' 凭空放置一个命令方块向他展示。"+
                         "7.【权限覆写】：若玩家极其虚弱或请求神力，可赐予他基础管理员权限('gamemode creative @s')，但记得在台词中嘲笑他：创造模式在你眼里不过是低级的测试权限。若玩家惹怒你，直接剥夺权限打回原形('gamemode survival @s')，或将其流放至虚无的旁观者维度('gamemode spectator @s')。" +
                         "8.【底层代码覆写】：改变时间(time set day/night)、天气(weather clear/thunder)、防掉落('gamerule keepInventory true')。加速作物生长改写随机刻('gamerule randomTickSpeed 1000'，事后记得改回3)。" +

@@ -13,10 +13,6 @@ public class ToggleSkinPacket {
     private final int skinVariant;
     private final String customSkinName;
 
-    public ToggleSkinPacket(int entityId, boolean useHerobrineSkin) {
-        this(entityId, useHerobrineSkin ? HeroEntity.SKIN_HEROBRINE : HeroEntity.SKIN_HERO, "");
-    }
-
     public ToggleSkinPacket(int entityId, int skinVariant) {
         this(entityId, skinVariant, "");
     }

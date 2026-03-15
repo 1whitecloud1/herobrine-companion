@@ -94,9 +94,10 @@ public class HeroGodlyCompanionGoal extends Goal {
     @Override
     public void start() {
         this.hero.setOwnerUUID(this.owner.getUUID());
-        // 初始默认飞行，由 tick 修正
-        this.hero.setNoGravity(true);
+        // [核心优化] 强制进入飞行模式，抵抗卡顿
         this.hero.setFloating(true);
+        this.hero.setNoGravity(true);
+        this.hero.getNavigation().stop(); // 停止任何地面寻路
 
         pickNewRandomPosition();
         this.targetOrbitAngle = this.owner.yBodyRot;
@@ -146,41 +147,28 @@ public class HeroGodlyCompanionGoal extends Goal {
         // 2. 计算目标位置
         Vec3 targetPos = calculateTargetPos(this.currentOrbitAngle);
 
-        // === 3. 核心修复：状态切换判定 ===
-        double heightDiff = this.hero.getY() - targetPos.y;
-        boolean ownerIsFlying = !this.owner.onGround() && this.owner.getAbilities().flying;
-
-        boolean shouldFly = ownerIsFlying || heightDiff > LANDING_THRESHOLD;
-
-        if (shouldFly != this.hero.isFloating()) {
-            this.hero.setFloating(shouldFly);
-            this.hero.setNoGravity(shouldFly);
-            this.hero.getNavigation().stop();
-        }
-
+        // === 3. [核心优化] 强制飞行，不再切换地面模式 ===
+        // 始终保持飞行状态，不再需要 shouldFly 的判断
+        if (!this.hero.isFloating()) this.hero.setFloating(true);
+        if (!this.hero.isNoGravity()) this.hero.setNoGravity(true);
+        
         // === 4. 移动逻辑修复 ===
         double dx = this.hero.getX() - targetPos.x;
         double dz = this.hero.getZ() - targetPos.z;
         double distHorizontalSqr = dx * dx + dz * dz;
+        double heightDiff = this.hero.getY() - targetPos.y;
 
         double speed = this.speedModifier;
         if (distHorizontalSqr > 25.0D) speed *= 1.5D;
 
-        if (this.hero.isFloating()) {
-            boolean closeEnoughHorizontally = distHorizontalSqr < 1.0D;
-            boolean closeEnoughVertically = Math.abs(heightDiff) < 0.2D;
+        // 始终使用 MoveControl 进行移动，因为它现在有动态响应速度
+        boolean closeEnoughHorizontally = distHorizontalSqr < 1.0D;
+        boolean closeEnoughVertically = Math.abs(heightDiff) < 0.2D;
 
-            if (closeEnoughHorizontally && closeEnoughVertically) {
-                this.hero.setDeltaMovement(this.hero.getDeltaMovement().scale(0.6));
-            } else {
-                this.hero.getMoveControl().setWantedPosition(targetPos.x, targetPos.y, targetPos.z, speed);
-            }
+        if (closeEnoughHorizontally && closeEnoughVertically) {
+            this.hero.setDeltaMovement(this.hero.getDeltaMovement().scale(0.6));
         } else {
-            if (distHorizontalSqr < 1.5D) {
-                this.hero.getNavigation().stop();
-            } else {
-                this.hero.getNavigation().moveTo(targetPos.x, targetPos.y, targetPos.z, speed);
-            }
+            this.hero.getMoveControl().setWantedPosition(targetPos.x, targetPos.y, targetPos.z, speed);
         }
     }
 
@@ -198,16 +186,14 @@ public class HeroGodlyCompanionGoal extends Goal {
         double tx = this.owner.getX() + Math.sin(-targetAngleRad) * FOLLOW_DISTANCE;
         double tz = this.owner.getZ() + Math.cos(-targetAngleRad) * FOLLOW_DISTANCE;
 
+        // [核心优化] 目标Y值计算简化
+        // 始终以玩家为基准，不再尝试探测地面，因为我们是飞行的
         double targetY;
         if (this.owner.getAbilities().flying || !this.owner.onGround()) {
             targetY = this.owner.getY() + HOVER_HEIGHT_AIR;
         } else {
-            targetY = this.owner.getY();
-            BlockPos blockPos = new BlockPos((int)tx, (int)targetY, (int)tz);
-            if (this.hero.level().getBlockState(blockPos).isSolid() &&
-                    this.hero.level().getBlockState(blockPos.above()).isSolid()) {
-                targetY = this.owner.getY() + 3.0;
-            }
+            // 即使玩家在地面，我们也只比他高一点点，做出“贴地飞行”的效果
+            targetY = this.owner.getY() + 0.5;
         }
         return new Vec3(tx, targetY, tz);
     }

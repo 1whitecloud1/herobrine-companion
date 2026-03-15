@@ -4,10 +4,8 @@ import com.mojang.logging.LogUtils;
 import com.mojang.serialization.Codec;
 import com.whitecloud233.modid.herobrine_companion.block.EndRingPortalBlock;
 import com.whitecloud233.modid.herobrine_companion.block.entity.EndRingPortalBlockEntity;
-import com.whitecloud233.modid.herobrine_companion.client.render.IrisPatcher;
 import com.whitecloud233.modid.herobrine_companion.compat.KubeJS.HerobrineCompanionKubeJSPlugin;
 import com.whitecloud233.modid.herobrine_companion.config.Config;
-import com.whitecloud233.modid.herobrine_companion.config.ConfigScreen;
 import com.whitecloud233.modid.herobrine_companion.client.service.LLMConfig;
 import com.whitecloud233.modid.herobrine_companion.event.ModEvents;
 import com.whitecloud233.modid.herobrine_companion.item.*;
@@ -16,7 +14,6 @@ import com.whitecloud233.modid.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.modid.herobrine_companion.world.inventory.ModMenus;
 import com.whitecloud233.modid.herobrine_companion.world.structure.ModStructurePieces;
 import com.whitecloud233.modid.herobrine_companion.world.structure.ModStructures;
-import net.minecraft.client.Minecraft;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -31,7 +28,6 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.material.MapColor;
 import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.ConfigScreenHandler; // 【修改点1】导入正确的Handler
 import net.minecraftforge.common.ForgeSpawnEggItem;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.common.loot.IGlobalLootModifier;
@@ -41,7 +37,6 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.config.ModConfig;
-import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.fml.loading.FMLEnvironment;
@@ -52,7 +47,7 @@ import org.slf4j.Logger;
 
 @Mod(HerobrineCompanion.MODID)
 public class HerobrineCompanion {
-    public static IrisPatcher PATCHER_INSTANCE;
+    public static Object PATCHER_INSTANCE;
     public static final String MODID = "herobrine_companion";
     private static final Logger LOGGER = LogUtils.getLogger();
 
@@ -135,9 +130,7 @@ public class HerobrineCompanion {
         modEventBus.addListener(this::commonSetup);
 
         if (FMLEnvironment.dist == Dist.CLIENT) {
-            modEventBus.addListener(this::clientSetup);
-            PATCHER_INSTANCE = new IrisPatcher();
-            MinecraftForge.EVENT_BUS.register(IrisPatcher.class);
+            com.whitecloud233.modid.herobrine_companion.client.ClientModSetup.init(modEventBus);
         }
 
         BLOCKS.register(modEventBus);
@@ -158,14 +151,6 @@ public class HerobrineCompanion {
 
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, Config.SPEC);
 
-        // 【修改点2】使用 ConfigScreenHandler 注册配置界面
-        ModLoadingContext.get().registerExtensionPoint(
-                ConfigScreenHandler.ConfigScreenFactory.class,
-                () -> new ConfigScreenHandler.ConfigScreenFactory(
-                        (minecraft, screen) -> new ConfigScreen(screen)
-                )
-        );
-
         // KubeJS Soft Dependency
         try {
             Class.forName("dev.latvian.mods.kubejs.plugin.KubeJSPlugin");
@@ -182,11 +167,6 @@ public class HerobrineCompanion {
         });
 
         LOGGER.info("DIRT BLOCK >> {}", ForgeRegistries.BLOCKS.getKey(Blocks.DIRT));
-    }
-
-    private void clientSetup(final FMLClientSetupEvent event) {
-        LOGGER.info(">>> AWESOME CLIENT SETUP TRIGGERED <<<");
-        LOGGER.info("MINECRAFT NAME >> {}", Minecraft.getInstance().getUser().getName());
     }
 
     @SubscribeEvent

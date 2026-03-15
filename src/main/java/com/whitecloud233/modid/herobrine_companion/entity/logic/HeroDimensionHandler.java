@@ -50,6 +50,16 @@ public class HeroDimensionHandler {
                 if (entity instanceof HeroEntity hero && hero.isAlive()) {
                     // [Fix] 确保是玩家的 Hero
                     if (hero.getOwnerUUID() != null && hero.getOwnerUUID().equals(player.getUUID())) {
+                        
+                        // [Fix] 强制备份一次数据到 HeroWorldData
+                        HeroWorldData data = HeroWorldData.get(fromLevel);
+                        data.setEquipment(hero.getOwnerUUID(), hero.getArmorItemsTag(), hero.getHandItemsTag());
+                        data.setCuriosBackItem(hero.getOwnerUUID(), hero.getCuriosBackItemTag());
+                        data.setSkinVariant(hero.getSkinVariant());
+                        if (hero.getSkinVariant() == HeroEntity.SKIN_CUSTOM) {
+                            data.setCustomSkinName(hero.getCustomSkinName());
+                        }
+
                         carriedHeroData = new CompoundTag();
                         hero.saveWithoutId(carriedHeroData);
                         
@@ -65,60 +75,91 @@ public class HeroDimensionHandler {
             }
         }
 
-        boolean alreadyHasHero = false;
+        HeroEntity heroToUpdate = null;
+        boolean isNewEntity = false;
+
+        // Check for existing hero in End Ring to prevent duplication or stale data
         for (var entity : endLevel.getAllEntities()) {
             if (entity instanceof HeroEntity hero && entity.isAlive()) {
-                // [Fix] 确保是玩家的 Hero
                 if (hero.getOwnerUUID() != null && hero.getOwnerUUID().equals(player.getUUID())) {
-                    alreadyHasHero = true;
+                    heroToUpdate = hero;
                     break;
                 }
             }
         }
 
-        if (!alreadyHasHero) {
-            HeroEntity hero = new HeroEntity(ModEvents.HERO.get(), endLevel);
-            
-            if (carriedHeroData != null) {
-                if (carriedHeroData.contains("UUID")) carriedHeroData.remove("UUID");
-                if (carriedHeroData.contains("UUIDMost")) carriedHeroData.remove("UUIDMost");
-                if (carriedHeroData.contains("UUIDLeast")) carriedHeroData.remove("UUIDLeast");
+        if (heroToUpdate == null) {
+            heroToUpdate = new HeroEntity(ModEvents.HERO.get(), endLevel);
+            heroToUpdate.setUUID(UUID.randomUUID());
+            isNewEntity = true;
+        }
 
-                hero.load(carriedHeroData);
-                
-                if (carriedHeroData.contains("TrustLevel")) {
-                    hero.setTrustLevel(carriedHeroData.getInt("TrustLevel"));
-                }
-                
-                // [Fix] 尝试恢复信任度
-                if (hero.getTrustLevel() == 0) {
-                    HeroDataHandler.restoreTrustFromPlayer(hero);
-                    // Fallback: 直接使用 player 对象查询数据
-                    if (hero.getTrustLevel() == 0) {
-                        HeroWorldData data = HeroWorldData.get(endLevel);
-                        int trust = data.getTrust(player.getUUID());
-                        if (trust > 0) hero.setTrustLevel(trust);
-                    }
-                }
-                
-                HeroDataHandler.syncGlobalTrust(hero);
-                
-            } else {
-                hero.setTrustLevel(0);
-                // Fallback: 即使没有携带数据，也尝试从玩家数据恢复
-                HeroWorldData data = HeroWorldData.get(endLevel);
-                int trust = data.getTrust(player.getUUID());
-                if (trust > 0) hero.setTrustLevel(trust);
-                
-                HeroDataHandler.syncGlobalTrust(hero);
+        // Reset position and tags for both new and existing entities
+        heroToUpdate.setPos(EndRingContext.CENTER_X, EndRingContext.CENTER_Y, EndRingContext.CENTER_Z);
+        heroToUpdate.setDeltaMovement(0, 0, 0);
+        heroToUpdate.setFallDistance(0);
+        
+        if (!heroToUpdate.getTags().contains(EndRingContext.TAG_FIXED)) heroToUpdate.addTag(EndRingContext.TAG_FIXED);
+        if (!heroToUpdate.getTags().contains(EndRingContext.TAG_INTRO)) heroToUpdate.addTag(EndRingContext.TAG_INTRO);
+
+        // Apply data
+        if (carriedHeroData != null) {
+            if (carriedHeroData.contains("UUID")) carriedHeroData.remove("UUID");
+            if (carriedHeroData.contains("UUIDMost")) carriedHeroData.remove("UUIDMost");
+            if (carriedHeroData.contains("UUIDLeast")) carriedHeroData.remove("UUIDLeast");
+
+            heroToUpdate.load(carriedHeroData);
+            
+            if (carriedHeroData.contains("TrustLevel")) {
+                heroToUpdate.setTrustLevel(carriedHeroData.getInt("TrustLevel"));
             }
-
-            hero.setPos(EndRingContext.CENTER_X, EndRingContext.CENTER_Y, EndRingContext.CENTER_Z);
-            hero.addTag(EndRingContext.TAG_FIXED);
-            hero.addTag(EndRingContext.TAG_INTRO); 
-            hero.setUUID(UUID.randomUUID());
             
-            endLevel.addFreshEntity(hero);
+            // Try to restore trust
+            if (heroToUpdate.getTrustLevel() == 0) {
+                HeroDataHandler.restoreTrustFromPlayer(heroToUpdate);
+                if (heroToUpdate.getTrustLevel() == 0) {
+                    HeroWorldData data = HeroWorldData.get(endLevel);
+                    int trust = data.getTrust(player.getUUID());
+                    if (trust > 0) heroToUpdate.setTrustLevel(trust);
+                }
+            }
+        } else {
+            // No carried data, use defaults or fallback
+            if (isNewEntity) {
+                heroToUpdate.setTrustLevel(0);
+            }
+            HeroWorldData data = HeroWorldData.get(endLevel);
+            int trust = data.getTrust(player.getUUID());
+            if (trust > 0) heroToUpdate.setTrustLevel(trust);
+            
+            // Fallback for equipment if no carried data
+            ListTag savedArmor = data.getArmorItems(player.getUUID());
+            ListTag savedHands = data.getHandItems(player.getUUID());
+            heroToUpdate.loadEquipmentFromTag(savedArmor, savedHands);
+        }
+        
+        // Force Curios restoration (as it's not in standard NBT)
+        HeroWorldData worldData = HeroWorldData.get(endLevel);
+        CompoundTag savedCurios = worldData.getCuriosBackItem(player.getUUID());
+        if (savedCurios != null && !savedCurios.isEmpty()) {
+            heroToUpdate.setCuriosBackItemFromTag(savedCurios);
+        }
+        
+        // Fallback check for equipment (in case load() failed or carried data was incomplete)
+        boolean isNaked = true;
+        for (ItemStack stack : heroToUpdate.getArmorSlots()) if (!stack.isEmpty()) isNaked = false;
+        for (ItemStack stack : heroToUpdate.getHandSlots()) if (!stack.isEmpty()) isNaked = false;
+
+        if (isNaked) {
+            ListTag savedArmor = worldData.getArmorItems(player.getUUID());
+            ListTag savedHands = worldData.getHandItems(player.getUUID());
+            heroToUpdate.loadEquipmentFromTag(savedArmor, savedHands);
+        }
+
+        HeroDataHandler.syncGlobalTrust(heroToUpdate);
+
+        if (isNewEntity) {
+            endLevel.addFreshEntity(heroToUpdate);
         }
 
         player.getPersistentData().putBoolean("HasVisitedHeroDimension", true);
@@ -137,6 +178,16 @@ public class HeroDimensionHandler {
             for (var entity : fromLevel.getAllEntities()) {
                 if (entity instanceof HeroEntity hero && hero.isAlive()) {
                     if (hero.getOwnerUUID() != null && hero.getOwnerUUID().equals(player.getUUID())) {
+                        
+                        // [Fix] 强制备份一次数据到 HeroWorldData
+                        HeroWorldData data = HeroWorldData.get(fromLevel);
+                        data.setEquipment(hero.getOwnerUUID(), hero.getArmorItemsTag(), hero.getHandItemsTag());
+                        data.setCuriosBackItem(hero.getOwnerUUID(), hero.getCuriosBackItemTag());
+                        data.setSkinVariant(hero.getSkinVariant());
+                        if (hero.getSkinVariant() == HeroEntity.SKIN_CUSTOM) {
+                            data.setCustomSkinName(hero.getCustomSkinName());
+                        }
+
                         carriedHeroData = new CompoundTag();
                         hero.saveWithoutId(carriedHeroData);
                         
@@ -178,7 +229,7 @@ public class HeroDimensionHandler {
             if (newHero.getTrustLevel() == 0) {
                 HeroDataHandler.restoreTrustFromPlayer(newHero);
                 
-                // [Fix] Fallback: 直接使用 player 对象查询数据 (防止 restoreTrustFromPlayer 找不到玩家实体)
+                // [Fix] Fallback: 直接使用 player 对象查询数据
                 if (newHero.getTrustLevel() == 0) {
                     HeroWorldData data = HeroWorldData.get(toLevel);
                     int trust = data.getTrust(player.getUUID());
@@ -186,6 +237,24 @@ public class HeroDimensionHandler {
                         newHero.setTrustLevel(trust);
                     }
                 }
+            }
+            
+            // [Fix] 恢复 Curios 背部物品
+            HeroWorldData worldData = HeroWorldData.get(toLevel);
+            CompoundTag savedCurios = worldData.getCuriosBackItem(player.getUUID());
+            if (savedCurios != null && !savedCurios.isEmpty() && newHero.isCuriosBackSlotEmpty()) {
+                newHero.setCuriosBackItemFromTag(savedCurios);
+            }
+            
+            // [Fix] 托底恢复装备
+            ListTag savedArmor = worldData.getArmorItems(player.getUUID());
+            ListTag savedHands = worldData.getHandItems(player.getUUID());
+            boolean isNaked = true;
+            for (ItemStack stack : newHero.getArmorSlots()) if (!stack.isEmpty()) isNaked = false;
+            for (ItemStack stack : newHero.getHandSlots()) if (!stack.isEmpty()) isNaked = false;
+
+            if (isNaked) {
+                newHero.loadEquipmentFromTag(savedArmor, savedHands);
             }
             
             HeroDataHandler.syncGlobalTrust(newHero);
@@ -279,6 +348,10 @@ public class HeroDimensionHandler {
             }
 
             hero.moveTo(x, y, z, level.random.nextFloat() * 360F, 0);
+            
+            // [Fix] 立即设置主人并恢复信任度，消除等待延迟
+            hero.setOwnerUUID(player.getUUID());
+            HeroDataHandler.restoreTrustFromPlayer(hero);
             
             HeroDataHandler.syncGlobalTrust(hero);
             

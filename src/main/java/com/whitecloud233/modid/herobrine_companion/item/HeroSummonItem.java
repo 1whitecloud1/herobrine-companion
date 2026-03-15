@@ -97,7 +97,7 @@ public class HeroSummonItem extends Item {
 
         if (isBound(stack)) {
             if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
-                long currentTime = level.getGameTime();
+long currentTime = level.getGameTime();
                 long lastUseTime = getLastUseTime(stack);
 
                 if (currentTime < lastUseTime + COOLDOWN_TICKS) {

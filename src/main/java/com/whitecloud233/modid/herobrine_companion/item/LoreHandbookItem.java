@@ -1,7 +1,5 @@
 package com.whitecloud233.modid.herobrine_companion.item;
 
-import com.whitecloud233.modid.herobrine_companion.client.gui.LoreHandbookScreen;
-import net.minecraft.client.Minecraft;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
@@ -21,8 +19,8 @@ public class LoreHandbookItem extends Item {
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
         if (level.isClientSide) {
-            // 打开 GUI
-            Minecraft.getInstance().setScreen(new LoreHandbookScreen(stack));
+            // [安全修改]：不直接 new Screen，而是呼叫客户端钩子
+            com.whitecloud233.modid.herobrine_companion.client.ClientHooks.openHandbook(stack);
         }
         return InteractionResultHolder.success(stack);
     }

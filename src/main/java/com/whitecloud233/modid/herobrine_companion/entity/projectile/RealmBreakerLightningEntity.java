@@ -20,7 +20,9 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.entity.projectile.ProjectileUtil;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.*;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 
@@ -104,7 +106,7 @@ public class RealmBreakerLightningEntity extends Projectile {
     }
 
     @Override
-    protected void onHitEntity(EntityHitResult result) {
+    protected void onHitEntity(@NotNull EntityHitResult result) {
         super.onHitEntity(result);
         Entity target = result.getEntity();
         // 修改：使用 magic() 伤害源，避免被雷电免疫
@@ -113,7 +115,7 @@ public class RealmBreakerLightningEntity extends Projectile {
     }
 
     @Override
-    protected void onHitBlock(BlockHitResult result) {
+    protected void onHitBlock(@NotNull BlockHitResult result) {
         super.onHitBlock(result);
         this.impact(result.getBlockPos());
     }
@@ -130,37 +132,60 @@ public class RealmBreakerLightningEntity extends Projectile {
                 serverLevel.addFreshEntity(lightning);
             }
 
-            // 【核心修改】手动实现爆炸伤害，以排除 HeroEntity
+            // 1. 计算爆炸参数
             float radius = this.getExplosionRadius();
+            DamageSource damageSource = this.damageSources().explosion(this, this.getOwner());
+            Vec3 center = Vec3.atCenterOf(pos);
+
+            // 2. 手动伤害处理 (排除 Owner 和 HeroEntity)
             AABB aabb = new AABB(pos).inflate(radius);
             List<LivingEntity> entities = serverLevel.getEntitiesOfClass(LivingEntity.class, aabb);
-            DamageSource damageSource = this.damageSources().explosion(this, this.getOwner());
 
             for (LivingEntity entity : entities) {
-                // 如果是 HeroEntity，则跳过，不造成伤害
-                if (entity instanceof HeroEntity) {
+                // 排除 HeroEntity 和 射击者(玩家)
+                if (entity instanceof HeroEntity || (this.getOwner() != null && entity.is(this.getOwner()))) {
                     continue;
                 }
-                // 计算伤害衰减
-                double distance = entity.position().distanceTo(Vec3.atCenterOf(pos));
+                
+                double distance = entity.position().distanceTo(center);
                 if (distance < radius) {
+                    // 伤害衰减
                     float damage = this.getDamage() * (1.0F - (float)(distance / radius));
                     entity.hurt(damageSource, damage);
+                    
+                    // 击退效果 (模拟爆炸推力)
+                    double kbStrength = 1.0 - distance / radius; 
+                    Vec3 dir = entity.position().subtract(center).normalize();
+                    if (dir.lengthSqr() < 1.0E-4) dir = new Vec3(0, 1, 0); // 避免零向量
+                    entity.push(dir.x * kbStrength, dir.y * kbStrength, dir.z * kbStrength);
                 }
             }
 
-            // 地形破坏逻辑保持不变
-            Level.ExplosionInteraction interaction = Config.poemOfTheEndExplosion ?
-                    Level.ExplosionInteraction.BLOCK : Level.ExplosionInteraction.NONE;
-
-            // 创建一个没有伤害的爆炸，只用于方块破坏和击退效果
-            serverLevel.explode(null, null, null,
-                    this.getX(), this.getY(), this.getZ(),
-                    radius, false, interaction);
-
-
-            // 播放声音
+            // 3. 视觉效果 (粒子 & 声音) - 替代 serverLevel.explode 以避免误伤
+            serverLevel.sendParticles(ParticleTypes.EXPLOSION_EMITTER, this.getX(), this.getY(), this.getZ(), 1, 0, 0, 0, 0);
+            serverLevel.playSound(null, pos, SoundEvents.GENERIC_EXPLODE, SoundSource.BLOCKS, 4.0F, (1.0F + (serverLevel.random.nextFloat() - serverLevel.random.nextFloat()) * 0.2F) * 0.7F);
             serverLevel.playSound(null, pos, SoundEvents.TRIDENT_THUNDER, SoundSource.WEATHER, 5.0F, 1.0F);
+
+            // 4. 方块破坏 (如果配置启用)
+            if (Config.poemOfTheEndExplosion) {
+                int r = (int) Math.ceil(radius);
+                for (int x = -r; x <= r; x++) {
+                    for (int y = -r; y <= r; y++) {
+                        for (int z = -r; z <= r; z++) {
+                            double distSqr = x*x + y*y + z*z;
+                            if (distSqr <= radius * radius) {
+                                BlockPos p = pos.offset(x, y, z);
+                                BlockState state = serverLevel.getBlockState(p);
+                                
+                                // 不破坏空气、基岩等不可破坏方块
+                                if (!state.isAir() && state.getDestroySpeed(serverLevel, p) >= 0) {
+                                    serverLevel.destroyBlock(p, true);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
 
             this.discard();
         }

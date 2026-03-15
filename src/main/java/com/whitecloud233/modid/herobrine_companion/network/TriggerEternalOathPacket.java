@@ -1,9 +1,5 @@
 package com.whitecloud233.modid.herobrine_companion.network;
 
-import com.whitecloud233.modid.herobrine_companion.client.gui.EternalOathScreen;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.fml.DistExecutor;
@@ -24,20 +20,10 @@ public class TriggerEternalOathPacket {
 
     public void handle(Supplier<NetworkEvent.Context> context) {
         context.get().enqueueWork(() -> {
-            DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> {
-                LocalPlayer player = Minecraft.getInstance().player;
-                if (player != null) {
-                    CompoundTag data = player.getPersistentData();
-                    // 检查客户端临时 NBT 标记，防止同一局游戏内重复触发
-                    if (!data.getBoolean("HasSeenEternalOath_Client")) {
-                        data.putBoolean("HasSeenEternalOath_Client", true);
-                        Minecraft.getInstance().setScreen(new EternalOathScreen());
-                    }
-                } else {
-                    // 兜底逻辑
-                    Minecraft.getInstance().setScreen(new EternalOathScreen());
-                }
-            });
+            // 【终极安全调用】
+            // 只有在客户端时，才会去加载并执行 ClientHooks 里的方法
+            // 由于使用了全限定类名和方法引用，这个类本身不会带有任何客户端依赖
+            DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> com.whitecloud233.modid.herobrine_companion.client.ClientHooks::triggerEternalOath);
         });
         context.get().setPacketHandled(true);
     }

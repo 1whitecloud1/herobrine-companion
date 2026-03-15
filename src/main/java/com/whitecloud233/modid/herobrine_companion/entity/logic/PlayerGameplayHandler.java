@@ -579,7 +579,8 @@ public class PlayerGameplayHandler {
                         heroData.putBoolean("CompanionMode", hero.isCompanionMode());
                         heroData.putBoolean("IsFloating", false);
                         // [修复] 保存皮肤状态
-                        heroData.putBoolean("UseHerobrineSkin", hero.shouldUseHerobrineSkin());
+// [修复] 保存皮肤状态 (适配新版整数枚举)
+                        heroData.putInt("SkinVariant", hero.getSkinVariant());
 
                         // 4. 存入玩家数据，等待 DimensionChange 事件处理重生
                         data.put("HeroRespawnData", heroData);

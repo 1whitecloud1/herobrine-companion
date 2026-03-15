@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.entity.logic;
 
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.HeroBrain;
 import com.whitecloud233.modid.herobrine_companion.event.ModEvents;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -19,8 +20,8 @@ public class HeroSpawner {
 
         // 只有当 Hero 不存在时才尝试生成
         boolean heroExists = false;
-        for (var entity : level.getAllEntities()) {
-            if (entity instanceof HeroEntity && entity.isAlive()) {
+        for (HeroEntity hero : HeroBrain.ACTIVE_HEROES) {
+            if (hero.isAlive()) {
                 heroExists = true;
                 break;
             }
