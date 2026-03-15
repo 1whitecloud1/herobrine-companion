@@ -1,8 +1,8 @@
 package com.whitecloud233.herobrine_companion.item;
 
-import com.whitecloud233.herobrine_companion.entity.CleaveBladeEntity;
+import com.whitecloud233.herobrine_companion.entity.projectile.CleaveBladeEntity;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
-import com.whitecloud233.herobrine_companion.entity.VoidRiftEntity;
+import com.whitecloud233.herobrine_companion.entity.projectile.VoidRiftEntity;
 import com.whitecloud233.herobrine_companion.entity.projectile.RealmBreakerLightningEntity;
 import com.whitecloud233.herobrine_companion.network.HeroWorldData;
 import net.minecraft.ChatFormatting;

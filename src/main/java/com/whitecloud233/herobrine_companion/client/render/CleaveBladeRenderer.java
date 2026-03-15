@@ -3,7 +3,7 @@ package com.whitecloud233.herobrine_companion.client.render;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
-import com.whitecloud233.herobrine_companion.entity.CleaveBladeEntity;
+import com.whitecloud233.herobrine_companion.entity.projectile.CleaveBladeEntity;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.entity.EntityRenderer;

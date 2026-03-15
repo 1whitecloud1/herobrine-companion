@@ -13,7 +13,6 @@ import net.neoforged.neoforge.event.ServerChatEvent;
 public class ChatEvents {
 
     @SubscribeEvent
-    @SuppressWarnings("deprecation")
     public static void onServerChat(ServerChatEvent event) {
         String message = event.getMessage().getString();
         if ("hb".equals(message)) {

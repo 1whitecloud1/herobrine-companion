@@ -84,6 +84,15 @@ neoForge {
             systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
         }
 
+        // 👇 新增的二号玩家专属启动项
+        client2 {
+            client()
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+            // 将用户名指定为 Player2
+            programArguments.addAll("--username", "Player2")
+        }
+        // 👆 新增结束
+
         server {
             server()
             programArgument '--nogui'

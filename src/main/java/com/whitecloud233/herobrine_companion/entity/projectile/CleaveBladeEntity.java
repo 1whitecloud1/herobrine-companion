@@ -1,4 +1,4 @@
-package com.whitecloud233.herobrine_companion.entity;
+package com.whitecloud233.herobrine_companion.entity.projectile;
 
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.RegistryFriendlyByteBuf;

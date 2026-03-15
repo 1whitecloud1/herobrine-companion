@@ -1,7 +1,7 @@
 package com.whitecloud233.herobrine_companion.event;
 
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
-import com.whitecloud233.herobrine_companion.entity.CleaveBladeEntity;
+import com.whitecloud233.herobrine_companion.entity.projectile.CleaveBladeEntity;
 import com.whitecloud233.herobrine_companion.entity.GhostCreeperEntity;
 import com.whitecloud233.herobrine_companion.entity.GhostSkeletonEntity;
 import com.whitecloud233.herobrine_companion.entity.GhostSteveEntity;
@@ -9,7 +9,7 @@ import com.whitecloud233.herobrine_companion.entity.GhostZombieEntity;
 import com.whitecloud233.herobrine_companion.entity.GlitchEchoEntity;
 import com.whitecloud233.herobrine_companion.entity.GlitchVillagerEntity;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
-import com.whitecloud233.herobrine_companion.entity.VoidRiftEntity;
+import com.whitecloud233.herobrine_companion.entity.projectile.VoidRiftEntity;
 import com.whitecloud233.herobrine_companion.entity.projectile.RealmBreakerLightningEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;

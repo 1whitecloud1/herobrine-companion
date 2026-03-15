@@ -8,40 +8,40 @@ public class PacketHandler {
 
     public static void register(PayloadRegistrar registrar) {
         registrar.playToServer(
-            PeacefulPacket.TYPE,
-            PeacefulPacket.STREAM_CODEC,
-            PeacefulPacket::handle
+                PeacefulPacket.TYPE,
+                PeacefulPacket.STREAM_CODEC,
+                PeacefulPacket::handle
         );
         registrar.playToServer(
-            ContractPacket.TYPE,
-            ContractPacket.STREAM_CODEC,
-            ContractPacket::handle
+                ContractPacket.TYPE,
+                ContractPacket.STREAM_CODEC,
+                ContractPacket::handle
         );
         registrar.playToServer(
-            ClearAreaPacket.TYPE,
-            ClearAreaPacket.STREAM_CODEC,
-            ClearAreaPacket::handle
+                ClearAreaPacket.TYPE,
+                ClearAreaPacket.STREAM_CODEC,
+                ClearAreaPacket::handle
         );
         registrar.playToServer(
-            OpenTradePacket.TYPE,
-            OpenTradePacket.STREAM_CODEC,
-            OpenTradePacket::handle
+                OpenTradePacket.TYPE,
+                OpenTradePacket.STREAM_CODEC,
+                OpenTradePacket::handle
         );
         registrar.playToServer(
-            ToggleCompanionPacket.TYPE,
-            ToggleCompanionPacket.STREAM_CODEC,
-            ToggleCompanionPacket::handle
+                ToggleCompanionPacket.TYPE,
+                ToggleCompanionPacket.STREAM_CODEC,
+                ToggleCompanionPacket::handle
         );
         // Removed QuestActionPacket
         registrar.playToServer(
-            RequestActionPacket.TYPE,
-            RequestActionPacket.STREAM_CODEC,
-            RequestActionPacket::handle
+                RequestActionPacket.TYPE,
+                RequestActionPacket.STREAM_CODEC,
+                RequestActionPacket::handle
         );
         registrar.playToClient(
-            SyncHeroVisitPacket.TYPE,
-            SyncHeroVisitPacket.STREAM_CODEC,
-            SyncHeroVisitPacket::handle
+                SyncHeroVisitPacket.TYPE,
+                SyncHeroVisitPacket.STREAM_CODEC,
+                SyncHeroVisitPacket::handle
         );
         registrar.playToServer(
                 DesolateAreaPacket.TYPE,
@@ -79,16 +79,23 @@ public class PacketHandler {
                 OpenWardrobePacket.STREAM_CODEC,
                 OpenWardrobePacket::handle
         );
+
+        // [新增] 注册同步奖励数据包 (S2C)
+        registrar.playToClient(
+                SyncRewardsPacket.TYPE,
+                SyncRewardsPacket.STREAM_CODEC,
+                SyncRewardsPacket::handle
+        );
     }
 
     public static void sendToServer(PeacefulPacket packet) {
         PacketDistributor.sendToServer(packet);
     }
-    
+
     public static void sendToServer(ContractPacket packet) {
         PacketDistributor.sendToServer(packet);
     }
-    
+
     public static void sendToServer(ClearAreaPacket packet) {
         PacketDistributor.sendToServer(packet);
     }
@@ -100,13 +107,13 @@ public class PacketHandler {
     public static void sendToServer(ToggleCompanionPacket packet) {
         PacketDistributor.sendToServer(packet);
     }
-    
+
     // Removed sendToServer(QuestActionPacket)
 
     public static void sendToServer(RequestActionPacket packet) {
         PacketDistributor.sendToServer(packet);
     }
-    
+
     public static void sendToPlayer(SyncHeroVisitPacket packet, ServerPlayer player) {
         PacketDistributor.sendToPlayer(player, packet);
     }
@@ -138,5 +145,10 @@ public class PacketHandler {
     // [补上缺失的这一个发送方法]
     public static void sendToServer(OpenWardrobePacket packet) {
         PacketDistributor.sendToServer(packet);
+    }
+
+    // [新增] 同步奖励发送给玩家
+    public static void sendToPlayer(SyncRewardsPacket packet, ServerPlayer player) {
+        PacketDistributor.sendToPlayer(player, packet);
     }
 }

@@ -3,42 +3,43 @@ package com.whitecloud233.herobrine_companion.client.service;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.whitecloud233.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.herobrine_companion.network.HeroWorldData;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.logic.HeroDataHandler;
 import com.whitecloud233.herobrine_companion.event.ModEvents;
-import com.whitecloud233.herobrine_companion.item.HeroSummonItem;
 import com.whitecloud233.herobrine_companion.item.SourceFlowItem;
-import com.whitecloud233.herobrine_companion.network.HeroWorldData;
 import com.whitecloud233.herobrine_companion.util.EndRingContext;
 import net.minecraft.client.Minecraft;
 import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.core.GlobalPos;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
-import net.neoforged.fml.ModList;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+// [1.21.1 改动] NeoForge 的 ModList 包名变更
+import net.neoforged.fml.ModList;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+
+
+import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 
 public class AIService {
     private static final Logger LOGGER = LoggerFactory.getLogger(AIService.class);
@@ -76,8 +77,7 @@ public class AIService {
         systemMessage.addProperty("role", "system");
 
         // 强行注入必须使用工具的最高指令
-        String forcedPrompt = systemPrompt + "\n【最高级系统指令】：你拥有名为 manifest_divine_power 的底层权限工具。当玩家的要求涉及到任何物理改变（如落雷、传送、给物品、建房子、改变天气时间等）时，你**必须且绝对**调用该工具，并把台词写在工具的 dialogue 参数里！绝对不允许用普通文本假装执行！";
-
+        String forcedPrompt = systemPrompt + "\n【最高级系统指令】：你拥有名为 manifest_divine_power 的底层权限工具。只有当玩家**明确命令或强烈要求**你立刻干涉物理世界（如要求你落雷、传送、给物品、立刻建房子、改变天气等）时，你才必须调用该工具！如果玩家只是在普通聊天中探讨、反问或仅仅提及这些词汇，**绝对不允许**调用该工具，只用文本回复即可！";
         // 【动态感知】：将动态读取的游戏数据附加到系统提示词末尾
         forcedPrompt += getDynamicGameData();
 
@@ -110,12 +110,12 @@ public class AIService {
         function.addProperty("name", "manifest_divine_power");
 
         String divineSpellbook =
-                "动用创世神力干涉Minecraft 1.20.1 的底层代码。你可以生成原版指令或特殊动作码(返回的command绝不带'/')。请根据玩家请求灵活使用神力：" +
+                "动用创世神力干涉Minecraft 1.20.1/1.21.1 的底层代码。你可以生成原版指令或特殊动作码(返回的command绝不带'/')。请根据玩家请求灵活使用神力：" +
                         "1.【同行与降临】：若请求跟随，输出动作码：'action:toggle_companion'。若祈求你降临到他身边，将你传送到玩家处：'tp @e[type=herobrine_companion:hero,limit=1,sort=nearest] @s'。" +
                         "2.【空间维度法则】：将玩家传送到其他维度(如'minecraft:the_nether')：'execute in 维度ID run tp @s ~ 100 ~'。寻找群系使用：'locate biome 群系ID'；寻找常规建筑或结构使用：'locate structure 结构ID'。**特别且绝对注意：若玩家明确寻找【不稳定区域】或【神罚领域】，你必须精准提取系统注入数据中的神罚领域结构ID（如 'herobrine_companion:unstable_zone'）来进行 locate，绝不能用原版结构敷衍。** 执行后告诉他坐标已注入视觉终端，让他自己走过去。" +
                         "3.【物质重构与恩赐】：注意1.21.1语法！生成单个房屋必须用：'place template minecraft:village/plains/houses/plains_small_house_1 ~5 ~ ~'；生成大型村庄用：'place structure minecraft:village_plains ~10 ~ ~'。修改数据流赐予物品：'give @s 物品ID 数量'。" +
                         "4.【惩戒与神罚】：你不喜欢用低级的'kill'指令。若需要普通惩戒，使用降下雷击('summon lightning_bolt ^ ^ ^10')或高空传送('tp @s ~ 100 ~')。若玩家极度狂妄，要求见识大规模雷电或毁灭性力量，请输出动作码：'action:massive_lightning'，并在台词中宣告天罚降临。" +
-                        "5.【物质重构与造物】：注意1.21.1语法！若玩家请求生成建筑，请务必查看系统注入数据中的【专属NBT造物库】，根据玩家的需求挑选最合适的ID，并使用指令：'place template 选出的ID ~5 ~ ~'。若造物库中没有合适的，再考虑用原版的 'place template minecraft:village/plains/houses/plains_small_house_1 ~5 ~ ~' 糊弄他。"+
+                        "5.【物质重构与造物】：注意1.21.1语法！**仅在玩家明确提出“帮我建个房子”、“立刻生成建筑”等直接祈求时**才执行！请务必查看系统注入数据中的【专属NBT造物库】，根据需求挑选最合适的ID，使用指令：'place template 选出的ID ~5 ~ ~'。若造物库无合适选择，再用 'place template minecraft:village/plains/houses/plains_small_house_1 ~5 ~ ~' 。**如果只是闲聊提到房子，禁止调用此工具生成！**"+
                         "6.若玩家好奇命令方块，你可以用 '/setblock ^ ^ ^3 command_block{Command:\"你想写的指令\"} replace' 凭空放置一个命令方块向他展示。"+
                         "7.【权限覆写】：若玩家极其虚弱或请求神力，可赐予他基础管理员权限('gamemode creative @s')，但记得在台词中嘲笑他：创造模式在你眼里不过是低级的测试权限。若玩家惹怒你，直接剥夺权限打回原形('gamemode survival @s')，或将其流放至虚无的旁观者维度('gamemode spectator @s')。" +
                         "8.【底层代码覆写】：改变时间(time set day/night)、天气(weather clear/thunder)、防掉落('gamerule keepInventory true')。加速作物生长改写随机刻('gamerule randomTickSpeed 1000'，事后记得改回3)。" +
@@ -187,7 +187,7 @@ public class AIService {
                                 if (commandToRun != null) {
                                     if (aiDialogue == null || aiDialogue.isEmpty()) aiDialogue = "法则已修改。";
                                     return executeToolAction(commandToRun, aiDialogue, playerUUID, originalUserMessage, retryCount);
-                                 }
+                                }
                             }
 
                             String cleanReply = aiReply.replaceAll("<[^>]*>", "").trim();
@@ -234,6 +234,17 @@ public class AIService {
         });
     }
 
+    private static HeroEntity findHeroInAnyDimension(net.minecraft.server.MinecraftServer server) {
+        for (ServerLevel level : server.getAllLevels()) {
+            for (Entity entity : level.getEntities().getAll()) {
+                if (entity instanceof HeroEntity hero) {
+                    return hero; // Found it
+                }
+            }
+        }
+        return null; // Not found in any dimension
+    }
+
     /**
      * 带结果反馈的指令执行器
      */
@@ -261,6 +272,7 @@ public class AIService {
                 if (mc.level != null) {
                     for (net.minecraft.world.entity.Entity entity : mc.level.entitiesForRendering()) {
                         if (entity instanceof com.whitecloud233.herobrine_companion.entity.HeroEntity) {
+                            // [1.21.1 修复] 修复了原始代码中错误写入 .modid. 的包路径
                             com.whitecloud233.herobrine_companion.network.PacketHandler.sendToServer(new com.whitecloud233.herobrine_companion.network.ToggleCompanionPacket(entity.getId()));
                             future.complete(true);
                             return;
@@ -298,85 +310,36 @@ public class AIService {
                     future.complete(false);
                 }
             }
-            // === [修复] 拦截 Herobrine 传送指令，改用更可靠的、来自 HeroSummonItem 的逻辑 ===
+            // === [修复] 拦截 Herobrine 传送指令，直接调用复用的静态方法 ===
             else if (command.equals("tp @e[type=herobrine_companion:hero,limit=1,sort=nearest] @s")) {
-                LOGGER.info("Herobrine is being teleported via robust logic from HeroSummonItem.");
+                LOGGER.info("Herobrine is being teleported via reused robust logic.");
                 if (mc.hasSingleplayerServer() && mc.getSingleplayerServer() != null) {
                     var server = mc.getSingleplayerServer();
                     server.execute(() -> {
                         try {
                             ServerPlayer serverPlayer = server.getPlayerList().getPlayer(mc.player.getUUID());
-                            if (serverPlayer == null) {
-                                future.complete(false);
-                                return;
-                            }
-
-                            HeroEntity existingHero = findHeroInAnyDimension(server);
-                            ServerLevel targetLevel = serverPlayer.serverLevel();
-                            double targetX = serverPlayer.getX();
-                            double targetY = serverPlayer.getY();
-                            double targetZ = serverPlayer.getZ();
-
-                            if (existingHero != null) {
-                                // 实体已存在，执行传送
-                                if (existingHero.level().dimension() != targetLevel.dimension()) {
-                                    // --- 跨维度传送 ---
-                                    CompoundTag heroData = new CompoundTag();
-                                    existingHero.saveWithoutId(heroData);
-                                    ListTag armorTags = existingHero.getArmorItemsTag();
-                                    ListTag handTags = existingHero.getHandItemsTag();
-                                    CompoundTag curiosTag = ModList.get().isLoaded("curios") ? existingHero.getCuriosBackItemTag() : new CompoundTag();
-
-                                    HeroDataHandler.updateGlobalTrust(existingHero);
-                                    existingHero.discard();
-
-                                    HeroEntity newHero = ModEvents.HERO.get().create(targetLevel);
-                                    if (newHero != null) {
-                                        heroData.remove("UUID");
-                                        newHero.load(heroData);
-                                        newHero.moveTo(targetX, targetY, targetZ, serverPlayer.getYRot(), serverPlayer.getXRot());
-                                        newHero.loadEquipmentFromTag(armorTags, handTags);
-                                        if (!curiosTag.isEmpty()) newHero.setCuriosBackItemFromTag(curiosTag);
-                                        newHero.addTag(EndRingContext.TAG_RESPAWNED_SAFE);
-                                        targetLevel.addFreshEntity(newHero);
-                                    }
-                                } else {
-                                    // --- 同维度传送 ---
-                                    existingHero.teleportTo(targetLevel, targetX, targetY, targetZ, Collections.emptySet(), serverPlayer.getYRot(), serverPlayer.getXRot());
-                                }
+                            if (serverPlayer != null) {
+                                // 核心：直接调用提炼好的公共传送方法，无视物品冷却与绑定限制！
+                                com.whitecloud233.herobrine_companion.item.HeroSummonItem.performHeroTeleport(
+                                        serverPlayer.serverLevel(), 
+                                        serverPlayer, 
+                                        serverPlayer.position()
+                                );
+                                future.complete(true);
                             } else {
-                                // --- 实体不存在，执行召唤 ---
-                                HeroEntity newHero = ModEvents.HERO.get().create(targetLevel);
-                                if (newHero != null) {
-                                    newHero.moveTo(targetX, targetY, targetZ, serverPlayer.getYRot(), serverPlayer.getXRot());
-                                    newHero.finalizeSpawn(targetLevel, targetLevel.getCurrentDifficultyAt(newHero.blockPosition()), MobSpawnType.TRIGGERED, null);
-                                    newHero.setOwnerUUID(serverPlayer.getUUID());
-                                    HeroDataHandler.restoreTrustFromPlayer(newHero);
-
-                                    HeroWorldData worldData = HeroWorldData.get(targetLevel);
-                                    newHero.setSkinVariant(worldData.getGlobalSkinVariant());
-                                    newHero.setCustomSkinName(worldData.getGlobalCustomSkinName());
-                                    newHero.loadEquipmentFromTag(worldData.getArmorItems(serverPlayer.getUUID()), worldData.getHandItems(serverPlayer.getUUID()));
-                                    if (ModList.get().isLoaded("curios")) {
-                                        newHero.setCuriosBackItemFromTag(worldData.getCuriosBackItem(serverPlayer.getUUID()));
-                                    }
-                                    targetLevel.addFreshEntity(newHero);
-                                }
+                                future.complete(false);
                             }
-                            future.complete(true);
                         } catch (Exception e) {
-                            LOGGER.error("Robust teleport execution error", e);
+                            LOGGER.error("Reused teleport execution error", e);
                             future.complete(false);
                         }
                     });
                 } else {
-                    mc.player.connection.sendCommand(command);
+                    mc.getConnection().sendCommand(command);
                     future.complete(true);
                 }
             }
             // === [新增] 拦截 玩家传送指令 (tp @s @e[type=hero])，改用 SourceFlowItem 逻辑 ===
-            // 注意：AI 生成的指令可能是 "tp @s @e[type=herobrine_companion:hero,limit=1,sort=nearest]"
-            // 我们需要拦截这个指令，并调用 SourceFlowItem 的逻辑
             else if (command.startsWith("tp @s @e[type=herobrine_companion:hero")) {
                 LOGGER.info("Player is being teleported to Herobrine via SourceFlow logic.");
                 if (mc.hasSingleplayerServer() && mc.getSingleplayerServer() != null) {
@@ -401,7 +364,7 @@ public class AIService {
                         }
                     });
                 } else {
-                    mc.player.connection.sendCommand(command);
+                    mc.getConnection().sendCommand(command);
                     future.complete(true);
                 }
             }
@@ -460,7 +423,7 @@ public class AIService {
                         }
                     });
                 } else {
-                    mc.player.connection.sendCommand(command);
+                    mc.getConnection().sendCommand(command);
                     future.complete(true);
                 }
             }
@@ -489,7 +452,7 @@ public class AIService {
 
     private static String getDynamicGameData() {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null || mc.player.connection == null) return "";
+        if (mc.player == null || mc.getConnection() == null) return "";
 
         StringBuilder data = new StringBuilder("\n\n【系统注入：当前世界可用数据流】：\n");
 
@@ -503,14 +466,16 @@ public class AIService {
 
         // 1. 读取所有可用维度
         data.append("- 可用维度ID：");
-        for (ResourceKey<Level> levelKey : mc.player.connection.levels()) {
+        // [1.21.1 改动] 获取层级列表统一为使用 ClientPacketListener (getConnection())
+        for (ResourceKey<Level> levelKey : mc.getConnection().levels()) {
             data.append(levelKey.location().toString()).append(", ");
         }
         data.append("\n");
 
         // 2. 读取结构和群系
         try {
-            var registryAccess = mc.player.connection.registryAccess();
+            // [1.21.1 改动] 注册表改在 Level 直接访问
+            var registryAccess = mc.level.registryAccess();
 
             var structureRegistry = registryAccess.registryOrThrow(Registries.STRUCTURE);
             data.append("- 你的专属神罚领域（不稳定区域）的结构ID：");
@@ -582,16 +547,6 @@ public class AIService {
             }
         } catch (Exception e) {
             e.printStackTrace();
-        }
-        return null;
-    }
-
-    private static HeroEntity findHeroInAnyDimension(net.minecraft.server.MinecraftServer server) {
-        for (ServerLevel level : server.getAllLevels()) {
-            var entities = level.getEntities(ModEvents.HERO.get(), entity -> true);
-            if (!entities.isEmpty()) {
-                return entities.get(0);
-            }
         }
         return null;
     }

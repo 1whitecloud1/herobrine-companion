@@ -36,10 +36,7 @@ public class HeroSpawner {
         // [新增] 终极防线：检查 WorldData 中记录的 ActiveHeroUUID
         // 如果 WorldData 说有一个活跃的 Hero，但它不在 ACTIVE_HEROES 里（说明它在未加载的区块），
         // 那么我们也不应该生成新的，而是应该等待 CommonEvents 里的强制召回逻辑把它拉回来。
-        if (!heroExists) {
-            HeroWorldData data = HeroWorldData.get(level);
-            UUID activeUUID = data.getActiveHeroUUID();
-            if (activeUUID != null) {
+
                 // 尝试在当前 level 找一下（虽然 ACTIVE_HEROES 没找到，可能刚加载？）
                 // 或者更激进一点：只要有记录，就认为它存在（在某个未加载的区块）
                 // 除非我们确认它真的消失了（比如被 /kill）
@@ -106,8 +103,6 @@ public class HeroSpawner {
                 // 3. 发现 ActiveHeroUUID != 自己的 UUID -> 自杀 (discard)。
                 
                 // 这样就解决了重复问题，而且不需要复杂的区块加载逻辑。
-            }
-        }
 
         if (!heroExists) {
             List<ServerPlayer> players = level.players();
@@ -168,12 +163,29 @@ public class HeroSpawner {
                         hero.setOwnerUUID(player.getUUID());
 
                         // [BUG 修复核心] 立即从全局存档恢复数据 (防止 Trust=0 进入世界)
-                        // 这会把 WorldData 里的 50 信任度读取到 Entity 身上
                         HeroDataHandler.restoreTrustFromPlayer(hero);
 
-                        // [新增] 登记为“正统” Hero
-                        HeroWorldData data = HeroWorldData.get(level);
-                        data.setActiveHeroUUID(hero.getUUID());
+                        HeroWorldData worldData = HeroWorldData.get(level);
+
+                        // [新增] 同步皮肤状态
+                        hero.setSkinVariant(worldData.getSkinVariant());
+                        if (worldData.getSkinVariant() == HeroEntity.SKIN_CUSTOM) {
+                            hero.setCustomSkinName(worldData.getCustomSkinName());
+                        }
+
+                        // [新增] 恢复装备与 Curios
+                        hero.loadEquipmentFromTag(worldData.getArmorItems(player.getUUID()), worldData.getHandItems(player.getUUID()));
+                        if (net.neoforged.fml.ModList.get().isLoaded("curios")) {
+                            net.minecraft.nbt.CompoundTag savedCurios = worldData.getCuriosBackItem(player.getUUID());
+                            if (savedCurios != null && !savedCurios.isEmpty()) {
+                                hero.setCuriosBackItemFromTag(savedCurios);
+                            }
+                        }
+
+                        // ============== [终极闭环修复] ==============
+                        // 新皇登基：向全局存档登记新的 UUID，彻底防止被 HeroServerTick 秒杀！
+                        worldData.setActiveHeroUUID(hero.getUUID());
+                        // ===========================================
 
                         level.addFreshEntity(hero);
                         return true;

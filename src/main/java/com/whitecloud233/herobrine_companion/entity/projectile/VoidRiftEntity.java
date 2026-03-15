@@ -1,5 +1,6 @@
-package com.whitecloud233.herobrine_companion.entity;
+package com.whitecloud233.herobrine_companion.entity.projectile;
 
+import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.event.ModEvents;
 import com.whitecloud233.herobrine_companion.item.PoemOfTheEndItem;
 import com.whitecloud233.herobrine_companion.network.HeroWorldData;

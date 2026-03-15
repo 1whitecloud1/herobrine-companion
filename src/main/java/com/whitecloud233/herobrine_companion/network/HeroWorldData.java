@@ -1,10 +1,11 @@
 package com.whitecloud233.herobrine_companion.network;
 
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.NbtUtils;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
@@ -20,206 +21,248 @@ import java.util.UUID;
 
 public class HeroWorldData extends SavedData {
 
-    private final Map<UUID, PlayerProfile> playerProfiles = new HashMap<>();
+    // [1.21.1 新增] 必须定义 Factory 以供 computeIfAbsent 使用
+    public static final SavedData.Factory<HeroWorldData> FACTORY = new SavedData.Factory<>(
+            HeroWorldData::new,
+            HeroWorldData::load,
+            null // DataFixTypes，传 null 即可
+    );
 
-    // 遗留数据暂存区
-    private int legacyGlobalTrust = -1;
-    private int legacyClaimedRewards = 0;
-
-    // 全局数据
-    private int globalSkinVariant = 2; // 默认 Herobrine (2)
-    private String customSkinName = ""; // [新增] 自定义皮肤名称/URL
-    private CompoundTag tempBrainData = null;
-    private long respawnReadyTime = 0;  // [新增] 重生冷却时间
-
-    private UUID activeHeroUUID = null;
-    private GlobalPos lastKnownHeroPos = null;
-
+    // [重构] 玩家档案类
     public static class PlayerProfile {
-        public int trustLevel = 0;
-        public int claimedRewardsFlags = 0;
-        public CompoundTag brainMemory = new CompoundTag();
+        public int trust = 0;
+        public Set<Integer> claimedRewards = new HashSet<>();
+        public CompoundTag brainMemory = new CompoundTag(); // 存储神经网络权重
 
-        // [新增] 装备持久化数据
+        // [修改] 存储原生的护甲、手持数据 以及 背部槽
         public ListTag armorItems = new ListTag();
         public ListTag handItems = new ListTag();
-        public CompoundTag curiosBackItem = new CompoundTag();
+        public CompoundTag curiosBackItem = new CompoundTag(); // [新增]
 
-        public PlayerProfile() {}
-
-        public void load(CompoundTag tag) {
-            this.trustLevel = tag.getInt("Trust");
-            this.claimedRewardsFlags = tag.getInt("Rewards");
-            if (tag.contains("Brain")) this.brainMemory = tag.getCompound("Brain");
-
-            // [新增] 读取装备与背部饰品
-            if (tag.contains("ArmorItems", Tag.TAG_LIST)) this.armorItems = tag.getList("ArmorItems", Tag.TAG_COMPOUND);
-            if (tag.contains("HandItems", Tag.TAG_LIST)) this.handItems = tag.getList("HandItems", Tag.TAG_COMPOUND);
-            if (tag.contains("CuriosBackItem", Tag.TAG_COMPOUND)) this.curiosBackItem = tag.getCompound("CuriosBackItem");
+        public void save(CompoundTag tag) {
+            tag.putInt("Trust", trust);
+            tag.putIntArray("ClaimedRewards", claimedRewards.stream().mapToInt(i -> i).toArray());
+            tag.put("BrainMemory", brainMemory);
+            // 保存
+            tag.put("ArmorItems", armorItems);
+            tag.put("HandItems", handItems);
+            tag.put("CuriosBackItem", curiosBackItem);
         }
 
-        public CompoundTag save() {
-            CompoundTag tag = new CompoundTag();
-            tag.putInt("Trust", this.trustLevel);
-            tag.putInt("Rewards", this.claimedRewardsFlags);
-            tag.put("Brain", this.brainMemory);
+        public void load(CompoundTag tag) {
+            trust = tag.getInt("Trust");
+            int[] rewards = tag.getIntArray("ClaimedRewards");
+            for (int id : rewards) claimedRewards.add(id);
+            if (tag.contains("BrainMemory")) {
+                brainMemory = tag.getCompound("BrainMemory");
+            }
 
-            // [新增] 保存装备与背部饰品
-            tag.put("ArmorItems", this.armorItems);
-            tag.put("HandItems", this.handItems);
-            tag.put("CuriosBackItem", this.curiosBackItem);
-            return tag;
+            // 读取
+            if (tag.contains("ArmorItems", 9)) armorItems = tag.getList("ArmorItems", 10);
+            if (tag.contains("HandItems", 9)) handItems = tag.getList("HandItems", 10);
+            if (tag.contains("CuriosBackItem", 10)) curiosBackItem = tag.getCompound("CuriosBackItem");
         }
     }
 
+    // [重构] 存储所有玩家的档案
+    private final Map<UUID, PlayerProfile> playerProfiles = new HashMap<>();
+
+    private long respawnReadyTime = 0;
+    // [修改] 废弃 useHerobrineSkin，改为 skinVariant
+    // private boolean useHerobrineSkin = true;
+    private int skinVariant = 0; // 0 = Herobrine, 1 = Hero, ...
+    private String customSkinName = ""; // 自定义皮肤名称
+
+    private CompoundTag tempBrainData = null;
+
+    // [新增] 存储当前活跃的 Hero 实体 UUID
+    private UUID activeHeroUUID = null;
+
+    // [新增] 记录 Hero 最后已知的位置 (用于 SourceFlowItem 跨维度定位)
+    private GlobalPos lastKnownHeroPos = null;
+
+    // [1.21.1 改动] 添加 HolderLookup.Provider 参数
     @Override
-    public CompoundTag save(CompoundTag compound, net.minecraft.core.HolderLookup.Provider provider) {
-        ListTag profileList = new ListTag();
-        for (Map.Entry<UUID, PlayerProfile> entry : playerProfiles.entrySet()) {
-            CompoundTag tag = entry.getValue().save();
-            tag.putUUID("UUID", entry.getKey());
-            profileList.add(tag);
-        }
-        compound.put("PlayerProfiles", profileList);
-
-        compound.putInt("GlobalSkinVariant", this.globalSkinVariant);
-        compound.putString("CustomSkinName", this.customSkinName); // [新增]
-        compound.putLong("RespawnReadyTime", this.respawnReadyTime); // [新增]
-
+    public CompoundTag save(CompoundTag compound, HolderLookup.Provider provider) {
+        compound.putLong("RespawnReadyTime", this.respawnReadyTime);
+        compound.putInt("SkinVariant", this.skinVariant);
+        compound.putString("CustomSkinName", this.customSkinName);
         if (this.tempBrainData != null) {
             compound.put("TempBrainData", this.tempBrainData);
         }
-
-        if (this.legacyGlobalTrust != -1) {
-            compound.putInt("GlobalTrust", this.legacyGlobalTrust);
-            compound.putInt("ClaimedRewardsFlags", this.legacyClaimedRewards);
-        }
-
         if (this.activeHeroUUID != null) {
             compound.putUUID("ActiveHeroUUID", this.activeHeroUUID);
         }
-
         if (this.lastKnownHeroPos != null) {
             compound.put("LastKnownHeroPos", writeGlobalPos(this.lastKnownHeroPos));
         }
 
+        // 保存玩家档案
+        ListTag profilesTag = new ListTag();
+        for (Map.Entry<UUID, PlayerProfile> entry : playerProfiles.entrySet()) {
+            CompoundTag profileTag = new CompoundTag();
+            profileTag.putUUID("UUID", entry.getKey());
+            entry.getValue().save(profileTag);
+            profilesTag.add(profileTag);
+        }
+        compound.put("PlayerProfiles", profilesTag);
+
         return compound;
     }
 
-    public static HeroWorldData load(CompoundTag compound, net.minecraft.core.HolderLookup.Provider provider) {
+    // [1.21.1 改动] 添加 HolderLookup.Provider 参数
+    public static HeroWorldData load(CompoundTag compound, HolderLookup.Provider provider) {
         HeroWorldData data = new HeroWorldData();
+        if (compound.contains("RespawnReadyTime")) {
+            data.respawnReadyTime = compound.getLong("RespawnReadyTime");
+        }
+        if (compound.contains("SkinVariant")) {
+            data.skinVariant = compound.getInt("SkinVariant");
+        } else if (compound.contains("UseHerobrineSkin")) {
+            // 兼容旧数据
+            data.skinVariant = compound.getBoolean("UseHerobrineSkin") ? 0 : 1;
+        }
 
+        if (compound.contains("CustomSkinName")) {
+            data.customSkinName = compound.getString("CustomSkinName");
+        }
+
+        if (compound.contains("TempBrainData")) {
+            data.tempBrainData = compound.getCompound("TempBrainData");
+        }
+        if (compound.hasUUID("ActiveHeroUUID")) {
+            data.activeHeroUUID = compound.getUUID("ActiveHeroUUID");
+        }
+        if (compound.contains("LastKnownHeroPos")) {
+            data.lastKnownHeroPos = readGlobalPos(compound.getCompound("LastKnownHeroPos"));
+        }
+
+        // 加载玩家档案
         if (compound.contains("PlayerProfiles", Tag.TAG_LIST)) {
-            ListTag list = compound.getList("PlayerProfiles", Tag.TAG_COMPOUND);
-            for (int i = 0; i < list.size(); i++) {
-                CompoundTag tag = list.getCompound(i);
-                if (tag.hasUUID("UUID")) {
-                    UUID uuid = tag.getUUID("UUID");
-                    PlayerProfile profile = new PlayerProfile();
-                    profile.load(tag);
-                    data.playerProfiles.put(uuid, profile);
-                }
+            ListTag profilesTag = compound.getList("PlayerProfiles", Tag.TAG_COMPOUND);
+            for (int i = 0; i < profilesTag.size(); i++) {
+                CompoundTag profileTag = profilesTag.getCompound(i);
+                UUID uuid = profileTag.getUUID("UUID");
+                PlayerProfile profile = new PlayerProfile();
+                profile.load(profileTag);
+                data.playerProfiles.put(uuid, profile);
             }
         }
-
-        if (compound.contains("GlobalTrust")) data.legacyGlobalTrust = compound.getInt("GlobalTrust");
-        if (compound.contains("ClaimedRewardsFlags")) {
-            data.legacyClaimedRewards = compound.getInt("ClaimedRewardsFlags");
-        } else if (compound.contains("ClaimedRewards")) {
-            int[] rewards = compound.getIntArray("ClaimedRewards");
-            for (int reward : rewards) {
-                if (reward >= 0 && reward < 32) data.legacyClaimedRewards |= (1 << reward);
-            }
-        }
-
-        if (compound.contains("GlobalSkinVariant")) data.globalSkinVariant = compound.getInt("GlobalSkinVariant");
-        if (compound.contains("CustomSkinName")) data.customSkinName = compound.getString("CustomSkinName"); // [新增]
-        if (compound.contains("RespawnReadyTime")) data.respawnReadyTime = compound.getLong("RespawnReadyTime"); // [新增]
-        if (compound.contains("TempBrainData")) data.tempBrainData = compound.getCompound("TempBrainData");
-        if (compound.hasUUID("ActiveHeroUUID")) data.activeHeroUUID = compound.getUUID("ActiveHeroUUID");
-        if (compound.contains("LastKnownHeroPos")) data.lastKnownHeroPos = readGlobalPos(compound.getCompound("LastKnownHeroPos"));
 
         return data;
     }
 
+    // [1.21.1 修复] 弃用不稳定的 NbtUtils BlockPos，改用直接存取 XYZ 坐标
     private static CompoundTag writeGlobalPos(GlobalPos pos) {
         CompoundTag tag = new CompoundTag();
         tag.putString("Dimension", pos.dimension().location().toString());
-        tag.put("Pos", NbtUtils.writeBlockPos(pos.pos()));
+        CompoundTag posTag = new CompoundTag();
+        posTag.putInt("X", pos.pos().getX());
+        posTag.putInt("Y", pos.pos().getY());
+        posTag.putInt("Z", pos.pos().getZ());
+        tag.put("Pos", posTag);
         return tag;
     }
 
     private static GlobalPos readGlobalPos(CompoundTag tag) {
         try {
+            // [1.21.1 改动] 使用 ResourceLocation.parse()
             ResourceLocation dimLoc = ResourceLocation.parse(tag.getString("Dimension"));
             ResourceKey<Level> dimKey = ResourceKey.create(Registries.DIMENSION, dimLoc);
-            return GlobalPos.of(dimKey, NbtUtils.readBlockPos(tag, "Pos").orElse(net.minecraft.core.BlockPos.ZERO));
+            CompoundTag posTag = tag.getCompound("Pos");
+            BlockPos blockPos = new BlockPos(posTag.getInt("X"), posTag.getInt("Y"), posTag.getInt("Z"));
+            return GlobalPos.of(dimKey, blockPos);
         } catch (Exception e) {
             return null;
         }
     }
 
-    // --- Player Profile Access ---
+    // --- API ---
 
-    public PlayerProfile getProfile(UUID playerUUID) {
-        return playerProfiles.computeIfAbsent(playerUUID, k -> {
-            PlayerProfile newProfile = new PlayerProfile();
-            if (this.legacyGlobalTrust != -1) {
-                newProfile.trustLevel = this.legacyGlobalTrust;
-                newProfile.claimedRewardsFlags = this.legacyClaimedRewards;
-                this.legacyGlobalTrust = -1;
-                this.legacyClaimedRewards = 0;
-                this.setDirty();
-            }
-            return newProfile;
-        });
+    public PlayerProfile getProfile(UUID uuid) {
+        return playerProfiles.computeIfAbsent(uuid, k -> new PlayerProfile());
     }
 
-    // --- Trust API ---
-    public int getTrust(UUID playerUUID) { return getProfile(playerUUID).trustLevel; }
-    public void setTrust(UUID playerUUID, int trust) {
-        getProfile(playerUUID).trustLevel = trust;
+    public int getTrust(UUID uuid) {
+        return getProfile(uuid).trust;
+    }
+
+    public void setTrust(UUID uuid, int trust) {
+        getProfile(uuid).trust = trust;
         this.setDirty();
     }
 
-    // --- Rewards API (适配 HeroEntity 调用) ---
-    public boolean hasClaimedReward(UUID playerUUID, int rewardId) {
-        if (rewardId < 0 || rewardId >= 32) return false;
-        return (getProfile(playerUUID).claimedRewardsFlags & (1 << rewardId)) != 0;
-    }
-    public boolean isRewardClaimed(UUID playerUUID, int rewardId) {
-        return hasClaimedReward(playerUUID, rewardId); // API 别名适配
+    public boolean isRewardClaimed(UUID uuid, int id) {
+        return getProfile(uuid).claimedRewards.contains(id);
     }
 
-    public void claimReward(UUID playerUUID, int rewardId) {
-        if (rewardId < 0 || rewardId >= 32) return;
-        PlayerProfile profile = getProfile(playerUUID);
-        int mask = (1 << rewardId);
-        if ((profile.claimedRewardsFlags & mask) == 0) {
-            profile.claimedRewardsFlags |= mask;
-            this.setDirty();
-        }
-    }
-    public void setRewardClaimed(UUID playerUUID, int rewardId, boolean claimed) {
-        if (claimed) claimReward(playerUUID, rewardId);
-        else {
-            if (rewardId >= 0 && rewardId < 32) {
-                getProfile(playerUUID).claimedRewardsFlags &= ~(1 << rewardId);
-                this.setDirty();
-            }
-        }
+    public void setRewardClaimed(UUID uuid, int id, boolean claimed) {
+        if (claimed) getProfile(uuid).claimedRewards.add(id);
+        else getProfile(uuid).claimedRewards.remove(id);
+        this.setDirty();
     }
 
-    public int[] getClaimedRewards(UUID playerUUID) {
-        int flags = getProfile(playerUUID).claimedRewardsFlags;
-        Set<Integer> rewards = new HashSet<>();
-        for (int i = 0; i < 32; i++) {
-            if ((flags & (1 << i)) != 0) rewards.add(i);
-        }
-        return rewards.stream().mapToInt(i -> i).toArray();
+    public CompoundTag getBrainMemory(UUID uuid) {
+        return getProfile(uuid).brainMemory;
     }
 
-    // --- Equipment Backup API [新增] ---
+    public void setBrainMemory(UUID uuid, CompoundTag memory) {
+        getProfile(uuid).brainMemory = memory;
+        this.setDirty();
+    }
+
+    public void setRespawnCooldown(ServerLevel level, int minutes) {
+        this.respawnReadyTime = level.getGameTime() + (long) minutes * 60 * 20;
+        this.setDirty();
+    }
+
+    // 兼容旧方法
+    public int getSkinVariant() {
+        return skinVariant;
+    }
+
+    public void setSkinVariant(int variant) {
+        this.skinVariant = variant;
+        this.setDirty();
+    }
+
+    public String getCustomSkinName() {
+        return customSkinName;
+    }
+
+    public void setCustomSkinName(String name) {
+        this.customSkinName = name;
+        this.setDirty();
+    }
+
+    public CompoundTag getTempBrainData() {
+        return this.tempBrainData;
+    }
+
+    public void setTempBrainData(CompoundTag data) {
+        this.tempBrainData = data;
+        this.setDirty();
+    }
+
+    public UUID getActiveHeroUUID() {
+        return this.activeHeroUUID;
+    }
+
+    public void setActiveHeroUUID(UUID uuid) {
+        this.activeHeroUUID = uuid;
+        this.setDirty();
+    }
+
+    public GlobalPos getLastKnownHeroPos() {
+        return this.lastKnownHeroPos;
+    }
+
+    public void setLastKnownHeroPos(GlobalPos pos) {
+        this.lastKnownHeroPos = pos;
+        this.setDirty();
+    }
+
+    // [新增] 装备存取
     public ListTag getArmorItems(UUID uuid) { return getProfile(uuid).armorItems; }
     public ListTag getHandItems(UUID uuid) { return getProfile(uuid).handItems; }
 
@@ -230,69 +273,17 @@ public class HeroWorldData extends SavedData {
     }
 
     public CompoundTag getCuriosBackItem(UUID uuid) { return getProfile(uuid).curiosBackItem; }
+
     public void setCuriosBackItem(UUID uuid, CompoundTag tag) {
         getProfile(uuid).curiosBackItem = tag;
         this.setDirty();
     }
 
-    // --- Brain Memory API ---
-    public CompoundTag getBrainMemory(UUID playerUUID) { return getProfile(playerUUID).brainMemory; }
-    public void setBrainMemory(UUID playerUUID, CompoundTag memory) {
-        getProfile(playerUUID).brainMemory = memory;
-        this.setDirty();
-    }
-
-    // --- Global Data API ---
-    public int getGlobalSkinVariant() { return this.globalSkinVariant; }
-    public void setGlobalSkinVariant(int variant) {
-        if (this.globalSkinVariant != variant) {
-            this.globalSkinVariant = variant;
-            this.setDirty();
-        }
-    }
-
-    public String getGlobalCustomSkinName() { return this.customSkinName; }
-    public void setGlobalCustomSkinName(String name) {
-        if (!this.customSkinName.equals(name)) {
-            this.customSkinName = name;
-            this.setDirty();
-        }
-    }
-
-    public void setRespawnCooldown(ServerLevel level, int minutes) {
-        this.respawnReadyTime = level.getGameTime() + (long) minutes * 60 * 20;
-        this.setDirty();
-    }
-    public long getRespawnReadyTime() { return this.respawnReadyTime; }
-
-    public CompoundTag getTempBrainData() { return this.tempBrainData; }
-    public void setTempBrainData(CompoundTag data) {
-        this.tempBrainData = data;
-        this.setDirty();
-    }
-
-    // --- Active Hero API ---
-    public UUID getActiveHeroUUID() { return this.activeHeroUUID; }
-    public void setActiveHeroUUID(UUID uuid) {
-        this.activeHeroUUID = uuid;
-        this.setDirty();
-    }
-
-    public GlobalPos getLastKnownHeroPos() { return this.lastKnownHeroPos; }
-    public void setLastKnownHeroPos(GlobalPos pos) {
-        this.lastKnownHeroPos = pos;
-        this.setDirty();
-    }
-
-    // --- 1.21.1 标准 Factory 初始化 ---
+    // [1.21.1 改动] 使用 FACTORY 注册获取 Data
     public static HeroWorldData get(ServerLevel level) {
         ServerLevel overworld = level.getServer().getLevel(Level.OVERWORLD);
         return overworld.getDataStorage().computeIfAbsent(
-                new SavedData.Factory<>(
-                        HeroWorldData::new,
-                        HeroWorldData::load,
-                        null
-                ),
+                FACTORY,
                 "herobrine_companion_data"
         );
     }

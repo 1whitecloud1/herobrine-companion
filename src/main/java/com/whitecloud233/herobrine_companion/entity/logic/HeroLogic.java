@@ -20,6 +20,7 @@ import net.minecraft.world.entity.player.Player;
 
 import java.util.List;
 
+
 public class HeroLogic {
 
     public static void tick(HeroEntity hero) {
@@ -45,41 +46,23 @@ public class HeroLogic {
     }
 
     private static void serverTick(HeroEntity hero) {
-        // 1. 唯一性检查 和 关键数据恢复
+        // 1. 唯一性检查
         if (hero.tickCount == 20) {
             HeroLifecycleHandler.checkUniqueness(hero);
-            if (!hero.isAlive()) return; // Stop if removed
-
-            // [修复] 无论实体是新生成的还是从磁盘加载的，都应从全局数据恢复状态，确保数据一致性
-            if (hero.getOwnerUUID() != null) {
-                // 恢复信任度
+            // [修复] 只有在全新生成（非读取）时，才从全局同步数据，防止覆盖存档原有数据
+            if (!hero.isLoadedFromDisk() && hero.getOwnerUUID() != null) {
                 HeroDataHandler.restoreTrustFromPlayer(hero);
-                
-                // [新增] 恢复皮肤和装扮
-                if (hero.level() instanceof ServerLevel serverLevel) {
-                    HeroWorldData data = HeroWorldData.get(serverLevel);
-                    int globalSkinVariant = data.getGlobalSkinVariant();
-                    String globalCustomSkin = data.getGlobalCustomSkinName();
-
-                    // 将全局皮肤数据应用到实体上
-                    hero.setSkinVariant(globalSkinVariant);
-                    if (globalSkinVariant == HeroEntity.SKIN_CUSTOM) {
-                        hero.setCustomSkinName(globalCustomSkin);
-                    } else {
-                        hero.setCustomSkinName(""); // 清空非自定义皮肤的名称
-                    }
-                }
             }
         }
 
         // [新增] 持续性唯一性检查 (每5秒检查一次，防止跨维度传送后旧实体未清除)
-        if (hero.tickCount > 20 && hero.tickCount % 100 == 0) {
+        if (hero.tickCount % 100 == 0) {
             HeroLifecycleHandler.checkUniqueness(hero);
-            if (!hero.isAlive()) return;
         }
 
         // 2. 自动绑定逻辑
         if (hero.getOwnerUUID() == null) {
+            // 如果是从磁盘加载的(isLoadedFromDisk)，且 tick 小于 600 (30秒)，则禁止自动绑定
             boolean isFreshSpawn = !hero.isLoadedFromDisk();
             boolean safeToBind = isFreshSpawn ? (hero.tickCount > 20) : (hero.tickCount > 600);
 
@@ -88,26 +71,28 @@ public class HeroLogic {
             }
         }
 
-        // 客户端同步
         if (hero.tickCount == 5) {
             HeroDataHandler.syncGlobalTrust(hero);
         }
 
-        // 3. 定期数据保存
+        // [风险点] 此处会保存数据。如果 Trust 为 0 且 Owner 不为空，会把存档覆盖为 0。
+        // 所以必须保证在此之前，restoreTrustFromPlayer 已经成功执行。
         if (hero.tickCount % 100 == 0) {
-            if (hero.getOwnerUUID() != null) {
-                // [修复] 保存信任度，如果信任度为0则尝试再次恢复，防止意外覆盖
-                if (hero.getTrustLevel() > 0) {
-                    HeroDataHandler.updateGlobalTrust(hero);
-                } else {
-                    HeroDataHandler.restoreTrustFromPlayer(hero);
-                }
+            // [Fix] 仅在信任度 > 0 时更新全局数据，防止意外覆盖
+            if (hero.getTrustLevel() > 0) {
+                HeroDataHandler.updateGlobalTrust(hero);
+            } else {
+                // 如果信任度为 0，尝试恢复
+                HeroDataHandler.restoreTrustFromPlayer(hero);
+            }
 
-                // [修复] 定期将实体当前的皮肤状态完整同步到全局数据
-                if (hero.level() instanceof ServerLevel serverLevel) {
-                    HeroWorldData data = HeroWorldData.get(serverLevel);
-                    data.setGlobalSkinVariant(hero.getSkinVariant());
-                    data.setGlobalCustomSkinName(hero.getCustomSkinName());
+            // [新增] 定期同步皮肤状态到全局数据，防止丢失
+            if (hero.level() instanceof ServerLevel serverLevel) {
+                HeroWorldData data = HeroWorldData.get(serverLevel);
+                // 如果当前实体有自定义皮肤，且全局数据没有，则更新全局
+                if (hero.getSkinVariant() == HeroEntity.SKIN_CUSTOM && !hero.getCustomSkinName().isEmpty()) {
+                    data.setSkinVariant(HeroEntity.SKIN_CUSTOM);
+                    data.setCustomSkinName(hero.getCustomSkinName());
                 }
             }
         }
@@ -154,20 +139,8 @@ public class HeroLogic {
                 hero.setOwnerUUID(closestPlayer.getUUID());
 
                 // [关键修复] 自动认主后，必须立即从该玩家/全局存档中恢复数据！
+                // 防止 tick 100 的 updateGlobalTrust 将 0 信任度写入存档
                 HeroDataHandler.restoreTrustFromPlayer(hero);
-
-                // [新增] 恢复皮肤状态
-                if (hero.level() instanceof ServerLevel serverLevel) {
-                    HeroWorldData data = HeroWorldData.get(serverLevel);
-                    int globalSkinVariant = data.getGlobalSkinVariant();
-                    String globalCustomSkin = data.getGlobalCustomSkinName();
-                    hero.setSkinVariant(globalSkinVariant);
-                    if (globalSkinVariant == HeroEntity.SKIN_CUSTOM) {
-                        hero.setCustomSkinName(globalCustomSkin);
-                    } else {
-                        hero.setCustomSkinName("");
-                    }
-                }
             }
         }
     }

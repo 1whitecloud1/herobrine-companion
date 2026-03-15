@@ -1,7 +1,7 @@
 package com.whitecloud233.herobrine_companion.event;
 
 // 修正了包名，去掉了多余的 .modid
-import com.whitecloud233.herobrine_companion.entity.CleaveBladeEntity;
+import com.whitecloud233.herobrine_companion.entity.projectile.CleaveBladeEntity;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;

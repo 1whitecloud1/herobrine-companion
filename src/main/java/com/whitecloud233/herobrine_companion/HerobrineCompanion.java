@@ -4,11 +4,8 @@ import com.mojang.logging.LogUtils;
 import com.mojang.serialization.MapCodec;
 import com.whitecloud233.herobrine_companion.block.EndRingPortalBlock;
 import com.whitecloud233.herobrine_companion.block.entity.EndRingPortalBlockEntity;
-import com.whitecloud233.herobrine_companion.config.ConfigScreen;
-import com.whitecloud233.herobrine_companion.client.render.IrisPatcher;
 import com.whitecloud233.herobrine_companion.config.Config;
 import com.whitecloud233.herobrine_companion.datagen.DataGenerators;
-import com.whitecloud233.herobrine_companion.client.service.LLMConfig;
 import com.whitecloud233.herobrine_companion.event.ModEvents;
 import com.whitecloud233.herobrine_companion.item.*;
 import com.whitecloud233.herobrine_companion.loot.AddItemModifier;
@@ -37,10 +34,8 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
-import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.fml.loading.FMLEnvironment;
-import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import net.neoforged.neoforge.common.DeferredSpawnEggItem;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.common.loot.IGlobalLootModifier;
@@ -53,7 +48,6 @@ import org.slf4j.Logger;
 
 @Mod(HerobrineCompanion.MODID)
 public class HerobrineCompanion {
-    public static IrisPatcher PATCHER_INSTANCE;
     public static final String MODID = "herobrine_companion";
     private static final Logger LOGGER = LogUtils.getLogger();
     public static final DeferredRegister.Blocks BLOCKS = DeferredRegister.createBlocks(MODID);
@@ -138,13 +132,7 @@ public class HerobrineCompanion {
         modEventBus.addListener(DataGenerators::gatherData);
 
         if (FMLEnvironment.dist == Dist.CLIENT) {
-            modEventBus.addListener(this::clientSetup);
-            
-            PATCHER_INSTANCE = new IrisPatcher();
-            net.neoforged.neoforge.common.NeoForge.EVENT_BUS.register(PATCHER_INSTANCE);
-            
-            // Register Config Screen
-            modContainer.registerExtensionPoint(IConfigScreenFactory.class, ConfigScreen.FACTORY);
+             com.whitecloud233.herobrine_companion.client.ClientModSetup.init(modEventBus);
         }
 
         BLOCKS.register(modEventBus);
@@ -163,8 +151,6 @@ public class HerobrineCompanion {
 
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
         
-        LLMConfig.load();
-        
         // Register KubeJS plugin if present
         try {
             Class.forName("dev.latvian.mods.kubejs.plugin.KubeJSPlugin");
@@ -172,12 +158,6 @@ public class HerobrineCompanion {
         } catch (ClassNotFoundException e) {
             // KubeJS not present
         }
-        
-        // Register JEI plugin if present (although JEI usually auto-discovers plugins via annotation, 
-        // explicit registration isn't typically needed for JEI, but we ensure no hard crash happens)
-        // Note: JEI uses @JeiPlugin annotation processor to find plugins, so we don't manually register it to event bus usually.
-        // The crash usually happens if we import JEI classes in our main code without checking.
-        // Since HerobrineJeiPlugin is in a separate class and only loaded by JEI, it should be fine as long as we don't reference it directly in common code.
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {
@@ -187,10 +167,6 @@ public class HerobrineCompanion {
         } else {
             LOGGER.warn(">>> [DEBUG] 未检测到 Armourer's Workshop，时装功能将不可用 <<<");
         }
-    }
-    
-    private void clientSetup(final FMLClientSetupEvent event) {
-        LOGGER.info(">>> AWESOME CLIENT SETUP TRIGGERED <<<");
     }
     
     private void registerPayloads(final RegisterPayloadHandlersEvent event) {

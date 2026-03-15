@@ -2,71 +2,111 @@ package com.whitecloud233.herobrine_companion.entity.logic;
 
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.network.HeroWorldData;
+import com.whitecloud233.herobrine_companion.network.PacketHandler;
+import com.whitecloud233.herobrine_companion.network.SyncRewardsPacket;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
 
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
+
 
 public class HeroDataHandler {
 
-    /**
-     * 从全局存档同步信任度到实体 (Read)
-     */
+    private static final String KEY_SAVED_TRUST = "HerobrineSavedTrust";
+
     public static void syncGlobalTrust(HeroEntity hero) {
         if (hero.level() instanceof ServerLevel serverLevel) {
-            UUID ownerUUID = hero.getOwnerUUID();
-            if (ownerUUID == null) return;
-
             HeroWorldData data = HeroWorldData.get(serverLevel);
 
-            // 1. 同步信任度
-            int trust = data.getTrust(ownerUUID);
-            hero.setTrustLevel(trust);
+            // [修改] 遍历周围玩家，同步各自的信任度和奖励
+            for (Player player : hero.level().players()) {
+                if (player.distanceToSqr(hero) < 64 * 64) {
+                    UUID uuid = player.getUUID();
+                    int trust = data.getTrust(uuid);
 
-            // 2. 同步奖励状态：将 WorldData 的 int[] 转换为实体的位掩码 (int)
-            int[] rewards = data.getClaimedRewards(ownerUUID);
-            int flags = 0;
-            for (int r : rewards) {
-                if (r >= 0 && r < 32) {
-                    flags |= (1 << r);
+                    // 如果是 Owner，更新 HeroEntity 上的显示值 (仅用于渲染或简单逻辑)
+                    if (uuid.equals(hero.getOwnerUUID())) {
+                        if (trust > hero.getTrustLevel()) {
+                            hero.setTrustLevel(trust);
+                        }
+                    }
+
+                    // 同步奖励状态给该玩家
+                    Set<Integer> claimedRewards = getClaimedRewards(data, uuid);
+                    SyncRewardsPacket packet = new SyncRewardsPacket(hero.getId(), claimedRewards);
+                    PacketHandler.sendToPlayer(packet, (ServerPlayer) player);
                 }
             }
-            hero.setClaimedRewards(flags);
         }
     }
 
-    /**
-     * 将实体信任度更新到全局存档 (Write)
-     */
+    public static void syncRewardsToPlayer(HeroEntity hero, ServerPlayer player) {
+        if (hero.level() instanceof ServerLevel serverLevel) {
+            HeroWorldData data = HeroWorldData.get(serverLevel);
+            Set<Integer> claimedRewards = getClaimedRewards(data, player.getUUID());
+            PacketHandler.sendToPlayer(new SyncRewardsPacket(hero.getId(), claimedRewards), player);
+        }
+    }
+
+    private static Set<Integer> getClaimedRewards(HeroWorldData data, UUID uuid) {
+        Set<Integer> claimedRewards = new HashSet<>();
+        for (HeroRewards.Reward reward : HeroRewards.REWARDS) {
+            if (data.isRewardClaimed(uuid, reward.id)) {
+                claimedRewards.add(reward.id);
+            }
+        }
+        return claimedRewards;
+    }
+
     public static void updateGlobalTrust(HeroEntity hero) {
         if (hero.level() instanceof ServerLevel serverLevel) {
-            UUID ownerUUID = hero.getOwnerUUID();
-            if (ownerUUID == null) return;
-
             HeroWorldData data = HeroWorldData.get(serverLevel);
 
-            // 1. 更新信任度
-            int currentTrust = hero.getTrustLevel();
-            if (currentTrust != data.getTrust(ownerUUID)) {
-                data.setTrust(ownerUUID, currentTrust);
-            }
-
-            // 2. 更新奖励状态：解析实体的位掩码 (int)，更新到 WorldData
-            int flags = hero.getClaimedRewards();
-            for (int i = 0; i < 32; i++) {
-                if ((flags & (1 << i)) != 0) {
-                    // 如果实体中该位为 1，则将其记录到 WorldData
-                    data.claimReward(ownerUUID, i);
+            // [修改] 如果有 Owner，更新 Owner 的信任度
+            UUID ownerUUID = hero.getOwnerUUID();
+            if (ownerUUID != null) {
+                int current = hero.getTrustLevel();
+                if (current != data.getTrust(ownerUUID)) {
+                    data.setTrust(ownerUUID, current);
                 }
             }
         }
     }
 
-    /**
-     * 尝试从附近的玩家身上恢复信任度 (Legacy / Backup)
-     * [Deprecated] 现在使用 HeroWorldData，此方法仅用于兼容旧存档迁移
-     */
     public static void restoreTrustFromPlayer(HeroEntity hero) {
-        // 直接复用新的全局同步逻辑即可
-        syncGlobalTrust(hero);
+        if (hero.getTrustLevel() > 0) return;
+
+        // [修改] 优先从 Owner 恢复，如果没有 Owner 则找最近的
+        Player p = null;
+        if (hero.getOwnerUUID() != null) {
+            p = hero.level().getPlayerByUUID(hero.getOwnerUUID());
+        }
+
+        if (p == null) {
+            p = hero.level().getNearestPlayer(hero, 32.0D);
+        }
+
+        if (p != null) {
+            // 尝试从 WorldData 恢复
+            if (hero.level() instanceof ServerLevel serverLevel) {
+                HeroWorldData data = HeroWorldData.get(serverLevel);
+                int trust = data.getTrust(p.getUUID());
+                if (trust > 0) {
+                    hero.setTrustLevel(trust);
+                    return;
+                }
+            }
+
+            // 备用：从玩家 NBT 恢复 (旧数据迁移)
+            CompoundTag data = p.getPersistentData();
+            if (data.contains(KEY_SAVED_TRUST)) {
+                int savedTrust = data.getInt(KEY_SAVED_TRUST);
+                hero.setTrustLevel(savedTrust);
+            }
+        }
     }
 }
