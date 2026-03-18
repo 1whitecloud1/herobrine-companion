@@ -3,7 +3,7 @@ package com.whitecloud233.modid.herobrine_companion.entity.logic;
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.event.ModEvents;
-import com.whitecloud233.modid.herobrine_companion.network.HeroWorldData;
+import com.whitecloud233.modid.herobrine_companion.event.HeroWorldData;
 import com.whitecloud233.modid.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.modid.herobrine_companion.network.SyncHeroVisitPacket;
 import com.whitecloud233.modid.herobrine_companion.util.EndRingContext;

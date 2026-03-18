@@ -1,4 +1,4 @@
-package com.whitecloud233.modid.herobrine_companion.client;
+package com.whitecloud233.modid.herobrine_companion.client.event;
 
 import com.whitecloud233.modid.herobrine_companion.client.gui.HeroScreen;
 import net.minecraft.client.Minecraft;

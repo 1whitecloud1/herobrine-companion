@@ -2,9 +2,8 @@ package com.whitecloud233.modid.herobrine_companion.datagen;
 
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.modid.herobrine_companion.world.dimension.ModDimensions;
-import com.whitecloud233.modid.herobrine_companion.world.structure.ModConfiguredStructures;
-import com.whitecloud233.modid.herobrine_companion.world.structure.ModStructureSets;
-import com.whitecloud233.modid.herobrine_companion.world.structure.ModTemplatePools;
+import com.whitecloud233.modid.herobrine_companion.world.structure.ModStructures; // [修改] 统一引入 ModStructures
+// [删除] 删除了无用的 ModConfiguredStructures 和 ModStructureSets 导入
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.RegistrySetBuilder;
 import net.minecraft.core.registries.Registries;
@@ -17,9 +16,10 @@ import java.util.concurrent.CompletableFuture;
 
 public class ModWorldGenProvider extends DatapackBuiltinEntriesProvider {
     public static final RegistrySetBuilder BUILDER = new RegistrySetBuilder()
-            .add(Registries.STRUCTURE, ModConfiguredStructures::bootstrap)
-            .add(Registries.STRUCTURE_SET, ModStructureSets::bootstrap)
-            .add(Registries.TEMPLATE_POOL, ModTemplatePools::bootstrap)
+            // [修改] 将 STRUCTURE 和 STRUCTURE_SET 都指向合并后的类和对应的方法
+            .add(Registries.STRUCTURE, ModStructures::bootstrapStructures)
+            .add(Registries.STRUCTURE_SET, ModStructures::bootstrapSets)
+
             .add(Registries.DIMENSION_TYPE, ModDimensions::bootstrapType)
             .add(Registries.LEVEL_STEM, ModDimensions::bootstrapStem)
             .add(ForgeRegistries.Keys.BIOME_MODIFIERS, ModBiomeModifiers::bootstrap);

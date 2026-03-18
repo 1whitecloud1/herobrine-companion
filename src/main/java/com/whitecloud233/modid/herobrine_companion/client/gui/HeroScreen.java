@@ -1,7 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.client.gui;
 
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.whitecloud233.modid.herobrine_companion.client.ClientHooks;
+import com.whitecloud233.modid.herobrine_companion.client.event.ClientHooks;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.event.ModEvents;
 import com.whitecloud233.modid.herobrine_companion.network.ClearAreaPacket;

@@ -14,6 +14,7 @@ public class ModItemModelProvider extends ItemModelProvider {
         super(output, HerobrineCompanion.MODID, existingFileHelper);
     }
 
+    @SuppressWarnings("removal")
     @Override
     protected void registerModels() {
         simpleItem(HerobrineCompanion.SOURCE_CODE_FRAGMENT);
@@ -39,6 +40,7 @@ public class ModItemModelProvider extends ItemModelProvider {
         withExistingParent(HerobrineCompanion.GHOST_STEVE_SPAWN_EGG.getId().getPath(), new ResourceLocation("item/template_spawn_egg"));
     }
 
+    @SuppressWarnings("removal")
     private ItemModelBuilder simpleItem(RegistryObject<? extends Item> item) {
         return withExistingParent(item.getId().getPath(),
                 new ResourceLocation("item/generated")).texture("layer0",

@@ -1,4 +1,4 @@
-package com.whitecloud233.modid.herobrine_companion.client;
+package com.whitecloud233.modid.herobrine_companion.client.event;
 
 import com.mojang.logging.LogUtils;
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
@@ -81,6 +81,7 @@ public class ClientEvents {
         });
     }
 
+    @SuppressWarnings("removal")
     @SubscribeEvent
     public static void registerDimensionSpecialEffects(RegisterDimensionSpecialEffectsEvent event) {
         // [Fix] 1.20.1 中 ResourceLocation 没有 fromNamespaceAndPath 方法，使用构造函数

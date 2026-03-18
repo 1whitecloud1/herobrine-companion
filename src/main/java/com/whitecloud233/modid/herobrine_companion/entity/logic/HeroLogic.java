@@ -4,7 +4,7 @@ import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.HeroDialogueHandler;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.HeroObserver;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.HeroPrankHandler;
-import com.whitecloud233.modid.herobrine_companion.network.HeroWorldData;
+import com.whitecloud233.modid.herobrine_companion.event.HeroWorldData;
 import com.whitecloud233.modid.herobrine_companion.world.structure.ModStructures;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;

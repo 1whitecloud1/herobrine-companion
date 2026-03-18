@@ -16,6 +16,7 @@ import net.minecraftforge.registries.ForgeRegistries;
 import java.util.List;
 
 public class ModBiomeModifiers {
+    @SuppressWarnings("removal")
     public static final ResourceKey<BiomeModifier> SPAWN_GHOST_STEVE = ResourceKey.create(ForgeRegistries.Keys.BIOME_MODIFIERS, new ResourceLocation(HerobrineCompanion.MODID, "spawn_ghost_steve"));
 
     public static void bootstrap(BootstapContext<BiomeModifier> context) {

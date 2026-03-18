@@ -4,6 +4,7 @@ import com.mojang.logging.LogUtils;
 import com.mojang.serialization.Codec;
 import com.whitecloud233.modid.herobrine_companion.block.EndRingPortalBlock;
 import com.whitecloud233.modid.herobrine_companion.block.entity.EndRingPortalBlockEntity;
+import com.whitecloud233.modid.herobrine_companion.client.event.ClientModSetup;
 import com.whitecloud233.modid.herobrine_companion.compat.KubeJS.HerobrineCompanionKubeJSPlugin;
 import com.whitecloud233.modid.herobrine_companion.config.Config;
 import com.whitecloud233.modid.herobrine_companion.client.service.LLMConfig;
@@ -17,11 +18,7 @@ import com.whitecloud233.modid.herobrine_companion.world.structure.ModStructures
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
-import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.CreativeModeTab;
-import net.minecraft.world.item.CreativeModeTabs;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.*;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -72,7 +69,7 @@ public class HerobrineCompanion {
     public static final RegistryObject<RecallStoneItem> RECALL_STONE = ITEMS.register("recall_stone", () -> new RecallStoneItem(new Item.Properties().stacksTo(1).durability(3).rarity(net.minecraft.world.item.Rarity.EPIC)));
     public static final RegistryObject<SoulBoundPactItem> SOUL_BOUND_PACT = ITEMS.register("soul_bound_pact", () -> new SoulBoundPactItem(new Item.Properties().stacksTo(1).rarity(net.minecraft.world.item.Rarity.EPIC)));
     public static final RegistryObject<TranscendencePermitItem> TRANSCENDENCE_PERMIT = ITEMS.register("transcendence_permit", () -> new TranscendencePermitItem(new Item.Properties().stacksTo(1).rarity(net.minecraft.world.item.Rarity.EPIC)));
-    public static final RegistryObject<PoemOfTheEndItem> POEM_OF_THE_END = ITEMS.register("poem_of_the_end", () -> new PoemOfTheEndItem(ModToolTiers.END, 5.0F, -2.8F, new Item.Properties().rarity(net.minecraft.world.item.Rarity.EPIC)));
+    public static final RegistryObject<PoemOfTheEndItem> POEM_OF_THE_END = ITEMS.register("poem_of_the_end", () -> new PoemOfTheEndItem(Tiers.NETHERITE, 5.0F, -2.8F, new Item.Properties().rarity(net.minecraft.world.item.Rarity.EPIC)));
 
     public static final RegistryObject<LoreFragmentItem> LORE_FRAGMENT = ITEMS.register("lore_fragment", () -> new LoreFragmentItem(new Item.Properties().stacksTo(16).rarity(net.minecraft.world.item.Rarity.UNCOMMON)));
     public static final RegistryObject<LoreHandbookItem> LORE_HANDBOOK = ITEMS.register("lore_handbook", () -> new LoreHandbookItem(new Item.Properties().stacksTo(1).rarity(net.minecraft.world.item.Rarity.RARE)));
@@ -130,7 +127,7 @@ public class HerobrineCompanion {
         modEventBus.addListener(this::commonSetup);
 
         if (FMLEnvironment.dist == Dist.CLIENT) {
-            com.whitecloud233.modid.herobrine_companion.client.ClientModSetup.init(modEventBus);
+            ClientModSetup.init(modEventBus);
         }
 
         BLOCKS.register(modEventBus);

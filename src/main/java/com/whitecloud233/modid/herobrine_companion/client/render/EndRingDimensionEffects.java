@@ -1,4 +1,4 @@
-package com.whitecloud233.modid.herobrine_companion.client;
+package com.whitecloud233.modid.herobrine_companion.client.render;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
@@ -11,6 +11,7 @@ import org.joml.Matrix4f;
 
 public class EndRingDimensionEffects extends DimensionSpecialEffects {
     
+    @SuppressWarnings("removal")
     private static final ResourceLocation[] REAL_WORLD_TEXTURES = new ResourceLocation[] {
         new ResourceLocation(HerobrineCompanion.MODID, "textures/environment/real_world_down.png"),  // 0: 底面 (地面)
         new ResourceLocation(HerobrineCompanion.MODID, "textures/environment/real_world_up.png"),    // 1: 顶面 (天空)

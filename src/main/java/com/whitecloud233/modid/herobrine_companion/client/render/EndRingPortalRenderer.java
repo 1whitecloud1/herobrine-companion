@@ -13,6 +13,7 @@ import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 
 public class EndRingPortalRenderer implements BlockEntityRenderer<EndRingPortalBlockEntity> {
+    @SuppressWarnings("removal")
     public static final ResourceLocation PORTAL_TEXTURE = new ResourceLocation(HerobrineCompanion.MODID, "textures/entity/end_ring_portal.png");
 
     public EndRingPortalRenderer(BlockEntityRendererProvider.Context context) {

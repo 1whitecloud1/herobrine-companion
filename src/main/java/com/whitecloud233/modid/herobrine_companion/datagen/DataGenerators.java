@@ -27,8 +27,8 @@ public class DataGenerators {
         
         generator.addProvider(event.includeServer(), new ModGlobalLootModifiersProvider(packOutput));
 
-        generator.addProvider(event.includeClient(), new ModEnUsLangProvider(packOutput));
-        generator.addProvider(event.includeClient(), new ModZhCnLangProvider(packOutput));
+      //  generator.addProvider(event.includeClient(), new ModEnUsLangProvider(packOutput));
+       // generator.addProvider(event.includeClient(), new ModZhCnLangProvider(packOutput));
         generator.addProvider(event.includeClient(), new ModItemModelProvider(packOutput, existingFileHelper));
         
         // BlockTagsProvider is needed for ItemTagsProvider

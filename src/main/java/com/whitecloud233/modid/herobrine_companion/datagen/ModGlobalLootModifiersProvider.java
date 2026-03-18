@@ -16,6 +16,7 @@ public class ModGlobalLootModifiersProvider extends GlobalLootModifierProvider {
         super(output, HerobrineCompanion.MODID);
     }
 
+    @SuppressWarnings("removal")
     @Override
     protected void start() {
         // 注册 永恒之匙 (远古城市) - 30% 概率

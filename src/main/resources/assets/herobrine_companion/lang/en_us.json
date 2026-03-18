@@ -98,6 +98,30 @@
   "item.herobrine_companion.source_flow.desc": "Right-click to force teleport to Herobrine's side",
   "message.herobrine_companion.source_flow_teleport": "You feel a powerful force pulling you towards the abyss...",
 
+  "message.herobrine_companion.action_riding_1": "Relying on these creatures made of code to travel? Bound by gravity and physical laws... the way you connect with this world is rather interesting.",
+  "message.herobrine_companion.action_riding_2": "If my brother were still here, he'd be glad to see you getting along with these animals. Take your time, I'm in no rush.",
+
+  "message.herobrine_companion.action_fishing_1": "Spending your time waiting for the underlying data's random number generation... For mortals with fleeting lives, such rare peace isn't a bad thing.",
+  "message.herobrine_companion.action_fishing_2": "The data flow in these waters is stable. Seeing you fish here so quietly reminds me of what this world looked like when it was first born.",
+
+  "message.herobrine_companion.action_eating_1": "Needing to constantly replenish data to keep your survival mechanisms running... Mortal bodies are indeed fragile, but perhaps that's why you try so hard to live.",
+  "message.herobrine_companion.action_eating_2": "Eat up. In this massive data maze where only I remain to keep watch, I don't want you turning into dissipating characters too soon.",
+
+  "message.herobrine_companion.action_drinking_1": "Temporarily overwriting your parameters by drinking potions? Do it in moderation, don't let mutating data flows burden your code.",
+  "message.herobrine_companion.action_drinking_2": "Replenishing your status variables is a wise choice. This land I maintain can be a bit too harsh on you sometimes.",
+
+  "message.herobrine_companion.action_sneaking_1": "Keeping your head down? Don't be nervous. I can see every string of coordinates you leave in this world clearly, but I won't disturb your journey.",
+  "message.herobrine_companion.action_sneaking_2": "There's no need to hide so carefully. I've already spoken to the children of the dark; they won't give you a hard time today.",
+  "gui.herobrine_companion.config.ai_vision": "Omniscient Vision (AI): %s",
+  "gui.herobrine_companion.config.ai_vision.tooltip": "When enabled, AI will dynamically generate dialogue based on your actions and environment.",
+  "gui.herobrine_companion.config.ai_vision_interval": "Vision Interval: %ds",
+  "gui.herobrine_companion.config.ai_vision_interval.tooltip": "Set the minimum interval (in seconds) between AI spontaneous speech to prevent spam.",
+  "gui.herobrine_companion.config.ai_language_style": "AI Language Style & Tone",
+  "gui.herobrine_companion.config.ai_language_style.tooltip": "Customize Herobrine's personality and speaking tone (affects AI chat and visual observations).\nExample: A calm and deep creator god.",
+  "message.herobrine_companion.update_found": "§e[Herobrine Companion] §fNew version available: §a%s §f! ",
+  "message.herobrine_companion.update_link": "§b§n[Click to download on Modrinth]",
+  "gui.herobrine_companion.config.update_checker": "Update Checker: %s",
+  "gui.herobrine_companion.config.update_checker.tooltip": "Whether to automatically check for new versions on Modrinth and notify in chat",
 
 
   "book.herobrine_companion.book.lore.title": "The Borderland Journal",

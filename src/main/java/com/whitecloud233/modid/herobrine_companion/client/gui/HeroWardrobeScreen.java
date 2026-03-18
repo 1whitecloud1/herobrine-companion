@@ -12,6 +12,8 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.inventory.Slot;
 
+
+@SuppressWarnings("removal")
 public class HeroWardrobeScreen extends AbstractContainerScreen<HeroWardrobeMenu> {
 
     // 引入原版槽位虚影的纹理路径

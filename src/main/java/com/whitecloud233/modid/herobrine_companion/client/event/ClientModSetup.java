@@ -1,4 +1,4 @@
-package com.whitecloud233.modid.herobrine_companion.client;
+package com.whitecloud233.modid.herobrine_companion.client.event;
 
 import com.mojang.logging.LogUtils;
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
@@ -13,6 +13,7 @@ import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 
 public class ClientModSetup {
     
+    @SuppressWarnings("removal")
     public static void init(IEventBus modEventBus) {
         // 1. 注册客户端生命周期事件
         modEventBus.addListener(ClientModSetup::clientSetup);

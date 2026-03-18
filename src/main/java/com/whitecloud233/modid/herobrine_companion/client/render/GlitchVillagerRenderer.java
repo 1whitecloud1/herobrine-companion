@@ -9,12 +9,14 @@ import net.minecraft.resources.ResourceLocation;
 
 public class GlitchVillagerRenderer extends MobRenderer<GlitchVillagerEntity, VillagerModel<GlitchVillagerEntity>> {
     // Use a missing texture or a corrupted one
+    @SuppressWarnings("removal")
     private static final ResourceLocation TEXTURE = new ResourceLocation("textures/entity/villager/villager.png");
 
     public GlitchVillagerRenderer(EntityRendererProvider.Context context) {
         super(context, new VillagerModel<>(context.bakeLayer(ModelLayers.VILLAGER)), 0.5F);
     }
 
+    @SuppressWarnings("removal")
     @Override
     public ResourceLocation getTextureLocation(GlitchVillagerEntity entity) {
         // Return a texture that might look glitchy or just the standard one

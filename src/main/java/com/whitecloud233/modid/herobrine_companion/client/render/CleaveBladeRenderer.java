@@ -16,6 +16,7 @@ import org.joml.Matrix4f;
 
 public class CleaveBladeRenderer extends EntityRenderer<CleaveBladeEntity> {
 
+    @SuppressWarnings("removal")
     private static final ResourceLocation TEXTURE = new ResourceLocation("herobrine_companion", "textures/entity/cleave_blade.png");
 
     public CleaveBladeRenderer(EntityRendererProvider.Context context) {

@@ -1,4 +1,4 @@
-package com.whitecloud233.modid.herobrine_companion.network;
+package com.whitecloud233.modid.herobrine_companion.event;
 
 import net.minecraft.core.GlobalPos;
 import net.minecraft.core.registries.Registries;
@@ -21,7 +21,7 @@ public class HeroWorldData extends SavedData {
         public int trust = 0;
         public Set<Integer> claimedRewards = new HashSet<>();
         public CompoundTag brainMemory = new CompoundTag(); // 存储神经网络权重
-        
+
         // [修改] 存储原生的护甲、手持数据 以及 背部槽
         public ListTag armorItems = new ListTag();
         public ListTag handItems = new ListTag();
@@ -44,7 +44,7 @@ public class HeroWorldData extends SavedData {
             if (tag.contains("BrainMemory")) {
                 brainMemory = tag.getCompound("BrainMemory");
             }
-            
+
             // 读取
             if (tag.contains("ArmorItems", 9)) armorItems = tag.getList("ArmorItems", 10);
             if (tag.contains("HandItems", 9)) handItems = tag.getList("HandItems", 10);
@@ -62,12 +62,15 @@ public class HeroWorldData extends SavedData {
     private String customSkinName = ""; // 自定义皮肤名称
 
     private CompoundTag tempBrainData = null;
-    
+
     // [新增] 存储当前活跃的 Hero 实体 UUID
     private UUID activeHeroUUID = null;
 
     // [新增] 记录 Hero 最后已知的位置 (用于 SourceFlowItem 跨维度定位)
     private GlobalPos lastKnownHeroPos = null;
+
+    // [新增] 记录是否已经通过 hb 指令召唤过
+    private boolean hasSpawnedFromChat = false;
 
     @Override
     public CompoundTag save(CompoundTag compound) {
@@ -83,6 +86,9 @@ public class HeroWorldData extends SavedData {
         if (this.lastKnownHeroPos != null) {
             compound.put("LastKnownHeroPos", writeGlobalPos(this.lastKnownHeroPos));
         }
+
+        // [新增] 保存聊天指令召唤状态
+        compound.putBoolean("HasSpawnedFromChat", this.hasSpawnedFromChat);
 
         // 保存玩家档案
         ListTag profilesTag = new ListTag();
@@ -108,7 +114,7 @@ public class HeroWorldData extends SavedData {
             // 兼容旧数据
             data.skinVariant = compound.getBoolean("UseHerobrineSkin") ? 0 : 1;
         }
-        
+
         if (compound.contains("CustomSkinName")) {
             data.customSkinName = compound.getString("CustomSkinName");
         }
@@ -121,6 +127,11 @@ public class HeroWorldData extends SavedData {
         }
         if (compound.contains("LastKnownHeroPos")) {
             data.lastKnownHeroPos = readGlobalPos(compound.getCompound("LastKnownHeroPos"));
+        }
+
+        // [新增] 读取聊天指令召唤状态
+        if (compound.contains("HasSpawnedFromChat")) {
+            data.hasSpawnedFromChat = compound.getBoolean("HasSpawnedFromChat");
         }
 
         // 加载玩家档案
@@ -202,7 +213,7 @@ public class HeroWorldData extends SavedData {
         this.skinVariant = variant;
         this.setDirty();
     }
-    
+
     public String getCustomSkinName() {
         return customSkinName;
     }
@@ -220,7 +231,7 @@ public class HeroWorldData extends SavedData {
         this.tempBrainData = data;
         this.setDirty();
     }
-    
+
     public UUID getActiveHeroUUID() {
         return this.activeHeroUUID;
     }
@@ -238,7 +249,7 @@ public class HeroWorldData extends SavedData {
         this.lastKnownHeroPos = pos;
         this.setDirty();
     }
-    
+
     // [新增] 装备存取
     public ListTag getArmorItems(UUID uuid) { return getProfile(uuid).armorItems; }
     public ListTag getHandItems(UUID uuid) { return getProfile(uuid).handItems; }
@@ -248,12 +259,22 @@ public class HeroWorldData extends SavedData {
         getProfile(uuid).handItems = hands;
         this.setDirty();
     }
-    
+
     public CompoundTag getCuriosBackItem(UUID uuid) { return getProfile(uuid).curiosBackItem; }
 
     public void setCuriosBackItem(UUID uuid, CompoundTag tag) {
         getProfile(uuid).curiosBackItem = tag;
         this.setDirty();
+    }
+
+    // [新增] 聊天指令召唤状态的存取
+    public boolean hasSpawnedFromChat() {
+        return this.hasSpawnedFromChat;
+    }
+
+    public void setSpawnedFromChat(boolean spawned) {
+        this.hasSpawnedFromChat = spawned;
+        this.setDirty(); // 必须调用，通知游戏数据已更改需要保存
     }
 
     public static HeroWorldData get(ServerLevel level) {
