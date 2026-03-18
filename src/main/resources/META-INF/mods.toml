@@ -5,7 +5,7 @@ issueTrackerURL="https://github.com/WhiteCloud233/herobrine-companion-mod/issues
 
 [[mods]]
 modId="herobrine_companion"
-version="0.142"
+version="${mod_version}"
 displayName="Herobrine Companion"
 authors="WhiteCloud233"
 description='''

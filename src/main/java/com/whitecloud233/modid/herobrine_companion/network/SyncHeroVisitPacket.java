@@ -1,5 +1,6 @@
 package com.whitecloud233.modid.herobrine_companion.network;
 
+import com.whitecloud233.modid.herobrine_companion.client.event.ClientHooks;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.fml.DistExecutor;
@@ -27,7 +28,7 @@ public class SyncHeroVisitPacket {
         context.enqueueWork(() -> {
             // [安全修改] 删除了文件头部的 import，使用 ClientHooks 代理执行
             DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> {
-                com.whitecloud233.modid.herobrine_companion.client.ClientHooks.setVisitedHeroDimension(this.visited);
+                ClientHooks.setVisitedHeroDimension(this.visited);
             });
         });
         context.setPacketHandled(true);

@@ -7,7 +7,7 @@ import com.whitecloud233.modid.herobrine_companion.event.ModEvents;
 import com.whitecloud233.modid.herobrine_companion.world.inventory.HeroContractMenu;
 import com.whitecloud233.modid.herobrine_companion.world.structure.ModStructures;
 import com.whitecloud233.modid.herobrine_companion.util.EndRingContext;
-import com.whitecloud233.modid.herobrine_companion.network.HeroWorldData;
+import com.whitecloud233.modid.herobrine_companion.event.HeroWorldData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;

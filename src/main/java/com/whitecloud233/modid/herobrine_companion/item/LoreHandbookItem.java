@@ -1,5 +1,6 @@
 package com.whitecloud233.modid.herobrine_companion.item;
 
+import com.whitecloud233.modid.herobrine_companion.client.event.ClientHooks;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
@@ -20,7 +21,7 @@ public class LoreHandbookItem extends Item {
         ItemStack stack = player.getItemInHand(hand);
         if (level.isClientSide) {
             // [安全修改]：不直接 new Screen，而是呼叫客户端钩子
-            com.whitecloud233.modid.herobrine_companion.client.ClientHooks.openHandbook(stack);
+            ClientHooks.openHandbook(stack);
         }
         return InteractionResultHolder.success(stack);
     }
