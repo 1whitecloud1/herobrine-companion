@@ -4,7 +4,7 @@ import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.logic.HeroDataHandler;
 import com.whitecloud233.herobrine_companion.entity.logic.HeroLogic;
 import com.whitecloud233.herobrine_companion.event.ModEvents;
-import com.whitecloud233.herobrine_companion.network.HeroWorldData;
+import com.whitecloud233.herobrine_companion.event.HeroWorldData;
 import com.whitecloud233.herobrine_companion.util.EndRingContext;
 import com.whitecloud233.herobrine_companion.world.inventory.HeroContractMenu;
 import com.whitecloud233.herobrine_companion.world.structure.ModStructures;
@@ -17,8 +17,6 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.sounds.SoundSource;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.InteractionHand;
@@ -40,7 +38,6 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.loading.FMLEnvironment;
 
-import java.util.Collections;
 import java.util.Random;
 import java.util.UUID;
 

@@ -1,7 +1,7 @@
 package com.whitecloud233.herobrine_companion.entity.logic;
 
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
-import com.whitecloud233.herobrine_companion.client.ClientHooks;
+import com.whitecloud233.herobrine_companion.client.event.ClientHooks;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.ai.learning.SimpleNeuralNetwork;
 import com.whitecloud233.herobrine_companion.item.HeroSummonItem;

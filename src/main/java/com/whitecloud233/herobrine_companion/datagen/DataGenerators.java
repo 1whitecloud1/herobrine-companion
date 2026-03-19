@@ -28,8 +28,8 @@ public class DataGenerators {
         generator.addProvider(event.includeServer(), new ModRecipeProvider(packOutput, lookupProvider));
         
         // Register Language Providers
-        generator.addProvider(event.includeClient(), new ModEnUsLangProvider(packOutput));
-        generator.addProvider(event.includeClient(), new ModZhCnLangProvider(packOutput));
+       // generator.addProvider(event.includeClient(), new ModEnUsLangProvider(packOutput));
+        //generator.addProvider(event.includeClient(), new ModZhCnLangProvider(packOutput));
 
         // Register Item Model Provider
         generator.addProvider(event.includeClient(), new ModItemModelProvider(packOutput, event.getExistingFileHelper()));

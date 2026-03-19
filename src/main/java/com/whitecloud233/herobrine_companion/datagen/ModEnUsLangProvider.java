@@ -3,7 +3,7 @@ package com.whitecloud233.herobrine_companion.datagen;
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import net.minecraft.data.PackOutput;
 import net.neoforged.neoforge.common.data.LanguageProvider;
-
+@Deprecated
 public class ModEnUsLangProvider extends LanguageProvider {
     public ModEnUsLangProvider(PackOutput output) {
         super(output, HerobrineCompanion.MODID, "en_us");

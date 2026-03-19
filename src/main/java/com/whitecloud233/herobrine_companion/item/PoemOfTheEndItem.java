@@ -4,7 +4,7 @@ import com.whitecloud233.herobrine_companion.entity.projectile.CleaveBladeEntity
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.projectile.VoidRiftEntity;
 import com.whitecloud233.herobrine_companion.entity.projectile.RealmBreakerLightningEntity;
-import com.whitecloud233.herobrine_companion.network.HeroWorldData;
+import com.whitecloud233.herobrine_companion.event.HeroWorldData;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;

@@ -1,7 +1,7 @@
 package com.whitecloud233.herobrine_companion.entity.ai.learning;
 
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
-import com.whitecloud233.herobrine_companion.network.HeroWorldData;
+import com.whitecloud233.herobrine_companion.event.HeroWorldData;
 import com.whitecloud233.herobrine_companion.world.structure.ModStructures;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;

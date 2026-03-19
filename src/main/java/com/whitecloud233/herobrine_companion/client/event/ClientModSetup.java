@@ -1,4 +1,4 @@
-package com.whitecloud233.herobrine_companion.client;
+package com.whitecloud233.herobrine_companion.client.event;
 
 import com.mojang.logging.LogUtils;
 import com.whitecloud233.herobrine_companion.client.render.IrisPatcher;

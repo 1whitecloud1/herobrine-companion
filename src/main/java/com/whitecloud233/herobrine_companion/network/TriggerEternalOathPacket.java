@@ -1,5 +1,6 @@
 package com.whitecloud233.herobrine_companion.network;
 
+import com.whitecloud233.herobrine_companion.client.event.ClientHooks;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -22,7 +23,7 @@ public record TriggerEternalOathPacket() implements CustomPacketPayload {
         context.enqueueWork(() -> {
             // 【安全调用】仅在客户端执行逻辑，且通过全限定类名调用 ClientHooks，避免服务端加载问题
             if (FMLEnvironment.dist == Dist.CLIENT) {
-                com.whitecloud233.herobrine_companion.client.ClientHooks.triggerEternalOath();
+                ClientHooks.triggerEternalOath();
             }
         });
     }

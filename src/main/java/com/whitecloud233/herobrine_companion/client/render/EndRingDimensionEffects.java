@@ -1,4 +1,4 @@
-package com.whitecloud233.herobrine_companion.client;
+package com.whitecloud233.herobrine_companion.client.render;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;

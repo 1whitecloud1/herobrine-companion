@@ -1,4 +1,4 @@
-package com.whitecloud233.herobrine_companion.client;
+package com.whitecloud233.herobrine_companion.client.event;
 
 import com.whitecloud233.herobrine_companion.item.PoemOfTheEndItem;
 import com.whitecloud233.herobrine_companion.network.CleaveSkillPacket;

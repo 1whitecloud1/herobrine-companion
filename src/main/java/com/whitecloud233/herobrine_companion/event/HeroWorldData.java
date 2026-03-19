@@ -1,4 +1,4 @@
-package com.whitecloud233.herobrine_companion.network;
+package com.whitecloud233.herobrine_companion.event;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
@@ -81,6 +81,9 @@ public class HeroWorldData extends SavedData {
     // [新增] 记录 Hero 最后已知的位置 (用于 SourceFlowItem 跨维度定位)
     private GlobalPos lastKnownHeroPos = null;
 
+    // [新增] 记录是否已经通过 hb 指令召唤过
+    private boolean hasSpawnedFromChat = false;
+
     // [1.21.1 改动] 添加 HolderLookup.Provider 参数
     @Override
     public CompoundTag save(CompoundTag compound, HolderLookup.Provider provider) {
@@ -96,6 +99,9 @@ public class HeroWorldData extends SavedData {
         if (this.lastKnownHeroPos != null) {
             compound.put("LastKnownHeroPos", writeGlobalPos(this.lastKnownHeroPos));
         }
+
+        // [新增] 保存聊天指令召唤状态
+        compound.putBoolean("HasSpawnedFromChat", this.hasSpawnedFromChat);
 
         // 保存玩家档案
         ListTag profilesTag = new ListTag();
@@ -135,6 +141,11 @@ public class HeroWorldData extends SavedData {
         }
         if (compound.contains("LastKnownHeroPos")) {
             data.lastKnownHeroPos = readGlobalPos(compound.getCompound("LastKnownHeroPos"));
+        }
+
+        // [新增] 读取聊天指令召唤状态
+        if (compound.contains("HasSpawnedFromChat")) {
+            data.hasSpawnedFromChat = compound.getBoolean("HasSpawnedFromChat");
         }
 
         // 加载玩家档案
@@ -277,6 +288,16 @@ public class HeroWorldData extends SavedData {
     public void setCuriosBackItem(UUID uuid, CompoundTag tag) {
         getProfile(uuid).curiosBackItem = tag;
         this.setDirty();
+    }
+
+    // [新增] 聊天指令召唤状态的存取
+    public boolean hasSpawnedFromChat() {
+        return this.hasSpawnedFromChat;
+    }
+
+    public void setSpawnedFromChat(boolean spawned) {
+        this.hasSpawnedFromChat = spawned;
+        this.setDirty(); // 必须调用，通知游戏数据已更改需要保存
     }
 
     // [1.21.1 改动] 使用 FACTORY 注册获取 Data

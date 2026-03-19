@@ -4,6 +4,7 @@ import com.mojang.logging.LogUtils;
 import com.mojang.serialization.MapCodec;
 import com.whitecloud233.herobrine_companion.block.EndRingPortalBlock;
 import com.whitecloud233.herobrine_companion.block.entity.EndRingPortalBlockEntity;
+import com.whitecloud233.herobrine_companion.client.event.ClientModSetup;
 import com.whitecloud233.herobrine_companion.config.Config;
 import com.whitecloud233.herobrine_companion.datagen.DataGenerators;
 import com.whitecloud233.herobrine_companion.event.ModEvents;
@@ -132,7 +133,7 @@ public class HerobrineCompanion {
         modEventBus.addListener(DataGenerators::gatherData);
 
         if (FMLEnvironment.dist == Dist.CLIENT) {
-             com.whitecloud233.herobrine_companion.client.ClientModSetup.init(modEventBus);
+             ClientModSetup.init(modEventBus);
         }
 
         BLOCKS.register(modEventBus);

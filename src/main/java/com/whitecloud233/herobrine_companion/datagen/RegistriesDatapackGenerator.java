@@ -99,7 +99,7 @@ public class RegistriesDatapackGenerator extends DatapackBuiltinEntriesProvider 
                 )
         );
     }
-
+@Deprecated
     private static void bootstrapBiomes(BootstrapContext<Biome> context) {
         // Register Past World Plains Biome (Alpha Void)
         // Alpha grass color: #B7CB62

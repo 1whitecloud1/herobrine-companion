@@ -1,6 +1,6 @@
 package com.whitecloud233.herobrine_companion.network;
 
-import com.whitecloud233.herobrine_companion.client.ClientHooks;
+import com.whitecloud233.herobrine_companion.client.event.ClientHooks;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
