@@ -15,20 +15,29 @@ public class ChatEvents {
     @SubscribeEvent
     public static void onServerChat(ServerChatEvent event) {
         String message = event.getMessage().getString();
+
         if ("hb".equals(message)) {
             if (event.getPlayer().level() instanceof ServerLevel serverLevel) {
-                HeroEntity hero = ModEvents.HERO.get().create(serverLevel);
-                if (hero != null) {
-                    // Calculate position 2 blocks in front of the player
-                    Vec3 look = event.getPlayer().getLookAngle();
-                    Vec3 playerPos = event.getPlayer().position();
-                    double x = playerPos.x + look.x * 2.0D;
-                    double z = playerPos.z + look.z * 2.0D;
-                    double y = playerPos.y; // Keep same height
+                // 获取全局的世界数据
+                HeroWorldData worldData = HeroWorldData.get(serverLevel);
 
-                    hero.moveTo(x, y, z, event.getPlayer().getYRot() + 180.0F, 0.0F);
-                    hero.finalizeSpawn(serverLevel, serverLevel.getCurrentDifficultyAt(hero.blockPosition()), MobSpawnType.COMMAND, null);
-                    serverLevel.addFreshEntity(hero);
+                // 检查是否从未通过指令召唤过
+                if (!worldData.hasSpawnedFromChat()) {
+                    HeroEntity hero = ModEvents.HERO.get().create(serverLevel);
+                    if (hero != null) {
+                        Vec3 look = event.getPlayer().getLookAngle();
+                        Vec3 playerPos = event.getPlayer().position();
+                        double x = playerPos.x + look.x * 2.0D;
+                        double z = playerPos.z + look.z * 2.0D;
+                        double y = playerPos.y;
+
+                        hero.moveTo(x, y, z, event.getPlayer().getYRot() + 180.0F, 0.0F);
+                        hero.finalizeSpawn(serverLevel, serverLevel.getCurrentDifficultyAt(hero.blockPosition()), MobSpawnType.COMMAND, null);
+                        serverLevel.addFreshEntity(hero);
+
+                        // 生成成功后，将世界数据中的状态设为 true，彻底封死后续的触发
+                        worldData.setSpawnedFromChat(true);
+                    }
                 }
             }
         }

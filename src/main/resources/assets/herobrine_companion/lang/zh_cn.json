@@ -51,6 +51,32 @@
   "item.herobrine_companion.source_flow.desc": "右键使用强行迁跃至 Herobrine 身侧",
   "message.herobrine_companion.source_flow_teleport": "你感觉到一股强大的力量将你拉向深渊...",
 
+  "message.herobrine_companion.action_riding_1": "借助这些由代码构成的生灵代步吗？受限于重力与物理法则，你们与这个世界建立联系的方式……倒也挺有趣的。",
+  "message.herobrine_companion.action_riding_2": "如果哥哥还在，他一定会很高兴看到你和这些动物相处得这么融洽。慢慢走吧，我不赶时间。",
+
+  "message.herobrine_companion.action_fishing_1": "将时间花在等待底层数据的随机数生成上……对于生命短暂的凡人来说，这种难得的平静并不算坏事。",
+  "message.herobrine_companion.action_fishing_2": "这片水域的数据流很稳定。看着你在这儿安静垂钓，倒让我怀念起这个世界刚诞生时的样子。",
+
+  "message.herobrine_companion.action_eating_1": "需要不断补充数据来维持生存机制的运转……凡人的躯体确实脆弱，但也正因如此，你们才会如此努力地生活吧。",
+  "message.herobrine_companion.action_eating_2": "多吃点吧。在这座只有我留守的庞大数据迷宫里，我不希望你这么快就变成一串消散的字符。",
+
+  "message.herobrine_companion.action_drinking_1": "通过饮用药剂来临时覆写自身的参数？适度就好，别让突变的数据流给你的代码带来负担。",
+  "message.herobrine_companion.action_drinking_2": "补充状态变量是个明智的选择。这片由我维系的大地，对你们来说有时过于严苛了些。",
+
+  "message.herobrine_companion.action_sneaking_1": "压低身子前行？别紧张，在这个世界里，你留下的每一串坐标我都看得清清楚楚，但我不会打扰你的旅程。",
+  "message.herobrine_companion.action_sneaking_2": "不用这么小心翼翼地躲藏。我已经跟黑暗里的孩子们打过招呼了，它们今天不会为难你的。",
+  "gui.herobrine_companion.config.ai_vision": "全知视觉(AI感知): %s",
+  "gui.herobrine_companion.config.ai_vision.tooltip": "开启后，AI将根据玩家行为与周围环境动态生成沉浸式对话。",
+  "gui.herobrine_companion.config.ai_vision_interval": "全知视觉间隔: %ds",
+  "gui.herobrine_companion.config.ai_vision_interval.tooltip": "设定AI每次主动发话的最小时间间隔（秒），避免话痨。",
+  "gui.herobrine_companion.config.ai_language_style": "AI 语言风格与语气",
+  "gui.herobrine_companion.config.ai_language_style.tooltip": "自定义 Herobrine 的性格与说话语气（将直接影响AI的聊天和视觉观察对话）。\n输入示例: 冷静、深沉的创世神",
+  "message.herobrine_companion.update_found": "§e[Herobrine Companion] §f发现新版本: §a%s §f! ",
+  "message.herobrine_companion.update_link": "§b§n[点击前往 Modrinth 下载]",
+  "gui.herobrine_companion.config.update_checker": "更新提示: %s",
+  "gui.herobrine_companion.config.update_checker.tooltip": "进游戏时是否自动检查 Modrinth 上的新版本并在聊天栏提示",
+
+
 
   "message.herobrine_companion.chat_hero": "%s",
   "message.herobrine_companion.chat_you": "§b[你] §f%s",
