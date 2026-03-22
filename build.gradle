@@ -181,6 +181,7 @@ dependencies {
     compileOnly fg.deobf("mezz.jei:jei-1.20.1-common-api:15.20.0.106")
     compileOnly fg.deobf("mezz.jei:jei-1.20.1-forge-api:15.20.0.106")
 
+    runtimeOnly fg.deobf("curse.maven:jade-324717:6855440")
     // Architectury
     implementation fg.deobf("dev.architectury:architectury-forge:9.2.14")
 
@@ -191,6 +192,10 @@ dependencies {
     // 引入 Curios API (1.20.1 Forge)
     compileOnly fg.deobf("top.theillusivec4.curios:curios-forge:5.9.1+1.20.1:api")
     runtimeOnly fg.deobf("top.theillusivec4.curios:curios-forge:5.9.1+1.20.1")
+
+// 引入 FDLib (以 1.20.1 的常用版本为例)
+    // 请根据 Modrinth 上的最新版本号替换下面的版本号
+    implementation fg.deobf("maven.modrinth:fdlib:1.0.8")
 }
 
 // 资源替换逻辑

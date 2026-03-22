@@ -26,6 +26,7 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.ai.control.MoveControl;
 import net.minecraft.world.entity.ai.goal.GoalSelector;
 import net.minecraft.world.entity.ai.navigation.FlyingPathNavigation;
 import net.minecraft.world.entity.ai.navigation.GroundPathNavigation;
@@ -58,12 +59,17 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     public static final EntityDataAccessor<Boolean> IS_GLITCHING = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.BOOLEAN);
     public static final EntityDataAccessor<Boolean> IS_DEBUGGING = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.BOOLEAN);
     public static final EntityDataAccessor<Boolean> IS_CASTING_THUNDER = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.BOOLEAN);
+    // 👇 [新增] 挑战模式专用同步通道 (仅作为数据桥梁，不含逻辑)
+    public static final EntityDataAccessor<Boolean> IS_CHALLENGE_ACTIVE = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.BOOLEAN);
+    public static final EntityDataAccessor<Integer> CHALLENGE_TICKS = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.INT);
+
 
     private final Set<Integer> claimedRewards = new HashSet<>();
     public float clientFloatingAmount;
     public float clientFloatingAmountO;
     public boolean clientSideSetupDone = false;
     public int patrolTimer = 2400;
+    public MoveControl moveControl;
     private int outOfWaterTimer = 0;
     private long lastSummonedTime = 0;
     private boolean isLoadedFromDisk = false;
@@ -95,8 +101,23 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         this.groundNavigation.setCanFloat(false);
     }
 
-    @Override protected void registerGoals() { HeroAI.registerGoals(this); }
+    @Override
+    protected void registerGoals() {
+        // 👇 [核心修改] 检查硬盘 NBT 数据中的挑战标记
+        // 使用 getPersistentData() 是因为它能跨越服务器重启持久化保存
+        if (this.getPersistentData().getBoolean("IsChallengeActive")) {
+            // 1. 清空所有可能存在的日常 AI
+            this.goalSelector.removeAllGoals(goal -> true);
+            this.targetSelector.removeAllGoals(goal -> true);
 
+            // 2. 重新装载挑战阶段 AI (无需传入 target，Goal 内部会自动寻找)
+            // 这样即使区块重新加载，Boss 也会立刻进入战斗姿态并寻找最近的挑战玩家
+            this.goalSelector.addGoal(1, new com.whitecloud233.modid.herobrine_companion.client.fight.goal.HeroPhase1Goal(this));
+        } else {
+            // 3. 如果没有挑战，则装载原本的日常 AI 系统
+            HeroAI.registerGoals(this);
+        }
+    }
     @Override
     protected PathNavigation createNavigation(Level level) {
         FlyingPathNavigation nav = new FlyingPathNavigation(this, level);
@@ -126,7 +147,6 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     public void tick() {
         super.tick();
 
-        // 委托视觉层处理客户端动画
         HeroVisuals.tickClientAnimations(this);
 
         if (!this.level().isClientSide) {
@@ -134,6 +154,9 @@ public class HeroEntity extends PathfinderMob implements Merchant {
             if (this.scytheAnimTick == 0 && this.entityData.get(INSPECTING_SCYTHE)) this.entityData.set(INSPECTING_SCYTHE, false);
             if (this.debugAnimTick == 0 && this.entityData.get(IS_DEBUGGING)) this.entityData.set(IS_DEBUGGING, false);
             if (this.thunderTicks == 0 && this.entityData.get(IS_CASTING_THUNDER)) this.entityData.set(IS_CASTING_THUNDER, false);
+
+            // 👇 【新增】：呼叫挑战状态管理器，守护底层物理状态
+            com.whitecloud233.modid.herobrine_companion.client.fight.HeroChallengeState.tick(this);
 
             if (this.level().dimension() != ModStructures.END_RING_DIMENSION_KEY) {
                 HeroLogic.tick(this);
@@ -189,6 +212,11 @@ public class HeroEntity extends PathfinderMob implements Merchant {
 
     @Override
     public InteractionResult mobInteract(Player player, InteractionHand hand) {
+        // 👇 [新增] 如果处于挑战模式，直接拦截所有右键交互
+        if (this.getEntityData().get(IS_CHALLENGE_ACTIVE)) {
+            return InteractionResult.FAIL;
+        }
+
         InteractionResult result = HeroLogic.onInteract(this, player, hand);
         return result != InteractionResult.PASS ? result : super.mobInteract(player, hand);
     }
@@ -201,8 +229,25 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         return HeroLogic.onHurt(this, source, amount) || super.hurt(source, amount);
     }
 
-    @Override public void setHealth(float health) { super.setHealth(this.getMaxHealth()); }
+    @Override
+    public void setHealth(float health) {
+        // 检查同步通道判断是否处于挑战模式
+        if (this.getEntityData().get(IS_CHALLENGE_ACTIVE)) {
 
+            // 👇 [核心新增] 如果血量即将归零，拦截死亡！
+            if (health <= 0.0F) {
+                // 锁血并恢复满血
+                health = this.getMaxHealth();
+                // 调用挑战结束逻辑（玩家胜利）
+                com.whitecloud233.modid.herobrine_companion.client.fight.HeroChallengeManager.endChallenge(this, true);
+            }
+
+            super.setHealth(health);
+        } else {
+            // 日常模式下依然强制锁满血
+            super.setHealth(this.getMaxHealth());
+        }
+    }
     @Override
     public void die(DamageSource damageSource) {
         if (!this.level().isClientSide && this.level() instanceof ServerLevel serverLevel) {
@@ -241,6 +286,8 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         this.entityData.define(IS_GLITCHING, false);
         this.entityData.define(IS_DEBUGGING, false);
         this.entityData.define(IS_CASTING_THUNDER, false);
+        this.entityData.define(IS_CHALLENGE_ACTIVE, false);
+        this.entityData.define(CHALLENGE_TICKS, 0);
     }
 
     @Override
@@ -261,9 +308,21 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     public void readAdditionalSaveData(CompoundTag compound) {
         super.readAdditionalSaveData(compound);
         this.isLoadedFromDisk = true;
+
+        // 👇 【修改】：调用专门的方法处理挑战断点恢复，把你原来写在这里的恢复逻辑删掉，保持代码整洁
+        com.whitecloud233.modid.herobrine_companion.client.fight.HeroChallengeState.onRestoreFromDisk(this);
+
         if (compound.contains("TrustLevel")) setTrustLevel(compound.getInt("TrustLevel"));
         if (compound.contains("PatrolTimer")) patrolTimer = compound.getInt("PatrolTimer");
         if (compound.contains("CompanionMode")) setCompanionMode(compound.getBoolean("CompanionMode"));
+// 👇 [核心修复] 恢复挑战模式的同步状态
+        if (this.getPersistentData().getBoolean("IsChallengeActive")) {
+            this.entityData.set(IS_CHALLENGE_ACTIVE, true);
+
+            // 恢复同步通道中的进度 tick，确保客户端动画同步
+            int savedTicks = this.getPersistentData().getInt("ChallengePhaseTicks");
+            this.entityData.set(CHALLENGE_TICKS, savedTicks);
+        }
 
         int localSkin = SKIN_HEROBRINE;
         if (compound.contains("SkinVariant")) localSkin = compound.getInt("SkinVariant");
@@ -352,7 +411,14 @@ public class HeroEntity extends PathfinderMob implements Merchant {
 
     @Override public boolean shouldShowName() { return false; }
     @Override public boolean isCustomNameVisible() { return false; }
-    @Override public boolean isInvulnerable() { return true; }
+    @Override
+    public boolean isInvulnerable() {
+        if (this.entityData.get(IS_CHALLENGE_ACTIVE)) { // [修改] 使用同步通道判断
+            return false;
+        }
+        return true;
+    }
+
     @Override public boolean isClientSide() { return this.level().isClientSide; }
     @Override public boolean removeWhenFarAway(double dist) { return false; }
     @Override public boolean requiresCustomPersistence() { return true; }

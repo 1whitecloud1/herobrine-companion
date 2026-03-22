@@ -93,6 +93,15 @@
   "gui.herobrine_companion.config.transcendence_permit": "Transcendence Permit: %s",
   "gui.herobrine_companion.config.transcendence_permit.tooltip": "Enable/Disable the Transcendence Permit item usage.",
 
+  "gui.herobrine_companion.challenge_mode": "Challenge Mode",
+  "gui.herobrine_companion.challenge_easy": "Easy",
+  "gui.herobrine_companion.challenge_normal": "Normal",
+  "gui.herobrine_companion.challenge_hard": "Hard",
+  "gui.herobrine_companion.challenge_mode_tooltip": "Click to cycle through challenge difficulties",
+  "gui.herobrine_companion.challenge_start": "▶ Start Challenge",
+  "gui.herobrine_companion.challenge_start_tooltip": "Confirm to start the battle at the current difficulty",
+  "message.herobrine_companion.challenge_victory": "The trial ends... You have proven your strength.",
+  "message.herobrine_companion.challenge_failed": "Trial failed... Your will could not be carried through to the end.",
 
   "item.herobrine_companion.source_flow": "Source Flow",
   "item.herobrine_companion.source_flow.desc": "Right-click to force teleport to Herobrine's side",

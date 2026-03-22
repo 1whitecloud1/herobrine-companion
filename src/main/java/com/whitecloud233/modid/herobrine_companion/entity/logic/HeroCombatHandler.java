@@ -17,9 +17,21 @@ public class HeroCombatHandler {
         if (source.is(DamageTypes.FELL_OUT_OF_WORLD)) return false;
         if (amount == Float.MAX_VALUE || amount >= 1.0E30F || Float.isInfinite(amount)) return false;
 
-        // 2. 玩家攻击判定
-        if (!hero.level().isClientSide && source.getEntity() instanceof Player player) {
+        // 【核心修复】：双重检查内存和硬盘数据
+        boolean isChallenge = hero.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE)
+                || hero.getPersistentData().getBoolean("IsChallengeActive");
 
+        if (isChallenge) {
+            // 如果处于挑战模式，确保内存标志是正确的 (防止同步延迟)
+            if (!hero.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE)) {
+                hero.getEntityData().set(HeroEntity.IS_CHALLENGE_ACTIVE, true);
+            }
+            return false; // 交给原版 super.hurt 处理掉血
+        }
+
+        // 2. 玩家攻击判定 (这是原来的日常判断逻辑)
+        if (!hero.level().isClientSide && source.getEntity() instanceof Player player) {
+            // ... (下面保持原样)
             // [新增] 神经网络输入：直接攻击 Herobrine
             // 使用新的输入类型 "DIRECT_ATTACK"，避免增加怪物同情值
             hero.getHeroBrain().input(player.getUUID(), "DIRECT_ATTACK", 0.2f);

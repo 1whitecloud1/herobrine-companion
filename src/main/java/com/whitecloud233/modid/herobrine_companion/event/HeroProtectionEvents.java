@@ -23,8 +23,11 @@ public class HeroProtectionEvents {
         if (newTarget instanceof Player player && player.getTags().contains("herobrine_companion_peaceful")) {
             event.setCanceled(true);
         }
-        if (newTarget instanceof HeroEntity) {
-            event.setCanceled(true);
+        if (newTarget instanceof HeroEntity hero) {
+            // [修复] 如果是在挑战模式下，允许被其他实体锁定
+            if (!hero.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE)) {
+                event.setCanceled(true);
+            }
         }
     }
 
@@ -35,9 +38,12 @@ public class HeroProtectionEvents {
                 event.setCanceled(true);
             }
         }
-        
-        if (event.getEntity() instanceof HeroEntity) {
-            event.setCanceled(true);
+
+        if (event.getEntity() instanceof HeroEntity hero) {
+            // [修复] 只有在日常模式下才取消攻击事件，挑战模式放行
+            if (!hero.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE)) {
+                event.setCanceled(true);
+            }
         }
     }
 
@@ -46,8 +52,12 @@ public class HeroProtectionEvents {
         if (event.getEntity() instanceof Player player && player.getTags().contains("herobrine_companion_peaceful")) {
             if (event.getSource().getEntity() != null) event.setCanceled(true);
         }
-        if (event.getEntity() instanceof HeroEntity) {
-            event.setCanceled(true);
+
+        if (event.getEntity() instanceof HeroEntity hero) {
+            // [修复] 只有在日常模式下才取消伤害事件，挑战模式放行
+            if (!hero.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE)) {
+                event.setCanceled(true);
+            }
         }
     }
 
@@ -61,9 +71,12 @@ public class HeroProtectionEvents {
                 mob.setTarget(null);
                 if (mob instanceof Warden warden) warden.clearAnger(player);
             }
-            if (target instanceof HeroEntity) {
-                mob.setTarget(null);
-                if (mob instanceof Warden warden) warden.clearAnger(target);
+            if (target instanceof HeroEntity hero) {
+                // [修复] 日常模式下清除怪物仇恨，挑战模式允许混战
+                if (!hero.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE)) {
+                    mob.setTarget(null);
+                    if (mob instanceof Warden warden) warden.clearAnger(target);
+                }
             }
             if (mob instanceof WitherBoss wither && wither.getTarget() instanceof Player player && player.getTags().contains("herobrine_companion_peaceful")) {
                 wither.setTarget(null);

@@ -43,32 +43,32 @@ public class HeroModel extends PlayerModel<HeroEntity> {
 
         float partialTick = Minecraft.getInstance().getPartialTick();
         float floatAmount = entity.getFloatingAmount(partialTick);
-        
+
         float headTilt = Mth.sin(ageInTicks * 0.05f) * 0.05f;
         headTilt += (netHeadYaw * 0.01f) * 0.2f;
         this.head.zRot = headTilt;
         this.hat.zRot = this.head.zRot;
 
-        float walkBodyY = 0.0F; 
-        float walkBodyXRot = this.body.xRot; 
+        float walkBodyY = 0.0F;
+        float walkBodyXRot = this.body.xRot;
 
         float floatBodyY = -2.0F + Mth.sin(ageInTicks * 0.1f) * 3.0F;
-        
-        float floatBodyXRot = 0.05F; 
+
+        float floatBodyXRot = 0.05F;
 
         float legLag = Mth.cos(ageInTicks * 0.1f) * 0.1f;
-        float floatRightLegX = 0.3f + legLag; 
-        float floatLeftLegX = 0.2f + legLag * 0.8f; 
+        float floatRightLegX = 0.3f + legLag;
+        float floatLeftLegX = 0.2f + legLag * 0.8f;
         float floatLegZ = 0.05f;
 
         float armBreath = Mth.sin(ageInTicks * 0.06f) * 0.1f;
         float floatRightArmZ = 0.2f + armBreath;
-        float floatLeftArmZ = -0.2f - armBreath; 
+        float floatLeftArmZ = -0.2f - armBreath;
         float floatArmX = -0.2f + armBreath * 0.5f;
 
         if (!entity.isCrouching()) {
             this.body.y = Mth.lerp(floatAmount, walkBodyY, floatBodyY);
-            
+
             this.body.xRot = Mth.lerp(floatAmount, walkBodyXRot, floatBodyXRot);
             this.body.yRot = Mth.lerp(floatAmount, this.body.yRot, 0.0F);
 
@@ -77,7 +77,7 @@ public class HeroModel extends PlayerModel<HeroEntity> {
             this.leftArm.y = 2.0F + this.body.y;
             this.rightLeg.y = 12.0F + this.body.y;
             this.leftLeg.y = 12.0F + this.body.y;
-            
+
             this.jacket.y = this.body.y;
             this.hat.y = this.head.y;
             this.rightSleeve.y = this.rightArm.y;
@@ -88,14 +88,14 @@ public class HeroModel extends PlayerModel<HeroEntity> {
 
         this.rightLeg.xRot = Mth.lerp(floatAmount, this.rightLeg.xRot, floatRightLegX);
         this.leftLeg.xRot = Mth.lerp(floatAmount, this.leftLeg.xRot, floatLeftLegX);
-        
-        this.rightLeg.yRot = Mth.lerp(floatAmount, this.rightLeg.yRot, 0.0F); 
+
+        this.rightLeg.yRot = Mth.lerp(floatAmount, this.rightLeg.yRot, 0.0F);
         this.leftLeg.yRot = Mth.lerp(floatAmount, this.leftLeg.yRot, 0.0F);
-        
+
         this.rightLeg.zRot = Mth.lerp(floatAmount, 0.0F, floatLegZ);
         this.leftLeg.zRot = Mth.lerp(floatAmount, 0.0F, -floatLegZ);
 
-        float walkRightArmZ = 0.0F; 
+        float walkRightArmZ = 0.0F;
         float walkLeftArmZ = 0.0F;
 
         if (this.attackTime <= 0 && this.rightArmPose == ArmPose.EMPTY) {
@@ -106,6 +106,9 @@ public class HeroModel extends PlayerModel<HeroEntity> {
             this.leftArm.xRot = Mth.lerp(floatAmount, this.leftArm.xRot, floatArmX);
             this.leftArm.zRot = Mth.lerp(floatAmount, walkLeftArmZ, floatLeftArmZ);
         }
+
+        // [新增] 挂载挑战模式专属的独立动画系统 (注意确保你的包路径与这里一致)
+        com.whitecloud233.modid.herobrine_companion.client.fight.animation.HeroChallengeAnimations.setupChallengeAnims(this, entity, ageInTicks);
 
         copyAllModelProperties();
     }
@@ -153,6 +156,7 @@ public class HeroModel extends PlayerModel<HeroEntity> {
         // 最后同步所有属性
         copyAllModelProperties();
     }
+
     private void setupDebugAnim(HeroEntity entity, float ageInTicks) {
         // 计算混合因子 (Blend)，同之前的逻辑，为了平滑过渡
         float animTimer = entity.debugAnimTick;
@@ -166,101 +170,74 @@ public class HeroModel extends PlayerModel<HeroEntity> {
         // --- 动作设计 ---
 
         // 1. 头部：盯着自己的右手
-        // 强制低头一点点，向右看一点点
         this.head.xRot = Mth.lerp(blend, this.head.xRot, 0.3F);
-        this.head.yRot = Mth.lerp(blend, this.head.yRot, -0.4F); // 负数是向右(模型视角)
+        this.head.yRot = Mth.lerp(blend, this.head.yRot, -0.4F);
 
         // 2. 右臂：抬起姿态 (Holding the screen)
-        // xRot: -1.5F (抬平，约90度)
-        // yRot: -0.6F (向内收，放在脸前)
         float baseArmX = -1.5F;
         float baseArmY = -0.5F;
 
         // 3. 模拟“打字”微动 (Typing Jitter)
-        // 使用高频的正弦波，加上一点随机噪音
-        // 速度 0.8F (很快)，幅度 0.05F (很小)
         float typeAction = Mth.sin(ageInTicks * 0.8F) * 0.05F;
-
-        // 偶尔加一点剧烈的“点击”动作 (模拟敲回车)
         if (entity.getRandom().nextFloat() < 0.1F) {
             typeAction += 0.15F;
         }
 
         // 应用到右臂
-        // 我们把抖动加在 xRot (上下点按) 和 zRot (手腕转动) 上
         this.rightArm.xRot = Mth.lerp(blend, this.rightArm.xRot, baseArmX + typeAction);
         this.rightArm.yRot = Mth.lerp(blend, this.rightArm.yRot, baseArmY);
-        // zRot 微动能增加灵动感
         this.rightArm.zRot = Mth.lerp(blend, this.rightArm.zRot, typeAction * 0.5F);
 
         // 4. 左臂：自然下垂或背在身后
-        // 让他看起来很从容，单手操作
-        this.leftArm.xRot = Mth.lerp(blend, this.leftArm.xRot, 0.2F); // 稍微往后摆
-        this.leftArm.zRot = Mth.lerp(blend, this.leftArm.zRot, 0.1F); // 稍微张开
+        this.leftArm.xRot = Mth.lerp(blend, this.leftArm.xRot, 0.2F);
+        this.leftArm.zRot = Mth.lerp(blend, this.leftArm.zRot, 0.1F);
 
         // 最后同步所有属性
         copyAllModelProperties();
     }
 
     private void setupThunderAnim(HeroEntity entity, float ageInTicks) {
-        // [修复] Minecraft.getInstance().getTimer() 在新版本中可能不可用或方法名变更
-        // 我们可以直接使用 Minecraft.getInstance().getPartialTick()
         float progress = entity.getThunderProgress(Minecraft.getInstance().getPartialTick());
 
         // 如果不在动作中，直接返回
         if (progress <= 0.01F) return;
 
         // --- 1. 计算平滑曲线 (SmoothStep) ---
-        // 这会让动作看起来不生硬
         float smooth = progress * progress * (3.0F - 2.0F * progress);
 
         // --- 2. 肢体动作 ---
 
-        // A. 右臂：高举擎天 (The Thunder Arm)
-        // 目标：竖直向上 (-180度 = -3.14F)，稍微向外张开
-        float targetRightArmX = -3.2F; // 甚至超过180度，向后一点点，更张狂
-        float targetRightArmZ = 0.2F;  // 向外张开
+        // A. 右臂：高举擎天
+        float targetRightArmX = -3.2F;
+        float targetRightArmZ = 0.2F;
 
         this.rightArm.xRot = Mth.lerp(smooth, this.rightArm.xRot, targetRightArmX);
         this.rightArm.zRot = Mth.lerp(smooth, this.rightArm.zRot, targetRightArmZ);
-        // 修正手腕，让镰刀/物品垂直
         this.rightArm.yRot = Mth.lerp(smooth, this.rightArm.yRot, 0.0F);
 
+        // B. 左臂：握拳下压
+        this.leftArm.xRot = Mth.lerp(smooth, this.leftArm.xRot, 0.8F);
+        this.leftArm.zRot = Mth.lerp(smooth, this.leftArm.zRot, -0.4F);
 
-        // B. 左臂：握拳下压 (Counter Balance)
-        // 另一只手用力下压，增加力量感
-        this.leftArm.xRot = Mth.lerp(smooth, this.leftArm.xRot, 0.8F); // 向下前伸
-        this.leftArm.zRot = Mth.lerp(smooth, this.leftArm.zRot, -0.4F); // 向外张开
-
-
-        // C. 头部：仰望天空 (Look at the Sky)
-        // 目标：仰视 (-1.2F)
+        // C. 头部：仰望天空
         this.head.xRot = Mth.lerp(smooth, this.head.xRot, -1.2F);
-        // 锁定头部旋转，不让它乱看玩家，而是看天
         this.head.yRot = Mth.lerp(smooth, this.head.yRot, 0.0F);
 
-
-        // D. 脊柱/身体：后仰挺胸 (Arch Back)
-        // 这是一个展现力量的关键细节
-        this.body.xRot = Mth.lerp(smooth, this.body.xRot, -0.3F); // 后仰
-        this.body.y = Mth.lerp(smooth, this.body.y, -2.0F); // 身体稍微被能量提起来一点点
-
+        // D. 脊柱/身体：后仰挺胸
+        this.body.xRot = Mth.lerp(smooth, this.body.xRot, -0.3F);
+        this.body.y = Mth.lerp(smooth, this.body.y, -2.0F);
 
         // --- 3. 能量过载震颤 (Overload Shake) ---
-        // 只有在动作后半段 (progress > 0.6) 才开始抖动
         if (progress > 0.6F) {
-            // 抖动幅度随进度增加
             float shakeIntensity = (progress - 0.6F) * 0.05F;
 
-            // 使用高频 sin 函数模拟电流通过身体
             float shakeX = Mth.sin(ageInTicks * 2.5F) * shakeIntensity;
             float shakeZ = Mth.cos(ageInTicks * 2.5F) * shakeIntensity;
 
-            // 应用抖动到所有部件
-            this.rightArm.xRot += shakeX * 2.0F; // 手臂抖动最剧烈
+            this.rightArm.xRot += shakeX * 2.0F;
             this.rightArm.zRot += shakeZ;
 
-            this.head.yRot += shakeX; // 头不自觉地摆动
+            this.head.yRot += shakeX;
 
             this.body.xRot += shakeX * 0.5F;
         }

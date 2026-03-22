@@ -49,10 +49,14 @@ public class PlayerGameplayHandler {
 
     @SubscribeEvent
     public static void onPlayerJoinWorld(EntityJoinLevelEvent event) {
-        // 1.20.1: getLevel()
         if (event.getEntity() instanceof ServerPlayer player && event.getLevel().dimension() == ModStructures.END_RING_DIMENSION_KEY) {
-            
+
             CompoundTag data = player.getPersistentData();
+
+            // 👇 [新增拦截] 挑战期间传送过来，绝对不启动跌落虚空逻辑和苏醒剧情
+            if (data.getBoolean("IsChallengeActive")) {
+                return;
+            }
 
             // [修复] 登录时虚空保护：防止因 disconnect 导致位置未保存而死循环
             if (player.getY() < -50) {
@@ -93,20 +97,22 @@ public class PlayerGameplayHandler {
     public static void onPlayerTick(TickEvent.PlayerTickEvent event) {
         // 1.20.1 必须检查 Phase 和 Side
         if (event.phase != TickEvent.Phase.END || event.side != LogicalSide.SERVER) return;
-
-        // 1.20.1 TickEvent 的 player 字段
         if (!(event.player instanceof ServerPlayer player)) return;
+
+        // 👇 [核心修复] 如果玩家已经死了（正躺在地上或处于“你死了”界面），绝对不要跑任何游戏机制！
+        if (!player.isAlive()) return;
 
         // 1. 主世界逻辑
         if (player.level().dimension() == Level.OVERWORLD) {
             checkUnstableZone(player);
             checkStillnessForFragment6(player);
-            // 注意：原本的 checkHeroRespawn 已删除，由 HeroDimensionHandler 接管跨维度逻辑
         }
-
-        // 2. End Ring 逻辑
+// 2. End Ring 逻辑
         if (player.level().dimension() == ModStructures.END_RING_DIMENSION_KEY) {
-            handleEndRingGameplay(player);
+            // 👇 [新增拦截] 挑战期间，直接剥夺剧情处理器的执行权
+            if (!player.getPersistentData().getBoolean("IsChallengeActive")) {
+                handleEndRingGameplay(player);
+            }
         }
     }
 
@@ -114,7 +120,10 @@ public class PlayerGameplayHandler {
     public static void onPlayerClone(PlayerEvent.Clone event) {
         CompoundTag original = event.getOriginal().getPersistentData();
         CompoundTag cur = event.getEntity().getPersistentData();
-
+// 👇 [新增] 继承挑战失败的播报标记
+        if (original.contains("ChallengeFailedMessagePending")) {
+            cur.putBoolean("ChallengeFailedMessagePending", original.getBoolean("ChallengeFailedMessagePending"));
+        }
         // 死亡重生时继承 Hero 的携带数据
         if (original.contains("HeroRespawnData")) {
             cur.put("HeroRespawnData", original.getCompound("HeroRespawnData"));
@@ -221,7 +230,14 @@ public class PlayerGameplayHandler {
                 }
             }
         }
+        // 👇 [新增核心逻辑：玩家在试炼中死亡]
+        if (event.getEntity() instanceof ServerPlayer deadPlayer) {
+            if (deadPlayer.getPersistentData().getBoolean("IsChallengeActive")) {
+                com.whitecloud233.modid.herobrine_companion.client.fight.HeroChallengeManager.failChallenge(deadPlayer);
+            }
+        }
     }
+
 
     // [新增] 玩家右键实体事件 (处理载具邀请)
     @SubscribeEvent
@@ -622,6 +638,28 @@ public class PlayerGameplayHandler {
                         Component.translatable("message.herobrine_companion.fragment_4_received")).withStyle(ChatFormatting.YELLOW));
 
                 data.putBoolean("HasReceivedFragment4", true);
+            }
+        }
+    }
+    @SubscribeEvent
+    public static void onPlayerRespawn(PlayerEvent.PlayerRespawnEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            CompoundTag data = player.getPersistentData();
+
+            // 1. 播报挑战失败信息
+            if (data.getBoolean("ChallengeFailedMessagePending")) {
+                player.sendSystemMessage(Component.translatable("message.herobrine_companion.challenge_failed").withStyle(ChatFormatting.RED, ChatFormatting.BOLD));
+                // 播放一个低沉的音效
+                player.level().playSound(null, player.blockPosition(), net.minecraft.sounds.SoundEvents.WITHER_SPAWN, net.minecraft.sounds.SoundSource.MASTER, 0.5f, 0.5f);
+                data.remove("ChallengeFailedMessagePending");
+            }
+
+            // 2. 托底机制：如果你把床放在了试炼维度（End Ring），原版的跨维度事件不会触发。
+            // 此时强行用战斗复活逻辑把 Hero 拉出来。
+            if (data.getBoolean("HeroPendingRespawn") && data.contains("HeroRespawnData")) {
+                com.whitecloud233.modid.herobrine_companion.entity.logic.HeroDimensionHandler.respawnNearPlayer((ServerLevel)player.level(), player);
+                data.remove("HeroPendingRespawn");
+                data.remove("HeroRespawnData");
             }
         }
     }

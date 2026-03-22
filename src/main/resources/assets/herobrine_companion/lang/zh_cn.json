@@ -13,6 +13,20 @@
   "message.herobrine_companion.summon_fail_exists": "Herobrine 已经存在。",
   "message.herobrine_companion.summon_success": "§a已召唤Hero！",
 
+  "gui.herobrine_companion.challenge_mode": "挑战模式",
+  "gui.herobrine_companion.challenge_easy": "简单",
+  "gui.herobrine_companion.challenge_normal": "普通",
+  "gui.herobrine_companion.challenge_hard": "困难",
+  "gui.herobrine_companion.challenge_mode_tooltip": "点击循环切换挑战难度",
+  "gui.herobrine_companion.challenge_start": "▶ 开始挑战",
+  "gui.herobrine_companion.challenge_start_tooltip": "确认开启当前难度的战斗",
+  "message.herobrine_companion.challenge_victory": "试炼结束... 你证明了你的实力。",
+  "message.herobrine_companion.challenge_failed": "试炼失败... 你的意志未能贯彻到底。",
+
+
+
+
+
   "itemGroup.herobrine_companion": "Herobrine的陪伴",
   "item.herobrine_companion.ghost_steve_spawn_egg": "幽灵史蒂夫刷怪蛋",
   "entity.herobrine_companion.ghost_steve": "幽灵史蒂夫",

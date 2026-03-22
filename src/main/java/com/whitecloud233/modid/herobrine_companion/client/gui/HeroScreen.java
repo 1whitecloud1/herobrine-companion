@@ -12,6 +12,7 @@ import com.whitecloud233.modid.herobrine_companion.network.OpenWardrobePacket;
 import com.whitecloud233.modid.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.modid.herobrine_companion.network.PeacefulPacket;
 import com.whitecloud233.modid.herobrine_companion.network.ToggleCompanionPacket;
+import com.whitecloud233.modid.herobrine_companion.network.StartChallengePacket;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -33,12 +34,15 @@ public class HeroScreen extends Screen {
 
     private boolean confirmingVoid = false;
     private long confirmTime = 0;
-    
+
     private boolean confirmingDesolate = false;
     private long confirmDesolateTime = 0;
-    
+
     private boolean confirmingFlatten = false;
     private long confirmFlattenTime = 0;
+
+    // [新增] 挑战难度状态：0=简单, 1=普通, 2=困难
+    private int challengeMode = 0;
 
     // 配色方案
     private static final int COL_BG_MAIN    = 0xFF2B2B2B;
@@ -89,13 +93,13 @@ public class HeroScreen extends Screen {
 
         // [修改] 使用自定义 ThemedButton 替换 API 切换按钮
         Button apiBtn = new ThemedButton(
-            btnX, btnY, 46, 16,
-            Component.translatable(ClientHooks.isApiEnabled() ? "gui.herobrine_companion.run_cloud" : "gui.herobrine_companion.run_local"),
-            button -> {
-                ClientHooks.toggleApiEnabled();
-                button.setMessage(Component.translatable(ClientHooks.isApiEnabled() ? "gui.herobrine_companion.run_cloud" : "gui.herobrine_companion.run_local"));
-            },
-            Tooltip.create(Component.translatable("gui.herobrine_companion.api_tooltip"))
+                btnX, btnY, 46, 16,
+                Component.translatable(ClientHooks.isApiEnabled() ? "gui.herobrine_companion.run_cloud" : "gui.herobrine_companion.run_local"),
+                button -> {
+                    ClientHooks.toggleApiEnabled();
+                    button.setMessage(Component.translatable(ClientHooks.isApiEnabled() ? "gui.herobrine_companion.run_cloud" : "gui.herobrine_companion.run_local"));
+                },
+                Tooltip.create(Component.translatable("gui.herobrine_companion.api_tooltip"))
         );
         this.addRenderableWidget(apiBtn);
 
@@ -103,18 +107,18 @@ public class HeroScreen extends Screen {
         // 放在面板左上角，标题栏区域
         int skinBtnX = startX + 5; // 左侧边距
         int skinBtnY = startY + 4; // 顶部边距，与 API 按钮对齐
-        
+
         // [修改] 按钮名称改为 "皮肤更改" (使用 key: gui.herobrine_companion.change_skin)
         Button skinBtn = new ThemedButton(
-            skinBtnX, 
-            skinBtnY, 
-            90, 16, // 宽度稍微调整以适应左侧空间
-            Component.translatable("gui.herobrine_companion.change_skin"),
-            button -> {
-                // 打开新的皮肤切换界面
-                Minecraft.getInstance().setScreen(new HeroSkinScreen(this.entityId));
-            },
-            Tooltip.create(Component.translatable("gui.herobrine_companion.switch_skin_tooltip"))
+                skinBtnX,
+                skinBtnY,
+                90, 16, // 宽度稍微调整以适应左侧空间
+                Component.translatable("gui.herobrine_companion.change_skin"),
+                button -> {
+                    // 打开新的皮肤切换界面
+                    Minecraft.getInstance().setScreen(new HeroSkinScreen(this.entityId));
+                },
+                Tooltip.create(Component.translatable("gui.herobrine_companion.switch_skin_tooltip"))
         );
         this.addRenderableWidget(skinBtn);
 
@@ -129,10 +133,10 @@ public class HeroScreen extends Screen {
 
         // [修改] 使用自定义 ThemedButton 替换 离开 按钮
         this.addRenderableWidget(new ThemedButton(
-            editorX + editorWidth - 85, startY + PANEL_HEIGHT - 18, 80, 16,
-            Component.translatable("gui.herobrine_companion.leave"),
-            button -> this.onClose(),
-            null
+                editorX + editorWidth - 85, startY + PANEL_HEIGHT - 18, 80, 16,
+                Component.translatable("gui.herobrine_companion.leave"),
+                button -> this.onClose(),
+                null
         ));
     }
 
@@ -168,7 +172,7 @@ public class HeroScreen extends Screen {
             return Component.translatable(isProtected ? "gui.herobrine_companion.disable_protection" : "gui.herobrine_companion.enable_protection");
         }, button -> {
             boolean isProtected = this.minecraft != null && this.minecraft.player != null && this.minecraft.player.getTags().contains("herobrine_companion_peaceful");
-            
+
             // [核心修复] 在客户端手动同步这个 Tag 的状态，保持客户端与服务端一致
             if (this.minecraft != null && this.minecraft.player != null) {
                 if (isProtected) {
@@ -185,10 +189,10 @@ public class HeroScreen extends Screen {
         this.actionList.addAction(Component.translatable("gui.herobrine_companion.trade"), button -> {
             PacketHandler.sendToServer(new OpenTradePacket(this.entityId));
             // [修复] 不要在这里关闭屏幕！
-            // this.onClose(); 
+            // this.onClose();
             // 让服务端打开新菜单时自动覆盖当前屏幕
         }, Tooltip.create(Component.translatable("gui.herobrine_companion.trade_tooltip")));
-        
+
         // 👇 [新增] 装扮(衣柜)按钮
         this.actionList.addAction(Component.translatable("gui.herobrine_companion.wardrobe"), button -> {
             // 向服务端发送打开装扮界面的请求
@@ -229,11 +233,11 @@ public class HeroScreen extends Screen {
                     currentState = h.isCompanionMode();
                 }
             }
-            
+
             if (!companionUnlocked) {
                 return Component.translatable("gui.herobrine_companion.companion_locked", 50, finalCurrentTrust).withStyle(style -> style.withColor(0xFF808080));
             }
-            
+
             String key = currentState ? "gui.herobrine_companion.companion_disable" : "gui.herobrine_companion.companion_enable";
             return Component.translatable(key).withStyle(style -> style.withColor(0xFFFFC66D));
         }, button -> {
@@ -275,6 +279,7 @@ public class HeroScreen extends Screen {
                 confirmDesolateTime = System.currentTimeMillis();
             }
         }, Tooltip.create(Component.translatable(desolateUnlocked ? "gui.herobrine_companion.desolate_warning" : "gui.herobrine_companion.desolate_locked_trust_tooltip", currentTrust))).active = desolateUnlocked;
+
         // [新增] 平整地形按钮
         boolean flattenUnlocked = currentTrust >= 50;
         this.actionList.addDynamicAction(() -> {
@@ -292,6 +297,31 @@ public class HeroScreen extends Screen {
                 confirmFlattenTime = System.currentTimeMillis();
             }
         }, Tooltip.create(Component.translatable(flattenUnlocked ? "gui.herobrine_companion.flatten_warning" : "gui.herobrine_companion.flatten_locked_trust_tooltip", currentTrust))).active = flattenUnlocked;
+
+        // [新增] 挑战难度切换按钮
+        this.actionList.addDynamicAction(() -> {
+            String modeKey = this.challengeMode == 0 ? "gui.herobrine_companion.challenge_easy" :
+                    (this.challengeMode == 1 ? "gui.herobrine_companion.challenge_normal" : "gui.herobrine_companion.challenge_hard");
+
+            return Component.translatable("gui.herobrine_companion.challenge_mode")
+                    .append(": ")
+                    .append(Component.translatable(modeKey))
+                    .withStyle(style -> style.withColor(0xFF55FF55)); // 绿色文本
+        }, button -> {
+            // 点击循环切换：0(简单) -> 1(普通) -> 2(困难) -> 0(简单)
+            this.challengeMode = (this.challengeMode + 1) % 3;
+        }, Tooltip.create(Component.translatable("gui.herobrine_companion.challenge_mode_tooltip")));
+
+        // [新增] 确认开始挑战按钮
+        this.actionList.addAction(
+                Component.translatable("gui.herobrine_companion.challenge_start").withStyle(style -> style.withColor(0xFFFF5555)), // 红色文本警告
+                button -> {
+                    // 需要在 network 包中自行实现 StartChallengePacket，以便将 this.entityId 和 this.challengeMode 发送给服务端
+                     PacketHandler.sendToServer(new StartChallengePacket(this.entityId, this.challengeMode));
+                    this.onClose();
+                },
+                Tooltip.create(Component.translatable("gui.herobrine_companion.challenge_start_tooltip"))
+        );
     }
 
     @Override
@@ -303,11 +333,11 @@ public class HeroScreen extends Screen {
         if (confirmingVoid && System.currentTimeMillis() - confirmTime > 3000) {
             confirmingVoid = false;
         }
-        
+
         if (confirmingDesolate && System.currentTimeMillis() - confirmDesolateTime > 3000) {
             confirmingDesolate = false;
         }
-        
+
         if (confirmingFlatten && System.currentTimeMillis() - confirmFlattenTime > 3000) {
             confirmingFlatten = false;
         }
