@@ -22,7 +22,7 @@ public class HeroPhase1Goal extends Goal {
     private final HeroEntity hero;
     private LivingEntity target;
     private int phaseTicks;
-    private double targetHoverY = 107.0;
+    private double targetHoverY = 112.0;
 
     private final List<PendingStrike> pendingStrikes = new ArrayList<>();
 
@@ -106,8 +106,8 @@ public class HeroPhase1Goal extends Goal {
         // 技能释放逻辑
         if (this.hero.level() instanceof ServerLevel serverLevel) {
             if (this.phaseTicks > 30) {
-                if (this.phaseTicks % 8 == 0) {
-                    int count = 1 + serverLevel.getRandom().nextInt(1);
+                if (this.phaseTicks % 6 == 0) {
+                    int count = 2 + serverLevel.getRandom().nextInt(2);
                     for (int i = 0; i < count; i++) castPaleLightningPillar();
                 }
             }

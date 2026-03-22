@@ -90,7 +90,6 @@ public class HeroChallengeManager {
     }
 
     private static void setupChallengeEntity(HeroEntity hero, ServerPlayer target, int challengeMode) {
-        // 在 setupChallengeEntity 方法开头添加
         hero.removeTag(EndRingContext.TAG_INTRO);
         hero.removeTag(EndRingContext.TAG_FIXED);
         hero.removeTag(EndRingContext.TAG_RESPAWNED_SAFE);
@@ -115,10 +114,19 @@ public class HeroChallengeManager {
         hero.setHealth(hero.getMaxHealth());
 
         hero.goalSelector.addGoal(1, new HeroPhase1Goal(hero));
+
         if (target != null) {
             target.sendSystemMessage(Component.literal("§c[系统] 试炼已启动，目标锁定！").withStyle(ChatFormatting.BOLD));
             // 缓慢下落防止网络延迟时掉虚空
             target.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.SLOW_FALLING, 100, 0, false, false));
+
+            // ✅ 新增：战前备份并剥夺生存模式飞行能力
+            if (!target.isCreative() && !target.isSpectator()) {
+                target.getPersistentData().putBoolean("PreChallengeMayFly", target.getAbilities().mayfly);
+                target.getAbilities().mayfly = false;
+                target.getAbilities().flying = false;
+                target.onUpdateAbilities();
+            }
         }
     }
 
@@ -180,24 +188,21 @@ public class HeroChallengeManager {
         // 将玩家拉回去
         player.teleportTo(returnLevel, rx, ry, rz, player.getYRot(), player.getXRot());
 
-        // 👇 [核心修复 1] 在传送 Hero 之前，临时再给他发一张跨维度的“免检通行证”！
-        // 这样你的 HeroEndringEvent 就会乖乖放行，让他回到主世界。
+        // [核心修复 1] 在传送 Hero 之前，临时再给他发一张跨维度的“免检通行证”！
         hero.getPersistentData().putBoolean("IsChallengeActive", true);
 
         // 将 Hero 拉回去
         hero.changeDimension(returnLevel, new net.minecraftforge.common.util.ITeleporter() {
             @Override
             public Entity placeEntity(Entity entity, ServerLevel currentWorld, ServerLevel destWorld, float yaw, java.util.function.Function<Boolean, Entity> repositionEntity) {
-                // 这个 apply 会在主世界生成一个他的克隆体，并触发加入世界的查重事件
                 Entity e = repositionEntity.apply(false);
                 e.setPos(rx + 1.0, ry, rz + 1.0);
 
-                // 👇 [核心修复 2] 落地主世界后，立刻没收他的免检通行证，并重新装载日常 AI！
+                // [核心修复 2] 落地主世界后，立刻没收他的免检通行证，并重新装载日常 AI！
                 if (e instanceof HeroEntity newHero) {
                     newHero.getPersistentData().putBoolean("IsChallengeActive", false);
                     newHero.getEntityData().set(HeroEntity.IS_CHALLENGE_ACTIVE, false);
 
-                    // 跨维度生成的克隆体可能丢失刚才设置的 AI，这里保险起见重新唤醒日常系统
                     newHero.goalSelector.removeAllGoals(goal -> true);
                     newHero.targetSelector.removeAllGoals(goal -> true);
                     newHero.setTarget(null);
@@ -214,13 +219,16 @@ public class HeroChallengeManager {
         playerData.remove("ChallengeReturnX");
         playerData.remove("ChallengeReturnY");
         playerData.remove("ChallengeReturnZ");
+
+        // ✅ 新增：胜利并传送回主世界后，恢复飞行权限
+        restoreFlightAbilities(player);
+
         playerData.remove("IsChallengeActive");
     }
+
     public static void failChallenge(ServerPlayer player) {
         CompoundTag playerData = player.getPersistentData();
         playerData.putBoolean("IsChallengeActive", false);
-
-        // ❌ 删除原来写在这里的 hero.getPersistentData().remove("ChallengePhaseTicks");
 
         ServerLevel level = (ServerLevel) player.level();
         HeroEntity activeHero = null;
@@ -239,7 +247,7 @@ public class HeroChallengeManager {
             activeHero.getEntityData().set(HeroEntity.CHALLENGE_TICKS, 0);
             activeHero.getPersistentData().putBoolean("IsChallengeActive", false);
 
-            // ✅ 【核心修复】：在这里使用 activeHero 清除存档的进度！
+            // 【核心修复】：在这里使用 activeHero 清除存档的进度！
             activeHero.getPersistentData().remove("ChallengePhaseTicks");
 
             // 恢复血量和重力
@@ -267,10 +275,28 @@ public class HeroChallengeManager {
             activeHero.discard();
         }
 
-        // 清除返回坐标（因为玩家将走原版正常的死亡重生流程，不需要强拉）
+        // 清除返回坐标
         playerData.remove("ChallengeReturnDim");
         playerData.remove("ChallengeReturnX");
         playerData.remove("ChallengeReturnY");
         playerData.remove("ChallengeReturnZ");
+
+        // ✅ 新增：试炼失败时，恢复飞行权限
+        restoreFlightAbilities(player);
+    }
+
+    // ✅ 新增：战后恢复玩家飞行权限的通用方法
+    public static void restoreFlightAbilities(ServerPlayer player) {
+        CompoundTag playerData = player.getPersistentData();
+        if (playerData.contains("PreChallengeMayFly")) {
+            boolean couldFly = playerData.getBoolean("PreChallengeMayFly");
+            // 如果玩家战前能飞，且现在不是创造/旁观模式，就把飞行还给他
+            if (couldFly && !player.isCreative() && !player.isSpectator()) {
+                player.getAbilities().mayfly = true;
+                player.onUpdateAbilities();
+            }
+            // 阅后即焚，清理掉备份数据
+            playerData.remove("PreChallengeMayFly");
+        }
     }
 }

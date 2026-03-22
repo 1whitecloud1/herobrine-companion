@@ -1,7 +1,5 @@
 package com.whitecloud233.modid.herobrine_companion.client.fight.particles;
 
-import com.finderfeed.fdlib.util.FDColor;
-import com.finderfeed.fdlib.util.math.FDMathUtil;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
 import net.minecraft.client.Camera;
@@ -25,13 +23,20 @@ public class PaleLightningArcParticle extends Particle {
 
     private final Vec3 absoluteEndPos;
     private final List<Vec3> mainPath;
-    private final float baseRadius = 0.02f; // 雷电网相对较细
+    private final float baseRadius = 0.02f;
+
+    // 内部类平替 FDColor
+    protected static class ParticleColor {
+        public final float r, g, b, a;
+        public ParticleColor(float r, float g, float b, float a) {
+            this.r = r; this.g = g; this.b = b; this.a = a;
+        }
+    }
 
     public PaleLightningArcParticle(ClientLevel level, double startX, double startY, double startZ, Vec3 endPos) {
         super(level, startX, startY, startZ);
         this.absoluteEndPos = endPos;
 
-        // 雷电网寿命较短，瞬间产生并快速消散
         this.lifetime = 12;
         this.hasPhysics = false;
 
@@ -40,7 +45,6 @@ public class PaleLightningArcParticle extends Particle {
         Vec3 startPos = new Vec3(this.x, this.y, this.z);
         Random r = new Random();
 
-        // 生成曲折的闪电路径
         int segments = Math.max(5, (int)(startPos.distanceTo(endPos) * 4));
         float wanderStep = 0.3f;
         this.mainPath = buildJaggedPath(startPos, endPos, segments, wanderStep, r);
@@ -53,13 +57,12 @@ public class PaleLightningArcParticle extends Particle {
         Vec3 currentWander = Vec3.ZERO;
 
         for (float p = step; p < 1.0f; p += step) {
-            Vec3 basePoint = FDMathUtil.interpolateVectors(start, end, p);
+            Vec3 basePoint = interpolateVec3(start, end, p);
             float dx = (r.nextFloat() * 2 - 1) * stepOffset;
             float dy = (r.nextFloat() * 2 - 1) * stepOffset;
             float dz = (r.nextFloat() * 2 - 1) * stepOffset;
             currentWander = currentWander.add(dx, dy, dz);
 
-            // 添加包络线让中段偏离更大，两端收束
             float envelope = (float) Math.sin(p * Math.PI);
             path.add(basePoint.add(currentWander.scale(envelope)));
         }
@@ -72,26 +75,22 @@ public class PaleLightningArcParticle extends Particle {
         Vec3 cameraPos = camera.getPosition();
         Matrix4f mat = new Matrix4f().identity();
 
-        // 计算消散透明度 (最后 5 tick 开始变淡)
         float alpha = 1.0f;
         int fadeStartTick = lifetime - 5;
         if (this.age > fadeStartTick) {
             alpha = 1.0f - ((float) (this.age - fadeStartTick) / 5.0f);
         }
 
-        // 保持纯白雷电的设定
-        FDColor coreColor = new FDColor(1.0f, 1.0f, 1.0f, 0.95f * alpha);
-        FDColor glowColor = new FDColor(0.8f, 0.9f, 1.0f, 0.4f * alpha);
+        ParticleColor coreColor = new ParticleColor(1.0f, 1.0f, 1.0f, 0.95f * alpha);
+        ParticleColor glowColor = new ParticleColor(0.8f, 0.9f, 1.0f, 0.4f * alpha);
 
-        int cylinderSegments = 5; // 性能考虑，雷电网截面段数可以稍微低一点
+        int cylinderSegments = 5;
 
-        // 渲染外发光层
         drawVolumetricCylinder(mat, vertex, cameraPos, this.mainPath, cylinderSegments, baseRadius * 2.5f, glowColor);
-        // 渲染核心高光层
         drawVolumetricCylinder(mat, vertex, cameraPos, this.mainPath, cylinderSegments, baseRadius, coreColor);
     }
 
-    private void drawVolumetricCylinder(Matrix4f transform, VertexConsumer vertex, Vec3 cameraPos, List<Vec3> path, int cylinderSegments, float radius, FDColor col) {
+    private void drawVolumetricCylinder(Matrix4f transform, VertexConsumer vertex, Vec3 cameraPos, List<Vec3> path, int cylinderSegments, float radius, ParticleColor col) {
         int totalSegments = path.size() - 1;
         if (totalSegments <= 0) return;
 
@@ -124,7 +123,7 @@ public class PaleLightningArcParticle extends Particle {
 
     private List<Vec3> generateRing(Vec3 center, Vec3 axis, int segments, float radius) {
         List<Vec3> ring = new ArrayList<>();
-        Vector3f axis3f = FDMathUtil.vec3ToVector3f(axis).normalize();
+        Vector3f axis3f = toVector3f(axis).normalize();
         Vector3f u;
         if (Math.abs(axis3f.y) < 0.999f) {
             u = axis3f.cross(new Vector3f(0.0f, 1.0f, 0.0f), new Vector3f()).normalize();
@@ -134,20 +133,37 @@ public class PaleLightningArcParticle extends Particle {
         Vector3f v = axis3f.cross(u, new Vector3f()).normalize();
 
         for (int i = 0; i < segments; i++) {
-            float angle = (float)i / segments * FDMathUtil.FPI * 2;
+            float angle = (float)i / segments * (float)Math.PI * 2;
             float cos = (float)Math.cos(angle);
             float sin = (float)Math.sin(angle);
 
-            Vector3f vertexPos = FDMathUtil.vec3ToVector3f(center);
+            Vector3f vertexPos = toVector3f(center);
             vertexPos.add(u.mul(cos * radius, new Vector3f()));
             vertexPos.add(v.mul(sin * radius, new Vector3f()));
-            ring.add(FDMathUtil.vector3fToVec3(vertexPos));
+            ring.add(toVec3(vertexPos));
         }
         return ring;
     }
 
-    private void addVertex(VertexConsumer vertex, Matrix4f mat, Vec3 pos, FDColor col) {
+    private void addVertex(VertexConsumer vertex, Matrix4f mat, Vec3 pos, ParticleColor col) {
         vertex.vertex(mat, (float) pos.x, (float) pos.y, (float) pos.z).color(col.r, col.g, col.b, col.a).endVertex();
+    }
+
+    // 平替 FDMathUtil 方法
+    private static Vec3 interpolateVec3(Vec3 start, Vec3 end, float p) {
+        return new Vec3(
+                start.x + (end.x - start.x) * p,
+                start.y + (end.y - start.y) * p,
+                start.z + (end.z - start.z) * p
+        );
+    }
+
+    private static Vector3f toVector3f(Vec3 vec) {
+        return new Vector3f((float) vec.x, (float) vec.y, (float) vec.z);
+    }
+
+    private static Vec3 toVec3(Vector3f vec) {
+        return new Vec3(vec.x, vec.y, vec.z);
     }
 
     public static final ParticleRenderType RENDER_TYPE = new ParticleRenderType() {

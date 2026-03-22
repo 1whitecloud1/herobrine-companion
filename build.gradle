@@ -195,7 +195,7 @@ dependencies {
 
 // 引入 FDLib (以 1.20.1 的常用版本为例)
     // 请根据 Modrinth 上的最新版本号替换下面的版本号
-    implementation fg.deobf("maven.modrinth:fdlib:1.0.8")
+   // implementation fg.deobf("maven.modrinth:fdlib:1.0.8")
 }
 
 // 资源替换逻辑

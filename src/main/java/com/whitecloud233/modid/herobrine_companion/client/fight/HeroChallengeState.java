@@ -1,13 +1,47 @@
 package com.whitecloud233.modid.herobrine_companion.client.fight;
 
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
+import net.minecraft.network.chat.Component; // [引用]
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.ai.control.MoveControl;
+import net.minecraft.world.entity.player.Player;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.event.level.BlockEvent;
 
+@Mod.EventBusSubscriber(modid = "herobrine_companion", bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class HeroChallengeState {
 
-    // 在 HeroEntity 的 tick 中调用，实时守护状态
+    @SubscribeEvent
+    public static void onBlockPlace(BlockEvent.EntityPlaceEvent event) {
+        if (event.getEntity() instanceof Player player) {
+            if (player.getPersistentData().getBoolean("IsChallengeActive")) {
+                if (!player.isCreative() && !player.isSpectator()) {
+                    event.setCanceled(true);
+                    if (!player.level().isClientSide) {
+                        // 使用 translatable 替换 literal
+                        player.displayClientMessage(Component.translatable("message.herobrine_companion.challenge.no_place"), true);
+                    }
+                }
+            }
+        }
+    }
+
+    @SubscribeEvent
+    public static void onBlockBreak(BlockEvent.BreakEvent event) {
+        Player player = event.getPlayer();
+        if (player != null && player.getPersistentData().getBoolean("IsChallengeActive")) {
+            if (!player.isCreative() && !player.isSpectator()) {
+                event.setCanceled(true);
+                if (!player.level().isClientSide) {
+                    player.displayClientMessage(Component.translatable("message.herobrine_companion.challenge.no_break"), true);
+                }
+            }
+        }
+    }
+
     public static void tick(HeroEntity hero) {
-        // 1. 状态自愈：如果硬盘记录在挑战中，但内存丢失了，立刻补回
         if (hero.getPersistentData().getBoolean("IsChallengeActive")) {
             if (!hero.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE)) {
                 hero.getEntityData().set(HeroEntity.IS_CHALLENGE_ACTIVE, true);
@@ -16,56 +50,60 @@ public class HeroChallengeState {
             }
         }
 
-        // 如果不在挑战状态，直接退出
         if (!hero.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE)) return;
 
-        // 2. 物理状态强制锁定（断点续传的核心）
         hero.setNoGravity(true);
-        hero.setFloating(true);
-        hero.setDeltaMovement(0, hero.getDeltaMovement().y, 0); // 锁死水平移动，允许垂直浮动
+        hero.setDeltaMovement(0, hero.getDeltaMovement().y, 0);
 
-        // 3. 强制劫持移动控制器
         if (!(hero.getMoveControl() instanceof ChallengeMoveControl)) {
             hero.moveControl = new ChallengeMoveControl(hero);
         }
+
+        if (hero.level() instanceof ServerLevel serverLevel) {
+            for (ServerPlayer player : serverLevel.players()) {
+                if (player.getPersistentData().getBoolean("IsChallengeActive")) {
+                    if (!player.isCreative() && !player.isSpectator()) {
+                        boolean updateNeeded = false;
+
+                        if (player.getAbilities().mayfly || player.getAbilities().flying) {
+                            player.getAbilities().mayfly = false;
+                            player.getAbilities().flying = false;
+                            updateNeeded = true;
+                        }
+
+                        if (updateNeeded) {
+                            player.onUpdateAbilities();
+                            player.displayClientMessage(Component.translatable("message.herobrine_companion.challenge.no_fly"), true);
+                        }
+
+                        if (player.isFallFlying()) {
+                            player.stopFallFlying();
+                            player.displayClientMessage(Component.translatable("message.herobrine_companion.challenge.no_elytra"), true);
+                        }
+                    }
+                }
+            }
+        }
     }
 
-    // 在 HeroEntity 读取 NBT 时调用，确保落地第一时间恢复姿态
     public static void onRestoreFromDisk(HeroEntity hero) {
         if (hero.getPersistentData().getBoolean("IsChallengeActive")) {
             hero.getEntityData().set(HeroEntity.IS_CHALLENGE_ACTIVE, true);
             int savedTicks = hero.getPersistentData().getInt("ChallengePhaseTicks");
             hero.getEntityData().set(HeroEntity.CHALLENGE_TICKS, savedTicks);
-
             hero.setNoGravity(true);
-            hero.setFloating(true);
-
-            // ==========================================
-            // 【核心修复】：AI 断点续传拦截
-            // 实体在构造函数阶段由于还没读取 NBT，误加载了日常 AI。
-            // 此时必须强制清空，并重新装填战斗 AI！
-            // ==========================================
             hero.goalSelector.removeAllGoals(goal -> true);
             hero.targetSelector.removeAllGoals(goal -> true);
             hero.setTarget(null);
             hero.getNavigation().stop();
-
-            // 强制接管移动控制权，防止掉落
             hero.moveControl = new ChallengeMoveControl(hero);
-
-            // 重新注入雷电 Boss 攻击 AI
             hero.goalSelector.addGoal(1, new com.whitecloud233.modid.herobrine_companion.client.fight.goal.HeroPhase1Goal(hero));
         }
     }
 
-    // 将其改为 public static，以便正确通过 instanceof 检查和分配
     public static class ChallengeMoveControl extends MoveControl {
-        public ChallengeMoveControl(HeroEntity hero) {
-            super(hero);
-        }
+        public ChallengeMoveControl(HeroEntity hero) { super(hero); }
         @Override
-        public void tick() {
-            // 什么都不做，彻底锁死原版寻路系统的移动意图
-        }
+        public void tick() {}
     }
 }
