@@ -86,8 +86,19 @@
   "gui.herobrine_companion.config.update_checker": "Update Checker: %s",
   "gui.herobrine_companion.config.update_checker.tooltip": "Whether to automatically check for new versions on Modrinth and notify in chat",
 
-
-
+  "gui.herobrine_companion.challenge_mode": "Challenge Mode(Unfinished)",
+  "gui.herobrine_companion.challenge_easy": "Easy",
+  "gui.herobrine_companion.challenge_normal": "Normal",
+  "gui.herobrine_companion.challenge_hard": "Hard",
+  "gui.herobrine_companion.challenge_mode_tooltip": "Click to cycle through challenge difficulties",
+  "gui.herobrine_companion.challenge_start": "▶ Start Challenge",
+  "gui.herobrine_companion.challenge_start_tooltip": "Confirm to start the battle at the current difficulty",
+  "message.herobrine_companion.challenge_victory": "The trial ends... You have proven your strength.",
+  "message.herobrine_companion.challenge_failed": "Trial failed... Your will could not be carried through to the end.",
+  "message.herobrine_companion.challenge.no_place": "§c[Trial Rule] During the challenge, placing blocks is prohibited!",
+  "message.herobrine_companion.challenge.no_break": "§c[Trial Rule] During the challenge, breaking blocks is prohibited!",
+  "message.herobrine_companion.challenge.no_fly": "§c[Trial Rule] The no-fly zone has been activated, flight is prohibited!",
+  "message.herobrine_companion.challenge.no_elytra": "§c[Trial Rule] The no-fly zone has been activated, elytra cannot be deployed!",
 
 
 

@@ -39,6 +39,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 import net.neoforged.neoforge.event.entity.player.CanPlayerSleepEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.tick.EntityTickEvent;
 
@@ -52,7 +53,10 @@ public class PlayerGameplayHandler {
         if (event.getEntity() instanceof ServerPlayer player && event.getLevel().dimension() == ModStructures.END_RING_DIMENSION_KEY) {
 
             CompoundTag data = player.getPersistentData();
-
+// 👇 [新增拦截] 挑战期间传送过来，绝对不启动跌落虚空逻辑和苏醒剧情
+            if (data.getBoolean("IsChallengeActive")) {
+                return;
+            }
             if (player.getY() < -50) {
                 player.teleportTo(EndRingContext.CENTER_X, EndRingContext.CENTER_Y, EndRingContext.CENTER_Z);
                 player.setDeltaMovement(0, 0, 0);
@@ -90,6 +94,9 @@ public class PlayerGameplayHandler {
     public static void onPlayerTick(EntityTickEvent.Post event) {
         if (event.getEntity().level().isClientSide || !(event.getEntity() instanceof ServerPlayer player)) return;
 
+        // 👇 [核心修复] 如果玩家已经死了（正躺在地上或处于“你死了”界面），绝对不要跑任何游戏机制！
+        if (!player.isAlive()) return;
+
         // 1. 主世界逻辑
         if (player.level().dimension() == Level.OVERWORLD) {
             checkUnstableZone(player);
@@ -98,7 +105,10 @@ public class PlayerGameplayHandler {
 
         // 2. End Ring 逻辑
         if (player.level().dimension() == ModStructures.END_RING_DIMENSION_KEY) {
-            handleEndRingGameplay(player);
+            // 👇 [新增拦截] 挑战期间，直接剥夺剧情处理器的执行权
+            if (!player.getPersistentData().getBoolean("IsChallengeActive")) {
+                handleEndRingGameplay(player);
+            }
         }
     }
 
@@ -106,7 +116,10 @@ public class PlayerGameplayHandler {
     public static void onPlayerClone(net.neoforged.neoforge.event.entity.player.PlayerEvent.Clone event) {
         CompoundTag original = event.getOriginal().getPersistentData();
         CompoundTag cur = event.getEntity().getPersistentData();
-
+// 👇 [新增] 继承挑战失败的播报标记
+        if (original.contains("ChallengeFailedMessagePending")) {
+            cur.putBoolean("ChallengeFailedMessagePending", original.getBoolean("ChallengeFailedMessagePending"));
+        }
         // 死亡重生时继承 Hero 的携带数据
         if (original.contains("HeroRespawnData")) {
             cur.put("HeroRespawnData", original.getCompound("HeroRespawnData"));
@@ -222,6 +235,12 @@ public class PlayerGameplayHandler {
                     }
                     break;
                 }
+            }
+        }
+        // 👇 [新增核心逻辑：玩家在试炼中死亡]
+        if (event.getEntity() instanceof ServerPlayer deadPlayer) {
+            if (deadPlayer.getPersistentData().getBoolean("IsChallengeActive")) {
+                com.whitecloud233.herobrine_companion.client.fight.HeroChallengeManager.failChallenge(deadPlayer);
             }
         }
     }
@@ -626,6 +645,28 @@ public class PlayerGameplayHandler {
                     // 注意：executeReturnToOverworld 通常只触发一次，如果这里失败了，玩家可能需要再次进入 End Ring 才能触发
                     // 或者我们可以添加一个 "PendingFragment4" 标记，在 onPlayerTick 中重试给予
                 }
+            }
+        }
+    }
+    @SubscribeEvent
+    public static void onPlayerRespawn(PlayerEvent.PlayerRespawnEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            CompoundTag data = player.getPersistentData();
+
+            // 1. 播报挑战失败信息
+            if (data.getBoolean("ChallengeFailedMessagePending")) {
+                player.sendSystemMessage(Component.translatable("message.herobrine_companion.challenge_failed").withStyle(ChatFormatting.RED, ChatFormatting.BOLD));
+                // 播放一个低沉的音效
+                player.level().playSound(null, player.blockPosition(), net.minecraft.sounds.SoundEvents.WITHER_SPAWN, net.minecraft.sounds.SoundSource.MASTER, 0.5f, 0.5f);
+                data.remove("ChallengeFailedMessagePending");
+            }
+
+            // 2. 托底机制：如果你把床放在了试炼维度（End Ring），原版的跨维度事件不会触发。
+            // 此时强行用战斗复活逻辑把 Hero 拉出来。
+            if (data.getBoolean("HeroPendingRespawn") && data.contains("HeroRespawnData")) {
+                com.whitecloud233.herobrine_companion.entity.logic.HeroDimensionHandler.respawnNearPlayer((ServerLevel)player.level(), player);
+                data.remove("HeroPendingRespawn");
+                data.remove("HeroRespawnData");
             }
         }
     }

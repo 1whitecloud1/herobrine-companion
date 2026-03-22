@@ -1,6 +1,8 @@
 package com.whitecloud233.herobrine_companion.network;
 
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
@@ -86,6 +88,23 @@ public class PacketHandler {
                 SyncRewardsPacket.STREAM_CODEC,
                 SyncRewardsPacket::handle
         );
+        // 在你的 RegisterPayloadHandlersEvent 监听方法中添加：
+        registrar.playToServer(
+                StartChallengePacket.TYPE,
+                StartChallengePacket.STREAM_CODEC,
+                StartChallengePacket::handle
+        );
+        // 注册苍白雷电数据包 (发往客户端)
+        // 注册苍白雷电数据包 (发往客户端)
+        registrar.playToClient(
+                PaleLightningPacket.TYPE,
+                PaleLightningPacket.STREAM_CODEC,
+                PaleLightningPacket::handle // 👈 修改这里，引用数据包自身的 handle
+        );
+        registrar.playBidirectional(
+                PaleLightningArcPacket.TYPE,
+                PaleLightningArcPacket.STREAM_CODEC,
+                PaleLightningArcPacket::handle);
     }
 
     public static void sendToServer(PeacefulPacket packet) {
@@ -150,5 +169,9 @@ public class PacketHandler {
     // [新增] 同步奖励发送给玩家
     public static void sendToPlayer(SyncRewardsPacket packet, ServerPlayer player) {
         PacketDistributor.sendToPlayer(player, packet);
+    }
+    // 1.21.1 的 PacketDistributor 调用方式
+    public static void sendToTracking(CustomPacketPayload packet, Entity entity) {
+        PacketDistributor.sendToPlayersTrackingEntity(entity, packet);
     }
 }

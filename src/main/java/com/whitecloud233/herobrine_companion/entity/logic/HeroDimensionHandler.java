@@ -30,6 +30,10 @@ public class HeroDimensionHandler {
     @SubscribeEvent
     public static void onPlayerChangedDimension(PlayerEvent.PlayerChangedDimensionEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        // 👇 [新增核心防御] 如果是挑战传送，直接放行，禁止删除战斗版 Hero 并刷出剧情版 Hero
+        if (player.getPersistentData().getBoolean("IsChallengeActive")) {
+            return;
+        }
         ServerLevel toLevel = (ServerLevel) player.level();
         ServerLevel fromLevel = player.server.getLevel(event.getFrom());
 

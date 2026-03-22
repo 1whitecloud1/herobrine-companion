@@ -26,8 +26,13 @@ public class HeroEndringInteraction {
         }
 
         if (event.getTarget() instanceof HeroEntity hero && !event.getLevel().isClientSide) {
+            // 👇 [核心拦截] 如果正在打架，什么剧情都不准触发，直接放行给战斗管理器！
+            if (hero.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE) ||
+                    hero.getPersistentData().getBoolean("IsChallengeActive")) {
+                return; // 挑战期间完全禁止剧情交互
+            }
             // 维度检查
-            if (event.getLevel().dimension() != ModStructures.END_RING_DIMENSION_KEY) {
+            if (hero.level().dimension() != ModStructures.END_RING_DIMENSION_KEY) {
                 return;
             }
 

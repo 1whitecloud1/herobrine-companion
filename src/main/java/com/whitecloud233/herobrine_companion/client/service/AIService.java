@@ -109,7 +109,8 @@ public class AIService {
 
         String divineSpellbook = "Alter Minecraft 1.21.1 underlying code. Generate vanilla commands or action codes (NO '/' prefix). " +
                 "1. [Follow/Summon]: action:toggle_companion or tp @e[type=herobrine_companion:hero,limit=1,sort=nearest] @s. " +
-                "2. [Dimension/Locate]: tp @s ~ 100 ~ in dimensions, locate biome/structure. Use specific mod IDs if requested. " +
+                // 👇 [核心修复] 教导 AI 使用正确的 1.21.1 跨维度传送原版语法
+                "2. [Dimension/Locate]: execute in <dimension_id> run tp @s ~ 100 ~ (e.g. execute in minecraft:the_nether run tp @s ~ 100 ~). locate biome/structure. Use specific mod IDs if requested. " +
                 "3. [Creation/Give]: place template ID ~5 ~ ~ or place structure. give @s ID count. " +
                 "4. [Punishment]: summon lightning_bolt ^ ^ ^10 or action:massive_lightning. " +
                 "5. [Admin]: gamemode creative @s (mock them), gamemode survival @s (strip power). " +

@@ -33,11 +33,21 @@ public class HeroEndringEvent {
     // 阻止 Hero 自行进传送门
     @SubscribeEvent
     public static void onEntityTravelToDimension(EntityTravelToDimensionEvent event) {
-        if (event.getEntity() instanceof HeroEntity && !event.getEntity().getTags().contains(EndRingContext.TAG_TELEPORTING)) {
+        if (event.getEntity() instanceof HeroEntity hero) {
+            // 👇 [核心新增] 如果是为了挑战而跨越维度，绝对放行！
+            if (hero.getPersistentData().getBoolean("IsChallengeActive")) {
+                return;
+            }
             event.setCanceled(true);
         }
     }
-
+    @SubscribeEvent
+    public static void onEntityJoinLevel(EntityJoinLevelEvent event) {
+        if (event.getLevel().isClientSide) return;
+        if (event.getEntity() instanceof HeroEntity hero) {
+            handleHeroJoin(hero, event);
+        }
+    }
     // --- Helpers ---
 
     private static void runIntroSequence(HeroEntity hero) {
@@ -75,6 +85,13 @@ public class HeroEndringEvent {
     }
 
     private static void handleHeroJoin(HeroEntity newHero, EntityJoinLevelEvent event) {
+
+        // [修复 1：进场清场]
+        if (newHero.getPersistentData().getBoolean("IsChallengeActive")) {
+            // 必须把之前留在 End Ring 的剧情版假 Hero 强行抹除！只留真身！
+            discardAllOtherHeroes(newHero);
+            return;
+        }
         if (newHero.getTags().contains(EndRingContext.TAG_RESPAWNED_SAFE)) {
             newHero.removeTag(EndRingContext.TAG_RESPAWNED_SAFE);
             discardAllOtherHeroes(newHero);

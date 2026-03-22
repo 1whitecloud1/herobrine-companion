@@ -76,6 +76,21 @@
   "gui.herobrine_companion.config.update_checker": "更新提示: %s",
   "gui.herobrine_companion.config.update_checker.tooltip": "进游戏时是否自动检查 Modrinth 上的新版本并在聊天栏提示",
 
+  "gui.herobrine_companion.challenge_mode": "挑战模式（未完成）",
+  "gui.herobrine_companion.challenge_easy": "简单",
+  "gui.herobrine_companion.challenge_normal": "普通",
+  "gui.herobrine_companion.challenge_hard": "困难",
+  "gui.herobrine_companion.challenge_mode_tooltip": "点击循环切换挑战难度",
+  "gui.herobrine_companion.challenge_start": "▶ 开始挑战",
+  "gui.herobrine_companion.challenge_start_tooltip": "确认开启当前难度的战斗",
+  "message.herobrine_companion.challenge_victory": "试炼结束... 你证明了你的实力。",
+  "message.herobrine_companion.challenge_failed": "试炼失败... 你的意志未能贯彻到底。",
+  "message.herobrine_companion.challenge.no_place": "§c[试炼法则] 挑战之时，禁止搭建方块！",
+  "message.herobrine_companion.challenge.no_break": "§c[试炼法则] 挑战之时，禁止破坏方块！",
+  "message.herobrine_companion.challenge.no_fly": "§c[试炼法则] 禁空领域已展开，禁止飞行！",
+  "message.herobrine_companion.challenge.no_elytra": "§c[试炼法则] 禁空领域已展开，无法展开鞘翅！",
+
+
 
 
   "message.herobrine_companion.chat_hero": "%s",

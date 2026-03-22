@@ -42,7 +42,7 @@ public class HeroTradeScreen extends Screen implements MenuAccess<MerchantMenu> 
     protected int inventoryLabelX = 107;
     protected int inventoryLabelY; // 动态计算
 
-    // 【核心修改】不再使用反射，直接定义我们自己的控制变量
+    // 我们自己的控制变量
     private int scrollOff = 0;
     private int shopItem = -1;
     private boolean isDragging;
@@ -71,7 +71,7 @@ public class HeroTradeScreen extends Screen implements MenuAccess<MerchantMenu> 
 
         // 手动调用背景渲染
         renderBg(guiGraphics, partialTick, mouseX, mouseY);
-        
+
         // 手动调用标签渲染
         renderLabels(guiGraphics, mouseX, mouseY);
 
@@ -80,20 +80,7 @@ public class HeroTradeScreen extends Screen implements MenuAccess<MerchantMenu> 
 
         // 渲染 Tooltip
         renderTradeTooltips(guiGraphics, mouseX, mouseY);
-        
-        // 渲染物品槽位 (因为不再继承 AbstractContainerScreen，需要手动渲染 Slot)
-        // 注意：这里我们只渲染“假”的 Slot 背景，真实的 Slot 交互逻辑需要自己处理或者放弃
-        // 如果需要真实的 Slot 交互，必须手动处理鼠标点击和渲染
-        // 但考虑到这是一个交易界面，主要交互是点击交易项，Slot 主要是展示
-        // 如果需要支持 Shift+点击等操作，这里会变得很复杂
-        // 鉴于这是一个权衡方案，我们先假设主要功能是交易
-        
-        // 渲染菜单中的 Slot
-        // 由于不再是 ContainerScreen，我们需要手动遍历 menu.slots 并渲染
-        // 这需要将 Slot 的坐标转换为屏幕坐标
-        // 这是一个比较大的改动，如果 Slot 功能很重要，这个方案可能不完美
-        // 但为了彻底隐藏 JEI，这是必须的代价
-        
+
         // 渲染 Slot 物品
         for (int k = 0; k < this.menu.slots.size(); ++k) {
             net.minecraft.world.inventory.Slot slot = this.menu.slots.get(k);
@@ -101,19 +88,15 @@ public class HeroTradeScreen extends Screen implements MenuAccess<MerchantMenu> 
                 renderSlot(guiGraphics, slot);
             }
         }
-        
+
         // 【新增】渲染鼠标抓取的物品 (Carried Item)
-        // 之前因为没有调用 super.render() (AbstractContainerScreen 的实现)，导致鼠标上的物品没有渲染
         renderCarriedItem(guiGraphics, mouseX, mouseY);
-        
+
         // 渲染 Slot 的 Tooltip
         renderSlotTooltip(guiGraphics, mouseX, mouseY);
-
-        // 最后渲染通用的 Tooltip
-        // super.render(guiGraphics, mouseX, mouseY, partialTick); // Screen.render 主要是渲染 widget，这里可能不需要
     }
-    
-    // 【新增】渲染鼠标抓取的物品
+
+    // 渲染鼠标抓取的物品
     private void renderCarriedItem(GuiGraphics guiGraphics, int mouseX, int mouseY) {
         ItemStack carried = this.menu.getCarried();
         if (!carried.isEmpty()) {
@@ -124,54 +107,46 @@ public class HeroTradeScreen extends Screen implements MenuAccess<MerchantMenu> 
             guiGraphics.pose().popPose();
         }
     }
-    
+
     // 手动渲染 Slot
     private void renderSlot(GuiGraphics guiGraphics, net.minecraft.world.inventory.Slot slot) {
         int i = slot.x;
         int j = slot.y;
         ItemStack itemstack = slot.getItem();
-        boolean flag = false;
-        boolean flag1 = slot == null; // clickedSlot logic omitted
-        ItemStack itemstack1 = this.menu.getCarried();
         String s = null;
-        if (slot == null) { // clickedSlot logic omitted
-             // ...
-        }
 
         guiGraphics.pose().pushPose();
         guiGraphics.pose().translate(0.0F, 0.0F, 100.0F);
-        
+
         // 简单的物品渲染
         int x = i + this.leftPos;
         int y = j + this.topPos;
-        
+
         guiGraphics.renderItem(itemstack, x, y);
         guiGraphics.renderItemDecorations(this.font, itemstack, x, y, s);
-        
+
         // 高亮鼠标悬停的 Slot
         if (isHovering(slot, this.minecraft.mouseHandler.xpos() * (double)this.minecraft.getWindow().getGuiScaledWidth() / (double)this.minecraft.getWindow().getScreenWidth(), this.minecraft.mouseHandler.ypos() * (double)this.minecraft.getWindow().getGuiScaledHeight() / (double)this.minecraft.getWindow().getScreenHeight())) {
-             renderSlotHighlight(guiGraphics, x, y, 0);
+            renderSlotHighlight(guiGraphics, x, y, 0);
         }
-        
+
         guiGraphics.pose().popPose();
     }
-    
-    // 【新增】渲染 Slot 高亮
+
+    // 渲染 Slot 高亮
     public static void renderSlotHighlight(GuiGraphics guiGraphics, int x, int y, int blitOffset) {
-        // 使用 RenderType.guiOverlay() 替代 RenderSystem.getVertexSorting()
-        // 或者直接使用 fillGradient 的简化版本，如果不涉及复杂的混合模式
         guiGraphics.fillGradient(RenderType.guiOverlay(), x, y, x + 16, y + 16, -2130706433, -2130706433, blitOffset);
     }
-    
+
     private void renderSlotTooltip(GuiGraphics guiGraphics, int mouseX, int mouseY) {
         if (this.menu.getCarried().isEmpty()) {
-             net.minecraft.world.inventory.Slot hoveredSlot = findSlot(mouseX, mouseY);
-             if (hoveredSlot != null && hoveredSlot.hasItem()) {
-                 guiGraphics.renderTooltip(this.font, hoveredSlot.getItem(), mouseX, mouseY);
-             }
+            net.minecraft.world.inventory.Slot hoveredSlot = findSlot(mouseX, mouseY);
+            if (hoveredSlot != null && hoveredSlot.hasItem()) {
+                guiGraphics.renderTooltip(this.font, hoveredSlot.getItem(), mouseX, mouseY);
+            }
         }
     }
-    
+
     private net.minecraft.world.inventory.Slot findSlot(double mouseX, double mouseY) {
         for(int i = 0; i < this.menu.slots.size(); ++i) {
             net.minecraft.world.inventory.Slot slot = this.menu.slots.get(i);
@@ -181,11 +156,11 @@ public class HeroTradeScreen extends Screen implements MenuAccess<MerchantMenu> 
         }
         return null;
     }
-    
+
     private boolean isHovering(net.minecraft.world.inventory.Slot slot, double mouseX, double mouseY) {
         return this.isHovering(slot.x, slot.y, 16, 16, mouseX, mouseY);
     }
-    
+
     protected boolean isHovering(int x, int y, int width, int height, double mouseX, double mouseY) {
         int i = this.leftPos;
         int j = this.topPos;
@@ -194,7 +169,7 @@ public class HeroTradeScreen extends Screen implements MenuAccess<MerchantMenu> 
         return mouseX >= (double)(x - 1) && mouseX < (double)(x + width + 1) && mouseY >= (double)(y - 1) && mouseY < (double)(y + height + 1);
     }
 
-    // 【新增】实现鼠标滚轮滚动逻辑
+    // 实现鼠标滚轮滚动逻辑
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
         double delta = scrollY;
@@ -208,7 +183,7 @@ public class HeroTradeScreen extends Screen implements MenuAccess<MerchantMenu> 
         return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
     }
 
-    // 【新增】实现鼠标拖拽滚动条逻辑
+    // 实现鼠标拖拽滚动条逻辑
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
         int i = this.menu.getOffers().size();
@@ -221,7 +196,6 @@ public class HeroTradeScreen extends Screen implements MenuAccess<MerchantMenu> 
             this.scrollOff = Mth.clamp((int)f, 0, l);
             return true;
         }
-        // 处理 Slot 的拖拽逻辑比较复杂，这里暂时忽略，或者调用 menu 的逻辑
         return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
     }
 
@@ -245,7 +219,7 @@ public class HeroTradeScreen extends Screen implements MenuAccess<MerchantMenu> 
                     // 更新选中项
                     this.shopItem = realIndex;
 
-                    // 【核心逻辑】手动发送选择包，模拟原版行为
+                    // 手动发送选择包，模拟原版行为
                     this.menu.setSelectionHint(realIndex);
                     this.minecraft.getConnection().send(new net.minecraft.network.protocol.game.ServerboundSelectTradePacket(realIndex));
                     return true;
@@ -258,58 +232,91 @@ public class HeroTradeScreen extends Screen implements MenuAccess<MerchantMenu> 
         if (mouseX >= x + 100 && mouseX < x + 100 + 6 && mouseY >= y + 18 && mouseY < y + 18 + 139) {
             this.isDragging = true;
         }
-        
-        // 处理 Slot 点击
+
+        // 【核心修改】处理 Slot 点击，支持 Shift、中键
         net.minecraft.world.inventory.Slot slot = findSlot(mouseX, mouseY);
         if (slot != null) {
-             // 这里需要模拟 ContainerScreen 的点击逻辑
-             // 这是一个简化的处理，直接发送点击包
-             // 注意：这可能不完全准确，特别是对于 Shift+点击等操作
-             // 但对于简单的拿取/放入应该是有效的
-             // 实际上，正确的做法是调用 minecraft.gameMode.handleInventoryMouseClick
-             // 但我们需要 slotId
-             
-             // 暂时省略复杂的点击逻辑，因为这需要大量的代码来复制 ContainerScreen 的行为
-             // 如果用户需要与背包交互，这个方案会有缺陷
-             // 但为了隐藏 JEI，这是必须的
-             
-             // 尝试调用 menu 的点击逻辑？不，menu 是服务端的逻辑镜像
-             // 我们需要发送包给服务器
-             
-             // 既然这是一个交易界面，玩家主要操作是点击交易项，然后从输出槽拿东西
-             // 我们可以尝试只处理基本的点击
-             
-             if (this.minecraft != null && this.minecraft.gameMode != null) {
-                 this.minecraft.gameMode.handleInventoryMouseClick(this.menu.containerId, slot.index, button, net.minecraft.world.inventory.ClickType.PICKUP, this.minecraft.player);
-                 return true;
-             }
+            if (this.minecraft != null && this.minecraft.gameMode != null && this.minecraft.player != null) {
+                net.minecraft.world.inventory.ClickType clickType = net.minecraft.world.inventory.ClickType.PICKUP;
+
+                // 检测鼠标中键 (克隆物品，仅创造模式有效)
+                if (button == 2) {
+                    clickType = net.minecraft.world.inventory.ClickType.CLONE;
+                }
+                // 检测 Shift 键 (快速移动)
+                else if (Screen.hasShiftDown()) {
+                    clickType = net.minecraft.world.inventory.ClickType.QUICK_MOVE;
+                }
+
+                this.minecraft.gameMode.handleInventoryMouseClick(this.menu.containerId, slot.index, button, clickType, this.minecraft.player);
+                return true;
+            }
         }
 
         return super.mouseClicked(mouseX, mouseY, button);
     }
-    
+
+    // 【新增】处理键盘操作 (按 E 退出、快捷栏数字键交换、丢弃物品等)
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        // 处理 Slot 释放逻辑 (如果需要拖拽物品)
-        net.minecraft.world.inventory.Slot slot = findSlot(mouseX, mouseY);
-        if (slot != null && this.minecraft != null && this.minecraft.gameMode != null) {
-             // 简化的释放逻辑
-             // this.minecraft.gameMode.handleInventoryMouseClick(this.menu.containerId, slot.index, button, net.minecraft.world.inventory.ClickType.PICKUP, this.minecraft.player);
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (super.keyPressed(keyCode, scanCode, modifiers)) {
+            return true;
         }
-        return super.mouseReleased(mouseX, mouseY, button);
+        if (this.minecraft == null || this.minecraft.player == null || this.minecraft.gameMode == null) return false;
+
+        // 1. 恢复按 E 键（或玩家设置的背包键）关闭界面
+        if (this.minecraft.options.keyInventory.matches(keyCode, scanCode)) {
+            this.onClose();
+            return true;
+        }
+
+        // 获取当前鼠标悬停的 Slot 位置，用于键盘快捷操作
+        double mouseX = this.minecraft.mouseHandler.xpos() * (double)this.minecraft.getWindow().getGuiScaledWidth() / (double)this.minecraft.getWindow().getScreenWidth();
+        double mouseY = this.minecraft.mouseHandler.ypos() * (double)this.minecraft.getWindow().getGuiScaledHeight() / (double)this.minecraft.getWindow().getScreenHeight();
+        net.minecraft.world.inventory.Slot slot = findSlot(mouseX, mouseY);
+
+        if (slot != null) {
+            // 2. 快捷键 1-9 (将物品在背包和快捷栏之间快速交换)
+            if (this.minecraft.options.keyHotbarSlots != null) {
+                for (int i = 0; i < 9; ++i) {
+                    if (this.minecraft.options.keyHotbarSlots[i].matches(keyCode, scanCode)) {
+                        this.minecraft.gameMode.handleInventoryMouseClick(this.menu.containerId, slot.index, i, net.minecraft.world.inventory.ClickType.SWAP, this.minecraft.player);
+                        return true;
+                    }
+                }
+            }
+
+            // 3. 丢弃物品 (按 Q 丢弃一个，Ctrl+Q 丢弃一组)
+            if (this.minecraft.options.keyDrop.matches(keyCode, scanCode)) {
+                this.minecraft.gameMode.handleInventoryMouseClick(this.menu.containerId, slot.index, Screen.hasControlDown() ? 1 : 0, net.minecraft.world.inventory.ClickType.THROW, this.minecraft.player);
+                return true;
+            }
+        }
+
+        return false;
     }
-    
+
+    // 【新增】关闭界面时处理物品退还等逻辑
+    @Override
+    public void onClose() {
+        super.onClose();
+        // 关键：通知服务器容器已关闭，服务器会自动把交易槽和鼠标游标上抓着的物品退回玩家背包
+        if (this.minecraft != null && this.minecraft.player != null) {
+            this.minecraft.player.closeContainer();
+        }
+    }
+
     // 必须重写 isPauseScreen
     @Override
     public boolean isPauseScreen() {
         return false;
     }
-    
+
     // 必须重写 tick 来更新 menu
     @Override
     public void tick() {
         super.tick();
-        if (!this.menu.stillValid(this.minecraft.player)) {
+        if (this.minecraft != null && this.minecraft.player != null && !this.menu.stillValid(this.minecraft.player)) {
             this.minecraft.player.closeContainer();
         }
     }
@@ -446,7 +453,7 @@ public class HeroTradeScreen extends Screen implements MenuAccess<MerchantMenu> 
     }
 
     private HeroEntity getHeroEntity() {
-        if (this.minecraft == null || this.minecraft.level == null) return null;
+        if (this.minecraft == null || this.minecraft.level == null || this.minecraft.player == null) return null;
         HeroEntity closest = null;
         double minDst = Double.MAX_VALUE;
         for (Entity e : this.minecraft.level.entitiesForRendering()) {

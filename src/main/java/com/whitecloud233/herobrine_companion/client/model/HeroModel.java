@@ -131,6 +131,8 @@ public class HeroModel extends PlayerModel<HeroEntity> {
             this.leftArm.xRot = Mth.lerp(floatAmount, this.leftArm.xRot, floatArmX);
             this.leftArm.zRot = Mth.lerp(floatAmount, walkLeftArmZ, floatLeftArmZ);
         }
+// [新增] 挂载挑战模式专属的独立动画系统 (注意确保你的包路径与这里一致)
+        com.whitecloud233.herobrine_companion.client.fight.animation.HeroChallengeAnimations.setupChallengeAnims(this, entity, ageInTicks);
 
         // 最后同步所有属性
         copyAllModelProperties();
