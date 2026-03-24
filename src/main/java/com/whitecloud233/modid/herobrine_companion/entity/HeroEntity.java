@@ -5,7 +5,12 @@ import com.whitecloud233.modid.herobrine_companion.entity.ai.HeroAI;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.HeroBrain;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.SimpleNeuralNetwork;
 import com.whitecloud233.modid.herobrine_companion.entity.logic.*;
-import com.whitecloud233.modid.herobrine_companion.event.HeroWorldData;
+import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroDataHandler;
+import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroDimensionHandler;
+import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroLogic;
+import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroWorldData;
+import com.whitecloud233.modid.herobrine_companion.event.HeroTrades;
+import com.whitecloud233.modid.herobrine_companion.event.HeroVisuals;
 import com.whitecloud233.modid.herobrine_companion.world.structure.ModStructures;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -75,7 +80,10 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     private int outOfWaterTimer = 0;
     private long lastSummonedTime = 0;
     private boolean isLoadedFromDisk = false;
-
+    // --- 姿势编辑器专用数据 ---
+    public boolean isPoseEditing = false;
+    // 0=头, 1=身体, 2=右上臂, 3=右小臂, 4=左上臂, 5=左小臂, 6=右大腿, 7=右小腿, 8=左大腿, 9=左小腿
+    public float[][] customPoseAngles = new float[10][3];
     // 👇 【新增】：创建一个纯白色的原版 Boss 进度条
     private final ServerBossEvent bossEvent = new ServerBossEvent(
             Component.translatable("entity.herobrine_companion.hero"),
@@ -286,6 +294,13 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     public void startSeenByPlayer(ServerPlayer player) {
         super.startSeenByPlayer(player);
         this.bossEvent.addPlayer(player);
+        // 👇 【核心修复】：当玩家进入视距或进入存档时，服务端强制把存好的姿势同步给该玩家客户端
+        if (this.isPoseEditing) {
+            com.whitecloud233.modid.herobrine_companion.network.PacketHandler.sendToPlayer(
+                    new com.whitecloud233.modid.herobrine_companion.network.SavePosePacket(this.getId(), this.isPoseEditing, this.customPoseAngles),
+                    player
+            );
+        }
     }
 
     @Override
@@ -336,6 +351,18 @@ public class HeroEntity extends PathfinderMob implements Merchant {
             compound.putUUID("OwnerUUID", getOwnerUUID());
             compound.putString("OwnerUUID_String", getOwnerUUID().toString());
         }
+        // 👇 [新增] 保存姿势编辑器数据
+        compound.putBoolean("IsPoseEditing", this.isPoseEditing);
+        if (this.isPoseEditing) {
+            ListTag poseList = new ListTag();
+            // 遍历 10 个部位
+            for (int i = 0; i < 10; i++) {
+                for (int j = 0; j < 3; j++) {
+                    poseList.add(net.minecraft.nbt.FloatTag.valueOf(this.customPoseAngles[i][j]));
+                }
+            }
+            compound.put("CustomPoseAngles", poseList);
+        }
     }
 
     @Override
@@ -367,6 +394,27 @@ public class HeroEntity extends PathfinderMob implements Merchant {
             try { ownerUUID = UUID.fromString(compound.getString("OwnerUUID_String")); } catch (Exception ignored) {}
         }
         if (ownerUUID != null) setOwnerUUID(ownerUUID);
+        // 👇 [新增] 读取姿势编辑器数据
+        if (compound.contains("IsPoseEditing")) {
+            this.isPoseEditing = compound.getBoolean("IsPoseEditing");
+            // 检查 Tag 类型是否为 List (ID 为 9)
+            if (this.isPoseEditing && compound.contains("CustomPoseAngles", 9)) {
+                // 读取 FloatTag (ID 为 5) 的列表
+                ListTag poseList = compound.getList("CustomPoseAngles", 5);
+                // 确保数据完整 (10 * 3 = 30)
+                if (poseList.size() == 30) {
+                    int index = 0;
+                    for (int i = 0; i < 10; i++) {
+                        for (int j = 0; j < 3; j++) {
+                            this.customPoseAngles[i][j] = poseList.getFloat(index++);
+                        }
+                    }
+                } else {
+                    // 数据损坏则重置
+                    this.isPoseEditing = false;
+                }
+            }
+        }
     }
 
     // 委托装备与NBT处理

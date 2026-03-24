@@ -1,17 +1,16 @@
-package com.whitecloud233.modid.herobrine_companion.entity.logic;
+package com.whitecloud233.modid.herobrine_companion.entity.logic.data;
 
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.HeroDialogueHandler;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.HeroObserver;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.HeroPrankHandler;
-import com.whitecloud233.modid.herobrine_companion.event.HeroWorldData;
+import com.whitecloud233.modid.herobrine_companion.entity.logic.HeroInteractionHandler;
 import com.whitecloud233.modid.herobrine_companion.world.structure.ModStructures;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -45,23 +44,21 @@ public class HeroLogic {
     }
 
     private static void serverTick(HeroEntity hero) {
-        // 1. 唯一性检查
         if (hero.tickCount == 20) {
             HeroLifecycleHandler.checkUniqueness(hero);
-            // [修复] 只有在全新生成（非读取）时，才从全局同步数据，防止覆盖存档原有数据
             if (!hero.isLoadedFromDisk() && hero.getOwnerUUID() != null) {
-                HeroDataHandler.restoreTrustFromPlayer(hero);
+                Player owner = hero.level().getPlayerByUUID(hero.getOwnerUUID());
+                if (owner != null) {
+                    HeroStateManager.restoreFromGlobal(hero, owner);
+                }
             }
         }
-        
-        // [新增] 持续性唯一性检查 (每5秒检查一次，防止跨维度传送后旧实体未清除)
+
         if (hero.tickCount % 100 == 0) {
             HeroLifecycleHandler.checkUniqueness(hero);
         }
 
-        // 2. 自动绑定逻辑
         if (hero.getOwnerUUID() == null) {
-            // 如果是从磁盘加载的(isLoadedFromDisk)，且 tick 小于 600 (30秒)，则禁止自动绑定
             boolean isFreshSpawn = !hero.isLoadedFromDisk();
             boolean safeToBind = isFreshSpawn ? (hero.tickCount > 20) : (hero.tickCount > 600);
 
@@ -74,27 +71,20 @@ public class HeroLogic {
             HeroDataHandler.syncGlobalTrust(hero);
         }
 
-        // [风险点] 此处会保存数据。如果 Trust 为 0 且 Owner 不为空，会把存档覆盖为 0。
-        // 所以必须保证在此之前，restoreTrustFromPlayer 已经成功执行。
+        // ============== [重构精简核心] 定期备份与托底恢复 ==============
         if (hero.tickCount % 100 == 0) {
-            // [Fix] 仅在信任度 > 0 时更新全局数据，防止意外覆盖
             if (hero.getTrustLevel() > 0) {
-                HeroDataHandler.updateGlobalTrust(hero);
-            } else {
-                // 如果信任度为 0，尝试恢复
-                HeroDataHandler.restoreTrustFromPlayer(hero);
-            }
-            
-            // [新增] 定期同步皮肤状态到全局数据，防止丢失
-            if (hero.level() instanceof ServerLevel serverLevel) {
-                HeroWorldData data = HeroWorldData.get(serverLevel);
-                // 如果当前实体有自定义皮肤，且全局数据没有，则更新全局
-                if (hero.getSkinVariant() == HeroEntity.SKIN_CUSTOM && !hero.getCustomSkinName().isEmpty()) {
-                    data.setSkinVariant(HeroEntity.SKIN_CUSTOM);
-                    data.setCustomSkinName(hero.getCustomSkinName());
+                // 如果信任度大于0，说明当前实体数据是健康的，执行全局备份
+                HeroStateManager.backupToGlobal(hero);
+            } else if (hero.getOwnerUUID() != null) {
+                // 如果信任度为0（可能发生了异常重置），尝试从全局档案托底恢复
+                Player owner = hero.level().getPlayerByUUID(hero.getOwnerUUID());
+                if (owner != null) {
+                    HeroStateManager.restoreFromGlobal(hero, owner);
                 }
             }
         }
+        // ==========================================================
 
         if (hero.tickCount % 20 == 0) {
             boolean isEndRing = hero.level().dimension() == ModStructures.END_RING_DIMENSION_KEY;
@@ -136,10 +126,7 @@ public class HeroLogic {
             }
             if (closestPlayer != null) {
                 hero.setOwnerUUID(closestPlayer.getUUID());
-
-                // [关键修复] 自动认主后，必须立即从该玩家/全局存档中恢复数据！
-                // 防止 tick 100 的 updateGlobalTrust 将 0 信任度写入存档
-                HeroDataHandler.restoreTrustFromPlayer(hero);
+                HeroStateManager.restoreFromGlobal(hero, closestPlayer); // 替换了原本的手动恢复逻辑
             }
         }
     }

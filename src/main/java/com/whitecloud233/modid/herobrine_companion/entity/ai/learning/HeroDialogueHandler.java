@@ -44,15 +44,11 @@ public class HeroDialogueHandler {
     public static void triggerAIObservation(HeroEntity hero, ServerPlayer player, String observationDesc) {
         hero.getPersistentData().putLong(TAG_LAST_SPEECH, hero.level().getGameTime());
 
-        // [修复] 传参时转回传入 UUID，完美匹配 AIService
-        AIService.observeEnvironment(observationDesc, player.getUUID())
-                .thenAccept(reply -> {
-                    if (reply != null && !reply.isEmpty() && !reply.startsWith("§c")) {
-                        player.getServer().execute(() -> {
-                            player.sendSystemMessage(Component.literal("§e<Herobrine> §f" + reply));
-                        });
-                    }
-                });
+        // 使用你原本写好的 PacketHandler 工具，发送数据包给特定玩家
+        com.whitecloud233.modid.herobrine_companion.network.PacketHandler.sendToPlayer(
+                new com.whitecloud233.modid.herobrine_companion.network.AIObservationPacket(hero.getId(), observationDesc),
+                player
+        );
     }
 
     public static void tick(HeroEntity hero) {

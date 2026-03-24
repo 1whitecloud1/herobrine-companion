@@ -2,9 +2,8 @@ package com.whitecloud233.modid.herobrine_companion.event;
 
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
-import com.whitecloud233.modid.herobrine_companion.entity.logic.GlitchVillagerSpawner;
-import com.whitecloud233.modid.herobrine_companion.entity.logic.HeroQuestHandler;
-import com.whitecloud233.modid.herobrine_companion.entity.logic.HeroSpawner;
+import com.whitecloud233.modid.herobrine_companion.entity.logic.spawn.GlitchVillagerSpawner;
+import com.whitecloud233.modid.herobrine_companion.entity.logic.spawn.HeroSpawner;
 import com.whitecloud233.modid.herobrine_companion.entity.projectile.RealmBreakerLightningEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;

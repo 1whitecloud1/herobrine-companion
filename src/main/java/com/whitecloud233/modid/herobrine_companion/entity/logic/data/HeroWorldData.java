@@ -1,4 +1,4 @@
-package com.whitecloud233.modid.herobrine_companion.event;
+package com.whitecloud233.modid.herobrine_companion.entity.logic.data;
 
 import net.minecraft.core.GlobalPos;
 import net.minecraft.core.registries.Registries;
@@ -26,6 +26,8 @@ public class HeroWorldData extends SavedData {
         public ListTag armorItems = new ListTag();
         public ListTag handItems = new ListTag();
         public CompoundTag curiosBackItem = new CompoundTag(); // [新增]
+        // 👇 [新增] 存储姿势数据
+        public CompoundTag poseData = new CompoundTag();
 
         public void save(CompoundTag tag) {
             tag.putInt("Trust", trust);
@@ -35,6 +37,8 @@ public class HeroWorldData extends SavedData {
             tag.put("ArmorItems", armorItems);
             tag.put("HandItems", handItems);
             tag.put("CuriosBackItem", curiosBackItem);
+            // 👇 [新增]
+            tag.put("PoseData", poseData);
         }
 
         public void load(CompoundTag tag) {
@@ -49,6 +53,8 @@ public class HeroWorldData extends SavedData {
             if (tag.contains("ArmorItems", 9)) armorItems = tag.getList("ArmorItems", 10);
             if (tag.contains("HandItems", 9)) handItems = tag.getList("HandItems", 10);
             if (tag.contains("CuriosBackItem", 10)) curiosBackItem = tag.getCompound("CuriosBackItem");
+            // 👇 [新增]
+            if (tag.contains("PoseData", 10)) poseData = tag.getCompound("PoseData");
         }
     }
 
@@ -276,7 +282,13 @@ public class HeroWorldData extends SavedData {
         this.hasSpawnedFromChat = spawned;
         this.setDirty(); // 必须调用，通知游戏数据已更改需要保存
     }
+    // [新增] 姿势存取
+    public CompoundTag getPoseData(UUID uuid) { return getProfile(uuid).poseData; }
 
+    public void setPoseData(UUID uuid, CompoundTag tag) {
+        getProfile(uuid).poseData = tag;
+        this.setDirty();
+    }
     public static HeroWorldData get(ServerLevel level) {
         ServerLevel overworld = level.getServer().getLevel(Level.OVERWORLD);
         return overworld.getDataStorage().computeIfAbsent(

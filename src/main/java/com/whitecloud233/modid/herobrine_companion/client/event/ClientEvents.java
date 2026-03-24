@@ -66,8 +66,8 @@ public class ClientEvents {
 
     @SubscribeEvent
     public static void registerLayerDefinitions(EntityRenderersEvent.RegisterLayerDefinitions event) {
-        event.registerLayerDefinition(HeroModel.LAYER_LOCATION, () -> net.minecraft.client.model.geom.builders.LayerDefinition.create(net.minecraft.client.model.PlayerModel.createMesh(net.minecraft.client.model.geom.builders.CubeDeformation.NONE, false), 64, 64));
-
+        // 👇 [修改后]：必须指向我们新写的 HeroModel.createBodyLayer
+        event.registerLayerDefinition(HeroModel.LAYER_LOCATION, () -> HeroModel.createBodyLayer(false));
         // 注册自定义龙模型 Layer
         event.registerLayerDefinition(HeroDragonModel.LAYER_LOCATION, HeroDragonModel::createBodyLayer);
     }

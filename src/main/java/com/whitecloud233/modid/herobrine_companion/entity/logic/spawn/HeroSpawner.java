@@ -1,7 +1,8 @@
-package com.whitecloud233.modid.herobrine_companion.entity.logic;
+package com.whitecloud233.modid.herobrine_companion.entity.logic.spawn;
 
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.HeroBrain;
+import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroDataHandler;
 import com.whitecloud233.modid.herobrine_companion.event.ModEvents;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;

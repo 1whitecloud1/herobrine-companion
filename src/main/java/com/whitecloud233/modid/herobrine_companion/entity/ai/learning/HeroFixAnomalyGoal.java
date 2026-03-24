@@ -4,7 +4,7 @@ import com.whitecloud233.modid.herobrine_companion.entity.GhostCreeperEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.GhostSkeletonEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.GhostZombieEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
-import com.whitecloud233.modid.herobrine_companion.entity.logic.HeroQuestHandler;
+import com.whitecloud233.modid.herobrine_companion.event.HeroQuestHandler;
 import com.whitecloud233.modid.herobrine_companion.world.structure.ModStructures;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;

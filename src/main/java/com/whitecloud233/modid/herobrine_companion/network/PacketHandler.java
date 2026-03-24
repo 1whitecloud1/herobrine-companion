@@ -43,7 +43,12 @@ public class PacketHandler {
         // [新增] 注册苍白雷电包
         INSTANCE.registerMessage(id++, PaleLightningPacket.class, PaleLightningPacket::encode, PaleLightningPacket::new, PaleLightningPacket::handle);
         // [新增] 注册苍白雷电弧包
-        INSTANCE.registerMessage(id, PaleLightningArcPacket.class, PaleLightningArcPacket::encode, PaleLightningArcPacket::new, PaleLightningArcPacket::handle);
+        INSTANCE.registerMessage(id++, PaleLightningArcPacket.class, PaleLightningArcPacket::encode, PaleLightningArcPacket::new, PaleLightningArcPacket::handle);
+        // [原代码修复] 注册姿势同步数据包 (把 id 改成 id++)
+        INSTANCE.registerMessage(id++, SavePosePacket.class, SavePosePacket::encode, SavePosePacket::new, SavePosePacket::handle);
+
+        // [新增] 注册 AI 观察环境数据包
+        INSTANCE.registerMessage(id, AIObservationPacket.class, AIObservationPacket::encode, AIObservationPacket::new, AIObservationPacket::handle);
     }
 
 

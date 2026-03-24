@@ -1,10 +1,9 @@
-package com.whitecloud233.modid.herobrine_companion.entity.logic;
+package com.whitecloud233.modid.herobrine_companion.event;
 
 import com.mojang.logging.LogUtils;
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.modid.herobrine_companion.compat.KubeJS.SafeKubeJSCaller;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
-import com.whitecloud233.modid.herobrine_companion.compat.KubeJS.HerobrineCompanionKubeJSPlugin;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.trading.MerchantOffer;

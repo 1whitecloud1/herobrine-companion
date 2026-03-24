@@ -1,7 +1,8 @@
 package com.whitecloud233.modid.herobrine_companion.entity.logic;
 
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
-import com.whitecloud233.modid.herobrine_companion.event.HeroWorldData;
+import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroDataHandler;
+import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroWorldData;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.server.level.ServerLevel;
 

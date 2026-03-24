@@ -4,6 +4,7 @@ import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.HeroAI;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.HeroMoveControl;
 import com.whitecloud233.modid.herobrine_companion.client.fight.goal.HeroPhase1Goal;
+import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroDataHandler;
 import com.whitecloud233.modid.herobrine_companion.util.EndRingContext;
 import com.whitecloud233.modid.herobrine_companion.world.structure.ModStructures;
 import net.minecraft.ChatFormatting;
@@ -261,7 +262,7 @@ public class HeroChallengeManager {
             activeHero.saveWithoutId(heroData);
 
             // 更新全局信任度，确保 NBT 完整
-            com.whitecloud233.modid.herobrine_companion.entity.logic.HeroDataHandler.updateGlobalTrust(activeHero);
+            HeroDataHandler.updateGlobalTrust(activeHero);
             heroData.putInt("TrustLevel", activeHero.getTrustLevel());
 
             // 挂起重生状态，触发你写好的跨维度复活逻辑

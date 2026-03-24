@@ -1,8 +1,8 @@
 package com.whitecloud233.modid.herobrine_companion.network;
 
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
-import com.whitecloud233.modid.herobrine_companion.entity.logic.HeroDataHandler;
-import com.whitecloud233.modid.herobrine_companion.entity.logic.HeroRewards;
+import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroDataHandler;
+import com.whitecloud233.modid.herobrine_companion.event.HeroRewards;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;

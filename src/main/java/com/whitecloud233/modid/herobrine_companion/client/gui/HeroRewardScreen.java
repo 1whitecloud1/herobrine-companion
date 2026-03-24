@@ -2,7 +2,7 @@ package com.whitecloud233.modid.herobrine_companion.client.gui;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
-import com.whitecloud233.modid.herobrine_companion.entity.logic.HeroRewards;
+import com.whitecloud233.modid.herobrine_companion.event.HeroRewards;
 import com.whitecloud233.modid.herobrine_companion.network.ClaimRewardPacket;
 import com.whitecloud233.modid.herobrine_companion.network.PacketHandler;
 import net.minecraft.client.Minecraft;

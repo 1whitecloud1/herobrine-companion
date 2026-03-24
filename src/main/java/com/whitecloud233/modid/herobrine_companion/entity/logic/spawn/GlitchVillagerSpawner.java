@@ -1,4 +1,4 @@
-package com.whitecloud233.modid.herobrine_companion.entity.logic;
+package com.whitecloud233.modid.herobrine_companion.entity.logic.spawn;
 
 import com.whitecloud233.modid.herobrine_companion.entity.GlitchVillagerEntity;
 import com.whitecloud233.modid.herobrine_companion.event.ModEvents;
