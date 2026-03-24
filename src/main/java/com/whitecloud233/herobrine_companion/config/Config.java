@@ -36,7 +36,7 @@ public class Config {
 
     public static final ModConfigSpec.ConfigValue<String> AI_LANGUAGE_STYLE = BUILDER
             .comment("Herobrine的AI语言风格与语气")
-            .define("aiLanguageStyle_v2", "理性且宽容");
+            .define("aiLanguageStyle_v1", "");
 
     // 【新增】恢复更新检查器开关
     public static final ModConfigSpec.BooleanValue ENABLE_UPDATE_CHECKER = BUILDER

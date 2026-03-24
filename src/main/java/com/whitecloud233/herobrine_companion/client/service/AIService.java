@@ -3,7 +3,7 @@ package com.whitecloud233.herobrine_companion.client.service;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.whitecloud233.herobrine_companion.entity.HeroEntity;
+
 import com.whitecloud233.herobrine_companion.item.SourceFlowItem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.commands.CommandSourceStack;
@@ -14,8 +14,6 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,23 +34,24 @@ public class AIService {
     private static final Map<UUID, List<JsonObject>> chatHistories = new ConcurrentHashMap<>();
     private static final int MAX_HISTORY_SIZE = 20;
 
-    // [修复] 恢复 UUID 传参，完美兼容 ClientChatHandler
     public static CompletableFuture<String> chat(String userMessage, UUID playerUUID) {
         return chatWithRetry(userMessage, userMessage, playerUUID, 0);
     }
 
+
+
     public static CompletableFuture<String> observeEnvironment(String observationDesc, UUID playerUUID) {
         String langCode = Minecraft.getInstance().options.languageCode;
-        // 获取玩家设置的语言风格
         String style = com.whitecloud233.herobrine_companion.config.Config.aiLanguageStyle;
 
-        // 将 style 动态嵌入 Prompt
-        String currentPrompt = "[Environment Observation]: Through your omniscient eyes, you observe the player: \"" + observationDesc + "\".\n"
-                + "Please give a brief, gentle comment or sigh (under 30 words).\n"
-                + "【CRITICAL WARNING】: No brackets in reply! Only output dialogue. DO NOT use tools. Your tone MUST BE: " + style + ". NO sarcasm or belittling. You are above creative mode and NEVER call mortals 'brother'.\n"
+        // 在提示词中增加强制发话的指令，防止 AI 扮演过头导致全损沉默
+        String currentPrompt = "[Environment Observation]: You observe the event: \"" + observationDesc + "\".\n"
+                + "Please give a brief comment (under 30 words).\n"
+                + "【CRITICAL WARNING】: No brackets in reply! Only output dialogue. DO NOT use tools.\n"
+                + "【CURRENT TONE/STYLE】: " + style + ". (IMPORTANT: You MUST speak at least one actual sentence, do NOT be completely silent or only use actions).\n"
                 + "【LANGUAGE OVERRIDE】: You MUST output your final dialogue in the language corresponding to this Minecraft locale code: '" + langCode + "'.";
 
-        String historyLog = "[System Vision Log] You gently observed the player: " + observationDesc;
+        String historyLog = "[System Vision Log] You observed: " + observationDesc;
         return chatWithRetry(currentPrompt, historyLog, playerUUID, 0);
     }
 
@@ -75,10 +74,8 @@ public class AIService {
         JsonObject systemMessage = new JsonObject();
         systemMessage.addProperty("role", "system");
 
-        // 获取玩家设置的语言风格
         String style = com.whitecloud233.herobrine_companion.config.Config.aiLanguageStyle;
 
-        // 在系统提示词中强制注入语言风格
         String forcedPrompt = systemPrompt + "\n[ROLEPLAY STYLE/TONE]: " + style + "\n"
                 + "[SUPREME DIRECTIVE]: You have a low-level tool named 'manifest_divine_power'. ONLY call it if the player EXPLICITLY commands you to alter the physical world (e.g. lightning, teleport, give items). If they just chat, DO NOT use it!\n"
                 + "[PLAYER LANGUAGE]: The player's client language code is '" + langCode + "'. You MUST reply in that language!\n";
@@ -86,7 +83,6 @@ public class AIService {
 
         systemMessage.addProperty("content", forcedPrompt);
         messages.add(systemMessage);
-
 
         List<JsonObject> history = chatHistories.computeIfAbsent(playerUUID, k -> new ArrayList<>());
         synchronized (history) {
@@ -108,14 +104,13 @@ public class AIService {
         function.addProperty("name", "manifest_divine_power");
 
         String divineSpellbook = "Alter Minecraft 1.21.1 underlying code. Generate vanilla commands or action codes (NO '/' prefix). " +
-                "1. [Follow/Summon]: action:toggle_companion or tp @e[type=herobrine_companion:hero,limit=1,sort=nearest] @s. " +
-                // 👇 [核心修复] 教导 AI 使用正确的 1.21.1 跨维度传送原版语法
+                "1. [Follow/Summon]: Use action:summon_to_player to teleport yourself to the player's side. Use action:toggle_companion to toggle follow state. " +
                 "2. [Dimension/Locate]: execute in <dimension_id> run tp @s ~ 100 ~ (e.g. execute in minecraft:the_nether run tp @s ~ 100 ~). locate biome/structure. Use specific mod IDs if requested. " +
                 "3. [Creation/Give]: place template ID ~5 ~ ~ or place structure. give @s ID count. " +
                 "4. [Punishment]: summon lightning_bolt ^ ^ ^10 or action:massive_lightning. " +
                 "5. [Admin]: gamemode creative @s (mock them), gamemode survival @s (strip power). " +
                 "6. [Environment]: time set day/night, weather clear/thunder. " +
-                "RULE: You are the lonely god. Command blocks are your creation. Jean is your servant.";
+                "RULE: You are the lonely god. Command blocks are your creation.";
         function.addProperty("description", divineSpellbook);
 
         JsonObject parameters = new JsonObject();
@@ -213,7 +208,6 @@ public class AIService {
         });
     }
 
-    // ---------------- 以下为不变的内部指令执行辅助方法 ----------------
     private static CompletableFuture<Boolean> executeCommandWithFeedback(String command) {
         CompletableFuture<Boolean> future = new CompletableFuture<>();
         Minecraft mc = Minecraft.getInstance();
@@ -249,31 +243,43 @@ public class AIService {
                         } catch (Exception e) { future.complete(false); }
                     });
                 } else future.complete(false);
-            } else if (command.equals("tp @e[type=herobrine_companion:hero,limit=1,sort=nearest] @s")) {
+            } else if ("action:summon_to_player".equals(command) || command.startsWith("tp @e[type=herobrine_companion:hero")) {
                 if (mc.hasSingleplayerServer() && mc.getSingleplayerServer() != null) {
-                    mc.getSingleplayerServer().execute(() -> {
+                    var server = mc.getSingleplayerServer();
+                    server.execute(() -> {
                         try {
-                            ServerPlayer serverPlayer = mc.getSingleplayerServer().getPlayerList().getPlayer(mc.player.getUUID());
-                            if (serverPlayer != null) {
-                                com.whitecloud233.herobrine_companion.item.HeroSummonItem.performHeroTeleport(serverPlayer.serverLevel(), serverPlayer, serverPlayer.position());
-                                future.complete(true);
-                            } else future.complete(false);
+                            ServerPlayer serverPlayer = server.getPlayerList().getPlayer(mc.player.getUUID());
+                            if (serverPlayer == null) { future.complete(false); return; }
+
+                            // 委托统一的召唤工具类 (处理跨维度、重新生成等逻辑)
+                            ServerLevel targetLevel = serverPlayer.serverLevel();
+                            boolean success = com.whitecloud233.herobrine_companion.item.HeroSummonItem.performSummonOrTeleport(
+                                    targetLevel, serverPlayer, serverPlayer.position()
+                            );
+                            future.complete(success);
                         } catch (Exception e) { future.complete(false); }
                     });
-                } else { mc.getConnection().sendCommand(command); future.complete(true); }
+                } else {
+                    // 【注意：多人游戏回退方案】
+                    // 在多人服务器中，客户端无法直接运行 performSummonOrTeleport，因此退回到原版 tp 指令兜底
+                    // 如果你后续想完美支持多人，建议像 action:toggle_companion 一样发一个发包 (Packet) 到服务端
+                    mc.player.connection.sendCommand("tp @e[type=herobrine_companion:hero,limit=1,sort=nearest] @s");
+                    future.complete(true);
+                }
+
             } else if (command.startsWith("tp @s @e[type=herobrine_companion:hero")) {
                 if (mc.hasSingleplayerServer() && mc.getSingleplayerServer() != null) {
                     mc.getSingleplayerServer().execute(() -> {
                         try {
                             ServerPlayer serverPlayer = mc.getSingleplayerServer().getPlayerList().getPlayer(mc.player.getUUID());
                             if (serverPlayer != null) {
-                                SourceFlowItem sourceFlowItem = (SourceFlowItem) HerobrineCompanion.SOURCE_FLOW.get();
+                                SourceFlowItem sourceFlowItem = HerobrineCompanion.SOURCE_FLOW.get();
                                 sourceFlowItem.use(serverPlayer.level(), serverPlayer, InteractionHand.MAIN_HAND);
                                 future.complete(true);
                             } else future.complete(false);
                         } catch (Exception e) { future.complete(false); }
                     });
-                } else { mc.getConnection().sendCommand(command); future.complete(true); }
+                } else { mc.player.connection.sendCommand(command); future.complete(true); }
             } else if (command.contains("gamemode creative") || command.contains("gamemode 1")) {
                 if (mc.hasSingleplayerServer() && mc.getSingleplayerServer() != null) {
                     mc.getSingleplayerServer().execute(() -> {
@@ -307,7 +313,7 @@ public class AIService {
                             } else future.complete(false);
                         } catch (Exception e) { future.complete(false); }
                     });
-                } else { mc.getConnection().sendCommand(command); future.complete(true); }
+                } else { mc.player.connection.sendCommand(command); future.complete(true); }
             }
         });
         return future;
@@ -326,23 +332,23 @@ public class AIService {
 
     private static String getDynamicGameData() {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null || mc.getConnection() == null) return "";
+        if (mc.player == null || mc.player.connection == null) return "";
         StringBuilder data = new StringBuilder("\n\n[System Inject: Current World Data]:\n");
         data.append("- Player Permission: ").append(mc.player.hasPermissions(2) ? "[Cheats Enabled] (Can use tools freely).\n" : "[Cheats Disabled] (CANNOT use physical alteration tools. Decline gently if asked).\n");
         data.append("- Available Dimensions: ");
-        for (ResourceKey<Level> levelKey : mc.getConnection().levels()) data.append(levelKey.location().toString()).append(", ");
+        for (ResourceKey<Level> levelKey : mc.player.connection.levels()) data.append(levelKey.location()).append(", ");
         data.append("\n");
         try {
-            var registryAccess = mc.level.registryAccess();
+            var registryAccess = mc.player.connection.registryAccess();
             var structureRegistry = registryAccess.registryOrThrow(Registries.STRUCTURE);
             data.append("- Your Unstable Zone Structure ID: ");
             for (ResourceLocation loc : structureRegistry.keySet()) {
-                if ((loc.getNamespace().equals(HerobrineCompanion.MODID) && loc.getPath().equals("unstable_zone")) || loc.getPath().contains("village")) data.append(loc.toString()).append(", ");
+                if ((loc.getNamespace().equals(HerobrineCompanion.MODID) && loc.getPath().equals("unstable_zone")) || loc.getPath().contains("village")) data.append(loc).append(", ");
             }
             data.append("\n- Available Biomes: ");
             var biomeRegistry = registryAccess.registryOrThrow(Registries.BIOME);
             for (ResourceLocation loc : biomeRegistry.keySet()) {
-                if (loc.getNamespace().equals(HerobrineCompanion.MODID) || loc.getNamespace().equals("twilightforest") || loc.getPath().contains("cherry")) data.append(loc.toString()).append(", ");
+                if (loc.getNamespace().equals(HerobrineCompanion.MODID) || loc.getNamespace().equals("twilightforest") || loc.getPath().contains("cherry")) data.append(loc).append(", ");
             }
             data.append("\n");
         } catch (Exception e) {}
@@ -351,13 +357,13 @@ public class AIService {
             for (Map.Entry<String, String> entry : LLMConfig.nbtStructures.entrySet()) data.append("  * ").append(entry.getKey()).append(": ").append(entry.getValue()).append("\n");
         } else data.append("  * (None configured)\n");
         data.append("\n- [Omniscient Eye] Current Environment:\n");
-        if (!mc.player.getMainHandItem().isEmpty()) data.append("  * Player Mainhand: ").append(net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(mc.player.getMainHandItem().getItem()).toString()).append("\n");
+        if (!mc.player.getMainHandItem().isEmpty()) data.append("  * Player Mainhand: ").append(net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(mc.player.getMainHandItem().getItem())).append("\n");
         data.append("  * Entities within 20 blocks (You pity monsters): ");
         if (mc.level != null) {
             int entityCount = 0;
             for (net.minecraft.world.entity.Entity entity : mc.level.entitiesForRendering()) {
                 if (entity != mc.player && entity.distanceTo(mc.player) < 20) {
-                    data.append(net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()).toString()).append(", ");
+                    data.append(net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType())).append(", ");
                     if (++entityCount > 15) { data.append("...and more"); break; }
                 }
             }
