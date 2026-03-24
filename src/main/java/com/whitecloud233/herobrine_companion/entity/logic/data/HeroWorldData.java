@@ -1,4 +1,4 @@
-package com.whitecloud233.herobrine_companion.event;
+package com.whitecloud233.herobrine_companion.entity.logic.data;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
@@ -6,6 +6,7 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtUtils;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
@@ -21,13 +22,6 @@ import java.util.UUID;
 
 public class HeroWorldData extends SavedData {
 
-    // [1.21.1 新增] 必须定义 Factory 以供 computeIfAbsent 使用
-    public static final SavedData.Factory<HeroWorldData> FACTORY = new SavedData.Factory<>(
-            HeroWorldData::new,
-            HeroWorldData::load,
-            null // DataFixTypes，传 null 即可
-    );
-
     // [重构] 玩家档案类
     public static class PlayerProfile {
         public int trust = 0;
@@ -38,6 +32,8 @@ public class HeroWorldData extends SavedData {
         public ListTag armorItems = new ListTag();
         public ListTag handItems = new ListTag();
         public CompoundTag curiosBackItem = new CompoundTag(); // [新增]
+        // 👇 [新增] 存储姿势数据
+        public CompoundTag poseData = new CompoundTag();
 
         public void save(CompoundTag tag) {
             tag.putInt("Trust", trust);
@@ -47,6 +43,8 @@ public class HeroWorldData extends SavedData {
             tag.put("ArmorItems", armorItems);
             tag.put("HandItems", handItems);
             tag.put("CuriosBackItem", curiosBackItem);
+            // 👇 [新增]
+            tag.put("PoseData", poseData);
         }
 
         public void load(CompoundTag tag) {
@@ -61,6 +59,8 @@ public class HeroWorldData extends SavedData {
             if (tag.contains("ArmorItems", 9)) armorItems = tag.getList("ArmorItems", 10);
             if (tag.contains("HandItems", 9)) handItems = tag.getList("HandItems", 10);
             if (tag.contains("CuriosBackItem", 10)) curiosBackItem = tag.getCompound("CuriosBackItem");
+            // 👇 [新增]
+            if (tag.contains("PoseData", 10)) poseData = tag.getCompound("PoseData");
         }
     }
 
@@ -68,8 +68,6 @@ public class HeroWorldData extends SavedData {
     private final Map<UUID, PlayerProfile> playerProfiles = new HashMap<>();
 
     private long respawnReadyTime = 0;
-    // [修改] 废弃 useHerobrineSkin，改为 skinVariant
-    // private boolean useHerobrineSkin = true;
     private int skinVariant = 0; // 0 = Herobrine, 1 = Hero, ...
     private String customSkinName = ""; // 自定义皮肤名称
 
@@ -84,7 +82,7 @@ public class HeroWorldData extends SavedData {
     // [新增] 记录是否已经通过 hb 指令召唤过
     private boolean hasSpawnedFromChat = false;
 
-    // [1.21.1 改动] 添加 HolderLookup.Provider 参数
+    // 👇 [修正 1] 1.21.1 必须增加 HolderLookup.Provider 参数
     @Override
     public CompoundTag save(CompoundTag compound, HolderLookup.Provider provider) {
         compound.putLong("RespawnReadyTime", this.respawnReadyTime);
@@ -116,7 +114,7 @@ public class HeroWorldData extends SavedData {
         return compound;
     }
 
-    // [1.21.1 改动] 添加 HolderLookup.Provider 参数
+    // 👇 [修正 2] 1.21.1 load 方法同样需要 Provider 参数
     public static HeroWorldData load(CompoundTag compound, HolderLookup.Provider provider) {
         HeroWorldData data = new HeroWorldData();
         if (compound.contains("RespawnReadyTime")) {
@@ -163,26 +161,33 @@ public class HeroWorldData extends SavedData {
         return data;
     }
 
-    // [1.21.1 修复] 弃用不稳定的 NbtUtils BlockPos，改用直接存取 XYZ 坐标
+    // Helper methods for GlobalPos serialization
     private static CompoundTag writeGlobalPos(GlobalPos pos) {
         CompoundTag tag = new CompoundTag();
         tag.putString("Dimension", pos.dimension().location().toString());
+
+        // 1.21.1 弃用 NbtUtils.writeBlockPos，直接手动构造兼容旧格式的 NBT
         CompoundTag posTag = new CompoundTag();
         posTag.putInt("X", pos.pos().getX());
         posTag.putInt("Y", pos.pos().getY());
         posTag.putInt("Z", pos.pos().getZ());
         tag.put("Pos", posTag);
+
         return tag;
     }
 
     private static GlobalPos readGlobalPos(CompoundTag tag) {
         try {
-            // [1.21.1 改动] 使用 ResourceLocation.parse()
             ResourceLocation dimLoc = ResourceLocation.parse(tag.getString("Dimension"));
             ResourceKey<Level> dimKey = ResourceKey.create(Registries.DIMENSION, dimLoc);
+
+            // 抛弃因为版本升级报参量错误的 NbtUtils，自己直接读取 XYZ
             CompoundTag posTag = tag.getCompound("Pos");
-            BlockPos blockPos = new BlockPos(posTag.getInt("X"), posTag.getInt("Y"), posTag.getInt("Z"));
-            return GlobalPos.of(dimKey, blockPos);
+            int x = posTag.getInt("X");
+            int y = posTag.getInt("Y");
+            int z = posTag.getInt("Z");
+
+            return GlobalPos.of(dimKey, new BlockPos(x, y, z));
         } catch (Exception e) {
             return null;
         }
@@ -227,7 +232,6 @@ public class HeroWorldData extends SavedData {
         this.setDirty();
     }
 
-    // 兼容旧方法
     public int getSkinVariant() {
         return skinVariant;
     }
@@ -273,7 +277,6 @@ public class HeroWorldData extends SavedData {
         this.setDirty();
     }
 
-    // [新增] 装备存取
     public ListTag getArmorItems(UUID uuid) { return getProfile(uuid).armorItems; }
     public ListTag getHandItems(UUID uuid) { return getProfile(uuid).handItems; }
 
@@ -290,21 +293,34 @@ public class HeroWorldData extends SavedData {
         this.setDirty();
     }
 
-    // [新增] 聊天指令召唤状态的存取
     public boolean hasSpawnedFromChat() {
         return this.hasSpawnedFromChat;
     }
 
     public void setSpawnedFromChat(boolean spawned) {
         this.hasSpawnedFromChat = spawned;
-        this.setDirty(); // 必须调用，通知游戏数据已更改需要保存
+        this.setDirty();
     }
 
-    // [1.21.1 改动] 使用 FACTORY 注册获取 Data
+    public CompoundTag getPoseData(UUID uuid) { return getProfile(uuid).poseData; }
+
+    public void setPoseData(UUID uuid, CompoundTag tag) {
+        getProfile(uuid).poseData = tag;
+        this.setDirty();
+    }
+
+    // 👇 [修正 4] 1.21.1 必须使用 SavedData.Factory 包装调用
     public static HeroWorldData get(ServerLevel level) {
         ServerLevel overworld = level.getServer().getLevel(Level.OVERWORLD);
+
+        SavedData.Factory<HeroWorldData> factory = new SavedData.Factory<>(
+                HeroWorldData::new,
+                HeroWorldData::load,
+                null // 自定义数据通常不需要 DataFixTypes，传 null 即可
+        );
+
         return overworld.getDataStorage().computeIfAbsent(
-                FACTORY,
+                factory,
                 "herobrine_companion_data"
         );
     }

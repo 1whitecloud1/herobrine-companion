@@ -52,14 +52,9 @@ public class HeroDialogueHandler {
     public static void triggerAIObservation(HeroEntity hero, ServerPlayer player, String observationDesc) {
         hero.getPersistentData().putLong(TAG_LAST_SPEECH, hero.level().getGameTime());
 
-        AIService.observeEnvironment(observationDesc, player.getUUID())
-                .thenAccept(reply -> {
-                    if (reply != null && !reply.isEmpty() && !reply.startsWith("§c")) {
-                        player.getServer().execute(() -> {
-                            player.sendSystemMessage(Component.literal("§e<Herobrine> §f" + reply));
-                        });
-                    }
-                });
+        // 服务端不直接调用 API，而是发送数据包给触发事件的那个玩家
+        net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player,
+                new com.whitecloud233.herobrine_companion.network.AIObservationPacket(hero.getId(), observationDesc));
     }
 
     public static void tick(HeroEntity hero) {

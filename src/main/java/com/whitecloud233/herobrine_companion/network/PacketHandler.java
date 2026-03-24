@@ -34,7 +34,6 @@ public class PacketHandler {
                 ToggleCompanionPacket.STREAM_CODEC,
                 ToggleCompanionPacket::handle
         );
-        // Removed QuestActionPacket
         registrar.playToServer(
                 RequestActionPacket.TYPE,
                 RequestActionPacket.STREAM_CODEC,
@@ -65,7 +64,6 @@ public class PacketHandler {
                 ToggleSkinPacket.STREAM_CODEC,
                 ToggleSkinPacket::handle
         );
-        // [新增] 注册触发永恒誓约的数据包 (S2C)
         registrar.playToClient(
                 TriggerEternalOathPacket.TYPE,
                 TriggerEternalOathPacket.STREAM_CODEC,
@@ -81,30 +79,41 @@ public class PacketHandler {
                 OpenWardrobePacket.STREAM_CODEC,
                 OpenWardrobePacket::handle
         );
-
-        // [新增] 注册同步奖励数据包 (S2C)
         registrar.playToClient(
                 SyncRewardsPacket.TYPE,
                 SyncRewardsPacket.STREAM_CODEC,
                 SyncRewardsPacket::handle
         );
-        // 在你的 RegisterPayloadHandlersEvent 监听方法中添加：
         registrar.playToServer(
                 StartChallengePacket.TYPE,
                 StartChallengePacket.STREAM_CODEC,
                 StartChallengePacket::handle
         );
-        // 注册苍白雷电数据包 (发往客户端)
-        // 注册苍白雷电数据包 (发往客户端)
         registrar.playToClient(
                 PaleLightningPacket.TYPE,
                 PaleLightningPacket.STREAM_CODEC,
-                PaleLightningPacket::handle // 👈 修改这里，引用数据包自身的 handle
+                PaleLightningPacket::handle
         );
         registrar.playBidirectional(
                 PaleLightningArcPacket.TYPE,
                 PaleLightningArcPacket.STREAM_CODEC,
-                PaleLightningArcPacket::handle);
+                PaleLightningArcPacket::handle
+        );
+
+        // ============================================
+        // [新增] 注册 SavePosePacket (双向通信)
+        // ============================================
+        registrar.playBidirectional(
+                SavePosePacket.TYPE,
+                SavePosePacket.STREAM_CODEC,
+                SavePosePacket::handle
+        );
+        // 注册我们刚刚写的 AIObservationPacket，方向是 服务端 -> 客户端 (playToClient)
+        registrar.playToClient(
+                AIObservationPacket.TYPE,
+                AIObservationPacket.STREAM_CODEC,
+                AIObservationPacket::handle
+        );
     }
 
     public static void sendToServer(PeacefulPacket packet) {
@@ -126,8 +135,6 @@ public class PacketHandler {
     public static void sendToServer(ToggleCompanionPacket packet) {
         PacketDistributor.sendToServer(packet);
     }
-
-    // Removed sendToServer(QuestActionPacket)
 
     public static void sendToServer(RequestActionPacket packet) {
         PacketDistributor.sendToServer(packet);
@@ -153,7 +160,6 @@ public class PacketHandler {
         PacketDistributor.sendToServer(packet);
     }
 
-    // [新增] 发送给玩家
     public static void sendToPlayer(TriggerEternalOathPacket packet, ServerPlayer player) {
         PacketDistributor.sendToPlayer(player, packet);
     }
@@ -161,14 +167,22 @@ public class PacketHandler {
     public static void sendToServer(CleaveSkillPacket packet) {
         PacketDistributor.sendToServer(packet);
     }
-    // [补上缺失的这一个发送方法]
+
     public static void sendToServer(OpenWardrobePacket packet) {
         PacketDistributor.sendToServer(packet);
     }
 
-    // [新增] 同步奖励发送给玩家
     public static void sendToPlayer(SyncRewardsPacket packet, ServerPlayer player) {
         PacketDistributor.sendToPlayer(player, packet);
+    }
+
+    // [新增] 客户端发送 GUI 姿势修改给服务端
+    public static void sendToServer(SavePosePacket packet) {
+        PacketDistributor.sendToServer(packet);
+    }
+    // [新增] 将 SavePosePacket 发送给指定的单个玩家
+    public static void sendToPlayer(SavePosePacket packet, ServerPlayer player) {
+        net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player, packet);
     }
     // 1.21.1 的 PacketDistributor 调用方式
     public static void sendToTracking(CustomPacketPayload packet, Entity entity) {

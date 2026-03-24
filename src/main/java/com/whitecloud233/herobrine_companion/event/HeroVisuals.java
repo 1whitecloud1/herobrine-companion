@@ -1,4 +1,4 @@
-package com.whitecloud233.herobrine_companion.entity.logic;
+package com.whitecloud233.herobrine_companion.event;
 
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.ai.learning.SimpleNeuralNetwork;

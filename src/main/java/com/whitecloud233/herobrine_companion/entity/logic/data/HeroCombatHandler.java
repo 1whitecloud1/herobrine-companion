@@ -1,7 +1,6 @@
-package com.whitecloud233.herobrine_companion.entity.logic;
+package com.whitecloud233.herobrine_companion.entity.logic.data;
 
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
-import com.whitecloud233.herobrine_companion.event.HeroWorldData;
 import com.whitecloud233.herobrine_companion.world.structure.ModStructures;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -10,7 +9,6 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.entity.player.Player;
-
 
 public class HeroCombatHandler {
 
@@ -30,14 +28,11 @@ public class HeroCombatHandler {
             return false; // 交给原版 super.hurt 处理掉血
         }
 
-        // 2. 玩家攻击判定 (这是原来的日常判断逻辑)
+        // 2. 玩家攻击判定
         if (!hero.level().isClientSide && source.getEntity() instanceof Player player) {
             // [新增] 神经网络输入：直接攻击 Herobrine
-            // 使用新的输入类型 "DIRECT_ATTACK"，避免增加怪物同情值
             hero.getHeroBrain().input(player.getUUID(), "DIRECT_ATTACK", 0.2f);
-
-            // 攻击 Herobrine 是一种极大的负面反馈，抑制他当前的任何行为
-            hero.getHeroBrain().inputFailure(player.getUUID(), 0.1f); // 玩家攻击他，说明他之前的行为可能让玩家不爽，或者玩家本身很暴力
+            hero.getHeroBrain().inputFailure(player.getUUID(), 0.1f);
 
             int currentTrust = hero.getTrustLevel();
             if (currentTrust > 0) {
@@ -65,41 +60,17 @@ public class HeroCombatHandler {
                 else {
                     player.sendSystemMessage(Component.translatable("message.herobrine_companion.attack_disappoint"));
 
-                    // [修复] 保存皮肤状态到玩家数据，以便重生时恢复
+                    // ============== [重构精简] 委托给状态管理器进行打包 ==============
                     if (player instanceof ServerPlayer serverPlayer) {
-                        CompoundTag data = serverPlayer.getPersistentData();
-                        CompoundTag heroData = new CompoundTag();
-                        // [关键修复] 使用新的皮肤变体和自定义名称，而不是旧的 boolean
-                        heroData.putInt("SkinVariant", hero.getSkinVariant());
-                        if (hero.getSkinVariant() == HeroEntity.SKIN_CUSTOM) {
-                            heroData.putString("CustomSkinName", hero.getCustomSkinName());
-                        }
-
-                        // ============== [修复] 打包所有装备 ==============
-                        heroData.put("ArmorItems", hero.getArmorItemsTag());
-                        heroData.put("HandItems", hero.getHandItemsTag());
-                        heroData.put("CuriosBackItem", hero.getCuriosBackItemTag()); // [新增]
-                        data.put("HeroCombatRespawnData", heroData);
+                        HeroStateManager.backupToPlayerNBT(hero, serverPlayer, "HeroCombatRespawnData");
                     }
-
-                    // [新增] 强制更新一次全局数据，作为双重保险
-                    if (hero.level() instanceof ServerLevel serverLevel) {
-                        HeroWorldData data = HeroWorldData.get(serverLevel);
-                        data.setSkinVariant(hero.getSkinVariant());
-                        if (hero.getSkinVariant() == HeroEntity.SKIN_CUSTOM) {
-                            data.setCustomSkinName(hero.getCustomSkinName());
-                        }
-
-                        data.setEquipment(player.getUUID(), hero.getArmorItemsTag(), hero.getHandItemsTag());
-                        data.setCuriosBackItem(player.getUUID(), hero.getCuriosBackItemTag()); // [新增]
-                    }
+                    // ==========================================================
 
                     HeroDimensionHandler.leaveWorld(hero, null);
 
-                    // [新增] 延迟 5 秒后在玩家附近重新生成
+                    // 延迟 5 秒后在玩家附近重新生成
                     if (hero.level() instanceof ServerLevel serverLevel) {
                         serverLevel.getServer().tell(new net.minecraft.server.TickTask(serverLevel.getServer().getTickCount() + 100, () -> {
-                            // 检查玩家是否还在
                             if (player instanceof ServerPlayer serverPlayer && serverPlayer.isAlive() && !serverPlayer.hasDisconnected()) {
                                 HeroDimensionHandler.respawnNearPlayer(serverLevel, serverPlayer);
                             }

@@ -2,7 +2,7 @@ package com.whitecloud233.herobrine_companion.network;
 
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
-import com.whitecloud233.herobrine_companion.entity.logic.HeroQuestHandler;
+import com.whitecloud233.herobrine_companion.event.HeroQuestHandler;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;

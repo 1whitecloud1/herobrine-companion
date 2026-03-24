@@ -1,7 +1,8 @@
-package com.whitecloud233.herobrine_companion.entity.logic;
+package com.whitecloud233.herobrine_companion.event;
 
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.entity.*;
+import com.whitecloud233.herobrine_companion.entity.logic.data.HeroDataHandler;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;

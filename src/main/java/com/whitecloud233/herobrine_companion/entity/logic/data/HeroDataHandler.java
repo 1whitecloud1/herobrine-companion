@@ -1,7 +1,7 @@
-package com.whitecloud233.herobrine_companion.entity.logic;
+package com.whitecloud233.herobrine_companion.entity.logic.data;
 
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
-import com.whitecloud233.herobrine_companion.event.HeroWorldData;
+import com.whitecloud233.herobrine_companion.entity.logic.HeroRewards;
 import com.whitecloud233.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.herobrine_companion.network.SyncRewardsPacket;
 import net.minecraft.nbt.CompoundTag;

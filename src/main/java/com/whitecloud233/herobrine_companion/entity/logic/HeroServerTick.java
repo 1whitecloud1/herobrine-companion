@@ -1,7 +1,8 @@
 package com.whitecloud233.herobrine_companion.entity.logic;
 
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
-import com.whitecloud233.herobrine_companion.event.HeroWorldData;
+import com.whitecloud233.herobrine_companion.entity.logic.data.HeroDataHandler;
+import com.whitecloud233.herobrine_companion.entity.logic.data.HeroWorldData;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.server.level.ServerLevel;
 
@@ -39,12 +40,24 @@ public class HeroServerTick {
             UUID activeUUID = data.getActiveHeroUUID();
 
             if (activeUUID != null && !activeUUID.equals(hero.getUUID())) {
-                // [1.21 修复] 删除了 activeExists 检查。
-                // 只要当前活跃的不是自己，说明玩家已在别处重新召唤。旧皇必须无条件自尽！
-                // 防止因新皇处于未加载区块导致旧皇“篡位复辟”而产生无限分身。
-                HeroDataHandler.updateGlobalTrust(hero);
-                hero.discard();
-                return false;
+                net.minecraft.server.MinecraftServer server = serverLevel.getServer();
+                boolean activeExists = false;
+                for (ServerLevel lvl : server.getAllLevels()) {
+                    if (lvl.getEntity(activeUUID) != null) {
+                        activeExists = true;
+                        break;
+                    }
+                }
+
+                if (activeExists) {
+                    // 旧皇必须死
+                    HeroDataHandler.updateGlobalTrust(hero);
+                    hero.discard();
+                    return false; // 实体已被清理，停止运行
+                } else {
+                    // 旧皇已死，我即新皇
+                    data.setActiveHeroUUID(hero.getUUID());
+                }
             }
 
             if (activeUUID == null) {

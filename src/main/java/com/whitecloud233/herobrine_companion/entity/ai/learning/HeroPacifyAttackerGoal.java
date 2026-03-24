@@ -1,7 +1,7 @@
 package com.whitecloud233.herobrine_companion.entity.ai.learning;
 
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
-import com.whitecloud233.herobrine_companion.entity.logic.HeroQuestHandler;
+import com.whitecloud233.herobrine_companion.event.HeroQuestHandler;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
