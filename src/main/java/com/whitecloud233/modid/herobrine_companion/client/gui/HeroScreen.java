@@ -297,6 +297,11 @@ public class HeroScreen extends Screen {
                 confirmFlattenTime = System.currentTimeMillis();
             }
         }, Tooltip.create(Component.translatable(flattenUnlocked ? "gui.herobrine_companion.flatten_warning" : "gui.herobrine_companion.flatten_locked_trust_tooltip", currentTrust))).active = flattenUnlocked;
+// [新增] 姿势编辑按钮
+        this.actionList.addAction(Component.translatable("gui.herobrine_companion.pose_editor"), button -> {
+            // 打开 3D 姿势调节界面
+            Minecraft.getInstance().setScreen(new HeroPoseScreen(this.entityId));
+        }, Tooltip.create(Component.translatable("gui.herobrine_companion.pose_editor_tooltip")));
 
         // [新增] 挑战难度切换按钮
         this.actionList.addDynamicAction(() -> {
@@ -365,8 +370,8 @@ public class HeroScreen extends Screen {
         guiGraphics.fill(startX + sideBarWidth, startY, startX + sideBarWidth + tabWidth, startY + topBarHeight - 2, COL_BG_MAIN);
         guiGraphics.fill(startX + sideBarWidth, startY, startX + sideBarWidth + tabWidth, startY + 2, 0xFF4A88C7);
 
-        guiGraphics.drawString(this.font, "Control Dashboard", startX + sideBarWidth + 10, startY + 8, COL_TEXT_MAIN, false);
-
+        // [修改]
+        guiGraphics.drawString(this.font, Component.translatable("gui.herobrine_companion.dashboard_title"), startX + sideBarWidth + 10, startY + 8, COL_TEXT_MAIN, false);
         // --- 左侧信息栏 ---
         guiGraphics.fill(startX + 5, startY + topBarHeight + 5, startX + sideBarWidth - 5, startY + topBarHeight + 95, 0xFF1E1E1E);
 
@@ -374,7 +379,8 @@ public class HeroScreen extends Screen {
         int lineHeight = 10;
         int indent = startX + 5;
 
-        drawInfoLabel(guiGraphics, indent, varY, "Target:", "Herobrine");
+        // [修改]
+        drawInfoLabel(guiGraphics, indent, varY, Component.translatable("gui.herobrine_companion.target"), Component.translatable("gui.herobrine_companion.target_name"));
 
         int trust = 0;
         UUID uuid = null;
@@ -390,15 +396,15 @@ public class HeroScreen extends Screen {
                 }
             }
         }
+// 👇 就是这里！把你之前漏掉的声明和绘制字段的代码补上
+        drawInfoField(guiGraphics, indent + 5, varY + lineHeight, Component.translatable("gui.herobrine_companion.trust_level"), Component.literal(String.valueOf(trust)));
+        drawInfoField(guiGraphics, indent + 5, varY + lineHeight * 2, Component.translatable("gui.herobrine_companion.active_time"), Component.literal(this.dummyHero.tickCount + "").append(Component.translatable("gui.herobrine_companion.ticks")));
+        drawInfoField(guiGraphics, indent + 5, varY + lineHeight * 3, Component.translatable("gui.herobrine_companion.entity_id"), Component.literal(uuid == null ? "N/A" : "..." + uuid.toString().substring(0, 4)));
 
-        drawInfoField(guiGraphics, indent + 5, varY + lineHeight, "TrustLevel", String.valueOf(trust));
-        drawInfoField(guiGraphics, indent + 5, varY + lineHeight * 2, "Active Time", this.dummyHero.tickCount + " ticks");
-        drawInfoField(guiGraphics, indent + 5, varY + lineHeight * 3, "Entity ID", uuid == null ? "N/A" : "..." + uuid.toString().substring(0, 4));
-
-        // 信任条
         int barY = varY + lineHeight * 4 + 5;
-        guiGraphics.drawString(this.font, "Sync Status:", indent, barY, COL_INFO, false);
+        guiGraphics.drawString(this.font, Component.translatable("gui.herobrine_companion.sync_status"), indent, barY, COL_INFO, false);
         int maxTrust = 100;
+
         float progress = Math.min(1.0f, (float)trust / maxTrust);
         int barWidth = sideBarWidth - 10;
         guiGraphics.fill(indent, barY + 10, indent + barWidth, barY + 14, 0xFF555555);
@@ -409,9 +415,9 @@ public class HeroScreen extends Screen {
         int mainAreaX = startX + sideBarWidth + 5;
         int mainAreaY = startY + topBarHeight + 5;
 
-        guiGraphics.drawString(this.font, "Available Actions", mainAreaX, mainAreaY, COL_LABEL, false);
+        // [修改]
+        guiGraphics.drawString(this.font, Component.translatable("gui.herobrine_companion.available_actions"), mainAreaX, mainAreaY, COL_LABEL, false);
         guiGraphics.fill(mainAreaX, mainAreaY + 10, startX + PANEL_WIDTH - 5, mainAreaY + 11, COL_BORDER);
-
         // --- 实体模型渲染 ---
         if (this.dummyHero != null) {
             guiGraphics.pose().pushPose();
@@ -432,12 +438,14 @@ public class HeroScreen extends Screen {
         super.render(guiGraphics, mouseX, mouseY, partialTick);
     }
 
-    private void drawInfoLabel(GuiGraphics g, int x, int y, String label, String value) {
+    // [修改] 参数从 String 变更为 Component
+    private void drawInfoLabel(GuiGraphics g, int x, int y, Component label, Component value) {
         g.drawString(this.font, label, x, y, COL_LABEL, false);
-        g.drawString(this.font, " " + value, x + this.font.width(label), y, COL_TEXT_MAIN, false);
+        g.drawString(this.font, Component.literal(" ").append(value), x + this.font.width(label), y, COL_TEXT_MAIN, false);
     }
 
-    private void drawInfoField(GuiGraphics g, int x, int y, String name, String value) {
+    // [修改] 参数从 String 变更为 Component
+    private void drawInfoField(GuiGraphics g, int x, int y, Component name, Component value) {
         g.drawString(this.font, name, x, y, COL_VALUE, false);
         g.drawString(this.font, ": ", x + this.font.width(name), y, COL_TEXT_MAIN, false);
         g.drawString(this.font, value, x + this.font.width(name) + 10, y, COL_INFO, false);
