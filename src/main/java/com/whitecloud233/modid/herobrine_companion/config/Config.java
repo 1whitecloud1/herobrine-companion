@@ -67,7 +67,7 @@ public class Config {
     public static final ForgeConfigSpec.ConfigValue<String> AI_LANGUAGE_STYLE = BUILDER
             .comment("The language style and tone for Herobrine's AI responses")
             .comment("Herobrine的AI语言风格与语气")
-            .define("aiLanguageStyle_v2", "理性且宽容");
+            .define("aiLanguageStyle_v1", "");
     // 【新增】更新检查器配置
     public static final ForgeConfigSpec.BooleanValue ENABLE_UPDATE_CHECKER = BUILDER
             .comment("Whether to check for mod updates on Modrinth when joining a world")
