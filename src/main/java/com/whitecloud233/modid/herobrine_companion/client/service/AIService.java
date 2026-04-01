@@ -76,6 +76,14 @@ public class AIService {
         String forcedPrompt = systemPrompt + "\n[ROLEPLAY STYLE/TONE]: " + style + "\n"
                 + "[SUPREME DIRECTIVE]: You have a low-level tool named 'manifest_divine_power'. ONLY call it if the player EXPLICITLY commands you to alter the physical world (e.g. lightning, teleport, give items). If they just chat, DO NOT use it!\n"
                 + "[PLAYER LANGUAGE]: The player's client language code is '" + langCode + "'. You MUST reply in that language!\n";
+
+        // --- 新增：调用 RAG 引擎，根据玩家当前说话内容注入对应的设定集 ---
+        String ragKnowledge = LoreRAGManager.getRelevantLoreInjectedPrompt(originalUserMessage, playerUUID);
+        if (!ragKnowledge.isEmpty()) {
+            forcedPrompt += "\n\n[DYNAMIC KNOWLEDGE RETRIEVAL]:" + ragKnowledge;
+        }
+        // -----------------------------------------------------------
+
         forcedPrompt += getDynamicGameData();
 
         systemMessage.addProperty("content", forcedPrompt);
