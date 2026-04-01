@@ -16,13 +16,11 @@ public class HeroModel extends PlayerModel<HeroEntity> {
     public static final ModelLayerLocation LAYER_LOCATION = new ModelLayerLocation(
             new ResourceLocation(HerobrineCompanion.MODID, "hero"), "main");
 
-    // --- 新增：用于弯折的下半截骨骼 ---
     public final ModelPart rightArmLower;
     public final ModelPart leftArmLower;
     public final ModelPart rightLegLower;
     public final ModelPart leftLegLower;
 
-    // --- 新增：对应的双层皮肤外套/裤腿层 ---
     public final ModelPart rightSleeveLower;
     public final ModelPart leftSleeveLower;
     public final ModelPart rightPantsLower;
@@ -31,7 +29,6 @@ public class HeroModel extends PlayerModel<HeroEntity> {
     public HeroModel(ModelPart root, boolean slim) {
         super(root, slim);
 
-        // 从上臂/大腿中获取作为子节点的下臂/小腿
         this.rightArmLower = this.rightArm.getChild("right_arm_lower");
         this.leftArmLower = this.leftArm.getChild("left_arm_lower");
         this.rightLegLower = this.rightLeg.getChild("right_leg_lower");
@@ -43,102 +40,135 @@ public class HeroModel extends PlayerModel<HeroEntity> {
         this.leftPantsLower = this.leftPants.getChild("left_pants_lower");
     }
 
-    // [核心重构]：用代码硬编码生成带有父子层级关节的玩家模型
     public static LayerDefinition createBodyLayer(boolean slim) {
         MeshDefinition meshdefinition = PlayerModel.createMesh(CubeDeformation.NONE, slim);
         PartDefinition partdefinition = meshdefinition.getRoot();
 
-        // 1. 右臂 (切分为上下两截，每截高度 6 像素)
-        PartDefinition rightArm = partdefinition.addOrReplaceChild("right_arm", CubeListBuilder.create().texOffs(40, 16).addBox(-3.0F, -2.0F, -2.0F, 4.0F, 6.0F, 4.0F), PartPose.offset(-5.0F, 2.0F, 0.0F));
-        // 子节点：右小臂，旋转轴心设在手肘处 (Y=4.0F)
-        rightArm.addOrReplaceChild("right_arm_lower", CubeListBuilder.create().texOffs(40, 22).addBox(-3.0F, 0.0F, -2.0F, 4.0F, 6.0F, 4.0F), PartPose.offset(0.0F, 4.0F, 0.0F));
+        // 1. 右臂
+        PartDefinition rightArm = partdefinition.addOrReplaceChild("right_arm", CubeListBuilder.create().texOffs(40, 16).addBox(-3.0F, -2.0F, -2.0F, 4.0F, 6.25F, 4.0F), PartPose.offset(-5.0F, 2.0F, 0.0F));
+        rightArm.addOrReplaceChild("right_arm_lower", CubeListBuilder.create().texOffs(40, 22).addBox(-3.0F, -0.25F, -2.0F, 4.0F, 6.25F, 4.0F), PartPose.offset(0.0F, 4.0F, 0.0F));
 
-        PartDefinition rightSleeve = partdefinition.addOrReplaceChild("right_sleeve", CubeListBuilder.create().texOffs(40, 32).addBox(-3.0F, -2.0F, -2.0F, 4.0F, 6.0F, 4.0F, new CubeDeformation(0.25F)), PartPose.offset(-5.0F, 2.0F, 0.0F));
-        rightSleeve.addOrReplaceChild("right_sleeve_lower", CubeListBuilder.create().texOffs(40, 38).addBox(-3.0F, 0.0F, -2.0F, 4.0F, 6.0F, 4.0F, new CubeDeformation(0.25F)), PartPose.offset(0.0F, 4.0F, 0.0F));
+        PartDefinition rightSleeve = partdefinition.addOrReplaceChild("right_sleeve", CubeListBuilder.create().texOffs(40, 32).addBox(-3.0F, -2.0F, -2.0F, 4.0F, 6.25F, 4.0F, new CubeDeformation(0.25F)), PartPose.offset(-5.0F, 2.0F, 0.0F));
+        rightSleeve.addOrReplaceChild("right_sleeve_lower", CubeListBuilder.create().texOffs(40, 38).addBox(-3.0F, -0.25F, -2.0F, 4.0F, 6.25F, 4.0F, new CubeDeformation(0.25F)), PartPose.offset(0.0F, 4.0F, 0.0F));
 
         // 2. 左臂
-        PartDefinition leftArm = partdefinition.addOrReplaceChild("left_arm", CubeListBuilder.create().texOffs(32, 48).addBox(-1.0F, -2.0F, -2.0F, 4.0F, 6.0F, 4.0F), PartPose.offset(5.0F, 2.0F, 0.0F));
-        leftArm.addOrReplaceChild("left_arm_lower", CubeListBuilder.create().texOffs(32, 54).addBox(-1.0F, 0.0F, -2.0F, 4.0F, 6.0F, 4.0F), PartPose.offset(0.0F, 4.0F, 0.0F));
+        PartDefinition leftArm = partdefinition.addOrReplaceChild("left_arm", CubeListBuilder.create().texOffs(32, 48).addBox(-1.0F, -2.0F, -2.0F, 4.0F, 6.25F, 4.0F), PartPose.offset(5.0F, 2.0F, 0.0F));
+        leftArm.addOrReplaceChild("left_arm_lower", CubeListBuilder.create().texOffs(32, 54).addBox(-1.0F, -0.25F, -2.0F, 4.0F, 6.25F, 4.0F), PartPose.offset(0.0F, 4.0F, 0.0F));
 
-        PartDefinition leftSleeve = partdefinition.addOrReplaceChild("left_sleeve", CubeListBuilder.create().texOffs(48, 48).addBox(-1.0F, -2.0F, -2.0F, 4.0F, 6.0F, 4.0F, new CubeDeformation(0.25F)), PartPose.offset(5.0F, 2.0F, 0.0F));
-        leftSleeve.addOrReplaceChild("left_sleeve_lower", CubeListBuilder.create().texOffs(48, 54).addBox(-1.0F, 0.0F, -2.0F, 4.0F, 6.0F, 4.0F, new CubeDeformation(0.25F)), PartPose.offset(0.0F, 4.0F, 0.0F));
+        PartDefinition leftSleeve = partdefinition.addOrReplaceChild("left_sleeve", CubeListBuilder.create().texOffs(48, 48).addBox(-1.0F, -2.0F, -2.0F, 4.0F, 6.25F, 4.0F, new CubeDeformation(0.25F)), PartPose.offset(5.0F, 2.0F, 0.0F));
+        leftSleeve.addOrReplaceChild("left_sleeve_lower", CubeListBuilder.create().texOffs(48, 54).addBox(-1.0F, -0.25F, -2.0F, 4.0F, 6.25F, 4.0F, new CubeDeformation(0.25F)), PartPose.offset(0.0F, 4.0F, 0.0F));
 
-        // 3. 右腿 (膝盖弯曲)
-        PartDefinition rightLeg = partdefinition.addOrReplaceChild("right_leg", CubeListBuilder.create().texOffs(0, 16).addBox(-2.0F, 0.0F, -2.0F, 4.0F, 6.0F, 4.0F), PartPose.offset(-1.9F, 12.0F, 0.0F));
-        // 子节点：右小腿，旋转轴心设在膝盖处 (Y=6.0F)
-        rightLeg.addOrReplaceChild("right_leg_lower", CubeListBuilder.create().texOffs(0, 22).addBox(-2.0F, 0.0F, -2.0F, 4.0F, 6.0F, 4.0F), PartPose.offset(0.0F, 6.0F, 0.0F));
+        // 3. 右腿
+        PartDefinition rightLeg = partdefinition.addOrReplaceChild("right_leg", CubeListBuilder.create().texOffs(0, 16).addBox(-2.0F, 0.0F, -2.0F, 4.0F, 6.25F, 4.0F), PartPose.offset(-1.9F, 12.0F, 0.0F));
+        rightLeg.addOrReplaceChild("right_leg_lower", CubeListBuilder.create().texOffs(0, 22).addBox(-2.0F, -0.25F, -2.0F, 4.0F, 6.25F, 4.0F), PartPose.offset(0.0F, 6.0F, 0.0F));
 
-        PartDefinition rightPants = partdefinition.addOrReplaceChild("right_pants", CubeListBuilder.create().texOffs(0, 32).addBox(-2.0F, 0.0F, -2.0F, 4.0F, 6.0F, 4.0F, new CubeDeformation(0.25F)), PartPose.offset(-1.9F, 12.0F, 0.0F));
-        rightPants.addOrReplaceChild("right_pants_lower", CubeListBuilder.create().texOffs(0, 38).addBox(-2.0F, 0.0F, -2.0F, 4.0F, 6.0F, 4.0F, new CubeDeformation(0.25F)), PartPose.offset(0.0F, 6.0F, 0.0F));
+        PartDefinition rightPants = partdefinition.addOrReplaceChild("right_pants", CubeListBuilder.create().texOffs(0, 32).addBox(-2.0F, 0.0F, -2.0F, 4.0F, 6.25F, 4.0F, new CubeDeformation(0.25F)), PartPose.offset(-1.9F, 12.0F, 0.0F));
+        rightPants.addOrReplaceChild("right_pants_lower", CubeListBuilder.create().texOffs(0, 38).addBox(-2.0F, -0.25F, -2.0F, 4.0F, 6.25F, 4.0F, new CubeDeformation(0.25F)), PartPose.offset(0.0F, 6.0F, 0.0F));
 
         // 4. 左腿
-        PartDefinition leftLeg = partdefinition.addOrReplaceChild("left_leg", CubeListBuilder.create().texOffs(16, 48).addBox(-2.0F, 0.0F, -2.0F, 4.0F, 6.0F, 4.0F), PartPose.offset(1.9F, 12.0F, 0.0F));
-        leftLeg.addOrReplaceChild("left_leg_lower", CubeListBuilder.create().texOffs(16, 54).addBox(-2.0F, 0.0F, -2.0F, 4.0F, 6.0F, 4.0F), PartPose.offset(0.0F, 6.0F, 0.0F));
+        PartDefinition leftLeg = partdefinition.addOrReplaceChild("left_leg", CubeListBuilder.create().texOffs(16, 48).addBox(-2.0F, 0.0F, -2.0F, 4.0F, 6.25F, 4.0F), PartPose.offset(1.9F, 12.0F, 0.0F));
+        leftLeg.addOrReplaceChild("left_leg_lower", CubeListBuilder.create().texOffs(16, 54).addBox(-2.0F, -0.25F, -2.0F, 4.0F, 6.25F, 4.0F), PartPose.offset(0.0F, 6.0F, 0.0F));
 
-        PartDefinition leftPants = partdefinition.addOrReplaceChild("left_pants", CubeListBuilder.create().texOffs(0, 48).addBox(-2.0F, 0.0F, -2.0F, 4.0F, 6.0F, 4.0F, new CubeDeformation(0.25F)), PartPose.offset(1.9F, 12.0F, 0.0F));
-        leftPants.addOrReplaceChild("left_pants_lower", CubeListBuilder.create().texOffs(0, 54).addBox(-2.0F, 0.0F, -2.0F, 4.0F, 6.0F, 4.0F, new CubeDeformation(0.25F)), PartPose.offset(0.0F, 6.0F, 0.0F));
+        PartDefinition leftPants = partdefinition.addOrReplaceChild("left_pants", CubeListBuilder.create().texOffs(0, 48).addBox(-2.0F, 0.0F, -2.0F, 4.0F, 6.25F, 4.0F, new CubeDeformation(0.25F)), PartPose.offset(1.9F, 12.0F, 0.0F));
+        leftPants.addOrReplaceChild("left_pants_lower", CubeListBuilder.create().texOffs(0, 54).addBox(-2.0F, -0.25F, -2.0F, 4.0F, 6.25F, 4.0F, new CubeDeformation(0.25F)), PartPose.offset(0.0F, 6.0F, 0.0F));
 
         return LayerDefinition.create(meshdefinition, 64, 64);
     }
 
     @Override
     public void setupAnim(HeroEntity entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
-        // [关键] 每次渲染前，必须把小臂/小腿的弯折角度清零，否则会被原版呼吸动画不断累加变异
+        // [关键修复] 每次渲染前，彻底重置所有基础坐标和【旋转角度】！
+        // 防止退出姿势编辑器后，躯干等部位的旋转角度发生“脏数据残留”导致身体翻折。
+        this.head.setPos(0.0F, 0.0F, 0.0F);
+        this.body.setPos(0.0F, 0.0F, 0.0F);
+        this.rightArm.setPos(-5.0F, 2.0F, 0.0F);
+        this.leftArm.setPos(5.0F, 2.0F, 0.0F);
+        this.rightLeg.setPos(-1.9F, 12.0F, 0.0F);
+        this.leftLeg.setPos(1.9F, 12.0F, 0.0F);
+
+        // 强行清零上半身的绝对旋转
+        this.head.xRot = 0; this.head.yRot = 0; this.head.zRot = 0;
+        this.body.xRot = 0; this.body.yRot = 0; this.body.zRot = 0;
+        this.rightArm.xRot = 0; this.rightArm.yRot = 0; this.rightArm.zRot = 0;
+        this.leftArm.xRot = 0; this.leftArm.yRot = 0; this.leftArm.zRot = 0;
+        this.rightLeg.xRot = 0; this.rightLeg.yRot = 0; this.rightLeg.zRot = 0;
+        this.leftLeg.xRot = 0; this.leftLeg.yRot = 0; this.leftLeg.zRot = 0;
+
+        // 下半截弯折角度清零
         this.rightArmLower.xRot = 0; this.rightArmLower.yRot = 0; this.rightArmLower.zRot = 0;
         this.leftArmLower.xRot = 0; this.leftArmLower.yRot = 0; this.leftArmLower.zRot = 0;
         this.rightLegLower.xRot = 0; this.rightLegLower.yRot = 0; this.rightLegLower.zRot = 0;
         this.leftLegLower.xRot = 0; this.leftLegLower.yRot = 0; this.leftLegLower.zRot = 0;
 
+        // 交给原版系统接管基础动画
         super.setupAnim(entity, limbSwing, limbSwingAmount, ageInTicks, netHeadYaw, headPitch);
 
-        // [新增] 姿势编辑器强行接管渲染 (10 个部位完全映射)
-        // [修改] 姿势编辑器接管渲染，但必须让步于挑战状态
+        // --- 姿势编辑器接管渲染 ---
         if (entity.isPoseEditing && !entity.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE)) {
-            // ... 保持中间的赋值和 return 不变
-            this.head.xRot = entity.customPoseAngles[0][0];
-            this.head.yRot = entity.customPoseAngles[0][1];
-            this.head.zRot = entity.customPoseAngles[0][2];
+            float[] cHead = entity.customPoseAngles[0];
+            float[] cBody = entity.customPoseAngles[1];
+            float[] cRArm = entity.customPoseAngles[2];
+            float[] cRArmL= entity.customPoseAngles[3];
+            float[] cLArm = entity.customPoseAngles[4];
+            float[] cLArmL= entity.customPoseAngles[5];
+            float[] cRLeg = entity.customPoseAngles[6];
+            float[] cRLegL= entity.customPoseAngles[7];
+            float[] cLLeg = entity.customPoseAngles[8];
+            float[] cLLegL= entity.customPoseAngles[9];
 
-            this.body.xRot = entity.customPoseAngles[1][0];
-            this.body.yRot = entity.customPoseAngles[1][1];
-            this.body.zRot = entity.customPoseAngles[1][2];
+            // 1. 躯干 (作为整个上身的基准)
+            this.body.xRot = cBody[0];
+            this.body.yRot = cBody[1];
+            this.body.zRot = cBody[2];
 
-            this.rightArm.xRot = entity.customPoseAngles[2][0];
-            this.rightArm.yRot = entity.customPoseAngles[2][1];
-            this.rightArm.zRot = entity.customPoseAngles[2][2];
+            // 2. 头部跟随躯干 (原点同样在0,0,0，所以坐标不需要移动，只需叠加旋转)
+            this.head.xRot = cBody[0] + cHead[0];
+            this.head.yRot = cBody[1] + cHead[1];
+            this.head.zRot = cBody[2] + cHead[2];
 
-            this.rightArmLower.xRot = entity.customPoseAngles[3][0];
-            this.rightArmLower.yRot = entity.customPoseAngles[3][1];
-            this.rightArmLower.zRot = entity.customPoseAngles[3][2];
+            // 3. 右臂跟随躯干联动 (计算肩膀在 3D 空间被旋转后的新位置)
+            org.joml.Vector3f rArmPos = new org.joml.Vector3f(-5.0F, 2.0F, 0.0F);
+            rArmPos.rotateX(cBody[0]).rotateY(cBody[1]).rotateZ(cBody[2]);
+            this.rightArm.setPos(rArmPos.x, rArmPos.y, rArmPos.z);
+            this.rightArm.xRot = cBody[0] + cRArm[0];
+            this.rightArm.yRot = cBody[1] + cRArm[1];
+            this.rightArm.zRot = cBody[2] + cRArm[2];
 
-            this.leftArm.xRot = entity.customPoseAngles[4][0];
-            this.leftArm.yRot = entity.customPoseAngles[4][1];
-            this.leftArm.zRot = entity.customPoseAngles[4][2];
+            // 4. 左臂跟随躯干联动
+            org.joml.Vector3f lArmPos = new org.joml.Vector3f(5.0F, 2.0F, 0.0F);
+            lArmPos.rotateX(cBody[0]).rotateY(cBody[1]).rotateZ(cBody[2]);
+            this.leftArm.setPos(lArmPos.x, lArmPos.y, lArmPos.z);
+            this.leftArm.xRot = cBody[0] + cLArm[0];
+            this.leftArm.yRot = cBody[1] + cLArm[1];
+            this.leftArm.zRot = cBody[2] + cLArm[2];
 
-            this.leftArmLower.xRot = entity.customPoseAngles[5][0];
-            this.leftArmLower.yRot = entity.customPoseAngles[5][1];
-            this.leftArmLower.zRot = entity.customPoseAngles[5][2];
+            // 5. 右腿跟随躯干联动 (计算大腿根部的新位置)
+            org.joml.Vector3f rLegPos = new org.joml.Vector3f(-1.9F, 12.0F, 0.0F);
+            rLegPos.rotateX(cBody[0]).rotateY(cBody[1]).rotateZ(cBody[2]);
+            this.rightLeg.setPos(rLegPos.x, rLegPos.y, rLegPos.z);
+            this.rightLeg.xRot = cBody[0] + cRLeg[0];
+            this.rightLeg.yRot = cBody[1] + cRLeg[1];
+            this.rightLeg.zRot = cBody[2] + cRLeg[2];
 
-            this.rightLeg.xRot = entity.customPoseAngles[6][0];
-            this.rightLeg.yRot = entity.customPoseAngles[6][1];
-            this.rightLeg.zRot = entity.customPoseAngles[6][2];
+            // 6. 左腿跟随躯干联动
+            org.joml.Vector3f lLegPos = new org.joml.Vector3f(1.9F, 12.0F, 0.0F);
+            lLegPos.rotateX(cBody[0]).rotateY(cBody[1]).rotateZ(cBody[2]);
+            this.leftLeg.setPos(lLegPos.x, lLegPos.y, lLegPos.z);
+            this.leftLeg.xRot = cBody[0] + cLLeg[0];
+            this.leftLeg.yRot = cBody[1] + cLLeg[1];
+            this.leftLeg.zRot = cBody[2] + cLLeg[2];
 
-            this.rightLegLower.xRot = entity.customPoseAngles[7][0];
-            this.rightLegLower.yRot = entity.customPoseAngles[7][1];
-            this.rightLegLower.zRot = entity.customPoseAngles[7][2];
-
-            this.leftLeg.xRot = entity.customPoseAngles[8][0];
-            this.leftLeg.yRot = entity.customPoseAngles[8][1];
-            this.leftLeg.zRot = entity.customPoseAngles[8][2];
-
-            this.leftLegLower.xRot = entity.customPoseAngles[9][0];
-            this.leftLegLower.yRot = entity.customPoseAngles[9][1];
-            this.leftLegLower.zRot = entity.customPoseAngles[9][2];
+            // 7. 下半截（小臂/小腿）因为原本就是子节点，天然跟随上半截，只需赋值局部角度
+            this.rightArmLower.xRot = cRArmL[0]; this.rightArmLower.yRot = cRArmL[1]; this.rightArmLower.zRot = cRArmL[2];
+            this.leftArmLower.xRot  = cLArmL[0]; this.leftArmLower.yRot  = cLArmL[1]; this.leftArmLower.zRot  = cLArmL[2];
+            this.rightLegLower.xRot = cRLegL[0]; this.rightLegLower.yRot = cRLegL[1]; this.rightLegLower.zRot = cRLegL[2];
+            this.leftLegLower.xRot  = cLLegL[0]; this.leftLegLower.yRot  = cLLegL[1]; this.leftLegLower.zRot  = cLLegL[2];
 
             copyAllModelProperties();
-            return; // 阻断后续所有原版动画
+            return;
         }
 
+        // --- 以下是原有的战斗/浮空等原生动画逻辑 ---
         if (entity.isInspectingScythe()) {
             setupScytheInspectAnim(entity, ageInTicks);
             return;
@@ -154,8 +184,7 @@ public class HeroModel extends PlayerModel<HeroEntity> {
             return;
         }
 
-        // --- 保持原有原版浮空动画逻辑 ---
-        float partialTick = Minecraft.getInstance().getPartialTick();
+        float partialTick = ageInTicks - entity.tickCount;
         float floatAmount = entity.getFloatingAmount(partialTick);
 
         float headTilt = Mth.sin(ageInTicks * 0.05f) * 0.05f;
@@ -319,7 +348,6 @@ public class HeroModel extends PlayerModel<HeroEntity> {
         this.leftPants.copyFrom(this.leftLeg);
         this.rightPants.copyFrom(this.rightLeg);
 
-        // [关键] 必须同时同步新增加的小臂/小腿皮肤外套
         this.rightSleeveLower.copyFrom(this.rightArmLower);
         this.leftSleeveLower.copyFrom(this.leftArmLower);
         this.rightPantsLower.copyFrom(this.rightLegLower);

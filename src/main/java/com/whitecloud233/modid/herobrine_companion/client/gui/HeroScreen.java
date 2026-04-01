@@ -23,7 +23,6 @@ import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.Entity;
 
-
 import java.util.UUID;
 
 public class HeroScreen extends Screen {
@@ -41,7 +40,7 @@ public class HeroScreen extends Screen {
     private boolean confirmingFlatten = false;
     private long confirmFlattenTime = 0;
 
-    // [新增] 挑战难度状态：0=简单, 1=普通, 2=困难
+    // 挑战难度状态：0=简单, 1=普通, 2=困难
     private int challengeMode = 0;
 
     // 配色方案
@@ -67,12 +66,20 @@ public class HeroScreen extends Screen {
         super.init();
         if (this.minecraft.level != null) {
             this.dummyHero = ModEvents.HERO.get().create(this.minecraft.level);
-            // 同步皮肤状态到 dummyHero 以便预览
+            // 同步皮肤状态与姿势到 dummyHero 以便预览
             Entity realEntity = this.minecraft.level.getEntity(this.entityId);
             if (realEntity instanceof HeroEntity realHero) {
                 this.dummyHero.setSkinVariant(realHero.getSkinVariant());
                 if (realHero.getSkinVariant() == HeroEntity.SKIN_CUSTOM) {
                     this.dummyHero.setCustomSkinName(realHero.getCustomSkinName());
+                }
+
+                // 【核心修复】：将真实实体的自定义姿势同步给预览用的 dummyHero
+                this.dummyHero.isPoseEditing = realHero.isPoseEditing;
+                if (realHero.isPoseEditing) {
+                    for (int i = 0; i < 10; i++) {
+                        System.arraycopy(realHero.customPoseAngles[i], 0, this.dummyHero.customPoseAngles[i], 0, 3);
+                    }
                 }
             }
         }
@@ -91,7 +98,6 @@ public class HeroScreen extends Screen {
         int btnX = startX + PANEL_WIDTH - 50;
         int btnY = startY + 4;
 
-        // [修改] 使用自定义 ThemedButton 替换 API 切换按钮
         Button apiBtn = new ThemedButton(
                 btnX, btnY, 46, 16,
                 Component.translatable(ClientHooks.isApiEnabled() ? "gui.herobrine_companion.run_cloud" : "gui.herobrine_companion.run_local"),
@@ -103,19 +109,15 @@ public class HeroScreen extends Screen {
         );
         this.addRenderableWidget(apiBtn);
 
-        // [新增] 皮肤切换按钮 (移至左上角)
-        // 放在面板左上角，标题栏区域
-        int skinBtnX = startX + 5; // 左侧边距
-        int skinBtnY = startY + 4; // 顶部边距，与 API 按钮对齐
+        int skinBtnX = startX + 5;
+        int skinBtnY = startY + 4;
 
-        // [修改] 按钮名称改为 "皮肤更改" (使用 key: gui.herobrine_companion.change_skin)
         Button skinBtn = new ThemedButton(
                 skinBtnX,
                 skinBtnY,
-                90, 16, // 宽度稍微调整以适应左侧空间
+                90, 16,
                 Component.translatable("gui.herobrine_companion.change_skin"),
                 button -> {
-                    // 打开新的皮肤切换界面
                     Minecraft.getInstance().setScreen(new HeroSkinScreen(this.entityId));
                 },
                 Tooltip.create(Component.translatable("gui.herobrine_companion.switch_skin_tooltip"))
@@ -123,15 +125,12 @@ public class HeroScreen extends Screen {
         this.addRenderableWidget(skinBtn);
 
 
-        // 1.20.1 List 初始化，注意这里传入 y 和 y+height 可能需要调整以适应 scissoring
-        // 这里 height 传入 PANEL_HEIGHT - top - bottom 是显示高度
         this.actionList = new HeroActionList(this.minecraft, editorWidth - 10, PANEL_HEIGHT - topBarHeight - bottomBarHeight - 10, startY + topBarHeight + 5, 24);
         this.actionList.setLeftPos(editorX + 5);
 
         populateActionList();
         this.addRenderableWidget(this.actionList);
 
-        // [修改] 使用自定义 ThemedButton 替换 离开 按钮
         this.addRenderableWidget(new ThemedButton(
                 editorX + editorWidth - 85, startY + PANEL_HEIGHT - 18, 80, 16,
                 Component.translatable("gui.herobrine_companion.leave"),
@@ -145,10 +144,6 @@ public class HeroScreen extends Screen {
         boolean visited = false;
 
         if (this.minecraft.player != null) {
-            // [Fix] 使用 getPersistentData() 获取 HasVisitedHeroDimension 标记
-            // 注意：在客户端，getPersistentData() 可能不会自动同步，需要服务端发包同步
-            // 我们之前在 HeroDimensionHandler 中已经添加了 SyncHeroVisitPacket
-            // 所以这里应该能读到同步后的数据
             visited = this.minecraft.player.getPersistentData().getBoolean("HasVisitedHeroDimension");
         }
 
@@ -173,7 +168,6 @@ public class HeroScreen extends Screen {
         }, button -> {
             boolean isProtected = this.minecraft != null && this.minecraft.player != null && this.minecraft.player.getTags().contains("herobrine_companion_peaceful");
 
-            // [核心修复] 在客户端手动同步这个 Tag 的状态，保持客户端与服务端一致
             if (this.minecraft != null && this.minecraft.player != null) {
                 if (isProtected) {
                     this.minecraft.player.removeTag("herobrine_companion_peaceful");
@@ -188,27 +182,17 @@ public class HeroScreen extends Screen {
 
         this.actionList.addAction(Component.translatable("gui.herobrine_companion.trade"), button -> {
             PacketHandler.sendToServer(new OpenTradePacket(this.entityId));
-            // [修复] 不要在这里关闭屏幕！
-            // this.onClose();
-            // 让服务端打开新菜单时自动覆盖当前屏幕
         }, Tooltip.create(Component.translatable("gui.herobrine_companion.trade_tooltip")));
 
-        // 👇 [新增] 装扮(衣柜)按钮
         this.actionList.addAction(Component.translatable("gui.herobrine_companion.wardrobe"), button -> {
-            // 向服务端发送打开装扮界面的请求
             PacketHandler.sendToServer(new OpenWardrobePacket(this.entityId));
         }, Tooltip.create(Component.translatable("gui.herobrine_companion.wardrobe_tooltip")));
-        // 👆 [新增结束]
 
-        // [新增] 委托按钮
         this.actionList.addAction(Component.translatable("gui.herobrine_companion.requests"), button -> {
-            // 打开委托界面
             Minecraft.getInstance().setScreen(new HeroRequestScreen(this.entityId));
         }, Tooltip.create(Component.translatable("gui.herobrine_companion.requests_tooltip")));
 
-        // [新增] 奖励按钮
         this.actionList.addAction(Component.translatable("gui.herobrine_companion.rewards"), button -> {
-            // 打开奖励界面
             Minecraft.getInstance().setScreen(new HeroRewardScreen(this.entityId));
         }, Tooltip.create(Component.translatable("gui.herobrine_companion.rewards_tooltip")));
 
@@ -262,7 +246,6 @@ public class HeroScreen extends Screen {
             }
         }, Tooltip.create(Component.translatable(visited ? "gui.herobrine_companion.void_warning" : "gui.herobrine_companion.void_locked_tooltip"))).active = visited;
 
-        // [新增] 清除障碍按钮
         boolean desolateUnlocked = currentTrust >= 70;
         this.actionList.addDynamicAction(() -> {
             if (!desolateUnlocked) {
@@ -280,7 +263,6 @@ public class HeroScreen extends Screen {
             }
         }, Tooltip.create(Component.translatable(desolateUnlocked ? "gui.herobrine_companion.desolate_warning" : "gui.herobrine_companion.desolate_locked_trust_tooltip", currentTrust))).active = desolateUnlocked;
 
-        // [新增] 平整地形按钮
         boolean flattenUnlocked = currentTrust >= 50;
         this.actionList.addDynamicAction(() -> {
             if (!flattenUnlocked) {
@@ -297,13 +279,11 @@ public class HeroScreen extends Screen {
                 confirmFlattenTime = System.currentTimeMillis();
             }
         }, Tooltip.create(Component.translatable(flattenUnlocked ? "gui.herobrine_companion.flatten_warning" : "gui.herobrine_companion.flatten_locked_trust_tooltip", currentTrust))).active = flattenUnlocked;
-// [新增] 姿势编辑按钮
+
         this.actionList.addAction(Component.translatable("gui.herobrine_companion.pose_editor"), button -> {
-            // 打开 3D 姿势调节界面
             Minecraft.getInstance().setScreen(new HeroPoseScreen(this.entityId));
         }, Tooltip.create(Component.translatable("gui.herobrine_companion.pose_editor_tooltip")));
 
-        // [新增] 挑战难度切换按钮
         this.actionList.addDynamicAction(() -> {
             String modeKey = this.challengeMode == 0 ? "gui.herobrine_companion.challenge_easy" :
                     (this.challengeMode == 1 ? "gui.herobrine_companion.challenge_normal" : "gui.herobrine_companion.challenge_hard");
@@ -311,18 +291,15 @@ public class HeroScreen extends Screen {
             return Component.translatable("gui.herobrine_companion.challenge_mode")
                     .append(": ")
                     .append(Component.translatable(modeKey))
-                    .withStyle(style -> style.withColor(0xFF55FF55)); // 绿色文本
+                    .withStyle(style -> style.withColor(0xFF55FF55));
         }, button -> {
-            // 点击循环切换：0(简单) -> 1(普通) -> 2(困难) -> 0(简单)
             this.challengeMode = (this.challengeMode + 1) % 3;
         }, Tooltip.create(Component.translatable("gui.herobrine_companion.challenge_mode_tooltip")));
 
-        // [新增] 确认开始挑战按钮
         this.actionList.addAction(
-                Component.translatable("gui.herobrine_companion.challenge_start").withStyle(style -> style.withColor(0xFFFF5555)), // 红色文本警告
+                Component.translatable("gui.herobrine_companion.challenge_start").withStyle(style -> style.withColor(0xFFFF5555)),
                 button -> {
-                    // 需要在 network 包中自行实现 StartChallengePacket，以便将 this.entityId 和 this.challengeMode 发送给服务端
-                     PacketHandler.sendToServer(new StartChallengePacket(this.entityId, this.challengeMode));
+                    PacketHandler.sendToServer(new StartChallengePacket(this.entityId, this.challengeMode));
                     this.onClose();
                 },
                 Tooltip.create(Component.translatable("gui.herobrine_companion.challenge_start_tooltip"))
@@ -370,7 +347,6 @@ public class HeroScreen extends Screen {
         guiGraphics.fill(startX + sideBarWidth, startY, startX + sideBarWidth + tabWidth, startY + topBarHeight - 2, COL_BG_MAIN);
         guiGraphics.fill(startX + sideBarWidth, startY, startX + sideBarWidth + tabWidth, startY + 2, 0xFF4A88C7);
 
-        // [修改]
         guiGraphics.drawString(this.font, Component.translatable("gui.herobrine_companion.dashboard_title"), startX + sideBarWidth + 10, startY + 8, COL_TEXT_MAIN, false);
         // --- 左侧信息栏 ---
         guiGraphics.fill(startX + 5, startY + topBarHeight + 5, startX + sideBarWidth - 5, startY + topBarHeight + 95, 0xFF1E1E1E);
@@ -379,7 +355,6 @@ public class HeroScreen extends Screen {
         int lineHeight = 10;
         int indent = startX + 5;
 
-        // [修改]
         drawInfoLabel(guiGraphics, indent, varY, Component.translatable("gui.herobrine_companion.target"), Component.translatable("gui.herobrine_companion.target_name"));
 
         int trust = 0;
@@ -389,14 +364,21 @@ public class HeroScreen extends Screen {
             if (realEntity instanceof HeroEntity hero) {
                 trust = hero.getTrustLevel();
                 uuid = hero.getUUID();
-                // 同步皮肤状态给 dummyHero 以正确渲染预览
+
+                // 【核心修复】：持续刷新渲染时的皮肤与姿势状态
                 this.dummyHero.setSkinVariant(hero.getSkinVariant());
                 if (hero.getSkinVariant() == HeroEntity.SKIN_CUSTOM) {
                     this.dummyHero.setCustomSkinName(hero.getCustomSkinName());
                 }
+                this.dummyHero.isPoseEditing = hero.isPoseEditing;
+                if (hero.isPoseEditing) {
+                    for (int i = 0; i < 10; i++) {
+                        System.arraycopy(hero.customPoseAngles[i], 0, this.dummyHero.customPoseAngles[i], 0, 3);
+                    }
+                }
             }
         }
-// 👇 就是这里！把你之前漏掉的声明和绘制字段的代码补上
+
         drawInfoField(guiGraphics, indent + 5, varY + lineHeight, Component.translatable("gui.herobrine_companion.trust_level"), Component.literal(String.valueOf(trust)));
         drawInfoField(guiGraphics, indent + 5, varY + lineHeight * 2, Component.translatable("gui.herobrine_companion.active_time"), Component.literal(this.dummyHero.tickCount + "").append(Component.translatable("gui.herobrine_companion.ticks")));
         drawInfoField(guiGraphics, indent + 5, varY + lineHeight * 3, Component.translatable("gui.herobrine_companion.entity_id"), Component.literal(uuid == null ? "N/A" : "..." + uuid.toString().substring(0, 4)));
@@ -415,9 +397,9 @@ public class HeroScreen extends Screen {
         int mainAreaX = startX + sideBarWidth + 5;
         int mainAreaY = startY + topBarHeight + 5;
 
-        // [修改]
         guiGraphics.drawString(this.font, Component.translatable("gui.herobrine_companion.available_actions"), mainAreaX, mainAreaY, COL_LABEL, false);
         guiGraphics.fill(mainAreaX, mainAreaY + 10, startX + PANEL_WIDTH - 5, mainAreaY + 11, COL_BORDER);
+
         // --- 实体模型渲染 ---
         if (this.dummyHero != null) {
             guiGraphics.pose().pushPose();
@@ -438,13 +420,11 @@ public class HeroScreen extends Screen {
         super.render(guiGraphics, mouseX, mouseY, partialTick);
     }
 
-    // [修改] 参数从 String 变更为 Component
     private void drawInfoLabel(GuiGraphics g, int x, int y, Component label, Component value) {
         g.drawString(this.font, label, x, y, COL_LABEL, false);
         g.drawString(this.font, Component.literal(" ").append(value), x + this.font.width(label), y, COL_TEXT_MAIN, false);
     }
 
-    // [修改] 参数从 String 变更为 Component
     private void drawInfoField(GuiGraphics g, int x, int y, Component name, Component value) {
         g.drawString(this.font, name, x, y, COL_VALUE, false);
         g.drawString(this.font, ": ", x + this.font.width(name), y, COL_TEXT_MAIN, false);
@@ -452,11 +432,9 @@ public class HeroScreen extends Screen {
     }
 
     private void renderEntityWithMouseFollow(GuiGraphics guiGraphics, int x, int y, int scale, float mouseX, float mouseY, HeroEntity entity) {
-        // 修复 Dummy 实体的 "驱魔人" 扭曲 Bug
         float f = (float)Math.atan(mouseX / 40.0F);
         float f1 = (float)Math.atan(mouseY / 40.0F);
 
-        // 强行对齐上一帧数据，抹杀掉从 0 开始插值造成的万向节死锁
         entity.yBodyRotO = 180.0F + f * 20.0F;
         entity.yRotO = 180.0F + f * 40.0F;
         entity.xRotO = -f1 * 20.0F;

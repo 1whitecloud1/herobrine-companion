@@ -44,7 +44,35 @@ public class HeroDimensionHandler {
             handleReturnToOverworld(fromLevel, toLevel, player);
         }
     }
+    @SubscribeEvent
+    public static void onPlayerClone(PlayerEvent.Clone event) {
+        Player original = event.getOriginal();
+        Player newPlayer = event.getEntity();
 
+        // 1. 继承“是否去过英雄维度”的解锁状态 (同时影响和平模式和虚空领域)
+        if (original.getPersistentData().contains("HasVisitedHeroDimension")) {
+            newPlayer.getPersistentData().putBoolean(
+                    "HasVisitedHeroDimension",
+                    original.getPersistentData().getBoolean("HasVisitedHeroDimension")
+            );
+        }
+
+        // 2. 继承和平模式的开启状态
+        if (original.getTags().contains("herobrine_companion_peaceful")) {
+            newPlayer.addTag("herobrine_companion_peaceful");
+        }
+
+        // 3. 继承虚空领域 (Void Domain) 的使用次数，防止玩家通过自杀重置次数
+        if (original.getPersistentData().contains("VoidDomainUsageCount")) {
+            newPlayer.getPersistentData().putInt(
+                    "VoidDomainUsageCount",
+                    original.getPersistentData().getInt("VoidDomainUsageCount")
+            );
+        }
+
+        // 提示：如果你代码里还有类似 HeroPendingQuestClear 这类挂在玩家身上的任务/奖励数据，
+        // 也请照猫画虎，在这里把它们 copy 过去！
+    }
     private static void handleEnterEndRing(ServerLevel fromLevel, ServerLevel endLevel, ServerPlayer player) {
         CompoundTag carriedHeroData = null;
         if (fromLevel != null) {

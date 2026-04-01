@@ -266,14 +266,12 @@ public class HeroEntity extends PathfinderMob implements Merchant {
 
     @Override
     public void setHealth(float health) {
-        if (this.getEntityData().get(IS_CHALLENGE_ACTIVE)) {
-            if (health <= 0.0F) {
-                health = this.getMaxHealth();
-                com.whitecloud233.modid.herobrine_companion.client.fight.HeroChallengeManager.endChallenge(this, true);
-            }
-            super.setHealth(health);
-        } else {
+        if (!this.getEntityData().get(IS_CHALLENGE_ACTIVE)) {
+            // 平时强制满血无敌
             super.setHealth(this.getMaxHealth());
+        } else {
+            // 挑战模式下正常扣血，不要在这里调用 endChallenge！
+            super.setHealth(health);
         }
     }
 

@@ -94,7 +94,11 @@ public class HeroChallengeManager {
         hero.removeTag(EndRingContext.TAG_INTRO);
         hero.removeTag(EndRingContext.TAG_FIXED);
         hero.removeTag(EndRingContext.TAG_RESPAWNED_SAFE);
-
+// 【新增】：每次开启挑战，必须清空上一次的假死状态，防止永久无敌！
+        hero.getPersistentData().remove("IsFakeOutPhase");
+        if (target != null) {
+            target.getPersistentData().remove("HeroFakeOutPhase");
+        }
         hero.goalSelector.removeAllGoals(goal -> true);
         hero.targetSelector.removeAllGoals(goal -> true);
         hero.setTarget(null);
@@ -136,6 +140,8 @@ public class HeroChallengeManager {
         hero.getEntityData().set(HeroEntity.CHALLENGE_TICKS, 0);
         hero.getPersistentData().putBoolean("IsChallengeActive", false);
         hero.getPersistentData().remove("ChallengePhaseTicks");
+        // 【新增】：结束时清空假死标记
+        hero.getPersistentData().remove("IsFakeOutPhase");
         hero.goalSelector.removeAllGoals(goal -> true);
         hero.targetSelector.removeAllGoals(goal -> true);
         hero.setTarget(null);
@@ -225,6 +231,13 @@ public class HeroChallengeManager {
         restoreFlightAbilities(player);
 
         playerData.remove("IsChallengeActive");
+        // ==========================================
+        // 【新增】：玩家已安全回到主世界，瞬间在后台重置 End Ring 场地！
+        // ==========================================
+        ServerLevel endRingLevel = server.getLevel(ModStructures.END_RING_DIMENSION_KEY);
+        if (endRingLevel != null) {
+            com.whitecloud233.modid.herobrine_companion.world.structure.EndRingRestorer.restoreArena(endRingLevel);
+        }
     }
 
     public static void failChallenge(ServerPlayer player) {
@@ -250,7 +263,9 @@ public class HeroChallengeManager {
 
             // 【核心修复】：在这里使用 activeHero 清除存档的进度！
             activeHero.getPersistentData().remove("ChallengePhaseTicks");
-
+// 【新增】：失败时清空假死标记
+            activeHero.getPersistentData().remove("IsFakeOutPhase");
+            player.getPersistentData().remove("HeroFakeOutPhase");
             // 恢复血量和重力
             activeHero.getAttribute(Attributes.MAX_HEALTH).setBaseValue(20.0D);
             activeHero.setHealth(activeHero.getMaxHealth());
@@ -284,7 +299,15 @@ public class HeroChallengeManager {
 
         // ✅ 新增：试炼失败时，恢复飞行权限
         restoreFlightAbilities(player);
-    }
+
+        // ==========================================
+        // 【新增】：即使玩家战败，也要将场地重置，为下一次挑战做准备！
+        // ==========================================
+        ServerLevel endRingLevel = player.getServer().getLevel(ModStructures.END_RING_DIMENSION_KEY);
+        if (endRingLevel != null) {
+            com.whitecloud233.modid.herobrine_companion.world.structure.EndRingRestorer.restoreArena(endRingLevel);
+        }
+    } // 这是 failChallenge 方法的大括号
 
     // ✅ 新增：战后恢复玩家飞行权限的通用方法
     public static void restoreFlightAbilities(ServerPlayer player) {
@@ -298,6 +321,45 @@ public class HeroChallengeManager {
             }
             // 阅后即焚，清理掉备份数据
             playerData.remove("PreChallengeMayFly");
+        }
+    }
+    // ==========================================
+    // [新增] 试炼第一阶段：虚晃一枪（撤回神力）
+    // ==========================================
+    public static void triggerFakeOutPhase(HeroEntity hero) {
+        // 1. 标记 Boss 进入假死演出阶段
+        hero.getPersistentData().putBoolean("IsFakeOutPhase", true);
+
+        // 2. 切断神明与世界的联系：清空所有行动 AI
+        hero.goalSelector.removeAllGoals(goal -> true);
+        hero.targetSelector.removeAllGoals(goal -> true);
+        hero.setTarget(null);
+        hero.getNavigation().stop();
+
+        // 3. 物理静止：强制悬浮在半空，不受重力影响
+        hero.setDeltaMovement(0, 0, 0);
+        hero.setNoGravity(true);
+
+        // 4. 处理场内玩家并发送视觉崩坏数据包
+        if (!hero.level().isClientSide) {
+            ServerLevel serverLevel = (ServerLevel) hero.level();
+
+            // 遍历当前维度（End Ring）的所有玩家
+            for (ServerPlayer player : serverLevel.players()) {
+                // 只对正在参与试炼的玩家生效
+                if (player.getPersistentData().getBoolean("IsChallengeActive")) {
+
+                    // 给玩家打上标记，用于稍后在事件中锁血（保持半颗心不死）
+                    player.getPersistentData().putBoolean("HeroFakeOutPhase", true);
+
+                    // 【核心】使用你自己的 PacketHandler 发送崩坏数据包！
+                    // 这会通知客户端开始黑屏和隐藏UI
+                    com.whitecloud233.modid.herobrine_companion.network.PacketHandler.sendToPlayer(
+                            new com.whitecloud233.modid.herobrine_companion.client.fight.network.SPacketStartCollapse(),
+                            player
+                    );
+                }
+            }
         }
     }
 }

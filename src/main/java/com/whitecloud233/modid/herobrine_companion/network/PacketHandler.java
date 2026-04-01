@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.network;
 
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.modid.herobrine_companion.client.fight.network.SPacketStartCollapse;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
@@ -48,7 +49,23 @@ public class PacketHandler {
         INSTANCE.registerMessage(id++, SavePosePacket.class, SavePosePacket::encode, SavePosePacket::new, SavePosePacket::handle);
 
         // [新增] 注册 AI 观察环境数据包
-        INSTANCE.registerMessage(id, AIObservationPacket.class, AIObservationPacket::encode, AIObservationPacket::new, AIObservationPacket::handle);
+        INSTANCE.registerMessage(id++, AIObservationPacket.class, AIObservationPacket::encode, AIObservationPacket::new, AIObservationPacket::handle);
+// [新增] 注册第一阶段：虚晃一枪（世界崩坏）数据包
+        // 【新增】：你漏掉了这个崩坏演出数据包！！
+        INSTANCE.registerMessage(id++, com.whitecloud233.modid.herobrine_companion.client.fight.network.SPacketStartCollapse.class,
+                com.whitecloud233.modid.herobrine_companion.client.fight.network.SPacketStartCollapse::toBytes,
+                com.whitecloud233.modid.herobrine_companion.client.fight.network.SPacketStartCollapse::new,
+                com.whitecloud233.modid.herobrine_companion.client.fight.network.SPacketStartCollapse::handle);
+        // 【新增】：注册第三阶段，假死机 Meta 数据包
+        INSTANCE.registerMessage(id++, com.whitecloud233.modid.herobrine_companion.client.fight.network.SPacketFakeCrash.class,
+                com.whitecloud233.modid.herobrine_companion.client.fight.network.SPacketFakeCrash::toBytes,
+                com.whitecloud233.modid.herobrine_companion.client.fight.network.SPacketFakeCrash::new,
+                com.whitecloud233.modid.herobrine_companion.client.fight.network.SPacketFakeCrash::handle);
+        // 【新增】：注册客户端通知服务器演出结束的包
+        INSTANCE.registerMessage(id, com.whitecloud233.modid.herobrine_companion.client.fight.network.CPacketCollapseFinished.class,
+                com.whitecloud233.modid.herobrine_companion.client.fight.network.CPacketCollapseFinished::toBytes,
+                com.whitecloud233.modid.herobrine_companion.client.fight.network.CPacketCollapseFinished::new,
+                com.whitecloud233.modid.herobrine_companion.client.fight.network.CPacketCollapseFinished::handle);
     }
 
 
