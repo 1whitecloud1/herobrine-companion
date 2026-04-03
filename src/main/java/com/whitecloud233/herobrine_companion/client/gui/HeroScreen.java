@@ -373,13 +373,21 @@ public class HeroScreen extends Screen {
             if (realEntity instanceof HeroEntity hero) {
                 trust = hero.getTrustLevel();
                 uuid = hero.getUUID();
-                // 同步皮肤状态给 dummyHero 以正确渲染预览
+
+                // 【核心修复】：持续刷新渲染时的皮肤与姿势状态
                 this.dummyHero.setSkinVariant(hero.getSkinVariant());
                 if (hero.getSkinVariant() == HeroEntity.SKIN_CUSTOM) {
                     this.dummyHero.setCustomSkinName(hero.getCustomSkinName());
                 }
+                this.dummyHero.isPoseEditing = hero.isPoseEditing;
+                if (hero.isPoseEditing) {
+                    for (int i = 0; i < 10; i++) {
+                        System.arraycopy(hero.customPoseAngles[i], 0, this.dummyHero.customPoseAngles[i], 0, 3);
+                    }
+                }
             }
         }
+
 
         // 👇 就是这里！把你之前漏掉的声明和绘制字段的代码补上
         drawInfoField(guiGraphics, indent + 5, varY + lineHeight, Component.translatable("gui.herobrine_companion.trust_level"), Component.literal(String.valueOf(trust)));

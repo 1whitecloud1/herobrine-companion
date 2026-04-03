@@ -268,26 +268,17 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         return wasHurt;
     }
 
-
     @Override
     public void setHealth(float health) {
-        // 检查同步通道判断是否处于挑战模式
-        if (this.getEntityData().get(IS_CHALLENGE_ACTIVE)) {
-
-            // 👇 [核心新增] 如果血量即将归零，拦截死亡！
-            if (health <= 0.0F) {
-                // 锁血并恢复满血
-                health = this.getMaxHealth();
-                // 调用挑战结束逻辑（玩家胜利）
-                com.whitecloud233.herobrine_companion.client.fight.HeroChallengeManager.endChallenge(this, true);
-            }
-
-            super.setHealth(health);
-        } else {
-            // 日常模式下依然强制锁满血
+        if (!this.getEntityData().get(IS_CHALLENGE_ACTIVE)) {
+            // 平时强制满血无敌
             super.setHealth(this.getMaxHealth());
+        } else {
+            // 挑战模式下正常扣血，不要在这里调用 endChallenge！
+            super.setHealth(health);
         }
     }
+
     @Override
     public void die(DamageSource damageSource) {
         if (!this.level().isClientSide && this.level() instanceof ServerLevel serverLevel) {

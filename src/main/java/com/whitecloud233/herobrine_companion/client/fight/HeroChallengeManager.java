@@ -18,8 +18,8 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.level.portal.DimensionTransition; // 【新增】1.21.1 传送核心
-import net.minecraft.world.phys.Vec3; // 【新增】
+import net.minecraft.world.level.portal.DimensionTransition; // 1.21.1 原生传送核心
+import net.minecraft.world.phys.Vec3;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -71,18 +71,17 @@ public class HeroChallengeManager {
             oldHero.teleportTo(EndRingContext.CENTER_X, EndRingContext.CENTER_Y, EndRingContext.CENTER_Z);
             setupChallengeEntity(oldHero, player, challengeMode);
         } else {
-            // 【核心修复】：1.21.1 跨维度传送逻辑 (DimensionTransition)
-            Vec3 targetPos = new Vec3(EndRingContext.CENTER_X, EndRingContext.CENTER_Y, EndRingContext.CENTER_Z);
-
+            // 如果跨维度，使用安全的 1.21.1 DimensionTransition 逻辑
             DimensionTransition transition = new DimensionTransition(
                     endRingLevel,
-                    targetPos,
+                    new Vec3(EndRingContext.CENTER_X, EndRingContext.CENTER_Y, EndRingContext.CENTER_Z),
                     Vec3.ZERO, // 清空动量，防止因传送前的跳跃飞出擂台
                     oldHero.getYRot(),
                     oldHero.getXRot(),
-                    DimensionTransition.DO_NOTHING // 传送后无需额外回调操作
+                    DimensionTransition.DO_NOTHING // 到达后不执行额外原版逻辑
             );
 
+            // 【核心修复】使用 1.21.1 语法取代废弃的 ITeleporter，彻底切断底层门机制
             Entity teleportedEntity = oldHero.changeDimension(transition);
 
             if (teleportedEntity instanceof HeroEntity newHero) {
@@ -96,6 +95,11 @@ public class HeroChallengeManager {
         hero.removeTag(EndRingContext.TAG_FIXED);
         hero.removeTag(EndRingContext.TAG_RESPAWNED_SAFE);
 
+        // 【新增】：每次开启挑战，必须清空上一次的假死状态，防止永久无敌！
+        hero.getPersistentData().remove("IsFakeOutPhase");
+        if (target != null) {
+            target.getPersistentData().remove("HeroFakeOutPhase");
+        }
         hero.goalSelector.removeAllGoals(goal -> true);
         hero.targetSelector.removeAllGoals(goal -> true);
         hero.setTarget(null);
@@ -122,7 +126,7 @@ public class HeroChallengeManager {
             // 缓慢下落防止网络延迟时掉虚空
             target.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.SLOW_FALLING, 100, 0, false, false));
 
-            // ✅ 新增：战前备份并剥夺生存/冒险模式的飞行能力
+            // ✅ 新增：战前备份并剥夺生存模式飞行能力
             if (!target.isCreative() && !target.isSpectator()) {
                 target.getPersistentData().putBoolean("PreChallengeMayFly", target.getAbilities().mayfly);
                 target.getAbilities().mayfly = false;
@@ -137,7 +141,8 @@ public class HeroChallengeManager {
         hero.getEntityData().set(HeroEntity.CHALLENGE_TICKS, 0);
         hero.getPersistentData().putBoolean("IsChallengeActive", false);
         hero.getPersistentData().remove("ChallengePhaseTicks");
-
+        // 【新增】：结束时清空假死标记
+        hero.getPersistentData().remove("IsFakeOutPhase");
         hero.goalSelector.removeAllGoals(goal -> true);
         hero.targetSelector.removeAllGoals(goal -> true);
         hero.setTarget(null);
@@ -150,7 +155,7 @@ public class HeroChallengeManager {
         hero.setHealth(hero.getMaxHealth());
 
         hero.setNoGravity(false);
-        // hero.setFloating(false); 如果在 1.21 中该方法报错请删除 (原版默认不存在此方法)
+        hero.setFloating(false);
         hero.setDeltaMovement(0, 0, 0);
 
         if (playerWon && !hero.level().isClientSide) {
@@ -169,6 +174,12 @@ public class HeroChallengeManager {
 
     private static void returnToSavedDimension(HeroEntity hero, ServerPlayer player) {
         CompoundTag playerData = player.getPersistentData();
+        // 【核心修复】：在传送开始前，立刻切断所有演出标记，防止触发安全网
+        playerData.remove("HeroFakeOutPhase");
+        playerData.remove("IsChallengeActive");
+        // 移除缓慢下落，防止带着慢落回到主世界
+        player.removeEffect(net.minecraft.world.effect.MobEffects.SLOW_FALLING);
+
         if (!playerData.contains("ChallengeReturnDim")) return;
 
         String dimName = playerData.getString("ChallengeReturnDim");
@@ -191,25 +202,21 @@ public class HeroChallengeManager {
         // 将玩家拉回去
         player.teleportTo(returnLevel, rx, ry, rz, player.getYRot(), player.getXRot());
 
-        // 临时再给他发一张跨维度的“免检通行证”！
+        // [核心修复 1] 在传送 Hero 之前，临时再给他发一张跨维度的“免检通行证”！
         hero.getPersistentData().putBoolean("IsChallengeActive", true);
 
-        // 【核心修复】：1.21.1 跨维度回调传送 (DimensionTransition)
-        Vec3 returnPos = new Vec3(rx + 1.0, ry, rz + 1.0);
-
+        // [核心修复 2] 使用 DimensionTransition.PostDimensionTransition (1.21.1) 落地后重置 AI
         DimensionTransition returnTransition = new DimensionTransition(
                 returnLevel,
-                returnPos,
+                new Vec3(rx + 1.0, ry, rz + 1.0),
                 Vec3.ZERO,
                 hero.getYRot(),
                 hero.getXRot(),
-                (entity) -> {
-                    // 👇 [回调逻辑] 落地主世界后，立刻没收他的免检通行证，并重新装载日常 AI！
+                entity -> {
                     if (entity instanceof HeroEntity newHero) {
                         newHero.getPersistentData().putBoolean("IsChallengeActive", false);
                         newHero.getEntityData().set(HeroEntity.IS_CHALLENGE_ACTIVE, false);
 
-                        // 跨维度生成的克隆体可能丢失刚才设置的 AI，这里保险起见重新唤醒日常系统
                         newHero.goalSelector.removeAllGoals(goal -> true);
                         newHero.targetSelector.removeAllGoals(goal -> true);
                         newHero.setTarget(null);
@@ -219,6 +226,7 @@ public class HeroChallengeManager {
                 }
         );
 
+        // 将 Hero 拉回去
         hero.changeDimension(returnTransition);
 
         // 落地后彻底清除玩家身上的挑战免检标志
@@ -226,10 +234,22 @@ public class HeroChallengeManager {
         playerData.remove("ChallengeReturnX");
         playerData.remove("ChallengeReturnY");
         playerData.remove("ChallengeReturnZ");
-        playerData.remove("IsChallengeActive");
-
+// ✅ 再次确保清理，防止数据同步延迟
+        player.getPersistentData().remove("HeroFakeOutPhase");
+        player.getPersistentData().remove("IsChallengeActive");
+        restoreFlightAbilities(player);
         // ✅ 新增：胜利并传送回主世界后，恢复飞行权限
         restoreFlightAbilities(player);
+
+        playerData.remove("IsChallengeActive");
+        // ==========================================
+        // 【新增】：玩家已安全回到主世界，瞬间在后台重置 End Ring 场地！
+        // ==========================================
+        ServerLevel endRingLevel = server.getLevel(ModStructures.END_RING_DIMENSION_KEY);
+        if (endRingLevel != null) {
+            // 修复了之前的错别字包名 modid -> herobrine_companion
+            com.whitecloud233.herobrine_companion.world.structure.EndRingRestorer.restoreArena(endRingLevel);
+        }
     }
 
     public static void failChallenge(ServerPlayer player) {
@@ -253,14 +273,16 @@ public class HeroChallengeManager {
             activeHero.getEntityData().set(HeroEntity.CHALLENGE_TICKS, 0);
             activeHero.getPersistentData().putBoolean("IsChallengeActive", false);
 
-            // ✅ 【核心修复】：在这里使用 activeHero 清除存档的进度！
+            // 【核心修复】：在这里使用 activeHero 清除存档的进度！
             activeHero.getPersistentData().remove("ChallengePhaseTicks");
-
+            // 【新增】：失败时清空假死标记
+            activeHero.getPersistentData().remove("IsFakeOutPhase");
+            player.getPersistentData().remove("HeroFakeOutPhase");
             // 恢复血量和重力
             activeHero.getAttribute(Attributes.MAX_HEALTH).setBaseValue(20.0D);
             activeHero.setHealth(activeHero.getMaxHealth());
             activeHero.setNoGravity(false);
-            // activeHero.setFloating(false);
+            activeHero.setFloating(false);
 
             // 【核心：强制保存数据给死去的玩家带走】
             CompoundTag heroData = new CompoundTag();
@@ -281,7 +303,7 @@ public class HeroChallengeManager {
             activeHero.discard();
         }
 
-        // 清除返回坐标（因为玩家将走原版正常的死亡重生流程，不需要强拉）
+        // 清除返回坐标
         playerData.remove("ChallengeReturnDim");
         playerData.remove("ChallengeReturnX");
         playerData.remove("ChallengeReturnY");
@@ -289,6 +311,14 @@ public class HeroChallengeManager {
 
         // ✅ 新增：试炼失败时，恢复飞行权限
         restoreFlightAbilities(player);
+
+        // ==========================================
+        // 【新增】：即使玩家战败，也要将场地重置，为下一次挑战做准备！
+        // ==========================================
+        ServerLevel endRingLevel = player.getServer().getLevel(ModStructures.END_RING_DIMENSION_KEY);
+        if (endRingLevel != null) {
+            com.whitecloud233.herobrine_companion.world.structure.EndRingRestorer.restoreArena(endRingLevel);
+        }
     }
 
     // ✅ 新增：战后恢复玩家飞行权限的通用方法
@@ -303,6 +333,60 @@ public class HeroChallengeManager {
             }
             // 阅后即焚，清理掉备份数据
             playerData.remove("PreChallengeMayFly");
+        }
+    }
+
+    // ==========================================
+    // [新增] 试炼第一阶段：虚晃一枪（撤回神力）
+    // ==========================================
+    // ==========================================
+    // [新增] 试炼第一阶段：虚晃一枪（撤回神力）
+    // ==========================================
+    public static void triggerFakeOutPhase(HeroEntity hero) {
+        // 1. 标记 Boss 进入假死演出阶段
+        hero.getPersistentData().putBoolean("IsFakeOutPhase", true);
+
+        // 2. 切断神明与世界的联系：清空所有行动 AI
+        hero.goalSelector.removeAllGoals(goal -> true);
+        hero.targetSelector.removeAllGoals(goal -> true);
+        hero.setTarget(null);
+        hero.getNavigation().stop();
+
+        // 3. 物理静止：强制悬浮在半空，不受重力影响
+        hero.setDeltaMovement(0, 0, 0);
+        hero.setNoGravity(true);
+
+        // 4. 处理场内玩家并发送视觉崩坏数据包
+        if (!hero.level().isClientSide) {
+            ServerLevel serverLevel = (ServerLevel) hero.level();
+
+            // 遍历当前维度（End Ring）的所有玩家
+            for (ServerPlayer player : serverLevel.players()) {
+                // 只对正在参与试炼的玩家生效
+                if (player.getPersistentData().getBoolean("IsChallengeActive")) {
+
+                    // 给玩家打上标记，用于稍后在事件中锁血（保持半颗心不死）
+                    player.getPersistentData().putBoolean("HeroFakeOutPhase", true);
+
+                    // ==========================================
+                    // 【终极修复核心】：赋予电影级失重感，防止 Boss 被冻结！
+                    // 给玩家施加 20 秒的缓慢下落，10 秒内只会下坠 16 格！
+                    // 彻底避免低模拟距离导致 Boss 停止 Tick！
+                    // ==========================================
+                    player.addEffect(new net.minecraft.world.effect.MobEffectInstance(
+                            net.minecraft.world.effect.MobEffects.SLOW_FALLING, 400, 0, false, false));
+
+                    // 清空玩家动量，防止带着极快的初速度被甩下去
+                    player.setDeltaMovement(0, 0, 0);
+                    player.hurtMarked = true; // 强制立刻向客户端同步清零的速度
+
+                    // 发送崩坏数据包开始黑屏和隐藏UI
+                    com.whitecloud233.herobrine_companion.network.PacketHandler.sendToPlayer(
+                            new com.whitecloud233.herobrine_companion.client.fight.network.SPacketStartCollapse(),
+                            player
+                    );
+                }
+            }
         }
     }
 }
