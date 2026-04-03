@@ -1,5 +1,10 @@
 package com.whitecloud233.herobrine_companion.network;
 
+// 【新增】导入这三个新的数据包
+import com.whitecloud233.herobrine_companion.client.fight.network.CPacketCollapseFinished;
+import com.whitecloud233.herobrine_companion.client.fight.network.SPacketFakeCrash;
+import com.whitecloud233.herobrine_companion.client.fight.network.SPacketStartCollapse;
+
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
@@ -108,11 +113,37 @@ public class PacketHandler {
                 SavePosePacket.STREAM_CODEC,
                 SavePosePacket::handle
         );
+
         // 注册我们刚刚写的 AIObservationPacket，方向是 服务端 -> 客户端 (playToClient)
         registrar.playToClient(
                 AIObservationPacket.TYPE,
                 AIObservationPacket.STREAM_CODEC,
                 AIObservationPacket::handle
+        );
+
+        // ============================================
+        // [新增] 试炼崩坏演出相关数据包
+        // ============================================
+
+        // 1. 客户端发给服务端：崩坏演出结束，请求结算
+        registrar.playToServer(
+                CPacketCollapseFinished.TYPE,
+                CPacketCollapseFinished.CODEC,
+                CPacketCollapseFinished::handle
+        );
+
+        // 2. 服务端发给客户端：开始世界崩坏演出
+        registrar.playToClient(
+                SPacketStartCollapse.TYPE,
+                SPacketStartCollapse.CODEC,
+                SPacketStartCollapse::handle
+        );
+
+        // 3. 服务端发给客户端：触发假死机/蓝屏界面
+        registrar.playToClient(
+                SPacketFakeCrash.TYPE,
+                SPacketFakeCrash.CODEC,
+                SPacketFakeCrash::handle
         );
     }
 
@@ -176,15 +207,30 @@ public class PacketHandler {
         PacketDistributor.sendToPlayer(player, packet);
     }
 
-    // [新增] 客户端发送 GUI 姿势修改给服务端
     public static void sendToServer(SavePosePacket packet) {
         PacketDistributor.sendToServer(packet);
     }
-    // [新增] 将 SavePosePacket 发送给指定的单个玩家
+
     public static void sendToPlayer(SavePosePacket packet, ServerPlayer player) {
-        net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player, packet);
+        PacketDistributor.sendToPlayer(player, packet);
     }
-    // 1.21.1 的 PacketDistributor 调用方式
+
+    // ============================================
+    // [新增] 试炼崩坏演出相关发包方法
+    // ============================================
+    public static void sendToServer(CPacketCollapseFinished packet) {
+        PacketDistributor.sendToServer(packet);
+    }
+
+    public static void sendToPlayer(SPacketStartCollapse packet, ServerPlayer player) {
+        PacketDistributor.sendToPlayer(player, packet);
+    }
+
+    public static void sendToPlayer(SPacketFakeCrash packet, ServerPlayer player) {
+        PacketDistributor.sendToPlayer(player, packet);
+    }
+
+    // 1.21.1 的通用群体发包：发送给所有追踪该实体的玩家（包括玩家自己）
     public static void sendToTracking(CustomPacketPayload packet, Entity entity) {
         PacketDistributor.sendToPlayersTrackingEntity(entity, packet);
     }
