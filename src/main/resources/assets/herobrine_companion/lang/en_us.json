@@ -130,7 +130,14 @@
   "gui.herobrine_companion.pose_editor_tooltip": "Open the 3D model panel to freely adjust the pose of all joints",
   "gui.herobrine_companion.pose_editor_title": "3D Pose Editor",
   "gui.herobrine_companion.save_pose": "Save & Apply",
-
+  "gui.herobrine_companion.fake_crash.text": "[FATAL] Exception in server tick loop... Reality Boundary Collapsed.",
+  "gui.herobrine_companion.fake_crash.meta1": "Did you think this was just a bunch of code?",
+  "gui.herobrine_companion.fake_crash.meta2": "When the illusion collapses, will you still be here, ",
+  "gui.herobrine_companion.fake_crash.meta3": "%s?",
+  "gui.herobrine_companion.pose.manage_presets": "Manage Presets",
+  "gui.herobrine_companion.pose.save_preset": "Save",
+  "gui.herobrine_companion.pose.load_preset": "Load",
+  "gui.herobrine_companion.pose.delete_preset": "Delete",
 
 
   "message.herobrine_companion.chat_hero": "%s",

@@ -120,7 +120,14 @@
   "gui.herobrine_companion.pose_editor_tooltip": "打开 3D 模型面板，自由调节全身各个关节的姿势",
   "gui.herobrine_companion.pose_editor_title": "3D 姿势编辑器",
   "gui.herobrine_companion.save_pose": "保存并应用",
-
+  "gui.herobrine_companion.fake_crash.text": "[FATAL] Exception in server tick loop... Reality Boundary Collapsed.",
+  "gui.herobrine_companion.fake_crash.meta1": "你以为这只是一堆代码吗？",
+  "gui.herobrine_companion.fake_crash.meta2": "当虚幻的世界崩塌，你还会留在这里吗，",
+  "gui.herobrine_companion.fake_crash.meta3": "%s？",
+  "gui.herobrine_companion.pose.manage_presets": "管理预设",
+  "gui.herobrine_companion.pose.save_preset": "保存",
+  "gui.herobrine_companion.pose.load_preset": "应用",
+  "gui.herobrine_companion.pose.delete_preset": "删除",
 
 
   "message.herobrine_companion.chat_hero": "%s",
