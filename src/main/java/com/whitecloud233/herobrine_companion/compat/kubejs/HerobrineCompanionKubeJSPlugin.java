@@ -1,7 +1,7 @@
 package com.whitecloud233.herobrine_companion.compat.kubejs;
 
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
-import com.whitecloud233.herobrine_companion.entity.logic.HeroRewards;
+import com.whitecloud233.herobrine_companion.event.HeroRewards;
 import dev.latvian.mods.kubejs.event.EventGroup;
 import dev.latvian.mods.kubejs.event.EventHandler;
 import dev.latvian.mods.kubejs.event.EventGroupRegistry;

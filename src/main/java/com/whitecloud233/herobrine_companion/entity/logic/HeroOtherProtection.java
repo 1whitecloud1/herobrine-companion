@@ -106,26 +106,32 @@ public class HeroOtherProtection {
 
     // 辅助方法：在周围寻找有效的非虚空坐标
     private static BlockPos findSafeLandNearby(ServerLevel level, BlockPos center) {
-        // 先检查正上方
         BlockPos directUp = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, center);
         if (directUp.getY() > level.getMinBuildHeight()) {
             return directUp;
         }
 
-        // 简单的十字/井字扫描（半径 16格 到 32格）寻找最近的岛屿边缘
-        int[] offsets = {128, -128, 128, -128};
+        // ⚡ 优化 1：修正数组，只需 2 个元素，组合出 4 个方向
+        int[] offsets = {128, -128};
         for (int dx : offsets) {
             for (int dz : offsets) {
-                BlockPos testPos = new BlockPos(center.getX() + dx, 0, center.getZ() + dz);
+                int targetX = center.getX() + dx;
+                int targetZ = center.getZ() + dz;
+
+                // ⚡ 优化 2：绝对不要在未加载的区块上获取高度图！
+                // 使用位移运算 >> 4 快速将方块坐标转换为区块坐标
+                if (!level.hasChunk(targetX >> 4, targetZ >> 4)) {
+                    continue; // 区块没加载就直接放弃这个方向，保护服务器 TPS
+                }
+
+                BlockPos testPos = new BlockPos(targetX, 0, targetZ);
                 BlockPos highestHere = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, testPos);
 
-                // 如果找到的最高点大于世界的最低高度，说明这里有实实在在的方块
                 if (highestHere.getY() > level.getMinBuildHeight()) {
                     return highestHere;
                 }
             }
         }
-
-        return null; // 附近什么都没有，全是虚空
+        return null;
     }
 }

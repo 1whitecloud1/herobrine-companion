@@ -127,8 +127,7 @@ sourceSets.main.resources {
 }
 
 dependencies {
-    implementation files('libs/h2-2.2.224.jar')
-    jarJar files('libs/h2-2.2.224.jar')
+
 
     // KubeJS (Optional)
     compileOnly("dev.latvian.mods:kubejs-neoforge:2101.+") {
@@ -156,15 +155,11 @@ dependencies {
     runtimeOnly "curse.maven:armourers-workshop-229523:7165519"
 }
 
-tasks.register('copyDependencies', Copy) {
-    from configurations.runtimeClasspath
-    into 'run/libs'
-    include 'h2*.jar'
-}
-
-tasks.named('processResources').configure {
-    finalizedBy 'copyDependencies'
-}
+//tasks.register('copyDependencies', Copy) {
+  //  from configurations.runtimeClasspath
+ //   into 'run/libs'
+  //  include 'h2*.jar'
+//
 
 var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {
     var replaceProperties = [minecraft_version      : minecraft_version,

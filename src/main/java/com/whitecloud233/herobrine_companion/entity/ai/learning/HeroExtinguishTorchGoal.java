@@ -76,19 +76,12 @@ public class HeroExtinguishTorchGoal extends Goal {
                 this.hero.level().playSound(null, this.targetTorch, SoundEvents.FIRE_EXTINGUISH, SoundSource.BLOCKS, 0.5F, 2.6F + (this.hero.level().random.nextFloat() - this.hero.level().random.nextFloat()) * 0.8F);
                 this.hero.level().addParticle(ParticleTypes.LARGE_SMOKE, this.targetTorch.getX() + 0.5, this.targetTorch.getY() + 0.5, this.targetTorch.getZ() + 0.5, 0.0, 0.0, 0.0);
 
-                Player player = null;
+                // 【修复】：只认主人，不理路人
                 if (this.hero.getOwnerUUID() != null) {
-                    player = this.hero.level().getPlayerByUUID(this.hero.getOwnerUUID());
-                }
-                if (player == null) {
-                    player = this.hero.level().getNearestPlayer(this.hero, 16.0D);
-                }
-
-                if (player instanceof ServerPlayer serverPlayer) {
-                    HeroDialogueHandler.onExtinguishTorch(this.hero, serverPlayer);
-                    // [深度学习] 恶作剧成功，反馈给大脑
-                    // 如果玩家没有攻击他，这会被视为正向反馈（好玩）
-                    // 具体的反馈逻辑在 HeroBrain 或 HeroObserver 中处理，这里只做行为执行
+                    Player player = this.hero.level().getPlayerByUUID(this.hero.getOwnerUUID());
+                    if (player instanceof ServerPlayer serverPlayer) {
+                        HeroDialogueHandler.onExtinguishTorch(this.hero, serverPlayer);
+                    }
                 }
             }
             this.targetTorch = null;

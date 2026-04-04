@@ -13,29 +13,32 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
 
 import java.util.List;
+import java.util.UUID;
 
 public class HeroSpawner {
 
+    // 在 HeroSpawner.java 中修改 tick 方法：
     public void tick(ServerLevel level) {
         if (level.dimension() != Level.OVERWORLD) return;
         if (level.getGameTime() % 100 != 0) return;
 
-        // 只有当 Hero 不存在时才尝试生成
-        boolean heroExists = false;
-        for (HeroEntity hero : HeroBrain.ACTIVE_HEROES) {
-            if (hero.isAlive()) {
-                heroExists = true;
-                break;
+        List<ServerPlayer> players = level.players();
+        if (players.isEmpty()) return;
+
+        RandomSource random = level.getRandom();
+        for (ServerPlayer player : players) {
+            UUID playerUUID = player.getUUID();
+
+            // [修改] 只检查当前这个玩家是否已经拥有存活的 Hero
+            boolean heroExistsForPlayer = false;
+            for (HeroEntity hero : HeroBrain.ACTIVE_HEROES) {
+                if (hero.isAlive() && playerUUID.equals(hero.getOwnerUUID())) {
+                    heroExistsForPlayer = true;
+                    break;
+                }
             }
-        }
 
-        if (!heroExists) {
-            List<ServerPlayer> players = level.players();
-            if (players.isEmpty()) return;
-
-            RandomSource random = level.getRandom();
-            for (ServerPlayer player : players) {
-                // [修改] 基础概率设为 10% (0.1F)，具体能否生成取决于光照和距离
+            if (!heroExistsForPlayer) {
                 if (random.nextFloat() < 0.1F) {
                     attemptSpawnSmart(level, player, random);
                 }
@@ -96,11 +99,26 @@ public class HeroSpawner {
                     if (hero != null) {
                         hero.moveTo(targetPos.getX() + 0.5, targetPos.getY(), targetPos.getZ() + 0.5, random.nextFloat() * 360F, 0);
 
-                        // [关键修复] 生成瞬间立即绑定主人，防止后续逻辑将 Trust 重置为 0
+                        // 1. 生成瞬间立即绑定主人，确立主权
                         hero.setOwnerUUID(player.getUUID());
 
-                        // [关键修复] 立即尝试恢复数据
-                        HeroDataHandler.restoreTrustFromPlayer(hero);
+                        // 👇👇👇 【核心数据防丢失与恢复逻辑】 👇👇👇
+
+                        // 2. 恢复硬盘中存储的满级装备、皮肤、姿势
+                        com.whitecloud233.herobrine_companion.entity.logic.data.HeroStateManager.restoreFromGlobal(hero, player);
+
+                        // 3. 恢复信任度和任务/奖励状态
+                        com.whitecloud233.herobrine_companion.entity.logic.data.HeroDataHandler.syncGlobalTrust(hero);
+
+                        // 4. 恢复大脑记忆 (神经网络数据)，防止性格和学习进度被洗白
+                        com.whitecloud233.herobrine_companion.entity.logic.data.HeroWorldData worldData =
+                                com.whitecloud233.herobrine_companion.entity.logic.data.HeroWorldData.get(level);
+                        net.minecraft.nbt.CompoundTag brainData = worldData.getTempBrainData(player.getUUID());
+                        if (brainData != null && !brainData.isEmpty()) {
+                            hero.getHeroBrain().load(brainData);
+                        }
+
+                        // 👆👆👆 ============================== 👆👆👆
 
                         level.addFreshEntity(hero);
                         return true;

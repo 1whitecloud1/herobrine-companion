@@ -48,6 +48,10 @@ public record ContractPacket() implements CustomPacketPayload {
                             CompoundTag tag = new CompoundTag();
                             tag.putBoolean("BoundHero", true);
                             tag.putString("OwnerName", serverPlayer.getName().getString());
+                            if (serverPlayer.getUUID() != null) {
+                                tag.putUUID("OwnerUUID", serverPlayer.getUUID());
+                            }
+
                             heldItem.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
 
                             // Set fancy name

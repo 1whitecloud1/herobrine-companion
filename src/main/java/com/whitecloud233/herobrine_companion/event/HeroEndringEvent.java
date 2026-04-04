@@ -2,6 +2,7 @@ package com.whitecloud233.herobrine_companion.event;
 
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.herobrine_companion.entity.logic.data.HeroLifecycleHandler;
 import com.whitecloud233.herobrine_companion.util.EndRingContext;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -29,7 +30,6 @@ public class HeroEndringEvent {
     }
 
 
-
     // 阻止 Hero 自行进传送门
     @SubscribeEvent
     public static void onEntityTravelToDimension(EntityTravelToDimensionEvent event) {
@@ -41,6 +41,7 @@ public class HeroEndringEvent {
             event.setCanceled(true);
         }
     }
+
     @SubscribeEvent
     public static void onEntityJoinLevel(EntityJoinLevelEvent event) {
         if (event.getLevel().isClientSide) return;
@@ -56,12 +57,12 @@ public class HeroEndringEvent {
         Player player = hero.level().getNearestPlayer(hero, 50);
 
         if (tick == 0 && player != null) {
-             if (!player.getPersistentData().getBoolean("HasSeenHeroIntro")) {
+            if (!player.getPersistentData().getBoolean("HasSeenHeroIntro")) {
                 player.displayClientMessage(Component.translatable("message.herobrine_companion.hero_welcome_real_illusion", player.getName().getString()), false);
                 player.getPersistentData().putBoolean("HasSeenHeroIntro", true);
             }
         }
-        
+
         if (player == null && tick < 100) return; // Wait for player
 
         if (tick < 100) {
@@ -85,49 +86,24 @@ public class HeroEndringEvent {
     }
 
     private static void handleHeroJoin(HeroEntity newHero, EntityJoinLevelEvent event) {
-
         // [修复 1：进场清场]
         if (newHero.getPersistentData().getBoolean("IsChallengeActive")) {
             // 必须把之前留在 End Ring 的剧情版假 Hero 强行抹除！只留真身！
-            discardAllOtherHeroes(newHero);
+            HeroLifecycleHandler.discardAllOtherHeroes(newHero);
             return;
         }
+
         if (newHero.getTags().contains(EndRingContext.TAG_RESPAWNED_SAFE)) {
             newHero.removeTag(EndRingContext.TAG_RESPAWNED_SAFE);
-            discardAllOtherHeroes(newHero);
+            HeroLifecycleHandler.discardAllOtherHeroes(newHero);
             return;
         }
         if (newHero.getTags().contains(EndRingContext.TAG_INTRO)) {
-             discardAllOtherHeroes(newHero);
-             return; 
+            HeroLifecycleHandler.discardAllOtherHeroes(newHero);
+            return;
         }
-        if (checkForDuplicates(newHero)) {
+        if (HeroLifecycleHandler.checkForDuplicates(newHero)) {
             event.setCanceled(true);
         }
-    }
-    
-    private static void discardAllOtherHeroes(HeroEntity safeHero) {
-        if (safeHero.getServer() == null) return;
-        for (ServerLevel level : safeHero.getServer().getAllLevels()) {
-            for (var entity : level.getAllEntities()) {
-                if (entity instanceof HeroEntity existing && existing != safeHero && existing.isAlive()) {
-                    existing.discard();
-                }
-            }
-        }
-    }
-
-    private static boolean checkForDuplicates(HeroEntity newHero) {
-        if (newHero.getServer() == null) return false;
-        for (ServerLevel level : newHero.getServer().getAllLevels()) {
-            for (var entity : level.getAllEntities()) {
-                if (entity instanceof HeroEntity existing && existing != newHero) {
-                    if (existing.isAlive() && !existing.isRemoved()) {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
     }
 }

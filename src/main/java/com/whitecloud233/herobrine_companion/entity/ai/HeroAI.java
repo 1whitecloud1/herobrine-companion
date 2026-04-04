@@ -5,6 +5,7 @@ import com.whitecloud233.herobrine_companion.entity.ai.goal.*;
 import com.whitecloud233.herobrine_companion.entity.ai.learning.*;
 
 import net.minecraft.world.entity.ai.goal.FloatGoal;
+import net.minecraft.world.entity.ai.goal.OpenDoorGoal;
 import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
 import net.minecraft.world.entity.ai.goal.WaterAvoidingRandomStrollGoal;
 
@@ -15,7 +16,8 @@ public class HeroAI {
         hero.getGoalSelector().addGoal(0, new FloatGoal(hero));
         // [新增] 王者光环：让周围怪物臣服 (提升至最高优先级 0，被动生效)
         hero.getGoalSelector().addGoal(0, new HeroKingAuraGoal(hero));
-        
+        // 👇 [新增]：赋予 Hero 自动开门的能力 (参数 true 代表走过去后会自动随手关门)
+        hero.getGoalSelector().addGoal(1, new OpenDoorGoal(hero, true));
         hero.getGoalSelector().addGoal(1, new HeroTeleportToPlayerGoal(hero));
         // 0.5 [新增] 玩家邀请互动 (最高优先级之一，响应玩家指令)
         hero.getGoalSelector().addGoal(1, new HeroInvitedActionGoal(hero));
@@ -36,6 +38,7 @@ public class HeroAI {
         hero.getGoalSelector().addGoal(2, new HeroPacifyAttackerGoal(hero));
         // 2.2 [Lore] 赠送礼物 (优先级 2，与跟随并行，但执行时会短暂停留)
         hero.getGoalSelector().addGoal(2, new HeroGiftPlayerGoal(hero));
+        hero.getGoalSelector().addGoal(3, new HeroStateGoals(hero));
 
         // 2.3 [Lore] 巡视世界 (优先级 3，空闲时触发)
         hero.getGoalSelector().addGoal(3, new HeroInspectBlockGoal(hero));

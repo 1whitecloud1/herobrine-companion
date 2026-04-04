@@ -213,6 +213,12 @@
 
   "gui.herobrine_companion.config.transcendence_permit": "凌越之允: %s",
   "gui.herobrine_companion.config.transcendence_permit.tooltip": "启用/禁用凌越之允物品的使用。",
+  "message.herobrine_companion.not_your_hero": "这里不是你绑定的 Herobrine!",
+  "gui.herobrine_companion.api_setup.title": "Herobrine AI 设置",
+  "gui.herobrine_companion.api_setup.api_key": "API 密钥",
+  "gui.herobrine_companion.api_setup.confirm_save": "确认并保存",
+  "gui.herobrine_companion.api_setup.prompt_input": "请输入您的 AI API 密钥",
+  "gui.herobrine_companion.api_setup.prompt_safe": "您的密钥将安全保存在根文件夹中。",
 
 
 

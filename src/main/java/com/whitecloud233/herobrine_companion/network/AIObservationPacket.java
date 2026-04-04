@@ -1,7 +1,8 @@
 package com.whitecloud233.herobrine_companion.network;
 
-import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.client.service.AIService;
+import com.whitecloud233.herobrine_companion.client.service.LLMConfig;
+import com.whitecloud233.herobrine_companion.config.Config; // 请根据实际 Config 导入路径确认
 import io.netty.buffer.ByteBuf;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
@@ -11,15 +12,17 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-public record AIObservationPacket(int heroId, String observationDesc) implements CustomPacketPayload {
+public record AIObservationPacket(int heroId, String observationDesc, String fallbackKey, int fallbackVariants) implements CustomPacketPayload {
 
-    // 1. 定义包的唯一标识符
-    public static final Type<AIObservationPacket> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(HerobrineCompanion.MODID, "ai_observation"));
+    // 定义数据包的唯一类型 ID
+    public static final Type<AIObservationPacket> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath("herobrine_companion", "ai_observation"));
 
-    // 2. 定义序列化与反序列化规则
+    // 组合式流编解码器
     public static final StreamCodec<ByteBuf, AIObservationPacket> STREAM_CODEC = StreamCodec.composite(
             ByteBufCodecs.INT, AIObservationPacket::heroId,
             ByteBufCodecs.STRING_UTF8, AIObservationPacket::observationDesc,
+            ByteBufCodecs.STRING_UTF8, AIObservationPacket::fallbackKey,
+            ByteBufCodecs.INT, AIObservationPacket::fallbackVariants,
             AIObservationPacket::new
     );
 
@@ -28,30 +31,47 @@ public record AIObservationPacket(int heroId, String observationDesc) implements
         return TYPE;
     }
 
-    // 3. 【核心修复】：使用 1.21.1 的 IPayloadContext 和静态 handle 方法
-    public static void handle(final AIObservationPacket data, final IPayloadContext context) {
-        // enqueueWork 确保任务在客户端主线程执行
+    // NeoForge 1.21.1 处理方法 (客户端执行)
+    public void handle(IPayloadContext context) {
         context.enqueueWork(() -> {
             Minecraft mc = Minecraft.getInstance();
             if (mc.player != null) {
-                // 【调试代码】：如果能在游戏里看到这条灰字，说明服务端成功看到了你的行为，数据包也成功发到了客户端！
-                //mc.player.sendSystemMessage(Component.literal("§7[Debug] 客户端已收到观察事件，正在呼叫大模型..."));
+                // 1. 检查客户端是否配置了有效的 API Key 以及是否开启了视觉
+                // 注意：由于旧代码中有 LLMConfig，你需要确保它的引用有效，这里沿用你的逻辑
+                boolean isAiReady = !LLMConfig.isKeyMissing() && Config.aiVisionEnabled;
 
-                // 注意：这里使用 data.observationDesc() 来获取 record 中的数据
-                AIService.observeEnvironment(data.observationDesc(), mc.player.getUUID())
-                        .thenAccept(reply -> {
-                            if (reply != null && !reply.isEmpty() && !reply.startsWith("§c")) {
+                if (isAiReady) {
+                    // 发起大模型请求（消耗当前玩家的 API）
+                    AIService.observeEnvironment(this.observationDesc(), mc.player.getUUID())
+                            .thenAccept(reply -> {
                                 mc.tell(() -> {
-                                    mc.player.sendSystemMessage(Component.literal("§e<Herobrine> §f" + reply));
+                                    if (reply != null && !reply.isEmpty() && !reply.startsWith("§c")) {
+                                        // 成功获取 AI 回复
+                                        mc.player.sendSystemMessage(Component.literal("§e<Herobrine> §f" + reply));
+                                    } else {
+                                        // AI 请求失败、报错或被拦截，执行原版台词保底
+                                        showFallbackDialogue(mc.player);
+                                    }
                                 });
-                            } else {
-                                // 【调试代码】：如果大模型返回了空或者报错，打印出来
-                                mc.tell(() -> {
-                                    mc.player.sendSystemMessage(Component.literal("§c[Debug] 大模型返回了空数据或错误拦截！"));
-                                });
-                            }
-                        });
+                            });
+                } else {
+                    // 玩家没填 Key 或没开视觉，直接显示原版台词保底
+                    showFallbackDialogue(mc.player);
+                }
             }
         });
+    }
+
+    // 显示原版备用台词的方法
+    private void showFallbackDialogue(net.minecraft.client.player.LocalPlayer player) {
+        if (this.fallbackKey() == null || this.fallbackKey().isEmpty()) return;
+
+        if (this.fallbackVariants() <= 1) {
+            player.sendSystemMessage(Component.translatable(this.fallbackKey()));
+        } else {
+            int rand = player.getRandom().nextInt(this.fallbackVariants()) + 1;
+            // 👇 修改为下划线 "_"
+            player.sendSystemMessage(Component.translatable(this.fallbackKey() + "_" + rand));
+        }
     }
 }

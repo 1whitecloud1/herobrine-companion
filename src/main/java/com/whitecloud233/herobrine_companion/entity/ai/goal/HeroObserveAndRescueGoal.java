@@ -40,18 +40,21 @@ public class HeroObserveAndRescueGoal extends Goal {
             return false;
         }
 
-        Player player = this.hero.level().getNearestPlayer(this.hero, 32.0D);
+        // 👇👇👇【核心修复】：只寻找真正的主人
+        if (this.hero.getOwnerUUID() == null) return false;
+        Player player = this.hero.level().getPlayerByUUID(this.hero.getOwnerUUID());
         if (player == null || !player.isAlive()) return false;
+        // 👆👆👆
 
-        boolean isCompanionOwner = isOwner(player);
         long currentTime = this.hero.level().getGameTime();
 
-        // 检查冷却时间是否大于 RESCUE_COOLDOWN (10分钟)
-        if (isCompanionOwner && player.getHealth() <= RESCUE_HEALTH_THRESHOLD && (currentTime - this.lastRescueTime) > RESCUE_COOLDOWN) {
+        // 判定主人的残血救援
+        if (player.getHealth() <= RESCUE_HEALTH_THRESHOLD && (currentTime - this.lastRescueTime) > RESCUE_COOLDOWN) {
             this.targetPlayer = player;
             return true;
         }
 
+        // 判定主人的战斗状态
         if (isInCombat(player)) {
             this.targetPlayer = player;
             return true;

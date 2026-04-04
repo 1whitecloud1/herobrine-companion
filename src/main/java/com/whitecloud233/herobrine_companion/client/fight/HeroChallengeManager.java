@@ -5,6 +5,7 @@ import com.whitecloud233.herobrine_companion.entity.ai.HeroAI;
 import com.whitecloud233.herobrine_companion.entity.ai.HeroMoveControl;
 import com.whitecloud233.herobrine_companion.client.fight.goal.HeroPhase1Goal;
 import com.whitecloud233.herobrine_companion.entity.logic.data.HeroDataHandler;
+import com.whitecloud233.herobrine_companion.entity.logic.data.HeroWorldData;
 import com.whitecloud233.herobrine_companion.util.EndRingContext;
 import com.whitecloud233.herobrine_companion.world.structure.ModStructures;
 import net.minecraft.ChatFormatting;
@@ -23,6 +24,7 @@ import net.minecraft.world.phys.Vec3;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 public class HeroChallengeManager {
 
@@ -48,6 +50,25 @@ public class HeroChallengeManager {
             player.sendSystemMessage(Component.literal("§c[系统] 无法连接到试炼维度，挑战失败！"));
             return;
         }
+
+        // 👇 新增：检查全局锁
+        HeroWorldData worldData = HeroWorldData.get(currentLevel);
+        UUID currentChallenger = worldData.getActiveChallengerUUID();
+
+        if (currentChallenger != null) {
+            ServerPlayer challenger = server.getPlayerList().getPlayer(currentChallenger);
+            // 如果锁定的玩家在线，且真的在挑战中，则拦截当前玩家
+            if (challenger != null && challenger.getPersistentData().getBoolean("IsChallengeActive")) {
+                player.sendSystemMessage(Component.literal("§c[系统] 试炼场地已被玩家 §e" + challenger.getName().getString() + " §c占用，请稍后再试！"));
+                return;
+            } else {
+                // 如果锁定的玩家已经离线或者状态异常，说明是死锁，强行解开
+                worldData.setActiveChallengerUUID(null);
+            }
+        }
+        // 正式上锁
+        worldData.setActiveChallengerUUID(player.getUUID());
+
 
         // 1. 保存主世界坐标 (仅当玩家从其他维度进入时保存)
         if (currentLevel.dimension() != ModStructures.END_RING_DIMENSION_KEY) {
@@ -157,7 +178,10 @@ public class HeroChallengeManager {
         hero.setNoGravity(false);
         hero.setFloating(false);
         hero.setDeltaMovement(0, 0, 0);
-
+// 在 endChallenge 和 failChallenge 方法的末尾添加：
+        if (hero.getServer() != null) {
+            HeroWorldData.get(hero.getServer().overworld()).setActiveChallengerUUID(null);
+        }
         if (playerWon && !hero.level().isClientSide) {
             hero.level().playSound(null, hero.blockPosition(), SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundSource.MASTER, 1.0f, 1.0f);
             if (hero.getOwnerUUID() != null) {
@@ -259,13 +283,15 @@ public class HeroChallengeManager {
         ServerLevel level = (ServerLevel) player.level();
         HeroEntity activeHero = null;
 
-        // 寻找正在与玩家战斗的 Hero
-        for (var entity : level.getAllEntities()) {
-            if (entity instanceof HeroEntity hero && hero.getPersistentData().getBoolean("IsChallengeActive")) {
+
+        // 寻找正在与玩家战斗的 Hero (已优化为 O(1) 查找)
+        for (HeroEntity hero : com.whitecloud233.herobrine_companion.entity.ai.learning.HeroBrain.ACTIVE_HEROES) {
+            if (hero.level() == level && hero.isAlive() && hero.getPersistentData().getBoolean("IsChallengeActive")) {
                 activeHero = hero;
                 break;
             }
         }
+
 
         if (activeHero != null) {
             // 清理 Hero 战斗状态
@@ -319,7 +345,12 @@ public class HeroChallengeManager {
         if (endRingLevel != null) {
             com.whitecloud233.herobrine_companion.world.structure.EndRingRestorer.restoreArena(endRingLevel);
         }
-    }
+        // 在 endChallenge 和 failChallenge 方法的末尾添加：
+        if (player.getServer() != null) {
+            HeroWorldData.get(player.getServer().overworld()).setActiveChallengerUUID(null);
+        }
+    } // 这是 failChallenge 方法的大括号
+
 
     // ✅ 新增：战后恢复玩家飞行权限的通用方法
     public static void restoreFlightAbilities(ServerPlayer player) {

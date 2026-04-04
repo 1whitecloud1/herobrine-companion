@@ -13,79 +13,73 @@ public class HeroMoveControl extends MoveControl {
         this.hero = hero;
     }
 
+
     @Override
     public void tick() {
-        // === 1. 走路逻辑 (落地状态) ===
-        // 如果不是飞行状态，直接交给原版 MoveControl 处理
-        // 这能保证走路动画、步声、自动跳跃等行为正常
-        if (!hero.isFloating()) {
+        if (!this.hero.isFloating()) {
             super.tick();
             return;
         }
 
-        // === 2. 飞行/下落逻辑 (平滑处理) ===
         if (this.operation == Operation.MOVE_TO) {
             Vec3 targetVec = new Vec3(this.wantedX - this.hero.getX(), this.wantedY - this.hero.getY(), this.wantedZ - this.hero.getZ());
             double distSq = targetVec.lengthSqr();
-            
-            if (distSq < 0.1D) { 
-                this.hero.setDeltaMovement(Vec3.ZERO);
+
+            // 1. 极近点平滑刹车，消除抖动
+            if (distSq < 0.5D) {
+                this.hero.setDeltaMovement(this.hero.getDeltaMovement().scale(0.5D));
                 return;
-            } 
-
-            Vec3 desiredVelocity = targetVec.normalize().scale(this.speedModifier);
-            Vec3 currentVelocity = this.hero.getDeltaMovement();
-            
-            // XZ轴平滑 (0.1D)
-            // [优化] 动态水平响应系数 (XZ)
-            // 基础响应 0.1，距离越远响应越快，防止卡顿（低TPS）导致移动迟缓
-            double lerpXZ = 0.1D;
-            if (distSq > 4.0D) lerpXZ = 0.3D;   // 距离 > 2格，提升响应
-            if (distSq > 16.0D) lerpXZ = 0.8D;  // 距离 > 4格，几乎瞬间响应，抵抗卡顿
-
-            double newX = Mth.lerp(lerpXZ, currentVelocity.x, desiredVelocity.x);
-            double newZ = Mth.lerp(lerpXZ, currentVelocity.z, desiredVelocity.z);
-
-            // 垂直轴 (Y): 0.03D (响应极慢，营造漂浮感)
-            double lerpY = 0.03D;
-
-            // 如果距离很远(>5格)，Y轴加速响应
-            if (Math.abs(targetVec.y) > 5.0D) {
-                lerpY = 0.2D;
             }
-            
-            double newY = Mth.lerp(lerpY, currentVelocity.y, desiredVelocity.y);
 
+            // 2. 动态最大速度
+            double maxSpeed = this.speedModifier * 0.9D;
+            if (distSq > 16.0D) maxSpeed *= 1.5D; // 远距离加速
+
+            // 3. 【核心防鬼畜：到达转向】
+            // 如果距离目标不到一步之遥，强行限制速度为刚好到达的量，防止飞过头
+            double actualSpeed = maxSpeed;
+            if (distSq < maxSpeed * maxSpeed) {
+                actualSpeed = Math.sqrt(distSq);
+            }
+
+            Vec3 desiredVelocity = targetVec.normalize().scale(actualSpeed);
+
+            // 4. 【核心动力注入】
+            // 抛弃迟缓的 Lerp！直接赋予期望速度，并乘以 1.1 的系数，强行抵消原版引擎的空气阻力扣减
+            double comp = 1.8D;
+            double newX = desiredVelocity.x * comp;
+            double newY = desiredVelocity.y * comp;
+            double newZ = desiredVelocity.z * comp;
+
+            // 5. 气垫船越障机制
+            if (this.hero.horizontalCollision) {
+                newY += 0.5D; // 撞墙时提供升力
+            }
+            if (this.hero.onGround()) {
+                newY += 0.1D; // 脚底擦地时微微抬升
+                newX *= 1.5D; // 补偿地面的巨大摩擦力惩罚
+                newZ *= 1.5D;
+            }
+
+            // 绝对速度覆盖
             this.hero.setDeltaMovement(newX, newY, newZ);
 
-            // 转向逻辑
-            // [修改] 无论是否在陪伴模式，只要在移动，就允许 MoveControl 调整朝向
-            // 但为了避免头部抽搐，我们限制最大旋转速度，并确保身体和头部同步
-            if (distSq > 2.25D) { 
+            // === 转向平滑化（保持不变） ===
+            if (distSq > 0.25D) {
                 double d0 = this.wantedX - this.hero.getX();
                 double d1 = this.wantedZ - this.hero.getZ();
-                float targetYRot = -((float)Mth.atan2(d0, d1)) * (180F / (float)Math.PI);
-                
-                // 平滑旋转身体
+                float targetYRot = -((float) Mth.atan2(d0, d1)) * (180F / (float) Math.PI);
                 this.hero.setYRot(rotlerp(this.hero.getYRot(), targetYRot, 10.0F));
                 this.hero.yBodyRot = this.hero.getYRot();
-                
-                // [新增] 强制重置头部垂直角度 (XRot)
-                // 如果没有 LookControl 正在工作（例如没有 LookAtPlayerGoal），
-                // 那么头部可能会保持之前的角度（例如之前在看地上的东西）。
-                // 我们在这里缓慢地将头部抬起，使其平视前方。
-                // 注意：LookControl 没有 isHasWanted() 方法，我们通过检查 lookAt 状态来判断
-                // 或者直接无条件缓慢复位，如果有 LookControl 覆盖它会自动生效
-                
-                // 简单方案：直接每 tick 尝试复位，如果 LookControl 激活，它会在稍后的 tick 中覆盖这个值
-                // 但为了保险，我们只在 XRot 偏差较大时才复位
+
                 if (Math.abs(this.hero.getXRot()) > 1.0F) {
-                     this.hero.setXRot(rotlerp(this.hero.getXRot(), 0.0F, 5.0F));
+                    this.hero.setXRot(rotlerp(this.hero.getXRot(), 0.0F, 5.0F));
                 }
             }
-            
+
         } else {
-            this.hero.setDeltaMovement(this.hero.getDeltaMovement().scale(0.8D));
+            // 自由滑行时保留惯性
+            this.hero.setDeltaMovement(this.hero.getDeltaMovement().scale(0.95D));
         }
     }
 }

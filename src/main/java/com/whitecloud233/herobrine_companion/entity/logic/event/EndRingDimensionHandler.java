@@ -116,8 +116,11 @@ public class EndRingDimensionHandler {
             ServerLevel endLevel = player.server.getLevel(ModStructures.END_RING_DIMENSION_KEY);
 
             if (endLevel != null) {
-                for (var entity : endLevel.getAllEntities()) {
-                    if (entity instanceof HeroEntity hero && hero.isAlive()) {
+                for (HeroEntity hero : com.whitecloud233.herobrine_companion.entity.ai.learning.HeroBrain.ACTIVE_HEROES) {
+                    // 【注意】这里判断维度必须是 endLevel
+                    if (hero.level() == endLevel && hero.isAlive()
+                            && hero.getOwnerUUID() != null && hero.getOwnerUUID().equals(player.getUUID())) {
+
                         hero.setFloating(false);
                         HeroStateManager.backupToPlayerNBT(hero, player, "HeroRespawnData");
                         data.putBoolean("HeroPendingRespawn", true);
@@ -153,12 +156,18 @@ public class EndRingDimensionHandler {
         player.fallDistance = 0;
 
         if (player.level() instanceof ServerLevel serverLevel) {
-            for (var entity : serverLevel.getAllEntities()) {
-                if (entity instanceof HeroEntity hero && hero.isAlive()) {
+            // 👇 优化：不再遍历 serverLevel.getAllEntities()
+            for (HeroEntity hero : com.whitecloud233.herobrine_companion.entity.ai.learning.HeroBrain.ACTIVE_HEROES) {
+                // 确保在同一维度，并且是当前玩家的主人
+                if (hero.level() == serverLevel && hero.isAlive()
+                        && hero.getOwnerUUID() != null && hero.getOwnerUUID().equals(player.getUUID())) {
+
                     hero.teleportTo(EndRingContext.CENTER_X, EndRingContext.CENTER_Y, EndRingContext.CENTER_Z);
                     hero.setDeltaMovement(0, 0, 0);
-                    hero.addTag(EndRingContext.TAG_FIXED);
-                    break;
+                    hero.fallDistance = 0;
+                    hero.getNavigation().stop();
+                    hero.setTarget(null);
+                    break; // 找到了就立刻跳出循环
                 }
             }
         }

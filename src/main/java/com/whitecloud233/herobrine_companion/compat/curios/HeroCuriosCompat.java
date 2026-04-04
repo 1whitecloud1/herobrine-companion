@@ -32,6 +32,12 @@ public class HeroCuriosCompat {
                         // 2. 否则走 Curios 默认的标签检查
                         return super.mayPlace(stack);
                     }
+                    // 👇【新增】：监听玩家在 UI 界面中拿放 Curios 饰品
+                    @Override
+                    public void setChanged() {
+                        super.setChanged();
+                        hero.isStateDirty = true; // 触发脏标记！
+                    }
                 };
             }
         }

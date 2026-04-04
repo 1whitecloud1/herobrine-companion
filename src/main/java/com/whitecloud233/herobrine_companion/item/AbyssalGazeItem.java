@@ -1,12 +1,12 @@
 package com.whitecloud233.herobrine_companion.item;
 
 import net.minecraft.core.component.DataComponents;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -18,6 +18,9 @@ import java.util.List;
 
 public class AbyssalGazeItem extends Item {
 
+    private static final String TAG_ACTIVE = "herobrine_companion.abyssal_gaze_active";
+    private static final String ITEM_TAG_ACTIVE = "Active";
+
     public AbyssalGazeItem(Properties properties) {
         super(properties);
     }
@@ -26,7 +29,7 @@ public class AbyssalGazeItem extends Item {
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
 
-        // 【新增】配置检查
+        // 配置检查
         if (!com.whitecloud233.herobrine_companion.config.Config.abyssalGazeEnabled) {
             if (!level.isClientSide) {
                 player.sendSystemMessage(Component.translatable("message.herobrine_companion.item_disabled_in_config").withStyle(net.minecraft.ChatFormatting.RED));
@@ -35,43 +38,73 @@ public class AbyssalGazeItem extends Item {
         }
 
         if (!level.isClientSide) {
-// ... 后续原有逻辑保持不变
-            String tag = "herobrine_companion.abyssal_gaze_active";
-            
-            // 检查玩家当前是否有该标签
-            boolean hasTag = player.getTags().contains(tag);
-            
-            if (!hasTag) {
-                // 启用
-                player.addTag(tag);
-                player.sendSystemMessage(Component.translatable("message.herobrine_companion.abyssal_gaze.enabled"));
-                player.addEffect(new MobEffectInstance(MobEffects.NIGHT_VISION, 300, 0, false, false, true));
-            } else {
-                // 禁用
-                player.removeTag(tag);
+            // 根据玩家身上的 Tag 判断当前状态
+            boolean isPlayerActive = player.getTags().contains(TAG_ACTIVE);
+
+            if (isPlayerActive) {
+                // 如果玩家已激活，则执行关闭逻辑
+                player.removeTag(TAG_ACTIVE);
                 player.sendSystemMessage(Component.translatable("message.herobrine_companion.abyssal_gaze.disabled"));
                 player.removeEffect(MobEffects.NIGHT_VISION);
+                setActive(stack, false);
+            } else {
+                // 如果玩家未激活，则执行开启逻辑
+                player.addTag(TAG_ACTIVE);
+                player.sendSystemMessage(Component.translatable("message.herobrine_companion.abyssal_gaze.enabled"));
+                // 给予初始夜视效果，后续由 PlayerMechanicsEventHandler 维持
+                player.addEffect(new MobEffectInstance(MobEffects.NIGHT_VISION, 300, 0, false, false, true));
+                setActive(stack, true);
             }
         }
         return InteractionResultHolder.success(stack);
     }
 
     @Override
-    public boolean isFoil(ItemStack stack) {
-        // 物品本身不再存储状态，始终不发光，或者根据玩家状态发光？
-        // 通常物品在物品栏里，我们无法轻易获取持有它的玩家（除非在 inventoryTick 中更新 NBT）
-        // 为了避免 NBT 问题，我们移除物品上的 NBT 逻辑。
-        // 如果需要发光，可以在 inventoryTick 中检查玩家标签并设置 NBT，但这会增加复杂性。
-        // 用户要求 "have an empty NBTtag"，所以我们不再在物品上存储 "Active" 标签。
-        return false; 
+    public void inventoryTick(ItemStack stack, Level level, Entity entity, int slotId, boolean isSelected) {
+        // 在服务端同步物品状态与玩家状态
+        if (!level.isClientSide && entity instanceof Player player) {
+            // 每 20 tick (1秒) 检查一次，减少性能开销
+            if (level.getGameTime() % 20 == 0) {
+                boolean isPlayerActive = player.getTags().contains(TAG_ACTIVE);
+                boolean isStackActive = isActive(stack);
+
+                // 如果物品显示状态与玩家实际状态不一致，则更新物品
+                if (isPlayerActive != isStackActive) {
+                    setActive(stack, isPlayerActive);
+                }
+            }
+        }
     }
 
     @Override
+    public boolean isFoil(ItemStack stack) {
+        return isActive(stack);
+    }
+
+    // 1.21.1: 参数改为 TooltipContext
+    @Override
     public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltipComponents, TooltipFlag tooltipFlag) {
         tooltipComponents.add(Component.translatable("item.herobrine_companion.abyssal_gaze.desc"));
-        // 移除基于物品 NBT 的状态显示，因为我们不再在物品上存储状态。
-        // 如果需要显示状态，可能需要根据客户端玩家的状态（但这在 Tooltip 中可能不准确，如果是查看别人的物品）。
-        // 简单起见，只保留描述。
+        if (isActive(stack)) {
+            tooltipComponents.add(Component.translatable("item.herobrine_companion.abyssal_gaze.active").withStyle(net.minecraft.ChatFormatting.GREEN));
+        } else {
+            tooltipComponents.add(Component.translatable("item.herobrine_companion.abyssal_gaze.inactive").withStyle(net.minecraft.ChatFormatting.RED));
+        }
         super.appendHoverText(stack, context, tooltipComponents, tooltipFlag);
+    }
+
+    // 1.21.1: 替代原有的 getTag() 检测，改用 CustomData
+    private boolean isActive(ItemStack stack) {
+        CustomData customData = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY);
+        return customData.contains(ITEM_TAG_ACTIVE) && customData.copyTag().getBoolean(ITEM_TAG_ACTIVE);
+    }
+
+    // 1.21.1: 替代原有的 setTag()，改用 CustomData.update
+    private void setActive(ItemStack stack, boolean active) {
+        if (active) {
+            CustomData.update(DataComponents.CUSTOM_DATA, stack, tag -> tag.putBoolean(ITEM_TAG_ACTIVE, true));
+        } else {
+            CustomData.update(DataComponents.CUSTOM_DATA, stack, tag -> tag.remove(ITEM_TAG_ACTIVE));
+        }
     }
 }

@@ -2,6 +2,7 @@ package com.whitecloud233.herobrine_companion.client.event;
 
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.client.service.AIService;
+import com.whitecloud233.herobrine_companion.client.service.LLMConfig;
 import com.whitecloud233.herobrine_companion.client.service.LocalChatService;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ChatScreen;
@@ -56,6 +57,14 @@ public class ClientChatHandler {
                     // -----------------------------
                     // 【云端模式】走 AI 大模型 API
                     // -----------------------------
+                    if (LLMConfig.isKeyMissing()) {
+                        // 【核心防御】：发现没填 Key，直接强制弹出 UI 引导，不发网络请求
+                        mc.tell(() -> {
+                            mc.setScreen(new com.whitecloud233.herobrine_companion.config.ApiKeyInputScreen(new ChatScreen("")));
+                        });
+                        return;
+                    }
+
                     if (mc.player != null) {
                         AIService.chat(message, mc.player.getUUID()).thenAccept(reply -> {
                             // 拿到大模型的回复后，切回主线程将其显示在聊天框
@@ -68,7 +77,7 @@ public class ClientChatHandler {
                     }
                 } else {
                     // -----------------------------
-                    // 【本地模式】走 H2 数据库正则匹配
+                    // 【本地模式】走本地 JSON 词库正则匹配
                     // -----------------------------
                     LocalChatService.CachedRule rule = LocalChatService.getInstance().getChatResponse(message);
                     Component heroMessage;
@@ -80,9 +89,14 @@ public class ClientChatHandler {
                         // 2. 获取原始文本作为兜底
                         String originalText = rule.response();
 
-                        // 3. 替换占位符 {player}
-                        if (mc.getUser() != null) {
-                            originalText = originalText.replace("{player}", mc.getUser().getName());
+                        // 必须先判断 originalText 是否为 null！
+                        if (originalText != null) {
+                            // 3. 替换占位符 {player}
+                            if (mc.getUser() != null && mc.getUser().getName() != null) {
+                                originalText = originalText.replace("{player}", mc.getUser().getName());
+                            }
+                        } else {
+                            originalText = "..."; // 防御性赋值，防止 Component 再次崩溃
                         }
 
                         // 4. 构建消息组件
@@ -121,7 +135,7 @@ public class ClientChatHandler {
     private static void exitChat() {
         ClientHooks.disableChat();
 
-        // 【新增】：在退出聊天时，清空大模型对当前玩家的短期记忆上下文
+        // 在退出聊天时，清空大模型对当前玩家的短期记忆上下文
         if (Minecraft.getInstance().player != null) {
             AIService.clearHistory(Minecraft.getInstance().player.getUUID());
         }
@@ -130,14 +144,14 @@ public class ClientChatHandler {
                 Component.translatable("message.herobrine_companion.chat_exit")
         );
     }
-    // 【新增】：当玩家退出当前存档或断开服务器时，强制重置所有聊天状态与大模型记忆
+
     // 当玩家退出当前存档或断开服务器时，强制重置所有聊天状态与大模型记忆
     @SubscribeEvent
     public static void onPlayerLogOut(ClientPlayerNetworkEvent.LoggingOut event) {
-        // 【修改】：使用我们刚写的新方法，彻底重置聊天状态和 API 开启状态
+        // 使用我们刚写的新方法，彻底重置聊天状态和 API 开启状态
         ClientHooks.resetAll();
 
-        // 2. 清理大模型的记忆上下文
+        // 清理大模型的记忆上下文
         if (event.getPlayer() != null) {
             AIService.clearHistory(event.getPlayer().getUUID());
         }

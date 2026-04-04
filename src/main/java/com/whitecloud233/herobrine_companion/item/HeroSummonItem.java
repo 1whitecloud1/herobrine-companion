@@ -101,12 +101,19 @@ public class HeroSummonItem extends Item {
                 long lastUseTime = getLastUseTime(stack);
 
                 if (currentTime < lastUseTime + COOLDOWN_TICKS) {
-                    String mockery = MOCKERY_MESSAGES[random.nextInt(MOCKERY_MESSAGES.length)];
-                    player.sendSystemMessage(Component.translatable(mockery));
+                    if (player != null) {
+                        String mockery = MOCKERY_MESSAGES[random.nextInt(MOCKERY_MESSAGES.length)];
+                        player.sendSystemMessage(Component.translatable(mockery));
+                    }
                     return InteractionResult.FAIL;
                 }
 
-                HeroEntity existingHero = findHeroInAnyDimension(serverLevel.getServer());
+                UUID ownerUUID = getOwnerUUID(stack);
+                if (ownerUUID == null && player != null) {
+                    ownerUUID = player.getUUID();
+                }
+
+                HeroEntity existingHero = ownerUUID != null ? findHeroInAnyDimension(serverLevel.getServer(), ownerUUID) : null;
                 int actionType = getInteractionType(level, clickedPos);
 
                 if (actionType > 0 && existingHero != null) {
@@ -119,7 +126,8 @@ public class HeroSummonItem extends Item {
 
                 Vec3 targetPos = context.getClickLocation().add(0, 1, 0);
 
-                boolean success = performSummonOrTeleport(serverLevel, player, targetPos);
+                // 调用公共召唤逻辑
+                boolean success = performSummonOrTeleport(serverLevel, player, stack, targetPos);
                 if (success) {
                     setLastUseTime(stack, currentTime);
                 }
@@ -133,8 +141,12 @@ public class HeroSummonItem extends Item {
         }
     }
 
-    public static boolean performSummonOrTeleport(ServerLevel serverLevel, Player player, Vec3 targetPos) {
-        HeroEntity existingHero = findHeroInAnyDimension(serverLevel.getServer());
+    // ============== 提取出来的公共核心召唤/传送逻辑 ==============
+    public static boolean performSummonOrTeleport(ServerLevel serverLevel, Player player, ItemStack stack, Vec3 targetPos) {
+        UUID ownerUUID = stack != null ? getOwnerUUID(stack) : null;
+        if (ownerUUID == null && player != null) ownerUUID = player.getUUID();
+
+        HeroEntity existingHero = ownerUUID != null ? findHeroInAnyDimension(serverLevel.getServer(), ownerUUID) : null;
         long currentTime = serverLevel.getGameTime();
 
         if (existingHero != null) {
@@ -144,7 +156,13 @@ public class HeroSummonItem extends Item {
             existingHero.setInvitedPos(null);
             existingHero.setInvitedAction(0);
 
-            if (existingHero.level().dimension() != serverLevel.dimension()) {
+            // 【核心修复】：判断是否安全。
+            // 如果是同维度且距离小于 100 格（约 10000 距离平方），说明区块是活的，直接传送。
+            // 否则（跨维度 或 处于远处的未加载区块），强制走 NBT 重建逻辑，防止 1.21.1 追踪器发包丢失变成空气。
+            boolean isSafeToDirectTeleport = existingHero.level().dimension() == serverLevel.dimension()
+                    && existingHero.distanceToSqr(targetPos.x, targetPos.y, targetPos.z) < 10000.0D;
+
+            if (!isSafeToDirectTeleport) {
                 float oldYRot = existingHero.getYRot();
                 float oldXRot = existingHero.getXRot();
 
@@ -170,7 +188,7 @@ public class HeroSummonItem extends Item {
 
                     newHero.addTag(EndRingContext.TAG_RESPAWNED_SAFE);
                     HeroDataHandler.syncGlobalTrust(newHero);
-                    serverLevel.addFreshEntity(newHero);
+                    serverLevel.addFreshEntity(newHero); // 强制向客户端发包渲染
                     newHero.setLastSummonedTime(currentTime);
 
                     if (player != null) {
@@ -178,6 +196,7 @@ public class HeroSummonItem extends Item {
                     }
                 }
             } else {
+                // 近距离同维度传送，区块活跃，直接调用原版传送
                 existingHero.teleportTo(serverLevel, targetPos.x, targetPos.y, targetPos.z, Collections.emptySet(), existingHero.getYRot(), existingHero.getXRot());
                 existingHero.getNavigation().stop();
                 existingHero.setTarget(null);
@@ -194,11 +213,13 @@ public class HeroSummonItem extends Item {
             HeroEntity hero = ModEvents.HERO.get().create(serverLevel);
             if (hero != null) {
                 hero.moveTo(targetPos);
-                // 1.21.1: 移除多余的第 5 个参数 (原为 null)
                 hero.finalizeSpawn(serverLevel, serverLevel.getCurrentDifficultyAt(hero.blockPosition()), MobSpawnType.TRIGGERED, null);
 
+                if (ownerUUID != null) {
+                    hero.setOwnerUUID(ownerUUID);
+                }
+
                 if (player != null) {
-                    hero.setOwnerUUID(player.getUUID());
                     HeroStateManager.restoreFromGlobal(hero, player);
                     HeroDataHandler.syncGlobalTrust(hero);
                 }
@@ -214,9 +235,18 @@ public class HeroSummonItem extends Item {
         return false;
     }
 
-    public static HeroEntity findHeroInAnyDimension(net.minecraft.server.MinecraftServer server) {
+    // =====================================================================
+
+    // 兼容原版 AIService 调用的签名（3参数），内部自动补全 null stack
+    public static boolean performSummonOrTeleport(ServerLevel serverLevel, Player player, Vec3 targetPos) {
+        return performSummonOrTeleport(serverLevel, player, null, targetPos);
+    }
+
+    // 增加 ownerUUID 参数，以便在多人游戏中不同玩家能找到自己的 Hero
+    public static HeroEntity findHeroInAnyDimension(net.minecraft.server.MinecraftServer server, UUID ownerUUID) {
+        if (ownerUUID == null) return null;
         for (ServerLevel level : server.getAllLevels()) {
-            var entities = level.getEntities(ModEvents.HERO.get(), entity -> true);
+            var entities = level.getEntities(ModEvents.HERO.get(), entity -> ownerUUID.equals(entity.getOwnerUUID()));
             if (!entities.isEmpty()) {
                 return entities.get(0);
             }
@@ -268,6 +298,19 @@ public class HeroSummonItem extends Item {
     private String getOwnerName(ItemStack stack) {
         CustomData customData = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY);
         return customData.contains("OwnerName") ? customData.copyTag().getString("OwnerName") : "";
+    }
+
+    public static UUID getOwnerUUID(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) return null;
+
+        // 1.21.1 获取自定义数据组件的方式
+        CustomData customData = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY);
+        CompoundTag tag = customData.copyTag();
+
+        if (tag.hasUUID("OwnerUUID")) {
+            return tag.getUUID("OwnerUUID");
+        }
+        return null;
     }
 
     private long getLastUseTime(ItemStack stack) {

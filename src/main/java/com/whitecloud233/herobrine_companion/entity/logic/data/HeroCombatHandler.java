@@ -10,6 +10,8 @@ import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.entity.player.Player;
 
+import java.util.UUID;
+
 public class HeroCombatHandler {
 
     public static boolean onHurt(HeroEntity hero, DamageSource source, float amount) {
@@ -30,6 +32,14 @@ public class HeroCombatHandler {
 
         // 2. 玩家攻击判定
         if (!hero.level().isClientSide && source.getEntity() instanceof Player player) {
+
+            // 👇👇👇【核心修复：上次你漏掉了这里！】拦截非主人的攻击，防止夺舍漏洞
+            UUID ownerUUID = hero.getOwnerUUID();
+            if (ownerUUID != null && !ownerUUID.equals(player.getUUID())) {
+                player.sendSystemMessage(Component.translatable("message.herobrine_companion.not_your_hero").withStyle(net.minecraft.ChatFormatting.RED));
+                return false;
+            }
+            // 👆👆👆
             // [新增] 神经网络输入：直接攻击 Herobrine
             hero.getHeroBrain().input(player.getUUID(), "DIRECT_ATTACK", 0.2f);
             hero.getHeroBrain().inputFailure(player.getUUID(), 0.1f);

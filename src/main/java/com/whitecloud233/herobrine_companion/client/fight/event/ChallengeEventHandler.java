@@ -7,10 +7,23 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent; // 👇 引入正确的 NeoForge 玩家事件包
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
 @EventBusSubscriber(modid = "herobrine_companion")
 public class ChallengeEventHandler {
+
+    @SubscribeEvent
+    // 👇 修复点：修改为 NeoForge 的 PlayerLoggedOutEvent
+    public static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            if (player.getPersistentData().getBoolean("IsChallengeActive")) {
+                // 如果玩家在挑战期间强行退出（拔网线），立刻触发失败逻辑！
+                // 这会自动清理 Boss 实体、恢复 End Ring 场地，并释放全局锁
+                HeroChallengeManager.failChallenge(player);
+            }
+        }
+    }
 
     @SubscribeEvent
     public static void onLivingDeath(LivingDeathEvent event) {

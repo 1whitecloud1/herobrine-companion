@@ -48,9 +48,9 @@ public class StoryAndLoreHandler {
         if (event.getEntity() instanceof ServerPlayer player) {
             ServerLevel level = (ServerLevel) player.level();
 
-            // 伴侣睡眠对话
-            for (var entity : level.getAllEntities()) {
-                if (entity instanceof HeroEntity hero && hero.isCompanionMode() && hero.getOwnerUUID() != null && hero.getOwnerUUID().equals(player.getUUID())) {
+            // 伴侣睡眠对话 (已优化)
+            for (HeroEntity hero : com.whitecloud233.herobrine_companion.entity.ai.learning.HeroBrain.ACTIVE_HEROES) {
+                if (hero.level() == level && hero.isAlive() && hero.isCompanionMode() && hero.getOwnerUUID() != null && hero.getOwnerUUID().equals(player.getUUID())) {
                     HeroDialogueHandler.onSleep(hero, player);
                     break;
                 }
@@ -143,8 +143,9 @@ public class StoryAndLoreHandler {
 
     private static void summonHeroNearPlayer(ServerLevel level, ServerPlayer player) {
         HeroEntity existingHero = null;
-        for (var entity : level.getAllEntities()) {
-            if (entity instanceof HeroEntity hero) {
+        // 👇 优化：不再遍历 level.getAllEntities()
+        for (HeroEntity hero : com.whitecloud233.herobrine_companion.entity.ai.learning.HeroBrain.ACTIVE_HEROES) {
+            if (hero.level() == level && hero.isAlive() && player.getUUID().equals(hero.getOwnerUUID())) {
                 existingHero = hero;
                 break;
             }
@@ -166,6 +167,7 @@ public class StoryAndLoreHandler {
                 hero.moveTo(targetPos);
                 // 1.21.1 更改：移除了最后废弃的 NBT tag 参数
                 hero.finalizeSpawn(level, level.getCurrentDifficultyAt(pos), MobSpawnType.EVENT, null);
+                hero.setOwnerUUID(player.getUUID());
                 level.addFreshEntity(hero);
             }
         }

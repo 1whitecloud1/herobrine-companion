@@ -113,26 +113,12 @@ public class HeroInspectBlockGoal extends Goal {
 
     @Override
     public void stop() {
-        // 结束时偶尔评价一句
         if (this.targetPos != null && this.hero.getRandom().nextInt(3) == 0) {
-            Player player = null;
+            // 【修复】：只认真正的主人，绝不跟陌生人搭话
             if (this.hero.getOwnerUUID() != null) {
-                player = this.hero.level().getPlayerByUUID(this.hero.getOwnerUUID());
-            }
-            if (player == null) {
-                player = this.hero.level().getNearestPlayer(this.hero, 16.0D);
-            }
-
-            if (player instanceof ServerPlayer serverPlayer) {
-                HeroDialogueHandler.onInspectBlock(this.hero, serverPlayer, this.hero.level().getBlockState(this.targetPos));
-                
-                // [深度学习] 学习反馈
-                // 如果玩家在附近，并且 Herobrine 发现了好东西（如钻石），这会增加玩家的“探索值”
-                // 因为 Herobrine 认为玩家带他来到了一个好地方
-                BlockState state = this.hero.level().getBlockState(this.targetPos);
-                if (state.is(Blocks.DIAMOND_ORE) || state.is(Blocks.DEEPSLATE_DIAMOND_ORE) || state.is(Blocks.ANCIENT_DEBRIS)) {
-                    // [修复] 传入 playerUUID
-                    this.hero.getHeroBrain().inputExploration(serverPlayer.getUUID(), 0.05f);
+                Player player = this.hero.level().getPlayerByUUID(this.hero.getOwnerUUID());
+                if (player instanceof ServerPlayer serverPlayer) {
+                    HeroDialogueHandler.onInspectBlock(this.hero, serverPlayer, this.hero.level().getBlockState(this.targetPos));
                 }
             }
         }

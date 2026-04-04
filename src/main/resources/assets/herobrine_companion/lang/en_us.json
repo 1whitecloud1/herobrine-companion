@@ -138,6 +138,12 @@
   "gui.herobrine_companion.pose.save_preset": "Save",
   "gui.herobrine_companion.pose.load_preset": "Load",
   "gui.herobrine_companion.pose.delete_preset": "Delete",
+  "message.herobrine_companion.not_your_hero": "This is not your Herobrine!",
+  "gui.herobrine_companion.api_setup.title": "Herobrine AI Setup",
+  "gui.herobrine_companion.api_setup.api_key": "API Key",
+  "gui.herobrine_companion.api_setup.confirm_save": "Confirm & Save",
+  "gui.herobrine_companion.api_setup.prompt_input": "Please input your AI API Key",
+  "gui.herobrine_companion.api_setup.prompt_safe": "Your Key will be saved safely in the root folder.",
 
 
   "message.herobrine_companion.chat_hero": "%s",

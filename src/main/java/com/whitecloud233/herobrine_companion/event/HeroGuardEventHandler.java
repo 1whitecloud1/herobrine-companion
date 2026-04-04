@@ -2,6 +2,7 @@ package com.whitecloud233.herobrine_companion.event;
 
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.herobrine_companion.entity.projectile.RealmBreakerLightningEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
@@ -9,53 +10,75 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.bus.api.Event;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
+import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.neoforge.event.level.ExplosionEvent;
 
 import java.util.List;
 
 /**
  * NeoForge 1.21.1 适配版
- * 处理 Herobrine 守卫状态下的物理规则干涉 (绝对防爆、绝对防盗)
+ * 处理 Herobrine 守卫状态下的物理规则干涉 (绝对防爆、绝对防盗、绝对防破坏)
  */
-@EventBusSubscriber(modid = HerobrineCompanion.MODID, bus = EventBusSubscriber.Bus.GAME)
+@EventBusSubscriber(modid = HerobrineCompanion.MODID)
 public class HeroGuardEventHandler {
 
+    /**
+     * 神之领域 - 绝对防爆
+     */
     @SubscribeEvent
     public static void onExplosionDetonate(ExplosionEvent.Detonate event) {
-        if (event.getLevel().isClientSide) return;
+        if (event.getLevel().isClientSide()) return;
 
-        // [修复] 1.21 Mojang 映射下，获取位置的方法是 center()
+        // ================= [机制 1：免疫专属落雷伤害] =================
+        Entity source = event.getExplosion().getDirectSourceEntity();
+        if (source instanceof RealmBreakerLightningEntity lightningEntity) {
+            event.getAffectedEntities().removeIf(entity -> entity instanceof HeroEntity);
+            Entity owner = lightningEntity.getOwner();
+            if (owner != null) {
+                event.getAffectedEntities().remove(owner);
+            }
+        }
+
+        // ================= [机制 2：神之领域 - 守卫防爆] =================
+        List<BlockPos> affectedBlocks = event.getAffectedBlocks();
+        if (affectedBlocks.isEmpty() && event.getAffectedEntities().isEmpty()) return;
+
         Vec3 explosionPos = event.getExplosion().center();
+        double ex = explosionPos.x;
+        double ey = explosionPos.y;
+        double ez = explosionPos.z;
 
-        // 1. 范围检测 (32格)
-        double searchRadius = 32.0;
-        AABB searchBox = new AABB(
-                explosionPos.x - searchRadius, explosionPos.y - searchRadius, explosionPos.z - searchRadius,
-                explosionPos.x + searchRadius, explosionPos.y + searchRadius, explosionPos.z + searchRadius
-        );
-
+        AABB searchBox = new AABB(ex - 32, ey - 32, ez - 32, ex + 32, ey + 32, ez + 32);
         List<HeroEntity> heroes = event.getLevel().getEntitiesOfClass(HeroEntity.class, searchBox);
 
         for (HeroEntity hero : heroes) {
-            // 2. 检查守卫状态 (Action 3)
             if (hero.getInvitedAction() == 3 && hero.getInvitedPos() != null) {
-
                 BlockPos guardedPos = hero.getInvitedPos();
-                double distSqr = guardedPos.distToCenterSqr(explosionPos);
 
-                // 3. 判定神之领域范围 (20格)
-                // 只要爆炸源位于守护点 20 格内，抹除伤害
-                if (distSqr < 400.0) {
-                    event.getAffectedBlocks().clear();
-                    event.getAffectedEntities().clear();
-                    return;
+                // 【新增】如果守卫的箱子/方块已经消失（变为空气），则自动失效，不产生粒子也不保护
+                if (event.getLevel().getBlockState(guardedPos).isAir()) continue;
+
+                double distSqrToExplosion = guardedPos.distToCenterSqr(explosionPos);
+
+                if (distSqrToExplosion < 400.0) {
+                    affectedBlocks.removeIf(pos -> pos.distSqr(guardedPos) < 100);
+                    event.getAffectedEntities().removeIf(ent -> ent.distanceToSqr(guardedPos.getX(), guardedPos.getY(), guardedPos.getZ()) < 100);
+
+                    if (event.getLevel() instanceof ServerLevel serverLevel) {
+                        serverLevel.sendParticles(ParticleTypes.ENCHANT,
+                                guardedPos.getX() + 0.5, guardedPos.getY() + 1.0, guardedPos.getZ() + 0.5,
+                                20, 0.5, 0.5, 0.5, 0.1);
+                    }
+                    break;
                 }
             }
         }
@@ -63,9 +86,6 @@ public class HeroGuardEventHandler {
 
     /**
      * 神之领域 - 绝对禁锢 (拦截右键交互)
-     * 监听玩家右键点击方块的瞬间。
-     * 如果点击的是 Herobrine 正在守卫的方块，且玩家不是被认可的主人，
-     * 直接在事件层抹除该交互，阻止任何容器界面的打开、声音或动画。
      */
     @SubscribeEvent
     public static void onPlayerRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
@@ -74,45 +94,85 @@ public class HeroGuardEventHandler {
 
         BlockPos clickedPos = event.getPos();
 
-        // 1. 快速检索：划定一个检测范围 (例如 32 格) 寻找 Herobrine
         double searchRadius = 32.0;
         AABB searchBox = new AABB(clickedPos).inflate(searchRadius);
         List<HeroEntity> heroes = event.getLevel().getEntitiesOfClass(HeroEntity.class, searchBox);
 
         for (HeroEntity hero : heroes) {
-            // 2. 确认 Herobrine 处于守卫模式 (Action 3) 且目标存在
             if (hero.getInvitedAction() == 3 && hero.getInvitedPos() != null) {
                 BlockPos guardedPos = hero.getInvitedPos();
 
-                // 3. 精准判定：玩家点击的正是被守卫的方块
-                if (clickedPos.equals(guardedPos)) {
+                // 【新增】如果守卫的箱子已经消失，不做保护处理
+                if (event.getLevel().getBlockState(guardedPos).isAir()) continue;
 
-                    // 4. 灵魂级甄别：比对 UUID 判断是否为主人
+                if (clickedPos.equals(guardedPos)) {
                     if (!player.getUUID().equals(hero.getOwnerUUID())) {
 
-                        // 5. 规则级抹除：彻底取消这次交互事件
+                        // 取消事件
                         event.setCanceled(true);
-// 如果你想防止客户端因为被拦截而产生短暂的“手部挥动”动画，可以补充设置取消结果：
-                        event.setCancellationResult(net.minecraft.world.InteractionResult.FAIL);
 
-                        // 6. 神罚反馈 (仅在服务端执行，给予入侵者视觉和听觉的压迫感)
-                        if (!event.getLevel().isClientSide) {
+                        if (!event.getLevel().isClientSide()) {
                             ServerLevel serverLevel = (ServerLevel) event.getLevel();
 
-                            // 播放沉闷的心跳警告音和末影人瞬移的低频音
                             serverLevel.playSound(null, clickedPos, SoundEvents.WARDEN_HEARTBEAT, SoundSource.HOSTILE, 1.0F, 0.5F);
                             serverLevel.playSound(null, clickedPos, SoundEvents.ENDERMAN_TELEPORT, SoundSource.HOSTILE, 0.5F, 0.5F);
 
-                            // 在箱子上方爆发幽匿灵魂粒子，警告入侵者
                             serverLevel.sendParticles(ParticleTypes.SCULK_SOUL,
                                     clickedPos.getX() + 0.5, clickedPos.getY() + 1.0, clickedPos.getZ() + 0.5,
                                     15, 0.3, 0.3, 0.3, 0.02);
 
-                            // 创世神的轻微威压：给入侵者施加瞬间的盲目效果 (可选)
                             player.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, 40, 0, true, false));
                         }
+                        return;
+                    }
+                }
+            }
+        }
+    }
 
-                        // 既然已经成功拦截，跳出循环即可
+    /**
+     * 神之领域 - 绝对壁垒 (拦截左键破坏)
+     * 【新增功能】如果破坏的是 Herobrine 正在守卫的方块，且玩家不是被认可的主人，直接取消破坏行为。
+     */
+    @SubscribeEvent
+    public static void onBlockBreak(BlockEvent.BreakEvent event) {
+        Player player = event.getPlayer();
+        if (player == null || player.isSpectator()) return;
+
+        BlockPos brokenPos = event.getPos();
+        LevelAccessor levelAccessor = event.getLevel();
+
+        // 将 LevelAccessor 转换为 Level 进行实体查询
+        if (!(levelAccessor instanceof Level level)) return;
+
+        double searchRadius = 32.0;
+        AABB searchBox = new AABB(brokenPos).inflate(searchRadius);
+        List<HeroEntity> heroes = level.getEntitiesOfClass(HeroEntity.class, searchBox);
+
+        for (HeroEntity hero : heroes) {
+            if (hero.getInvitedAction() == 3 && hero.getInvitedPos() != null) {
+                BlockPos guardedPos = hero.getInvitedPos();
+
+                // 【新增】如果守卫的箱子已经消失，不做保护处理
+                if (level.getBlockState(guardedPos).isAir()) continue;
+
+                // 判定：有玩家正在挖掘被守卫的方块
+                if (brokenPos.equals(guardedPos)) {
+                    if (!player.getUUID().equals(hero.getOwnerUUID())) {
+
+                        // 抹除破坏事件
+                        event.setCanceled(true);
+
+                        // 给予和右键乱动箱子一样的神罚反馈
+                        if (!level.isClientSide() && level instanceof ServerLevel serverLevel) {
+                            serverLevel.playSound(null, brokenPos, SoundEvents.WARDEN_HEARTBEAT, SoundSource.HOSTILE, 1.0F, 0.5F);
+
+                            serverLevel.sendParticles(ParticleTypes.SCULK_SOUL,
+                                    brokenPos.getX() + 0.5, brokenPos.getY() + 1.0, brokenPos.getZ() + 0.5,
+                                    15, 0.3, 0.3, 0.3, 0.02);
+
+                            player.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, 40, 0, true, false));
+                        }
                         return;
                     }
                 }

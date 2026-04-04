@@ -145,6 +145,19 @@ public class PacketHandler {
                 SPacketFakeCrash.CODEC,
                 SPacketFakeCrash::handle
         );
+// 注册 SummonHeroPacket
+        registrar.playToServer(
+                SummonHeroPacket.TYPE,
+                SummonHeroPacket.STREAM_CODEC,
+                SummonHeroPacket::handle
+        );
+
+        // 注册 TeleportToHeroPacket
+        registrar.playToServer(
+                TeleportToHeroPacket.TYPE,
+                TeleportToHeroPacket.STREAM_CODEC,
+                TeleportToHeroPacket::handle
+        );
     }
 
     public static void sendToServer(PeacefulPacket packet) {
@@ -233,5 +246,18 @@ public class PacketHandler {
     // 1.21.1 的通用群体发包：发送给所有追踪该实体的玩家（包括玩家自己）
     public static void sendToTracking(CustomPacketPayload packet, Entity entity) {
         PacketDistributor.sendToPlayersTrackingEntity(entity, packet);
+    }
+    public static void sendToServer(SummonHeroPacket packet) {
+        PacketDistributor.sendToServer(packet);
+    }
+
+    public static void sendToServer(TeleportToHeroPacket packet) {
+        PacketDistributor.sendToServer(packet);
+    }
+    // ============================================
+    // [新增] 发送 AI 观察数据包给特定玩家客户端
+    // ============================================
+    public static void sendToPlayer(AIObservationPacket packet, ServerPlayer player) {
+        PacketDistributor.sendToPlayer(player, packet);
     }
 }

@@ -7,6 +7,8 @@ import com.whitecloud233.herobrine_companion.entity.GhostSkeletonEntity;
 import com.whitecloud233.herobrine_companion.entity.GhostSteveEntity;
 import com.whitecloud233.herobrine_companion.entity.GhostZombieEntity;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.herobrine_companion.network.AIObservationPacket;
+import com.whitecloud233.herobrine_companion.network.PacketHandler;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.RandomSource;
@@ -29,32 +31,21 @@ public class HeroDialogueHandler {
 
     private static final String TAG_LAST_SPEECH = "HeroLastSpeechTime";
 
-    public static boolean isAIEnabled() {
-        String key = LLMConfig.aiApiKey;
-        return com.whitecloud233.herobrine_companion.config.Config.aiVisionEnabled
-                && key != null && !key.isEmpty() && !key.equals("YOUR_API_KEY_HERE");
-    }
-
     public static boolean canSpeak(HeroEntity hero) {
         long time = hero.level().getGameTime();
         long last = hero.getPersistentData().getLong(TAG_LAST_SPEECH);
+        // 读取配置中的冷却时间（由于Config类通常不是仅客户端的，所以可以在服务端读取）
         return (time - last) >= (com.whitecloud233.herobrine_companion.config.Config.aiVisionInterval * 20L);
     }
 
-    private static void tryAIDialogueOrFallback(HeroEntity hero, ServerPlayer player, String aiPrompt, String fallbackKey, int fallbackVariants) {
-        if (isAIEnabled()) {
-            triggerAIObservation(hero, player, aiPrompt);
-        } else {
-            speakRandom(hero, player, fallbackKey, fallbackVariants);
-        }
-    }
-
-    public static void triggerAIObservation(HeroEntity hero, ServerPlayer player, String observationDesc) {
+    // 【核心改造】：不再服务端判断AI，而是把大模型提示词和备用台词打包发给客户端，扣对应玩家的钱！
+    public static void tryAIDialogueOrFallback(HeroEntity hero, ServerPlayer player, String aiPrompt, String fallbackKey, int fallbackVariants) {
+        if (!canSpeak(hero)) return;
+        // 记录说话时间，进入冷却
         hero.getPersistentData().putLong(TAG_LAST_SPEECH, hero.level().getGameTime());
 
-        // 服务端不直接调用 API，而是发送数据包给触发事件的那个玩家
-        net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player,
-                new com.whitecloud233.herobrine_companion.network.AIObservationPacket(hero.getId(), observationDesc));
+        // 发送数据包，将提示词和保底翻译键全部交给该玩家的客户端去处理
+        PacketHandler.sendToPlayer(new AIObservationPacket(hero.getId(), aiPrompt, fallbackKey, fallbackVariants), player);
     }
 
     public static void tick(HeroEntity hero) {
@@ -86,34 +77,59 @@ public class HeroDialogueHandler {
     }
 
     private static void handleStateSpeech(HeroEntity hero, ServerPlayer owner, SimpleNeuralNetwork.MindState state) {
-        if (isAIEnabled()) {
-            String stateContext = switch (state) {
-                case PROTECTOR -> "You are currently in a protective state.";
-                case JUDGE -> "You are observing the player.";
-                case PRANKSTER -> "You are in a mischievous state.";
-                case MAINTAINER -> "You are focusing on Minecraft's underlying code.";
-                case GLITCH_LORD -> "Your data stream is currently experiencing anomalies.";
-                case MONSTER_KING -> "You are sensing the presence of nearby monsters.";
-                case REMINISCING -> "You are recalling past events regarding the creation of this world.";
-                default -> hero.level().isNight() ? "It is currently nighttime." : "It is currently daytime.";
-            };
-            triggerAIObservation(hero, owner, "The player is quiet right now. " + stateContext + " Please make a comment based on this state.");
-        } else {
-            switch (state) {
-                case PROTECTOR -> speakRandom(hero, owner, "message.herobrine_companion.state_protector", 2);
-                case JUDGE -> speakRandom(hero, owner, "message.herobrine_companion.state_judge", 2);
-                case PRANKSTER -> speakRandom(hero, owner, "message.herobrine_companion.state_prankster", 2);
-                case MAINTAINER -> speakRandom(hero, owner, "message.herobrine_companion.state_maintainer", 2);
-                case GLITCH_LORD -> speakRandom(hero, owner, "message.herobrine_companion.state_glitch_lord", 2);
-                case MONSTER_KING -> speakRandom(hero, owner, "message.herobrine_companion.state_monster_king", 2);
-                case REMINISCING -> speakRandom(hero, owner, "message.herobrine_companion.state_reminiscing", 2);
-                default -> {
-                    if (hero.level().isNight()) speakRandom(hero, owner, "message.herobrine_companion.night_comment", 3);
-                    else speakRandom(hero, owner, "message.herobrine_companion.day_comment", 3);
+        String stateContext;
+        String fallbackKey;
+        int fallbackVariants = 2;
+
+        switch (state) {
+            case PROTECTOR -> {
+                stateContext = "You are currently in a protective state.";
+                fallbackKey = "message.herobrine_companion.state_protector";
+            }
+            case JUDGE -> {
+                stateContext = "You are observing the player.";
+                fallbackKey = "message.herobrine_companion.state_judge";
+            }
+            case PRANKSTER -> {
+                stateContext = "You are in a mischievous state.";
+                fallbackKey = "message.herobrine_companion.state_prankster";
+            }
+            case MAINTAINER -> {
+                stateContext = "You are focusing on Minecraft's underlying code.";
+                fallbackKey = "message.herobrine_companion.state_maintainer";
+            }
+            case GLITCH_LORD -> {
+                stateContext = "Your data stream is currently experiencing anomalies.";
+                fallbackKey = "message.herobrine_companion.state_glitch_lord";
+            }
+            case MONSTER_KING -> {
+                stateContext = "You are sensing the presence of nearby monsters.";
+                fallbackKey = "message.herobrine_companion.state_monster_king";
+            }
+            case REMINISCING -> {
+                stateContext = "You are recalling past events regarding the creation of this world.";
+                fallbackKey = "message.herobrine_companion.state_reminiscing";
+            }
+            default -> {
+                if (hero.level().isNight()) {
+                    stateContext = "It is currently nighttime.";
+                    fallbackKey = "message.herobrine_companion.night_comment";
+                } else {
+                    stateContext = "It is currently daytime.";
+                    fallbackKey = "message.herobrine_companion.day_comment";
                 }
+                fallbackVariants = 3;
             }
         }
+
+        tryAIDialogueOrFallback(hero, owner,
+                "The player is quiet right now. " + stateContext + " Please make a comment based on this state.",
+                fallbackKey, fallbackVariants);
     }
+
+    // ========================================================
+    // 以下是你编写的所有交互事件，已经全部接入安全的发包架构
+    // ========================================================
 
     public static void onSleep(HeroEntity hero, ServerPlayer owner) {
         if (hero.getRandom().nextFloat() < 0.2) {
@@ -243,6 +259,10 @@ public class HeroDialogueHandler {
         if (hero.getRandom().nextFloat() < 0.05)
             tryAIDialogueOrFallback(hero, player, "The player is chopping wood.", "message.herobrine_companion.action_chopping", 2);
     }
+
+    // ========================================================
+    // 保留给那些没有 AI 提示词，纯原版固定剧本的对话方法
+    // ========================================================
 
     public static void speak(HeroEntity hero, ServerPlayer player, String key) {
         player.sendSystemMessage(Component.translatable(key));

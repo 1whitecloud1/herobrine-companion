@@ -9,6 +9,7 @@ import com.whitecloud233.herobrine_companion.util.EndRingContext;
 import com.whitecloud233.herobrine_companion.world.structure.ModStructures;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -44,65 +45,79 @@ public class HeroDimensionHandler {
             }
         }
 
-        private static void handleEnterEndRing(ServerLevel fromLevel, ServerLevel endLevel, ServerPlayer player) {
-            CompoundTag carriedHeroData = null;
-            if (fromLevel != null) {
-                for (var entity : fromLevel.getAllEntities()) {
-                    if (entity instanceof HeroEntity hero && hero.isAlive() && hero.getOwnerUUID() != null && hero.getOwnerUUID().equals(player.getUUID())) {
-                        // ============== [重构精简] ==============
-                        HeroStateManager.backupToGlobal(hero);
-                        carriedHeroData = new CompoundTag();
-                        hero.saveWithoutId(carriedHeroData);
-                        hero.remove(Entity.RemovalReason.DISCARDED);
-                        // =====================================
-                        break;
-                    }
+    private static void handleEnterEndRing(ServerLevel fromLevel, ServerLevel endLevel, ServerPlayer player) {
+        CompoundTag carriedHeroData = null;
+
+        // 🚀 优化 1：使用 ACTIVE_HEROES 替代 fromLevel.getAllEntities()
+        if (fromLevel != null) {
+            for (HeroEntity hero : com.whitecloud233.herobrine_companion.entity.ai.learning.HeroBrain.ACTIVE_HEROES) {
+                if (hero.level() == fromLevel && hero.isAlive() && hero.getOwnerUUID() != null && hero.getOwnerUUID().equals(player.getUUID())) {
+                    // ============== [重构精简] ==============
+                    HeroStateManager.backupToGlobal(hero);
+                    carriedHeroData = new CompoundTag();
+                    hero.saveWithoutId(carriedHeroData);
+                    hero.remove(Entity.RemovalReason.DISCARDED);
+                    // =====================================
+                    break;
                 }
             }
+        }
 
             HeroEntity heroToUpdate = null;
             boolean isNewEntity = false;
 
-            for (var entity : endLevel.getAllEntities()) {
-                if (entity instanceof HeroEntity hero && entity.isAlive() && hero.getOwnerUUID() != null && hero.getOwnerUUID().equals(player.getUUID())) {
-                    heroToUpdate = hero;
-                    break;
-                }
+        // 🚀 优化 2：使用 ACTIVE_HEROES 替代 endLevel.getAllEntities()
+        for (HeroEntity hero : com.whitecloud233.herobrine_companion.entity.ai.learning.HeroBrain.ACTIVE_HEROES) {
+            if (hero.level() == endLevel && hero.isAlive() && hero.getOwnerUUID() != null && hero.getOwnerUUID().equals(player.getUUID())) {
+                heroToUpdate = hero;
+                break;
             }
+        }
 
             if (heroToUpdate == null) {
                 heroToUpdate = new HeroEntity(ModEvents.HERO.get(), endLevel);
                 heroToUpdate.setUUID(UUID.randomUUID());
                 isNewEntity = true;
             }
+        // =======================================================
+        // 【核心修复】：必须先 load NBT 数据，再覆盖坐标和 Tag！
+        // =======================================================
+        if (carriedHeroData != null) {
+            if (carriedHeroData.contains("UUID")) carriedHeroData.remove("UUID");
+            if (carriedHeroData.contains("UUIDMost")) carriedHeroData.remove("UUIDMost");
+            if (carriedHeroData.contains("UUIDLeast")) carriedHeroData.remove("UUIDLeast");
 
-            heroToUpdate.setPos(EndRingContext.CENTER_X, EndRingContext.CENTER_Y, EndRingContext.CENTER_Z);
-            heroToUpdate.setDeltaMovement(0, 0, 0);
-            heroToUpdate.setFallDistance(0);
+            // 清洗掉旧的坐标和动量，防止对后续设定造成干扰
+            if (carriedHeroData.contains("Pos")) carriedHeroData.remove("Pos");
+            if (carriedHeroData.contains("Motion")) carriedHeroData.remove("Motion");
 
-            if (!heroToUpdate.getTags().contains(EndRingContext.TAG_FIXED)) heroToUpdate.addTag(EndRingContext.TAG_FIXED);
-            if (!heroToUpdate.getTags().contains(EndRingContext.TAG_INTRO)) heroToUpdate.addTag(EndRingContext.TAG_INTRO);
-
-            if (carriedHeroData != null) {
-                if (carriedHeroData.contains("UUID")) carriedHeroData.remove("UUID");
-                if (carriedHeroData.contains("UUIDMost")) carriedHeroData.remove("UUIDMost");
-                if (carriedHeroData.contains("UUIDLeast")) carriedHeroData.remove("UUIDLeast");
-                heroToUpdate.load(carriedHeroData);
-            }
-
-            // ============== [重构精简] ==============
-            heroToUpdate.setOwnerUUID(player.getUUID());
-            HeroStateManager.restoreFromGlobal(heroToUpdate, player);
-            HeroDataHandler.syncGlobalTrust(heroToUpdate);
-            // =====================================
-
-            if (isNewEntity) {
-                endLevel.addFreshEntity(heroToUpdate);
-            }
-
-            player.getPersistentData().putBoolean("HasVisitedHeroDimension", true);
-            PacketHandler.sendToPlayer(new SyncHeroVisitPacket(true), player);
+            // 先恢复数据
+            heroToUpdate.load(carriedHeroData);
         }
+
+        // 然后再强行把实体按在 End Ring 中心！
+        heroToUpdate.moveTo(EndRingContext.CENTER_X, EndRingContext.CENTER_Y, EndRingContext.CENTER_Z, 0, 0);
+        heroToUpdate.setDeltaMovement(0, 0, 0);
+        heroToUpdate.setFallDistance(0);
+
+        // 重新打上剧情专用的 Tag（防止被旧 NBT 洗掉）
+        if (!heroToUpdate.getTags().contains(EndRingContext.TAG_FIXED)) heroToUpdate.addTag(EndRingContext.TAG_FIXED);
+        if (!heroToUpdate.getTags().contains(EndRingContext.TAG_INTRO)) heroToUpdate.addTag(EndRingContext.TAG_INTRO);
+
+
+        // ============== [重构精简] ==============
+        heroToUpdate.setOwnerUUID(player.getUUID());
+        HeroStateManager.restoreFromGlobal(heroToUpdate, player);
+        HeroDataHandler.syncGlobalTrust(heroToUpdate);
+        // =====================================
+
+        if (isNewEntity) {
+            endLevel.addFreshEntity(heroToUpdate);
+        }
+
+        player.getPersistentData().putBoolean("HasVisitedHeroDimension", true);
+        PacketHandler.sendToPlayer(new SyncHeroVisitPacket(true), player);
+    }
 
         private static void handleReturnToOverworld(ServerLevel fromLevel, ServerLevel toLevel, ServerPlayer player) {
             if (player.getPersistentData().getBoolean("HasVisitedHeroDimension")) {
@@ -111,9 +126,10 @@ public class HeroDimensionHandler {
 
             CompoundTag carriedHeroData = null;
 
+            // 🚀 优化 3：使用 ACTIVE_HEROES 替代 fromLevel.getAllEntities()
             if (fromLevel != null) {
-                for (var entity : fromLevel.getAllEntities()) {
-                    if (entity instanceof HeroEntity hero && hero.isAlive() && hero.getOwnerUUID() != null && hero.getOwnerUUID().equals(player.getUUID())) {
+                for (HeroEntity hero : com.whitecloud233.herobrine_companion.entity.ai.learning.HeroBrain.ACTIVE_HEROES) {
+                    if (hero.level() == fromLevel && hero.isAlive() && hero.getOwnerUUID() != null && hero.getOwnerUUID().equals(player.getUUID())) {
                         // ============== [重构精简] ==============
                         HeroStateManager.backupToGlobal(hero);
                         carriedHeroData = new CompoundTag();
@@ -180,32 +196,39 @@ public class HeroDimensionHandler {
             }
         }
 
-        public static void leaveWorld(HeroEntity hero, @Nullable String messageKey) {
-            if (hero.level() instanceof ServerLevel serverLevel) {
-                HeroWorldData data = HeroWorldData.get(serverLevel);
+    public static void leaveWorld(HeroEntity hero, @Nullable String messageKey) {
+        int cooldownMinutes = 0;
+
+        if (hero.level() instanceof ServerLevel serverLevel) {
+            HeroWorldData data = HeroWorldData.get(serverLevel);
+            UUID ownerUUID = hero.getOwnerUUID();
+            if (ownerUUID != null) {
                 CompoundTag brainData = new CompoundTag();
                 hero.getHeroBrain().save(brainData);
-                data.setTempBrainData(brainData);
+                data.setTempBrainData(ownerUUID, brainData);
+                data.setRespawnCooldown(ownerUUID, serverLevel, cooldownMinutes);
             }
+        }
 
             // ============== [重构精简] ==============
             HeroStateManager.backupToGlobal(hero);
             // =====================================
 
-            if (messageKey != null) {
-                hero.level().getEntitiesOfClass(Player.class, hero.getBoundingBox().inflate(32.0D))
-                        .forEach(p -> p.sendSystemMessage(Component.translatable(messageKey)));
+        if (messageKey != null) {
+            if (hero.getOwnerUUID() != null) {
+                Player owner = hero.level().getPlayerByUUID(hero.getOwnerUUID());
+                if (owner != null) {
+                    owner.sendSystemMessage(Component.translatable(messageKey));
+                }
             }
-
-            if (hero.level() instanceof ServerLevel serverLevel) {
-                serverLevel.sendParticles(ParticleTypes.REVERSE_PORTAL, hero.getX(), hero.getY() + 1, hero.getZ(), 30, 0.5, 0.5, 0.5, 0.1);
-                serverLevel.playSound(null, hero.blockPosition(), net.minecraft.sounds.SoundEvents.ENDERMAN_TELEPORT, net.minecraft.sounds.SoundSource.NEUTRAL, 1.0f, 0.5f);
-
-                int cooldownMinutes = 0;
-                HeroWorldData.get(serverLevel).setRespawnCooldown(serverLevel, cooldownMinutes);
-            }
-            hero.remove(Entity.RemovalReason.DISCARDED);
         }
+
+        if (hero.level() instanceof ServerLevel serverLevel) {
+            serverLevel.sendParticles(ParticleTypes.REVERSE_PORTAL, hero.getX(), hero.getY() + 1, hero.getZ(), 30, 0.5, 0.5, 0.5, 0.1);
+            serverLevel.playSound(null, hero.blockPosition(), net.minecraft.sounds.SoundEvents.ENDERMAN_TELEPORT, net.minecraft.sounds.SoundSource.NEUTRAL, 1.0f, 0.5f);
+        }
+        hero.remove(Entity.RemovalReason.DISCARDED);
+    }
 
         public static void teleportRandomly(HeroEntity hero) {
             for (int i = 0; i < 64; ++i) {
@@ -220,9 +243,12 @@ public class HeroDimensionHandler {
         }
 
         public static void respawnNearPlayer(ServerLevel level, ServerPlayer player) {
-            for (Entity entity : level.getAllEntities()) {
-                if (entity instanceof HeroEntity && entity.isAlive()) {
-                    return;
+            // 🚀 优化 4：使用 ACTIVE_HEROES 替代 level.getAllEntities() 防止重复复活
+            for (HeroEntity hero : com.whitecloud233.herobrine_companion.entity.ai.learning.HeroBrain.ACTIVE_HEROES) {
+                if (hero.level() == level && hero.isAlive()) {
+                    if (player.getUUID().equals(hero.getOwnerUUID())) {
+                        return;
+                    }
                 }
             }
 
@@ -238,8 +264,8 @@ public class HeroDimensionHandler {
                 com.whitecloud233.herobrine_companion.entity.logic.data.HeroDataHandler.syncGlobalTrust(hero);
 
                 HeroWorldData worldData = HeroWorldData.get(level);
-                if (worldData.getTempBrainData() != null) {
-                    hero.getHeroBrain().load(worldData.getTempBrainData());
+                if (worldData.getTempBrainData(player.getUUID()) != null) {
+                    hero.getHeroBrain().load(worldData.getTempBrainData(player.getUUID()));
                 }
 
                 // 【核心修复2】再去计算安全的坐标，防止被 NBT 覆盖

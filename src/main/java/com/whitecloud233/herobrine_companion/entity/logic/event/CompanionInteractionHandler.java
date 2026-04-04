@@ -83,8 +83,8 @@ public class CompanionInteractionHandler {
         Player player = event.getEntity();
 
         // 检查是否有 Hero 正在“占用”这个方块
-        for (var entity : level.getAllEntities()) {
-            if (entity instanceof HeroEntity hero && hero.isCompanionMode()) {
+        for (HeroEntity hero : com.whitecloud233.herobrine_companion.entity.ai.learning.HeroBrain.ACTIVE_HEROES) {
+            if (hero.level() == level && hero.isAlive() && hero.isCompanionMode()) {
                 BlockPos invitedPos = hero.getInvitedPos();
                 // 如果 Hero 被邀请到这个位置，且正在执行“休息”动作 (Action=2)
                 if (invitedPos != null && invitedPos.equals(pos) && hero.getInvitedAction() == 2) {
@@ -118,15 +118,24 @@ public class CompanionInteractionHandler {
         HeroEntity nearestHero = null;
         double minDistance = Double.MAX_VALUE;
 
-        for (var entity : level.getAllEntities()) {
-            if (entity instanceof HeroEntity h) {
-                if (h.getOwnerUUID() != null && h.getOwnerUUID().equals(player.getUUID())) return h; // 直接找到主人的伴侣
+        // 💡 顺手优化：使用 ACTIVE_HEROES 高速缓存，抛弃卡顿的 getAllEntities
+        for (HeroEntity h : com.whitecloud233.herobrine_companion.entity.ai.learning.HeroBrain.ACTIVE_HEROES) {
+            if (h.level() != level || !h.isAlive()) continue;
 
-                double dist = h.distanceToSqr(player);
-                if (dist < 4096.0D && dist < minDistance) {
-                    minDistance = dist;
-                    nearestHero = h;
-                }
+            // 1. 如果找到主人的伴侣，直接返回
+            if (h.getOwnerUUID() != null && h.getOwnerUUID().equals(player.getUUID())) {
+                return h;
+            }
+
+            // 👇👇👇【核心修复】：如果这个 Hero 是别人的，绝对不能把它当成备选目标！直接跳过！
+            if (h.getOwnerUUID() != null) continue;
+            // 👆👆👆
+
+            // 2. 只有“完全无主”的野生 Hero，才能作为备选
+            double dist = h.distanceToSqr(player);
+            if (dist < 4096.0D && dist < minDistance) {
+                minDistance = dist;
+                nearestHero = h;
             }
         }
 

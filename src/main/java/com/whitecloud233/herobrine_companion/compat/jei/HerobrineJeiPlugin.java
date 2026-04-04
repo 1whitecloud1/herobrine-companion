@@ -2,8 +2,8 @@ package com.whitecloud233.herobrine_companion.compat.jei;
 
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
-import com.whitecloud233.herobrine_companion.entity.logic.HeroRewards;
-import com.whitecloud233.herobrine_companion.entity.logic.HeroTrades;
+import com.whitecloud233.herobrine_companion.event.HeroRewards;
+import com.whitecloud233.herobrine_companion.event.HeroTrades;
 import com.whitecloud233.herobrine_companion.event.ModEvents;
 import mezz.jei.api.IModPlugin;
 import mezz.jei.api.JeiPlugin;

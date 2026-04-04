@@ -66,17 +66,23 @@ public class HeroTeleportToPlayerGoal extends Goal {
             return false;
         }
 
-        // 优先跟随主人
+        // === 【核心修复区域】 ===
         if (this.hero.getOwnerUUID() != null) {
+            // 1. 如果有主人，只能去找真正的主人
             this.targetPlayer = this.hero.level().getPlayerByUUID(this.hero.getOwnerUUID());
-        }
 
-        // 如果没有主人，或者主人不在附近，才找最近的玩家
-        if (this.targetPlayer == null) {
+            // 2. 如果主人下线、死亡或跨维度了，直接终止传送逻辑！
+            // 坚决不执行后面的 getNearestPlayer 去骚扰其他玩家！
+            if (this.targetPlayer == null || !this.targetPlayer.isAlive()) {
+                return false;
+            }
+        } else {
+            // 3. 只有完全没有主人（野生状态），才允许找最近的玩家进行惊吓互动
             this.targetPlayer = this.hero.level().getNearestPlayer(this.hero, 64.0D);
         }
 
         if (this.targetPlayer == null) return false;
+        // === 【修复结束】 ===
 
         double distSqr = this.hero.distanceToSqr(this.targetPlayer);
         boolean playerInCombat = isInCombat(this.targetPlayer);

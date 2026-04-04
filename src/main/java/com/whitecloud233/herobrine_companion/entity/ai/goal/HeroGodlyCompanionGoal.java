@@ -1,14 +1,13 @@
 package com.whitecloud233.herobrine_companion.entity.ai.goal;
 
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
-import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
-import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.EnumSet;
+import java.util.UUID;
 
 public class HeroGodlyCompanionGoal extends Goal {
     private final HeroEntity hero;
@@ -71,8 +70,14 @@ public class HeroGodlyCompanionGoal extends Goal {
         // 如果正在交易，禁止跟随移动
         if (this.hero.getTradingPlayer() != null) return false;
 
-        Player player = this.hero.level().getNearestPlayer(this.hero, 64.0D);
-        if (player == null) return false;
+        // 【修复点 1】：严格通过 UUID 获取自己真正的主人，禁止使用 getNearestPlayer 乱认主人
+        UUID ownerId = this.hero.getOwnerUUID();
+        if (ownerId == null) return false;
+
+        Player player = this.hero.level().getPlayerByUUID(ownerId);
+        // 如果主人离线、不在同一维度或死亡，停止跟随
+        if (player == null || !player.isAlive()) return false;
+
         this.owner = player;
 
         // 【关键修复】如果玩家进入战斗，立刻禁用贴身跟随
@@ -97,7 +102,9 @@ public class HeroGodlyCompanionGoal extends Goal {
 
     @Override
     public void start() {
-        this.hero.setOwnerUUID(this.owner.getUUID());
+        // 【修复点 2】：彻底删除 this.hero.setOwnerUUID(this.owner.getUUID());
+        // 绝对不能在行为 AI 中篡改主人的主权！
+
         // [核心优化] 强制进入飞行模式，抵抗卡顿
         this.hero.setFloating(true);
         this.hero.setNoGravity(true);
@@ -127,11 +134,12 @@ public class HeroGodlyCompanionGoal extends Goal {
             this.hero.setYRot(this.hero.yBodyRot);
         }
 
+        // 关键干扰项：由于此处强制注视主人，Hero 的 LookAngle 并不代表前进方向
         this.hero.getLookControl().setLookAt(this.owner, 30.0F, 40.0F);
 
-        // 兜底逻辑：如果你跑得太快(超过 20 格)，但又没处于战斗中，偶尔会触发传送
+        // 2. 兜底逻辑：距离过远传送
         double distToOwnerSqr = this.hero.distanceToSqr(this.owner);
-        if (distToOwnerSqr > 400.0D) {
+        if (distToOwnerSqr > 200.0D) {
             if (this.teleportCooldown-- <= 0) {
                 teleportNearOwner();
                 this.teleportCooldown = 20;
@@ -140,24 +148,20 @@ public class HeroGodlyCompanionGoal extends Goal {
         }
 
         boolean isOwnerMoving = this.owner.getDeltaMovement().horizontalDistanceSqr() > 0.001;
-        if (!isOwnerMoving && --this.changePositionTimer <= 0) {
+        if (--this.changePositionTimer <= 0) {
             pickNewRandomPosition();
         }
 
-        // 1. 计算角度
+        // 3. 计算轨道与目标位置
         updateTargetAngle(isOwnerMoving);
         this.currentOrbitAngle = rotlerp(this.currentOrbitAngle, this.targetOrbitAngle, 1.5F);
-
-        // 2. 计算目标位置
         Vec3 targetPos = calculateTargetPos(this.currentOrbitAngle);
 
-        // === 3. [核心优化] 强制飞行，不再切换地面模式 ===
-        // 始终保持飞行状态，不再需要 shouldFly 的判断
+        // 4. 强制飞行锁定
         if (!this.hero.isFloating()) this.hero.setFloating(true);
         if (!this.hero.isNoGravity()) this.hero.setNoGravity(true);
 
-
-        // === 4. 移动逻辑修复 ===
+        // === 5. 移动速度优化 (解决由于频繁减速导致的粘滞感) ===
         double dx = this.hero.getX() - targetPos.x;
         double dz = this.hero.getZ() - targetPos.z;
         double distHorizontalSqr = dx * dx + dz * dz;
@@ -166,15 +170,47 @@ public class HeroGodlyCompanionGoal extends Goal {
         double speed = this.speedModifier;
         if (distHorizontalSqr > 25.0D) speed *= 1.5D;
 
-
-        // 始终使用 MoveControl 进行移动，因为它现在有动态响应速度
-        boolean closeEnoughHorizontally = distHorizontalSqr < 1.0D;
-        boolean closeEnoughVertically = Math.abs(heightDiff) < 0.2D;
+        // 核心修复：只有极其接近(0.25格内)时才进入停靠减速，防止在跟随途中产生“阻力”
+        boolean closeEnoughHorizontally = distHorizontalSqr < 0.0625D;
+        boolean closeEnoughVertically = Math.abs(heightDiff) < 0.25D;
 
         if (closeEnoughHorizontally && closeEnoughVertically) {
-            this.hero.setDeltaMovement(this.hero.getDeltaMovement().scale(0.6));
+            this.hero.setDeltaMovement(this.hero.getDeltaMovement().scale(0.5));
         } else {
+            // 只要没到目的地，就利用 MoveControl 的平滑插值全力移动
             this.hero.getMoveControl().setWantedPosition(targetPos.x, targetPos.y, targetPos.z, speed);
+        }
+
+        // === 6. [核心修复] 物理强行开门逻辑 (使用移动向量) ===
+        // 当 Hero 发生水平碰撞，或者正在显著朝某处移动时进行探测
+        if (this.hero.horizontalCollision || distHorizontalSqr > 0.1D) {
+            // 重点：使用当前的移动速度向量（Velocity）来判定前方，而非 LookAngle
+            Vec3 moveDir = this.hero.getDeltaMovement().normalize();
+
+            // 如果移动速度极慢（静止），则回退到视线方向作为探测兜底
+            if (this.hero.getDeltaMovement().lengthSqr() < 0.001) {
+                moveDir = this.hero.getLookAngle();
+            }
+
+            // 探测 Hero 移动方向前方 0.8 格的位置
+            net.minecraft.core.BlockPos frontPos = net.minecraft.core.BlockPos.containing(
+                    this.hero.getX() + moveDir.x * 0.8,
+                    this.hero.getY() + 0.1, // 确保探测高度在门的下半扇
+                    this.hero.getZ() + moveDir.z * 0.8
+            );
+
+            // 循环检查：当前高度及头顶高度（应对门的两部分）
+            for (int i = 0; i < 2; i++) {
+                net.minecraft.core.BlockPos checkPos = (i == 0) ? frontPos : frontPos.above();
+                net.minecraft.world.level.block.state.BlockState state = this.hero.level().getBlockState(checkPos);
+
+                if (state.getBlock() instanceof net.minecraft.world.level.block.DoorBlock door) {
+                    // 如果门是关着的，强行“用意念”将其推开
+                    if (!state.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.OPEN)) {
+                        door.setOpen(this.hero, this.hero.level(), state, checkPos, true);
+                    }
+                }
+            }
         }
     }
 
@@ -214,7 +250,8 @@ public class HeroGodlyCompanionGoal extends Goal {
         this.targetOrbitAngle = this.currentOrbitAngle;
         Vec3 target = calculateTargetPos(this.currentOrbitAngle);
 
-        this.hero.teleportTo(target.x, target.y, target.z);
+        // 【修改】废弃 teleportTo，改用 moveTo 强行降临
+        this.hero.moveTo(target.x, target.y, target.z, this.hero.getYRot(), this.hero.getXRot());
         this.hero.setDeltaMovement(Vec3.ZERO);
     }
 
