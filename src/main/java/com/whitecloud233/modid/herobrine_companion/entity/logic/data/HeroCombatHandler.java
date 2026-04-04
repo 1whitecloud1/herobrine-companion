@@ -9,27 +9,35 @@ import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.entity.player.Player;
 
+import java.util.UUID;
+
 public class HeroCombatHandler {
 
     public static boolean onHurt(HeroEntity hero, DamageSource source, float amount) {
         if (source.is(DamageTypes.FELL_OUT_OF_WORLD)) return false;
         if (amount == Float.MAX_VALUE || amount >= 1.0E30F || Float.isInfinite(amount)) return false;
 
-        // 【核心修复】：双重检查内存和硬盘数据
         boolean isChallenge = hero.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE)
                 || hero.getPersistentData().getBoolean("IsChallengeActive");
 
         if (isChallenge) {
-            // 如果处于挑战模式，确保内存标志是正确的 (防止同步延迟)
             if (!hero.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE)) {
                 hero.getEntityData().set(HeroEntity.IS_CHALLENGE_ACTIVE, true);
             }
-            return false; // 交给原版 super.hurt 处理掉血
+            return false;
         }
 
         // 2. 玩家攻击判定
         if (!hero.level().isClientSide && source.getEntity() instanceof Player player) {
-            // [新增] 神经网络输入：直接攻击 Herobrine
+
+            // 👇👇👇【核心修复：上次你漏掉了这里！】拦截非主人的攻击，防止夺舍漏洞
+            UUID ownerUUID = hero.getOwnerUUID();
+            if (ownerUUID != null && !ownerUUID.equals(player.getUUID())) {
+                player.sendSystemMessage(Component.translatable("message.herobrine_companion.not_your_hero").withStyle(net.minecraft.ChatFormatting.RED));
+                return false;
+            }
+            // 👆👆👆
+
             hero.getHeroBrain().input(player.getUUID(), "DIRECT_ATTACK", 0.2f);
             hero.getHeroBrain().inputFailure(player.getUUID(), 0.1f);
 
@@ -59,15 +67,12 @@ public class HeroCombatHandler {
                 else {
                     player.sendSystemMessage(Component.translatable("message.herobrine_companion.attack_disappoint"));
 
-                    // ============== [重构精简] 委托给状态管理器进行打包 ==============
                     if (player instanceof ServerPlayer serverPlayer) {
                         HeroStateManager.backupToPlayerNBT(hero, serverPlayer, "HeroCombatRespawnData");
                     }
-                    // ==========================================================
 
                     HeroDimensionHandler.leaveWorld(hero, null);
 
-                    // 延迟 5 秒后在玩家附近重新生成
                     if (hero.level() instanceof ServerLevel serverLevel) {
                         serverLevel.getServer().tell(new net.minecraft.server.TickTask(serverLevel.getServer().getTickCount() + 100, () -> {
                             if (player instanceof ServerPlayer serverPlayer && serverPlayer.isAlive() && !serverPlayer.hasDisconnected()) {

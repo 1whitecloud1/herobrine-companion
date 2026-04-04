@@ -12,6 +12,7 @@ import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroWorldDa
 import com.whitecloud233.modid.herobrine_companion.event.HeroTrades;
 import com.whitecloud233.modid.herobrine_companion.event.HeroVisuals;
 import com.whitecloud233.modid.herobrine_companion.world.structure.ModStructures;
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -71,6 +72,7 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     public static final EntityDataAccessor<Integer> CHALLENGE_TICKS = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.INT);
 
 
+    public boolean isStateDirty = true;
     private final Set<Integer> claimedRewards = new HashSet<>();
     public float clientFloatingAmount;
     public float clientFloatingAmountO;
@@ -118,6 +120,8 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         this.groundNavigation.setCanFloat(false);
         // 👇 【新增】：在实体诞生时，强制让 Boss 血条默认保持隐藏
         this.bossEvent.setVisible(false);
+        // 👇 [新增这一行]：允许地面寻路算法把门视为可开启的通道
+        this.groundNavigation.setCanOpenDoors(true);
     }
 
     @Override
@@ -130,11 +134,17 @@ public class HeroEntity extends PathfinderMob implements Merchant {
             HeroAI.registerGoals(this);
         }
     }
-
+    @Override
+    public void remove(RemovalReason reason) {
+        super.remove(reason);
+        // 【核心修复】：无论是因为死亡、区块卸载还是其他原因被移除，
+        // 都在生命周期结束的最后一刻，强制将自己从全局高速缓存中踢出，防止内存泄漏！
+        com.whitecloud233.modid.herobrine_companion.entity.ai.learning.HeroBrain.ACTIVE_HEROES.remove(this);
+    }
     @Override
     protected PathNavigation createNavigation(Level level) {
         FlyingPathNavigation nav = new FlyingPathNavigation(this, level);
-        nav.setCanOpenDoors(false);
+        nav.setCanOpenDoors(true);
         nav.setCanFloat(true);
         nav.setCanPassDoors(true);
         return nav;
@@ -175,7 +185,7 @@ public class HeroEntity extends PathfinderMob implements Merchant {
 
             com.whitecloud233.modid.herobrine_companion.client.fight.HeroChallengeState.tick(this);
 
-            // 👇 【新增】：同步血条逻辑
+            // 同步血条逻辑
             if (this.getEntityData().get(IS_CHALLENGE_ACTIVE)) {
                 this.bossEvent.setProgress(this.getHealth() / this.getMaxHealth());
                 if (!this.bossEvent.isVisible()) {
@@ -187,6 +197,13 @@ public class HeroEntity extends PathfinderMob implements Merchant {
                 }
             }
 
+            // 👇【核心修复】：将全局缓存登记提到维度判断的外面！
+            // 这样一来，哪怕 Hero 在试炼擂台（End Ring）被冻结了大脑，也能作为肉体被正确登记到花名册中
+            if (this.isAlive() && !this.isRemoved()) {
+                com.whitecloud233.modid.herobrine_companion.entity.ai.learning.HeroBrain.ACTIVE_HEROES.add(this);
+            }
+
+            // 👇 这是你原本的维度判断
             if (this.level().dimension() != ModStructures.END_RING_DIMENSION_KEY) {
                 HeroLogic.tick(this);
                 if (this.isAlive()) {
@@ -240,6 +257,21 @@ public class HeroEntity extends PathfinderMob implements Merchant {
 
     @Override
     public InteractionResult mobInteract(Player player, InteractionHand hand) {
+        // 【新增】：核心权限拦截逻辑
+        UUID owner = this.getOwnerUUID();
+        // 如果这个 Hero 已经绑定了主人，且正在右键的玩家不是主人
+        if (owner != null && !owner.equals(player.getUUID())) {
+            if (!this.level().isClientSide) {
+                // 给企图交互的玩家发送一条仅他可见的红色提示
+                player.sendSystemMessage(
+                        net.minecraft.network.chat.Component.translatable("message.herobrine_companion.not_your_hero")
+                                .withStyle(ChatFormatting.RED)
+                );
+            }
+            // 拒绝交互
+            return InteractionResult.FAIL;
+        }
+
         if (this.getEntityData().get(IS_CHALLENGE_ACTIVE)) {
             return InteractionResult.FAIL;
         }
@@ -274,14 +306,22 @@ public class HeroEntity extends PathfinderMob implements Merchant {
             super.setHealth(health);
         }
     }
-
+    // 👇【新增】：监听所有的装备穿脱和手持物品变化，一旦改变立即触发脏标记
+    @Override
+    public void setItemSlot(net.minecraft.world.entity.EquipmentSlot slot, net.minecraft.world.item.ItemStack stack) {
+        super.setItemSlot(slot, stack);
+        // 标记为脏，让下一次 100 tick 循环触发硬盘写入
+        this.isStateDirty = true;
+    }
+    // 在 die() 方法中修改：
     @Override
     public void die(DamageSource damageSource) {
         if (!this.level().isClientSide && this.level() instanceof ServerLevel serverLevel) {
             HeroWorldData data = HeroWorldData.get(serverLevel);
-            if (this.getUUID().equals(data.getActiveHeroUUID())) {
-                data.setActiveHeroUUID(null);
-                data.setLastKnownHeroPos(null);
+            UUID owner = this.getOwnerUUID();
+            if (owner != null && this.getUUID().equals(data.getActiveHeroUUID(owner))) {
+                data.setActiveHeroUUID(owner, null);
+                data.setLastKnownHeroPos(owner, null);
             }
         }
         super.die(damageSource);
@@ -296,6 +336,15 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         if (this.isPoseEditing) {
             com.whitecloud233.modid.herobrine_companion.network.PacketHandler.sendToPlayer(
                     new com.whitecloud233.modid.herobrine_companion.network.SavePosePacket(this.getId(), this.isPoseEditing, this.customPoseAngles),
+                    player
+            );
+        }
+
+        // 👇 【新增修复】：当玩家开始追踪 Hero 实体时，强制同步其已领取的奖励状态
+        if (!this.level().isClientSide && this.level() instanceof ServerLevel serverLevel && getOwnerUUID() != null) {
+            HeroWorldData data = HeroWorldData.get(serverLevel);
+            com.whitecloud233.modid.herobrine_companion.network.PacketHandler.sendToPlayer(
+                    new com.whitecloud233.modid.herobrine_companion.network.SyncRewardsPacket(this.getId(), data.getClaimedRewards(getOwnerUUID())),
                     player
             );
         }
@@ -430,20 +479,30 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     public int getTrustLevel() { return entityData.get(TRUST_LEVEL); }
     public void setTrustLevel(int level) {
         entityData.set(TRUST_LEVEL, level);
+        this.isStateDirty = true; // 👈 新增这一行
         if (!this.level().isClientSide) HeroDataHandler.updateGlobalTrust(this);
     }
     public void increaseTrust(int amount) { setTrustLevel(getTrustLevel() + amount); }
     public boolean isCompanionMode() { return entityData.get(IS_COMPANION_MODE); }
     public void setCompanionMode(boolean active) { entityData.set(IS_COMPANION_MODE, active); }
     public int getSkinVariant() { return entityData.get(SKIN_VARIANT); }
+    // 修复 setSkinVariant 和 setCustomSkinName:
     public void setSkinVariant(int variant) {
         entityData.set(SKIN_VARIANT, variant);
-        if (!this.level().isClientSide && this.level() instanceof ServerLevel serverLevel) HeroWorldData.get(serverLevel).setSkinVariant(variant);
+        this.isStateDirty = true; // 👈 新增这一行
+        if (!this.level().isClientSide && this.level() instanceof ServerLevel serverLevel) {
+            UUID owner = getOwnerUUID();
+            if (owner != null) HeroWorldData.get(serverLevel).setSkinVariant(owner, variant);
+        }
     }
     public String getCustomSkinName() { return entityData.get(CUSTOM_SKIN_NAME); }
     public void setCustomSkinName(String name) {
         entityData.set(CUSTOM_SKIN_NAME, name);
-        if (!this.level().isClientSide && this.level() instanceof ServerLevel serverLevel) HeroWorldData.get(serverLevel).setCustomSkinName(name);
+        this.isStateDirty = true; // 👈 新增这一行
+        if (!this.level().isClientSide && this.level() instanceof ServerLevel serverLevel) {
+            UUID owner = getOwnerUUID();
+            if (owner != null) HeroWorldData.get(serverLevel).setCustomSkinName(owner, name);
+        }
     }
     @Nullable public UUID getOwnerUUID() { return this.entityData.get(OWNER_UUID).orElse(null); }
     public void setOwnerUUID(@Nullable UUID uuid) { this.entityData.set(OWNER_UUID, Optional.ofNullable(uuid)); }

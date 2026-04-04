@@ -18,8 +18,13 @@ public class CombatAndChallengeHandler {
         // 玩家击杀怪物
         if (event.getSource().getEntity() instanceof ServerPlayer player && event.getEntity() instanceof Monster) {
             ServerLevel level = (ServerLevel) player.level();
-            for (var entity : level.getAllEntities()) {
-                if (entity instanceof HeroEntity hero && hero.isCompanionMode() && hero.getOwnerUUID() != null && hero.getOwnerUUID().equals(player.getUUID())) {
+
+            // 👇 优化：不再遍历 level.getAllEntities()
+            for (HeroEntity hero : com.whitecloud233.modid.herobrine_companion.entity.ai.learning.HeroBrain.ACTIVE_HEROES) {
+                // 确保在同一维度，且存活，并且是当前玩家的伴侣
+                if (hero.level() == level && hero.isAlive() && hero.isCompanionMode()
+                        && hero.getOwnerUUID() != null && hero.getOwnerUUID().equals(player.getUUID())) {
+
                     if (hero.distanceToSqr(player) < 400) {
                         HeroDialogueHandler.onKillMonster(hero, player);
                     }
@@ -27,6 +32,8 @@ public class CombatAndChallengeHandler {
                 }
             }
         }
+
+        // ... 下方的玩家死亡挑战逻辑保持不变 ...
 
         // 玩家死亡（挑战失败逻辑）
         if (event.getEntity() instanceof ServerPlayer deadPlayer) {

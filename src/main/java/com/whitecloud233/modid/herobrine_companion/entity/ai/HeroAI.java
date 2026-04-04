@@ -4,6 +4,7 @@ import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.goal.*;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.*;
 import net.minecraft.world.entity.ai.goal.FloatGoal;
+import net.minecraft.world.entity.ai.goal.OpenDoorGoal;
 import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
 import net.minecraft.world.entity.ai.goal.WaterAvoidingRandomStrollGoal;
 
@@ -13,7 +14,8 @@ public class HeroAI {
         // 0. 基础生存
         hero.getGoalSelector().addGoal(0, new FloatGoal(hero));
         hero.getGoalSelector().addGoal(1, new HeroTeleportToPlayerGoal(hero));
-        
+        // 👇 [新增]：赋予 Hero 自动开门的能力 (参数 true 代表走过去后会自动随手关门)
+       // hero.getGoalSelector().addGoal(1, new OpenDoorGoal(hero, true));
         // 0.5 [新增] 玩家邀请互动 (最高优先级之一，响应玩家指令)
         hero.getGoalSelector().addGoal(1, new HeroInvitedActionGoal(hero));
 
@@ -38,7 +40,7 @@ public class HeroAI {
 
         // 2.3 [Lore] 巡视世界 (优先级 3，空闲时触发)
         hero.getGoalSelector().addGoal(3, new HeroInspectBlockGoal(hero));
-        
+        hero.getGoalSelector().addGoal(3, new HeroStateGoals(hero));
 
 
         // 2.4 [Lore] 恶作剧：熄灭火把 (优先级 3，极低概率)

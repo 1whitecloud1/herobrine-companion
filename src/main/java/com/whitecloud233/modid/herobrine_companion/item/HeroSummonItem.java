@@ -98,12 +98,19 @@ public class HeroSummonItem extends Item {
                 long lastUseTime = getLastUseTime(stack);
 
                 if (currentTime < lastUseTime + COOLDOWN_TICKS) {
-                    String mockery = MOCKERY_MESSAGES[random.nextInt(MOCKERY_MESSAGES.length)];
-                    player.sendSystemMessage(Component.translatable(mockery));
+                    if (player != null) {
+                        String mockery = MOCKERY_MESSAGES[random.nextInt(MOCKERY_MESSAGES.length)];
+                        player.sendSystemMessage(Component.translatable(mockery));
+                    }
                     return InteractionResult.FAIL;
                 }
 
-                HeroEntity existingHero = findHeroInAnyDimension(serverLevel.getServer());
+                UUID ownerUUID = getOwnerUUID(stack);
+                if (ownerUUID == null && player != null) {
+                    ownerUUID = player.getUUID();
+                }
+                
+                HeroEntity existingHero = ownerUUID != null ? findHeroInAnyDimension(serverLevel.getServer(), ownerUUID) : null;
                 int actionType = getInteractionType(level, clickedPos);
 
                 if (actionType > 0 && existingHero != null) {
@@ -117,7 +124,7 @@ public class HeroSummonItem extends Item {
                 Vec3 targetPos = context.getClickLocation().add(0, 1, 0);
 
                 // ============== [重构] 调用公共召唤逻辑 ==============
-                boolean success = performSummonOrTeleport(serverLevel, player, targetPos);
+                boolean success = performSummonOrTeleport(serverLevel, player, stack, targetPos);
                 if (success) {
                     setLastUseTime(stack, currentTime);
                 }
@@ -133,8 +140,11 @@ public class HeroSummonItem extends Item {
     }
 
     // ============== [新增] 提取出来的公共核心召唤/传送逻辑 ==============
-    public static boolean performSummonOrTeleport(ServerLevel serverLevel, Player player, Vec3 targetPos) {
-        HeroEntity existingHero = findHeroInAnyDimension(serverLevel.getServer());
+    public static boolean performSummonOrTeleport(ServerLevel serverLevel, Player player, ItemStack stack, Vec3 targetPos) {
+        UUID ownerUUID = stack != null ? getOwnerUUID(stack) : null;
+        if (ownerUUID == null && player != null) ownerUUID = player.getUUID();
+        
+        HeroEntity existingHero = ownerUUID != null ? findHeroInAnyDimension(serverLevel.getServer(), ownerUUID) : null;
         long currentTime = serverLevel.getGameTime();
 
         if (existingHero != null) {
@@ -198,8 +208,11 @@ public class HeroSummonItem extends Item {
                 hero.moveTo(targetPos);
                 hero.finalizeSpawn(serverLevel, serverLevel.getCurrentDifficultyAt(hero.blockPosition()), MobSpawnType.TRIGGERED, null, null);
 
+                if (ownerUUID != null) {
+                    hero.setOwnerUUID(ownerUUID);
+                }
+                
                 if (player != null) {
-                    hero.setOwnerUUID(player.getUUID());
                     HeroStateManager.restoreFromGlobal(hero, player);
                     HeroDataHandler.syncGlobalTrust(hero);
                 }
@@ -215,11 +228,17 @@ public class HeroSummonItem extends Item {
         return false;
     }
     // =====================================================================
+    
+    // 兼容原版 AIService 等调用的签名
+    public static boolean performSummonOrTeleport(ServerLevel serverLevel, Player player, Vec3 targetPos) {
+        return performSummonOrTeleport(serverLevel, player, null, targetPos);
+    }
 
-    // [修改] 改为 public static，以便其他类可以复用这个查找逻辑
-    public static HeroEntity findHeroInAnyDimension(net.minecraft.server.MinecraftServer server) {
+    // [修改] 增加 ownerUUID 参数，以便在多人游戏中不同玩家能找到自己的 Hero
+    public static HeroEntity findHeroInAnyDimension(net.minecraft.server.MinecraftServer server, UUID ownerUUID) {
+        if (ownerUUID == null) return null;
         for (ServerLevel level : server.getAllLevels()) {
-            var entities = level.getEntities(ModEvents.HERO.get(), entity -> true);
+            var entities = level.getEntities(ModEvents.HERO.get(), entity -> ownerUUID.equals(entity.getOwnerUUID()));
             if (!entities.isEmpty()) {
                 return entities.get(0);
             }
@@ -268,6 +287,14 @@ public class HeroSummonItem extends Item {
     private String getOwnerName(ItemStack stack) {
         CompoundTag tag = stack.getOrCreateTag();
         return tag.getString("OwnerName");
+    }
+
+    public static UUID getOwnerUUID(ItemStack stack) {
+        CompoundTag tag = stack.getTag();
+        if (tag != null && tag.hasUUID("OwnerUUID")) {
+            return tag.getUUID("OwnerUUID");
+        }
+        return null;
     }
 
     private long getLastUseTime(ItemStack stack) {

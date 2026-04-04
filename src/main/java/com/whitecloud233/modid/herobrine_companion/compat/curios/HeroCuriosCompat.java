@@ -30,13 +30,19 @@ public class HeroCuriosCompat {
                         // 2. 否则走 Curios 默认的标签检查（此时会去查我们在 JSON 里定义的 #curios:back）
                         return super.mayPlace(stack);
                     }
+
+                    // 👇【新增】：监听玩家在 UI 界面中拿放 Curios 饰品
+                    @Override
+                    public void setChanged() {
+                        super.setChanged();
+                        hero.isStateDirty = true; // 触发脏标记！
+                    }
                 };
             }
         }
         return null;
     }
 
-    // 在类末尾添加这两个方法：
     public static ItemStack getBackSlotItem(HeroEntity hero) {
         ICuriosItemHandler handler = CuriosApi.getCuriosInventory(hero).orElse(null);
         if (handler != null) {
@@ -54,6 +60,8 @@ public class HeroCuriosCompat {
             var stacksHandler = handler.getCurios().get("back");
             if (stacksHandler != null) {
                 ((IItemHandlerModifiable) stacksHandler.getStacks()).setStackInSlot(0, stack);
+                // 👇【新增】：代码强行修改饰品时也触发脏标记
+                hero.isStateDirty = true;
             }
         }
     }

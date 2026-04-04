@@ -11,7 +11,16 @@ import net.minecraftforge.fml.common.Mod;
 
 @Mod.EventBusSubscriber(modid = "herobrine_companion")
 public class ChallengeEventHandler {
-
+    @SubscribeEvent
+    public static void onPlayerLoggedOut(net.minecraftforge.event.entity.player.PlayerEvent.PlayerLoggedOutEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            if (player.getPersistentData().getBoolean("IsChallengeActive")) {
+                // 如果玩家在挑战期间强行退出（拔网线），立刻触发失败逻辑！
+                // 这会自动清理 Boss 实体、恢复 End Ring 场地，并释放全局锁
+                HeroChallengeManager.failChallenge(player);
+            }
+        }
+    }
     // 【修复核心】：使用 LivingDeathEvent 拦截致死一击，100% 准确
     @SubscribeEvent
     public static void onLivingDeath(LivingDeathEvent event) {

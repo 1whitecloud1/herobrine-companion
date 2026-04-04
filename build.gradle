@@ -12,8 +12,8 @@ buildscript {
     dependencies {
         classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: '[6.0.16,6.2)', changing: true
         classpath 'org.spongepowered:mixingradle:0.7-SNAPSHOT'
-        // 引入 Shadow 插件
-        classpath 'com.github.johnrengelman.shadow:com.github.johnrengelman.shadow.gradle.plugin:8.1.1'
+
+
     }
 }
 
@@ -22,8 +22,7 @@ apply plugin: 'org.spongepowered.mixin'
 apply plugin: 'eclipse'
 apply plugin: 'maven-publish'
 apply plugin: 'java'
-// 应用 Shadow 插件
-apply plugin: 'com.github.johnrengelman.shadow'
+
 
 version = mod_version
 group = mod_group_id
@@ -48,6 +47,13 @@ minecraft {
             mods { "${mod_id}" { source sourceSets.main } }
         }
         client { property 'forge.enabledGameTestNamespaces', mod_id }
+        // 👇 新增的第二个客户端配置
+        client2 {
+            parent runs.client // 继承 client 的所有基础设置
+            taskName 'runClient2' // 在 IDEA 中显示的运行配置名称
+            // 强制指定第二个玩家的名字和 UUID，防止数据冲突
+            args '--username', 'PlayerB', '--uuid', '22222222-2222-2222-2222-222222222222'
+        }
         server { property 'forge.enabledGameTestNamespaces', mod_id; args '--nogui' }
         data {
             workingDirectory project.file('run-data')
@@ -171,8 +177,7 @@ dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
     // compileOnly fg.deobf(files("libs/armourersworkshop-forge-1.20.1-3.2.7-beta.jar"))
-    // H2 Database (本地 libs) - 改用 shade 引入
-    shade files('libs/h2-2.2.224.jar')
+
 // 引入 Armourer's Workshop 进行测试和 API 调用 (需替换为真实的 ID)
     // 引入 Armourer's Workshop 进行测试和 API 调用 (软依赖声明)
     compileOnly fg.deobf("curse.maven:armourers-workshop-229523:7165521")
@@ -213,7 +218,6 @@ tasks.named('processResources', ProcessResources).configure {
 }
 // === 原生 Jar 构建逻辑 ===
 tasks.named('jar', Jar).configure {
-    archiveClassifier.set('slim') // 💡 新增：给原生 jar 加上 slim 后缀，避免与 shadowJar 产物文件冲突
     manifest {
         attributes([
                 "Specification-Title": mod_id,
@@ -231,31 +235,8 @@ tasks.named('jar', Jar).configure {
     finalizedBy 'reobfJar'
 }
 
-// === ShadowJar 构建逻辑 (负责重定位 H2 包名) ===
-shadowJar {
-    archiveClassifier.set('') // 覆盖默认生成的 jar，作为最终发布的模组
-    configurations = [project.configurations.shade]
-
-    // 核心重定位规则，将 org.h2 转移到模组专属包下以避免冲突
-    relocate 'org.h2', 'herobrine_companion.shadow.h2'
-
-    exclude 'META-INF/*.RSA', 'META-INF/*.SF', 'META-INF/*.DSA', 'module-info.class'
-// 👇 新增：排除多版本 JAR 中高版本的 Java 类文件（解决 version 65 报错）
-    exclude 'META-INF/versions/**'
-    // 排除被审核标记为敏感的 H2 工具类
-    exclude 'org/h2/tools/Upgrade.class'
-    exclude 'org/h2/tools/Shell.class'
-    exclude 'org/h2/tools/RunScript.class'
-    exclude 'org/h2/tools/Console.class'
-    exclude 'org/h2/tools/Server.class'
-
-    finalizedBy 'reobfShadowJar' // 💡 新增：打完 Shadow 包后，明确指定执行针对 Shadow 的重混淆任务
-}
-
 // 配置 Forge 重混淆处理 shadowJar 的产物
-reobf {
-    shadowJar {}
-}
+
 
 // 避免编码错误
 tasks.withType(JavaCompile).configureEach {

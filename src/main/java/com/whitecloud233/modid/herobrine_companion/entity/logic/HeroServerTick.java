@@ -10,40 +10,39 @@ import java.util.UUID;
 
 public class HeroServerTick {
 
-    /**
-     * @return true 如果实体应当继续存活，false 如果实体被 discard
-     */
     public static boolean handleTick(HeroEntity hero, ServerLevel serverLevel) {
+        UUID ownerUUID = hero.getOwnerUUID();
+
+        // 没主人的实体不管它
+        if (ownerUUID == null) return true;
+
+        HeroWorldData data = HeroWorldData.get(serverLevel);
+
         // 1. 每秒更新一次皮肤和备份数据
         if (hero.tickCount % 20 == 0) {
-            HeroWorldData data = HeroWorldData.get(serverLevel);
-            int globalSkin = data.getSkinVariant();
+            int globalSkin = data.getSkinVariant(ownerUUID);
             if (hero.getSkinVariant() != globalSkin) {
                 hero.setSkinVariant(globalSkin);
             }
             if (globalSkin == HeroEntity.SKIN_CUSTOM) {
-                String customName = data.getCustomSkinName();
+                String customName = data.getCustomSkinName(ownerUUID);
                 if (!hero.getCustomSkinName().equals(customName)) {
                     hero.setCustomSkinName(customName);
                 }
             }
-            // 备份装备
-            if (hero.getOwnerUUID() != null) {
-                data.setEquipment(hero.getOwnerUUID(), hero.getArmorItemsTag(), hero.getHandItemsTag());
-                data.setCuriosBackItem(hero.getOwnerUUID(), hero.getCuriosBackItemTag());
-            }
+            data.setEquipment(ownerUUID, hero.getArmorItemsTag(), hero.getHandItemsTag());
+            data.setCuriosBackItem(ownerUUID, hero.getCuriosBackItemTag());
         }
 
-        // 2. 持续性唯一性检查 (防伪造)
+        // 2. 持续性唯一性检查 - 严格比对存档内记录的“唯一合法存活者”
         int checkInterval = hero.tickCount < 200 ? 10 : 100;
         if (hero.tickCount % checkInterval == 0) {
-            HeroWorldData data = HeroWorldData.get(serverLevel);
-            UUID activeUUID = data.getActiveHeroUUID();
+            UUID activeUUID = data.getActiveHeroUUID(ownerUUID);
 
             if (activeUUID != null && !activeUUID.equals(hero.getUUID())) {
-                net.minecraft.server.MinecraftServer server = serverLevel.getServer();
                 boolean activeExists = false;
-                for (ServerLevel lvl : server.getAllLevels()) {
+                // 全维度扫描存档里记录的正统合法体是否还活着
+                for (ServerLevel lvl : serverLevel.getServer().getAllLevels()) {
                     if (lvl.getEntity(activeUUID) != null) {
                         activeExists = true;
                         break;
@@ -51,21 +50,22 @@ public class HeroServerTick {
                 }
 
                 if (activeExists) {
-                    // 旧皇必须死
+                    // 正统合法体还活着，我就是个意外产生的克隆幽灵，自我销毁
                     HeroDataHandler.updateGlobalTrust(hero);
                     hero.discard();
-                    return false; // 实体已被清理，停止运行
+                    return false;
                 } else {
-                    // 旧皇已死，我即新皇
-                    data.setActiveHeroUUID(hero.getUUID());
+                    // 记录上的合法体其实已经死了/被删了，那我接管合法身份
+                    data.setActiveHeroUUID(ownerUUID, hero.getUUID());
                 }
             }
 
             if (activeUUID == null) {
-                data.setActiveHeroUUID(hero.getUUID());
+                data.setActiveHeroUUID(ownerUUID, hero.getUUID());
             }
-            // 定期更新跨维度位置
-            data.setLastKnownHeroPos(GlobalPos.of(hero.level().dimension(), hero.blockPosition()));
+
+            // 持续向全服硬盘写入自己的最新坐标，方便 SourceFlowItem 跨维度寻人
+            data.setLastKnownHeroPos(ownerUUID, GlobalPos.of(hero.level().dimension(), hero.blockPosition()));
         }
 
         return true;

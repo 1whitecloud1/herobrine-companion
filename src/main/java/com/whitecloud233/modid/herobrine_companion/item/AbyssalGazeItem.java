@@ -52,7 +52,7 @@ public class AbyssalGazeItem extends Item {
                 // 如果玩家未激活，则执行开启逻辑
                 player.addTag(TAG_ACTIVE);
                 player.sendSystemMessage(Component.translatable("message.herobrine_companion.abyssal_gaze.enabled"));
-                // 给予初始夜视效果，后续由 CommonEvents 维持
+                // 给予初始夜视效果，后续由 PlayerMechanicsEventHandler 维持
                 player.addEffect(new MobEffectInstance(MobEffects.NIGHT_VISION, 300, 0, false, false, true));
                 setActive(stack, true);
             }

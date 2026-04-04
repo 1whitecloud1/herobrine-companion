@@ -71,11 +71,14 @@ public class HeroLogic {
             HeroDataHandler.syncGlobalTrust(hero);
         }
 
-        // ============== [重构精简核心] 定期备份与托底恢复 ==============
+        // ============== [⚡ 重构精简核心：脏标记备份与托底恢复] ==============
         if (hero.tickCount % 100 == 0) {
             if (hero.getTrustLevel() > 0) {
-                // 如果信任度大于0，说明当前实体数据是健康的，执行全局备份
-                HeroStateManager.backupToGlobal(hero);
+                // 【核心优化】：只有当数据真正发生改变时 (isStateDirty == true)，才执行耗时的 NBT 序列化！
+                if (hero.isStateDirty) {
+                    HeroStateManager.backupToGlobal(hero);
+                    hero.isStateDirty = false; // 备份完成，重置脏标记
+                }
             } else if (hero.getOwnerUUID() != null) {
                 // 如果信任度为0（可能发生了异常重置），尝试从全局档案托底恢复
                 Player owner = hero.level().getPlayerByUUID(hero.getOwnerUUID());
@@ -113,21 +116,12 @@ public class HeroLogic {
 
     private static void findAndSetOwner(HeroEntity hero) {
         if (hero.level().isClientSide()) return;
-        List<ServerPlayer> players = hero.level().getEntitiesOfClass(ServerPlayer.class, hero.getBoundingBox().inflate(64));
-        if (!players.isEmpty()) {
-            ServerPlayer closestPlayer = null;
-            double closestDistance = Double.MAX_VALUE;
-            for (ServerPlayer p : players) {
-                double dist = hero.distanceToSqr(p);
-                if (dist < closestDistance) {
-                    closestDistance = dist;
-                    closestPlayer = p;
-                }
-            }
-            if (closestPlayer != null) {
-                hero.setOwnerUUID(closestPlayer.getUUID());
-                HeroStateManager.restoreFromGlobal(hero, closestPlayer); // 替换了原本的手动恢复逻辑
-            }
+
+        Player closestPlayer = hero.level().getNearestPlayer(hero, 64.0D);
+
+        if (closestPlayer instanceof ServerPlayer serverPlayer) {
+            hero.setOwnerUUID(serverPlayer.getUUID());
+            HeroStateManager.restoreFromGlobal(hero, serverPlayer);
         }
     }
 

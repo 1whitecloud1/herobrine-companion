@@ -62,10 +62,15 @@ public class PacketHandler {
                 com.whitecloud233.modid.herobrine_companion.client.fight.network.SPacketFakeCrash::new,
                 com.whitecloud233.modid.herobrine_companion.client.fight.network.SPacketFakeCrash::handle);
         // 【新增】：注册客户端通知服务器演出结束的包
-        INSTANCE.registerMessage(id, com.whitecloud233.modid.herobrine_companion.client.fight.network.CPacketCollapseFinished.class,
+        INSTANCE.registerMessage(id++, com.whitecloud233.modid.herobrine_companion.client.fight.network.CPacketCollapseFinished.class,
                 com.whitecloud233.modid.herobrine_companion.client.fight.network.CPacketCollapseFinished::toBytes,
                 com.whitecloud233.modid.herobrine_companion.client.fight.network.CPacketCollapseFinished::new,
                 com.whitecloud233.modid.herobrine_companion.client.fight.network.CPacketCollapseFinished::handle);
+        // 👇 【新增】：注册召唤实体、传送到实体身边的两个数据包
+        INSTANCE.registerMessage(id++, SummonHeroPacket.class,
+                SummonHeroPacket::toBytes, SummonHeroPacket::new, SummonHeroPacket::handle);
+        INSTANCE.registerMessage(id, TeleportToHeroPacket.class,
+                TeleportToHeroPacket::toBytes, TeleportToHeroPacket::new, TeleportToHeroPacket::handle);
     }
 
 

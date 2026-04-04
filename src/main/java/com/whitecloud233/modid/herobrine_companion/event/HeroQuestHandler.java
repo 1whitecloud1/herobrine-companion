@@ -2,6 +2,7 @@ package com.whitecloud233.modid.herobrine_companion.event;
 
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.modid.herobrine_companion.entity.*;
+import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.HeroBrain;
 import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroDataHandler;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -61,7 +62,7 @@ public class HeroQuestHandler {
                 questEnderman.setCustomName(Component.translatable("entity.herobrine_companion.quest_enderman"));
                 questEnderman.setCustomNameVisible(true);
                 questEnderman.setPersistenceRequired();
-                questEnderman.getTags().add("quest_target_for:" + player.getUUID().toString());
+                questEnderman.getTags().add("quest_target_for:" + player.getUUID());
 
 
                 serverLevel.addFreshEntity(questEnderman);
@@ -219,8 +220,9 @@ public class HeroQuestHandler {
     private static void increaseTrust(ServerPlayer player, int amount) {
         boolean heroFound = false;
         if (player.level() instanceof ServerLevel serverLevel) {
-            for (Entity entity : serverLevel.getAllEntities()) {
-                if (entity instanceof HeroEntity hero) {
+            for (HeroEntity hero : HeroBrain.ACTIVE_HEROES) {
+                // 关键：必须判断维度是否一致，并且实体是否存活
+                if (hero.level() == serverLevel && hero.isAlive() && !hero.isRemoved()) {
                     boolean isOwner = hero.getOwnerUUID() != null && hero.getOwnerUUID().equals(player.getUUID());
                     boolean isNearby = hero.getOwnerUUID() == null && hero.distanceToSqr(player) < 1024.0D;
 

@@ -1,6 +1,5 @@
 package com.whitecloud233.modid.herobrine_companion.entity.ai.learning;
 
-import com.whitecloud233.modid.herobrine_companion.client.service.LLMConfig;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
@@ -35,18 +34,8 @@ public class HeroObserver {
     private static final Map<String, Long> cooldownMap = new HashMap<>();
 
     private static void triggerObserverDialogue(HeroEntity hero, ServerPlayer player, String aiPrompt, String fallbackKey, int variants) {
-        if (!HeroDialogueHandler.canSpeak(hero)) return;
-        boolean isAIEnabled = HeroDialogueHandler.isAIEnabled();
-
-        if (isAIEnabled) {
-            HeroDialogueHandler.triggerAIObservation(hero, player, aiPrompt);
-        } else {
-            if (variants > 1) {
-                HeroDialogueHandler.speakRandom(hero, player, fallbackKey, variants);
-            } else {
-                HeroDialogueHandler.speak(hero, player, fallbackKey);
-            }
-        }
+        // 【核心修复】：移除所有服务端危险检查，直接转交给已重构安全的 HeroDialogueHandler 发包！
+        HeroDialogueHandler.tryAIDialogueOrFallback(hero, player, aiPrompt, fallbackKey, variants);
     }
 
     public static void tick(HeroEntity hero) {

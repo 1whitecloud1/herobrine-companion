@@ -109,7 +109,8 @@ public class AIService {
         function.addProperty("name", "manifest_divine_power");
 
         String divineSpellbook = "Alter Minecraft 1.20.1 underlying code. Generate vanilla commands or action codes (NO '/' prefix). " +
-                "1. [Follow/Summon]: Use action:summon_to_player to teleport yourself to the player's side. Use action:toggle_companion to toggle follow state. " +
+                // 【修改】：细化传送逻辑的分类
+                "1. [Follow/Summon/Teleport]: CRITICAL: If the player asks you to come to them, output 'action:summon_to_player'. If the player asks to teleport to YOU, output 'action:teleport_to_hero'. Do NOT just say you are already there! Use action:toggle_companion to toggle follow state. " +
                 "2. [Dimension/Locate]: execute in <dimension_id> run tp @s ~ 100 ~ (e.g. execute in minecraft:the_nether run tp @s ~ 100 ~). locate biome/structure. Use specific mod IDs if requested. " +
                 "3. [Creation/Give]: place template ID ~5 ~ ~ or place structure. give @s ID count. " +
                 "4. [Punishment]: summon lightning_bolt ^ ^ ^10 or action:massive_lightning. " +
@@ -194,7 +195,7 @@ public class AIService {
     }
 
     private static CompletableFuture<String> executeToolAction(String commandToRun, String aiDialogue, UUID playerUUID, String originalUserMessage, int retryCount) {
-        return executeCommandWithFeedback(commandToRun).thenCompose(success -> {
+        return executeCommandWithFeedback(commandToRun, playerUUID).thenCompose(success -> {
             if (success) {
                 addToHistory(playerUUID, "user", originalUserMessage);
                 addToHistory(playerUUID, "assistant", aiDialogue);
@@ -213,15 +214,17 @@ public class AIService {
         });
     }
 
-    private static CompletableFuture<Boolean> executeCommandWithFeedback(String command) {
+    private static CompletableFuture<Boolean> executeCommandWithFeedback(String command, UUID targetPlayerUUID) {
         CompletableFuture<Boolean> future = new CompletableFuture<>();
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) { future.complete(false); return future; }
+
         mc.tell(() -> {
             if (!"action:toggle_companion".equals(command) && !mc.player.hasPermissions(2)) {
                 mc.gui.getChat().addMessage(Component.literal("§4[System Block] Cheats are disabled in this world, Herobrine's physical interference is revoked!"));
                 future.complete(false); return;
             }
+
             if ("action:toggle_companion".equals(command)) {
                 if (mc.level != null) {
                     for (net.minecraft.world.entity.Entity entity : mc.level.entitiesForRendering()) {
@@ -232,6 +235,7 @@ public class AIService {
                     }
                 }
                 future.complete(false);
+
             } else if ("action:massive_lightning".equals(command)) {
                 if (mc.hasSingleplayerServer() && mc.getSingleplayerServer() != null) {
                     mc.getSingleplayerServer().execute(() -> {
@@ -248,7 +252,9 @@ public class AIService {
                         } catch (Exception e) { future.complete(false); }
                     });
                 } else future.complete(false);
+
             } else if ("action:summon_to_player".equals(command) || command.startsWith("tp @e[type=herobrine_companion:hero")) {
+                // 【行为1：AI 传送到玩家身边】
                 if (mc.hasSingleplayerServer() && mc.getSingleplayerServer() != null) {
                     var server = mc.getSingleplayerServer();
                     server.execute(() -> {
@@ -265,25 +271,35 @@ public class AIService {
                         } catch (Exception e) { future.complete(false); }
                     });
                 } else {
-                    // 【注意：多人游戏回退方案】
-                    // 在多人服务器中，客户端无法直接运行 performSummonOrTeleport，因此退回到原版 tp 指令兜底
-                    // 如果你后续想完美支持多人，建议像 action:toggle_companion 一样发一个发包 (Packet) 到服务端
-                    mc.player.connection.sendCommand("tp @e[type=herobrine_companion:hero,limit=1,sort=nearest] @s");
+                    // 多人游戏下发送召唤数据包，触发 HeroSummonItem 的跨维度拉取逻辑
+                    com.whitecloud233.modid.herobrine_companion.network.PacketHandler.sendToServer(
+                            new com.whitecloud233.modid.herobrine_companion.network.SummonHeroPacket()
+                    );
                     future.complete(true);
                 }
-            } else if (command.startsWith("tp @s @e[type=herobrine_companion:hero")) {
+
+            } else if ("action:teleport_to_hero".equals(command) || command.startsWith("tp @s @e[type=herobrine_companion:hero")) {
+                // 【行为2：玩家传送到 AI 身边】
                 if (mc.hasSingleplayerServer() && mc.getSingleplayerServer() != null) {
-                    mc.getSingleplayerServer().execute(() -> {
+                    var server = mc.getSingleplayerServer();
+                    server.execute(() -> {
                         try {
-                            ServerPlayer serverPlayer = mc.getSingleplayerServer().getPlayerList().getPlayer(mc.player.getUUID());
-                            if (serverPlayer != null) {
-                                SourceFlowItem sourceFlowItem = HerobrineCompanion.SOURCE_FLOW.get();
-                                sourceFlowItem.use(serverPlayer.level(), serverPlayer, InteractionHand.MAIN_HAND);
-                                future.complete(true);
-                            } else future.complete(false);
+                            ServerPlayer serverPlayer = server.getPlayerList().getPlayer(mc.player.getUUID());
+                            if (serverPlayer == null) { future.complete(false); return; }
+
+                            // 调用 SourceFlowItem 的传送代码
+                            boolean success = com.whitecloud233.modid.herobrine_companion.item.SourceFlowItem.performTeleportToHero(serverPlayer);
+                            future.complete(success);
                         } catch (Exception e) { future.complete(false); }
                     });
-                } else { mc.player.connection.sendCommand(command); future.complete(true); }
+                } else {
+                    // 多人游戏下发送传送到Hero身边的数据包
+                    com.whitecloud233.modid.herobrine_companion.network.PacketHandler.sendToServer(
+                            new com.whitecloud233.modid.herobrine_companion.network.TeleportToHeroPacket()
+                    );
+                    future.complete(true);
+                }
+
             } else if (command.contains("gamemode creative") || command.contains("gamemode 1")) {
                 if (mc.hasSingleplayerServer() && mc.getSingleplayerServer() != null) {
                     mc.getSingleplayerServer().execute(() -> {
@@ -317,7 +333,10 @@ public class AIService {
                             } else future.complete(false);
                         } catch (Exception e) { future.complete(false); }
                     });
-                } else { mc.player.connection.sendCommand(command); future.complete(true); }
+                } else {
+                    mc.player.connection.sendCommand(command);
+                    future.complete(true);
+                }
             }
         });
         return future;

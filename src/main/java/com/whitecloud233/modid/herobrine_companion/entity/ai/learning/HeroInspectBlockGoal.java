@@ -103,24 +103,16 @@ public class HeroInspectBlockGoal extends Goal {
 
     @Override
     public void stop() {
-        // 结束时偶尔评价一句
         if (this.targetPos != null && this.hero.getRandom().nextInt(3) == 0) {
-             // [修改] 即使不是陪伴模式，如果附近有玩家，也可以说话
-             // 优先找主人，如果没有主人，找最近的玩家
-             Player player = null;
-             if (this.hero.getOwnerUUID() != null) {
-                 player = this.hero.level().getPlayerByUUID(this.hero.getOwnerUUID());
-             }
-             if (player == null) {
-                 player = this.hero.level().getNearestPlayer(this.hero, 16.0D);
-             }
-
-             // [修复] 使用 instanceof 检查，确保 player 是 ServerPlayer
-             if (player instanceof ServerPlayer serverPlayer) {
-                 HeroDialogueHandler.onInspectBlock(this.hero, serverPlayer, this.hero.level().getBlockState(this.targetPos));
-             }
+            // 【修复】：只认真正的主人，绝不跟陌生人搭话
+            if (this.hero.getOwnerUUID() != null) {
+                Player player = this.hero.level().getPlayerByUUID(this.hero.getOwnerUUID());
+                if (player instanceof ServerPlayer serverPlayer) {
+                    HeroDialogueHandler.onInspectBlock(this.hero, serverPlayer, this.hero.level().getBlockState(this.targetPos));
+                }
+            }
         }
-        
+
         this.targetPos = null;
         // [深度学习] 根据状态调整冷却时间
         SimpleNeuralNetwork.MindState state = this.hero.getHeroBrain().getState();

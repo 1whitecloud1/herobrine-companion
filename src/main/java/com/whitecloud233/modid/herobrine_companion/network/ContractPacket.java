@@ -43,6 +43,9 @@ public class ContractPacket {
                             CompoundTag tag = heldItem.getOrCreateTag();
                             tag.putBoolean("BoundHero", true);
                             tag.putString("OwnerName", serverPlayer.getName().getString());
+                            if (serverPlayer.getUUID() != null) {
+                                tag.putUUID("OwnerUUID", serverPlayer.getUUID());
+                            }
                             
                             // Set fancy name
                             heldItem.setHoverName(Component.translatable("item.herobrine_companion.bound_shelter_name", serverPlayer.getName().getString()));

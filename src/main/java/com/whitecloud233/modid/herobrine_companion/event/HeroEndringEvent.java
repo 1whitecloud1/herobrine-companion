@@ -2,13 +2,12 @@ package com.whitecloud233.modid.herobrine_companion.event;
 
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroLifecycleHandler;
 import com.whitecloud233.modid.herobrine_companion.util.EndRingContext;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.entity.EntityJoinLevelEvent;
@@ -87,46 +86,21 @@ public class HeroEndringEvent {
         // [修复 1：进场清场]
         if (newHero.getPersistentData().getBoolean("IsChallengeActive")) {
             // 必须把之前留在 End Ring 的剧情版假 Hero 强行抹除！只留真身！
-            discardAllOtherHeroes(newHero);
+            HeroLifecycleHandler.discardAllOtherHeroes(newHero);
             return;
         }
 
         if (newHero.getTags().contains(EndRingContext.TAG_RESPAWNED_SAFE)) {
             newHero.removeTag(EndRingContext.TAG_RESPAWNED_SAFE);
-            discardAllOtherHeroes(newHero);
+            HeroLifecycleHandler.discardAllOtherHeroes(newHero);
             return;
         }
         if (newHero.getTags().contains(EndRingContext.TAG_INTRO)) {
-             discardAllOtherHeroes(newHero);
-             return; 
+            HeroLifecycleHandler.discardAllOtherHeroes(newHero);
+            return;
         }
-        if (checkForDuplicates(newHero)) {
+        if (HeroLifecycleHandler.checkForDuplicates(newHero)) {
             event.setCanceled(true);
         }
-    }
-    
-    private static void discardAllOtherHeroes(HeroEntity safeHero) {
-        if (safeHero.getServer() == null) return;
-        for (ServerLevel level : safeHero.getServer().getAllLevels()) {
-            for (var entity : level.getAllEntities()) {
-                if (entity instanceof HeroEntity existing && existing != safeHero && existing.isAlive()) {
-                    existing.remove(Entity.RemovalReason.DISCARDED);
-                }
-            }
-        }
-    }
-
-    private static boolean checkForDuplicates(HeroEntity newHero) {
-        if (newHero.getServer() == null) return false;
-        for (ServerLevel level : newHero.getServer().getAllLevels()) {
-            for (var entity : level.getAllEntities()) {
-                if (entity instanceof HeroEntity existing && existing != newHero) {
-                    if (existing.isAlive() && !existing.isRemoved()) {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
     }
 }

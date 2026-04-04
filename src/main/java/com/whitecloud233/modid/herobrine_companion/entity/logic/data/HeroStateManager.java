@@ -19,39 +19,40 @@ public class HeroStateManager {
      */
     public static void backupToGlobal(HeroEntity hero) {
         if (!(hero.level() instanceof ServerLevel serverLevel)) return;
+
+        // 【修复】：必须先获取并判断 ownerUUID，再执行后续依赖 UUID 的操作
+        UUID ownerUUID = hero.getOwnerUUID();
+        if (ownerUUID == null) return;
+
         HeroWorldData data = HeroWorldData.get(serverLevel);
 
-        // 1. 同步皮肤
         if (hero.getSkinVariant() == HeroEntity.SKIN_CUSTOM && !hero.getCustomSkinName().isEmpty()) {
-            data.setSkinVariant(HeroEntity.SKIN_CUSTOM);
-            data.setCustomSkinName(hero.getCustomSkinName());
+            data.setSkinVariant(ownerUUID, HeroEntity.SKIN_CUSTOM);
+            data.setCustomSkinName(ownerUUID, hero.getCustomSkinName());
         } else {
-            data.setSkinVariant(hero.getSkinVariant());
+            data.setSkinVariant(ownerUUID, hero.getSkinVariant());
         }
 
-        // 2. 同步信任度与装备 (必须有 Owner 才能存入玩家专属档案)
-        UUID ownerUUID = hero.getOwnerUUID();
-        if (ownerUUID != null) {
-            if (hero.getTrustLevel() > 0) {
-                data.setTrust(ownerUUID, hero.getTrustLevel());
-            }
-            data.setEquipment(ownerUUID, hero.getArmorItemsTag(), hero.getHandItemsTag());
-            data.setCuriosBackItem(ownerUUID, hero.getCuriosBackItemTag());
+        // 同步信任度与装备
+        if (hero.getTrustLevel() > 0) {
+            data.setTrust(ownerUUID, hero.getTrustLevel());
+        }
+        data.setEquipment(ownerUUID, hero.getArmorItemsTag(), hero.getHandItemsTag());
+        data.setCuriosBackItem(ownerUUID, hero.getCuriosBackItemTag());
 
-            // 👇 [新增] 3. 同步姿势数据到全局存档
-            CompoundTag poseTag = new CompoundTag();
-            poseTag.putBoolean("IsPoseEditing", hero.isPoseEditing);
-            if (hero.isPoseEditing) {
-                net.minecraft.nbt.ListTag poseList = new net.minecraft.nbt.ListTag();
-                for (int i = 0; i < 10; i++) {
-                    for (int j = 0; j < 3; j++) {
-                        poseList.add(net.minecraft.nbt.FloatTag.valueOf(hero.customPoseAngles[i][j]));
-                    }
+        // 同步姿势数据到全局存档
+        CompoundTag poseTag = new CompoundTag();
+        poseTag.putBoolean("IsPoseEditing", hero.isPoseEditing);
+        if (hero.isPoseEditing) {
+            net.minecraft.nbt.ListTag poseList = new net.minecraft.nbt.ListTag();
+            for (int i = 0; i < 10; i++) {
+                for (int j = 0; j < 3; j++) {
+                    poseList.add(net.minecraft.nbt.FloatTag.valueOf(hero.customPoseAngles[i][j]));
                 }
-                poseTag.put("CustomPoseAngles", poseList);
             }
-            data.setPoseData(ownerUUID, poseTag);
+            poseTag.put("CustomPoseAngles", poseList);
         }
+        data.setPoseData(ownerUUID, poseTag);
     }
 
     /**
@@ -62,10 +63,10 @@ public class HeroStateManager {
         HeroWorldData data = HeroWorldData.get(serverLevel);
         UUID ownerUUID = owner.getUUID();
 
-        // 1. 恢复皮肤
-        hero.setSkinVariant(data.getSkinVariant());
-        if (data.getSkinVariant() == HeroEntity.SKIN_CUSTOM) {
-            hero.setCustomSkinName(data.getCustomSkinName());
+        // 以及在 restoreFromGlobal 中：
+        hero.setSkinVariant(data.getSkinVariant(ownerUUID));
+        if (data.getSkinVariant(ownerUUID) == HeroEntity.SKIN_CUSTOM) {
+            hero.setCustomSkinName(data.getCustomSkinName(ownerUUID));
         }
 
         // 2. 恢复信任度 (如果实体信任度丢失则恢复)

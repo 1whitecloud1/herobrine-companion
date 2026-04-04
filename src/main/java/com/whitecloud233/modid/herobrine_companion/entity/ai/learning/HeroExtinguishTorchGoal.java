@@ -76,18 +76,13 @@ public class HeroExtinguishTorchGoal extends Goal {
                 this.hero.level().destroyBlock(this.targetTorch, true);
                 this.hero.level().playSound(null, this.targetTorch, SoundEvents.FIRE_EXTINGUISH, SoundSource.BLOCKS, 0.5F, 2.6F + (this.hero.level().random.nextFloat() - this.hero.level().random.nextFloat()) * 0.8F);
                 this.hero.level().addParticle(ParticleTypes.LARGE_SMOKE, this.targetTorch.getX() + 0.5, this.targetTorch.getY() + 0.5, this.targetTorch.getZ() + 0.5, 0.0, 0.0, 0.0);
-                
-                Player player = null;
-                if (this.hero.getOwnerUUID() != null) {
-                    player = this.hero.level().getPlayerByUUID(this.hero.getOwnerUUID());
-                }
-                if (player == null) {
-                    player = this.hero.level().getNearestPlayer(this.hero, 16.0D);
-                }
 
-                // [修复] 使用 instanceof 检查，确保 player 是 ServerPlayer
-                if (player instanceof ServerPlayer serverPlayer) {
-                    HeroDialogueHandler.onExtinguishTorch(this.hero, serverPlayer);
+                // 【修复】：只认主人，不理路人
+                if (this.hero.getOwnerUUID() != null) {
+                    Player player = this.hero.level().getPlayerByUUID(this.hero.getOwnerUUID());
+                    if (player instanceof ServerPlayer serverPlayer) {
+                        HeroDialogueHandler.onExtinguishTorch(this.hero, serverPlayer);
+                    }
                 }
             }
             this.targetTorch = null;

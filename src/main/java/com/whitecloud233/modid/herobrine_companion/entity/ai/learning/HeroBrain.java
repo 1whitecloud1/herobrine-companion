@@ -91,11 +91,29 @@ public class HeroBrain {
             ACTIVE_HEROES.add(hero);
         }
 
-        List<ServerPlayer> nearbyPlayers = hero.level().getEntitiesOfClass(ServerPlayer.class, hero.getBoundingBox().inflate(64));
-        for (ServerPlayer p : nearbyPlayers) getNetwork(p.getUUID()).tick(hero.level().getGameTime());
+        // ==========================================
+        // 🚨 核心性能优化：实体扫描降频
+        // 将原先每秒 20 次的 AABB 扫描降低为每 5 秒 1 次 (100 ticks)
+        // 完美对齐 SimpleNeuralNetwork 内部的 100 tick 冷却时间
+        // ==========================================
+        if (hero.tickCount % 100 == 0) {
+            /*  // 方案 A：如果你希望 Hero 学习周围【所有玩家】的行为，使用降频后的范围扫描
+            List<ServerPlayer> nearbyPlayers = hero.level().getEntitiesOfClass(ServerPlayer.class, hero.getBoundingBox().inflate(64));
+            for (ServerPlayer p : nearbyPlayers) {
+                getNetwork(p.getUUID()).tick(hero.level().getGameTime());
+            }*/
+           // 方案 B：(终极优化) 如果 Hero 只需要学习【自己主人】的行为
+            // 建议直接删除上面的扫描代码，换成下面这两行，性能消耗将直接降为 0！
+            if (hero.getOwnerUUID() != null) {
+                getNetwork(hero.getOwnerUUID()).tick(hero.level().getGameTime());
+            }
+
+        }
+
+        // 默认网络的更新（它内部自带 100 tick 冷却拦截，不会卡顿）
         defaultNetwork.tick(hero.level().getGameTime());
 
-        // 方块修复本能（最高级优先，忽略状态限制，不再写进 Goal 里）
+        // 方块修复本能
         processBlockRepair();
 
         if (hero.getTags().contains("brain_debug")) {

@@ -22,7 +22,6 @@ import javax.annotation.Nullable;
 import java.util.List;
 import java.util.UUID;
 
-
 public class SourceFlowItem extends Item {
     public SourceFlowItem(Properties properties) {
         super(properties);
@@ -32,63 +31,50 @@ public class SourceFlowItem extends Item {
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
 
-        if (!level.isClientSide && player instanceof ServerPlayer serverPlayer) {
-            ServerLevel serverLevel = (ServerLevel) level;
-
-            // 1. 获取全局活跃 Hero 的 UUID 和最后已知位置
-            HeroWorldData data = HeroWorldData.get(serverLevel);
-            UUID heroUUID = data.getActiveHeroUUID();
-            GlobalPos lastKnownPos = data.getLastKnownHeroPos();
-            Entity targetEntity = null;
-
-            // 2. 尝试查找实体 (如果已加载)
-            if (heroUUID != null) {
-                for (ServerLevel lvl : serverLevel.getServer().getAllLevels()) {
-                    targetEntity = lvl.getEntity(heroUUID);
-                    if (targetEntity != null) {
-                        break;
-                    }
-                }
-            }
-
-            // 3. 传送逻辑
-            if (targetEntity instanceof HeroEntity hero) {
-
-                // A. 实体已加载：直接传送
-
-                if (hero.level().dimension() != serverLevel.dimension()) {
-                    ServerLevel targetLevel = serverLevel.getServer().getLevel(hero.level().dimension());
-                    if (targetLevel != null) {
-                        serverPlayer.teleportTo(targetLevel, hero.getX(), hero.getY(), hero.getZ(), hero.getYRot(), hero.getXRot());
-                    }
-
-                } else {
-
-                    serverPlayer.teleportTo(hero.getX(), hero.getY(), hero.getZ());
-                }
-                playTeleportSound(level, player);
-                player.sendSystemMessage(Component.translatable("message.herobrine_companion.source_flow_teleport").withStyle(ChatFormatting.AQUA));
+        // 物品右键逻辑：交由公共方法执行
+        if (!level.isClientSide() && player instanceof ServerPlayer serverPlayer) {
+            boolean success = performTeleportToHero(serverPlayer);
+            if (success) {
                 return InteractionResultHolder.success(stack);
+            } else {
+                return InteractionResultHolder.fail(stack);
             }
-
-            else if (lastKnownPos != null) {
-                // B. 实体未加载 (跨维度/远距离)：使用最后已知坐标
-                ServerLevel targetLevel = serverLevel.getServer().getLevel(lastKnownPos.dimension());
-                if (targetLevel != null) {
-                    serverPlayer.teleportTo(targetLevel, lastKnownPos.pos().getX() + 0.5, lastKnownPos.pos().getY(), lastKnownPos.pos().getZ() + 0.5, serverPlayer.getYRot(), serverPlayer.getXRot());
-                    playTeleportSound(level, player);
-                    return InteractionResultHolder.success(stack);
-                }
-            }
-            // C. 彻底找不到
-            player.sendSystemMessage(Component.translatable("message.herobrine_companion.hero_not_found").withStyle(ChatFormatting.RED));
-            return InteractionResultHolder.fail(stack);
         }
         return InteractionResultHolder.pass(stack);
     }
 
-    private void playTeleportSound(Level level, Player player) {
-        level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.ENDERMAN_TELEPORT, SoundSource.PLAYERS, 1.0F, 1.0F);
+    /**
+     * 【核心提取】：将寻找并传送到 Hero 身边的逻辑提取为公共方法
+     */
+    public static boolean performTeleportToHero(ServerPlayer serverPlayer) {
+        ServerLevel serverLevel = serverPlayer.serverLevel();
+        UUID playerUUID = serverPlayer.getUUID();
+        HeroWorldData data = HeroWorldData.get(serverLevel);
+        UUID activeHeroId = data.getActiveHeroUUID(playerUUID);
+
+        if (activeHeroId != null) {
+            for (ServerLevel lvl : serverLevel.getServer().getAllLevels()) {
+                Entity entity = lvl.getEntity(activeHeroId);
+                if (entity instanceof HeroEntity hero && hero.isAlive()) {
+                    serverPlayer.teleportTo(lvl, entity.getX(), entity.getY(), entity.getZ(), serverPlayer.getYRot(), serverPlayer.getXRot());
+                    lvl.playSound(null, serverPlayer.getX(), serverPlayer.getY(), serverPlayer.getZ(), SoundEvents.ENDERMAN_TELEPORT, SoundSource.PLAYERS, 1.0F, 1.0F);
+                    return true;
+                }
+            }
+        }
+
+        GlobalPos lastKnownPos = data.getLastKnownHeroPos(playerUUID);
+        if (lastKnownPos != null) {
+            ServerLevel targetLevel = serverLevel.getServer().getLevel(lastKnownPos.dimension());
+            if (targetLevel != null) {
+                serverPlayer.teleportTo(targetLevel, lastKnownPos.pos().getX() + 0.5, lastKnownPos.pos().getY(), lastKnownPos.pos().getZ() + 0.5, serverPlayer.getYRot(), serverPlayer.getXRot());
+                targetLevel.playSound(null, serverPlayer.getX(), serverPlayer.getY(), serverPlayer.getZ(), SoundEvents.ENDERMAN_TELEPORT, SoundSource.PLAYERS, 1.0F, 1.0F);
+                return true;
+            }
+        }
+
+        serverPlayer.sendSystemMessage(Component.translatable("message.herobrine_companion.hero_not_found").withStyle(ChatFormatting.RED));
+        return false;
     }
 
     @Override
@@ -96,12 +82,4 @@ public class SourceFlowItem extends Item {
         tooltipComponents.add(Component.translatable("item.herobrine_companion.source_flow.desc").withStyle(ChatFormatting.GRAY));
         super.appendHoverText(stack, level, tooltipComponents, tooltipFlag);
     }
-
-    @Override
-    public Component getName(ItemStack stack) {
-        return Component.translatable(this.getDescriptionId(stack)).withStyle(ChatFormatting.AQUA);
-    }
 }
-
-
-

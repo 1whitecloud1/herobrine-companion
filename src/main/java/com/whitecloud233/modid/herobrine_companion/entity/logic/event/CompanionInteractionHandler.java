@@ -59,8 +59,8 @@ public class CompanionInteractionHandler {
         ServerLevel level = (ServerLevel) event.getLevel();
         Player player = event.getEntity();
 
-        for (var entity : level.getAllEntities()) {
-            if (entity instanceof HeroEntity hero && hero.isCompanionMode()) {
+        for (HeroEntity hero : com.whitecloud233.modid.herobrine_companion.entity.ai.learning.HeroBrain.ACTIVE_HEROES) {
+            if (hero.level() == level && hero.isAlive() && hero.isCompanionMode()) {
                 BlockPos invitedPos = hero.getInvitedPos();
                 if (invitedPos != null && invitedPos.equals(pos) && hero.getInvitedAction() == 2) {
                     if (hero.isPassenger()) {
@@ -87,15 +87,24 @@ public class CompanionInteractionHandler {
         HeroEntity nearestHero = null;
         double minDistance = Double.MAX_VALUE;
 
-        for (var entity : level.getAllEntities()) {
-            if (entity instanceof HeroEntity h) {
-                if (h.getOwnerUUID() != null && h.getOwnerUUID().equals(player.getUUID())) return h; // 直接找到主人的伴侣
+        // 💡 顺手优化：使用 ACTIVE_HEROES 高速缓存，抛弃卡顿的 getAllEntities
+        for (HeroEntity h : com.whitecloud233.modid.herobrine_companion.entity.ai.learning.HeroBrain.ACTIVE_HEROES) {
+            if (h.level() != level || !h.isAlive()) continue;
 
-                double dist = h.distanceToSqr(player);
-                if (dist < 4096.0D && dist < minDistance) {
-                    minDistance = dist;
-                    nearestHero = h;
-                }
+            // 1. 如果找到主人的伴侣，直接返回
+            if (h.getOwnerUUID() != null && h.getOwnerUUID().equals(player.getUUID())) {
+                return h;
+            }
+
+            // 👇👇👇【核心修复】：如果这个 Hero 是别人的，绝对不能把它当成备选目标！直接跳过！
+            if (h.getOwnerUUID() != null) continue;
+            // 👆👆👆
+
+            // 2. 只有“完全无主”的野生 Hero，才能作为备选
+            double dist = h.distanceToSqr(player);
+            if (dist < 4096.0D && dist < minDistance) {
+                minDistance = dist;
+                nearestHero = h;
             }
         }
 
