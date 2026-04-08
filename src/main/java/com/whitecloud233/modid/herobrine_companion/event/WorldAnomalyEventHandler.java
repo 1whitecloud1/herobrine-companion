@@ -1,5 +1,6 @@
 package com.whitecloud233.modid.herobrine_companion.event;
 
+import com.whitecloud233.modid.herobrine_companion.config.Config;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
@@ -20,6 +21,11 @@ public class WorldAnomalyEventHandler {
 
     @SubscribeEvent
     public static void onPlayerBreak(BlockEvent.BreakEvent event) {
+        // 【新增】如果配置文件中禁用了方块修复，则完全不需要记录玩家破坏事件
+        if (!Config.heroBlockRestoration) {
+            return;
+        }
+
         if (event.getLevel() instanceof Level level && !level.isClientSide()) {
             BlockPos pos = event.getPos();
             BlockState state = event.getState();

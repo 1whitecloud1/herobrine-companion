@@ -21,7 +21,7 @@ public class Config {
     public static final ForgeConfigSpec.BooleanValue HERO_KING_AURA_ENABLED = BUILDER
             .comment("Whether the Hero King Aura goal is enabled for Herobrine")
             .comment("是否启用 Herobrine 的怪物臣服AI")
-            .define("heroKingAuraEnabled_v3", false);
+            .define("heroKingAuraEnabled_v4", false);
 
     public static final ForgeConfigSpec.BooleanValue HERO_BLOCK_RESTORATION = BUILDER
             .comment("Whether Herobrine automatically restores broken blocks")

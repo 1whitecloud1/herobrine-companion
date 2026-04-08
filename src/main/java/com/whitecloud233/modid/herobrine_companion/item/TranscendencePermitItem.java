@@ -31,21 +31,27 @@ public class TranscendencePermitItem extends Item {
         }
 
         if (!level.isClientSide) {
-// ... 后续原有逻辑保持不变
             String tag = "herobrine_companion.transcendence_permit_active";
-            // 使用 PersistentData 替代 Tags，更稳定
+
+            // 【核心修复】：统一使用 PersistentData，而不是 getTags()
             boolean isActive = player.getPersistentData().getBoolean(tag);
 
             if (!isActive) {
-                // 启用
+                // 启用：写入 PersistentData
                 player.getPersistentData().putBoolean(tag, true);
                 player.sendSystemMessage(Component.translatable("message.herobrine_companion.transcendence_permit.enabled"));
-                player.getAbilities().mayfly = true;
-                player.onUpdateAbilities();
+
+                // 立即给予飞行能力
+                if (!player.getAbilities().mayfly) {
+                    player.getAbilities().mayfly = true;
+                    player.onUpdateAbilities();
+                }
             } else {
-                // 禁用
+                // 禁用：从 PersistentData 移除
                 player.getPersistentData().remove(tag);
                 player.sendSystemMessage(Component.translatable("message.herobrine_companion.transcendence_permit.disabled"));
+
+                // 如果不是创造/旁观模式，移除飞行能力
                 if (!player.isCreative() && !player.isSpectator()) {
                     player.getAbilities().mayfly = false;
                     player.getAbilities().flying = false;
