@@ -17,7 +17,7 @@ public class HeroAI {
         // [新增] 王者光环：让周围怪物臣服 (提升至最高优先级 0，被动生效)
         hero.getGoalSelector().addGoal(0, new HeroKingAuraGoal(hero));
         // 👇 [新增]：赋予 Hero 自动开门的能力 (参数 true 代表走过去后会自动随手关门)
-        hero.getGoalSelector().addGoal(1, new OpenDoorGoal(hero, true));
+      //  hero.getGoalSelector().addGoal(1, new OpenDoorGoal(hero, true));
         hero.getGoalSelector().addGoal(1, new HeroTeleportToPlayerGoal(hero));
         // 0.5 [新增] 玩家邀请互动 (最高优先级之一，响应玩家指令)
         hero.getGoalSelector().addGoal(1, new HeroInvitedActionGoal(hero));

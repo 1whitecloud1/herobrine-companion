@@ -5,6 +5,7 @@ import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.client.gui.HeroContractScreen;
 import com.whitecloud233.herobrine_companion.client.gui.HeroTradeScreen;
 import com.whitecloud233.herobrine_companion.client.gui.HeroWardrobeScreen;
+import com.whitecloud233.herobrine_companion.client.model.GhostSteveModel;
 import com.whitecloud233.herobrine_companion.client.model.HeroDragonModel;
 import com.whitecloud233.herobrine_companion.client.model.HeroModel;
 import com.whitecloud233.herobrine_companion.client.render.*;
@@ -68,6 +69,8 @@ public class ClientEvents {
 
         // 注册自定义龙模型 Layer
         event.registerLayerDefinition(HeroDragonModel.LAYER_LOCATION, HeroDragonModel::createBodyLayer);
+        // 👇 [新增代码] 注册 GhostSteve 的纯净独立模型 Layer
+        event.registerLayerDefinition(GhostSteveModel.LAYER_LOCATION, GhostSteveModel::createBodyLayer);
     }
 
     @SubscribeEvent

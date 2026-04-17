@@ -1,23 +1,22 @@
 package com.whitecloud233.herobrine_companion.client.render;
 
-import com.mojang.blaze3d.vertex.PoseStack;
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.herobrine_companion.client.model.GhostSteveModel;
 import com.whitecloud233.herobrine_companion.entity.GhostSteveEntity;
-import net.minecraft.client.model.PlayerModel;
-import net.minecraft.client.model.geom.ModelLayers;
-import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
-import net.minecraft.client.renderer.entity.LivingEntityRenderer;
+import net.minecraft.client.renderer.entity.MobRenderer; // 更推荐给怪物使用 MobRenderer
 import net.minecraft.client.renderer.entity.layers.ItemInHandLayer;
-import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 
-public class GhostSteveRenderer extends LivingEntityRenderer<GhostSteveEntity, PlayerModel<GhostSteveEntity>> {
+public class GhostSteveRenderer extends MobRenderer<GhostSteveEntity, GhostSteveModel> {
+
+    // [1.21.1 特性] 必须使用 fromNamespaceAndPath
     private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath(HerobrineCompanion.MODID, "textures/entity/ghost_steve.png");
 
     public GhostSteveRenderer(EntityRendererProvider.Context context) {
-        super(context, new PlayerModel<>(context.bakeLayer(ModelLayers.PLAYER), false), 0.5F);
-        // [修复] 添加手持物品渲染层
+        super(context, new GhostSteveModel(context.bakeLayer(GhostSteveModel.LAYER_LOCATION)), 0.5F);
+
+        // 绑定手持物品渲染层
         this.addLayer(new ItemInHandLayer<>(this, context.getItemInHandRenderer()));
     }
 
@@ -26,8 +25,9 @@ public class GhostSteveRenderer extends LivingEntityRenderer<GhostSteveEntity, P
         return TEXTURE;
     }
 
+    // [1.21.1 优化] 直接重写 shouldShowName 并返回 false 来隐藏名称，彻底避免覆写 renderNameTag 时出现参数签名不匹配的问题
     @Override
-    protected void renderNameTag(GhostSteveEntity entity, Component displayName, PoseStack poseStack, MultiBufferSource buffer, int packedLight, float partialTick) {
-        // 覆盖此方法并留空，以禁止渲染名字
+    protected boolean shouldShowName(GhostSteveEntity entity) {
+        return false;
     }
 }
