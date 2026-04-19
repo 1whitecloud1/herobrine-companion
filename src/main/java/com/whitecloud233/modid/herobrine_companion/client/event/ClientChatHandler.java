@@ -56,7 +56,7 @@ public class ClientChatHandler {
                     // -----------------------------
                     // 【云端模式】走 AI 大模型 API
                     // -----------------------------
-                    if (LLMConfig.isKeyMissing()) {
+                    if (LLMConfig.isKeyMissingOrInvalid()) {
                         // 【核心防御】：发现没填 Key，直接强制弹出 UI 引导，不发网络请求
                         mc.tell(() -> {
                             mc.setScreen(new com.whitecloud233.modid.herobrine_companion.config.ApiKeyInputScreen(new ChatScreen("")));

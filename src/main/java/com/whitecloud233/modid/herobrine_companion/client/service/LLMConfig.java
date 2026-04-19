@@ -10,6 +10,7 @@ import java.util.Map;
 
 public class LLMConfig {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static boolean apiKeyMarkedInvalid = false;
 
     // 1. 公开配置：放在 config 文件夹，会被整合包打包
     private static final File PUBLIC_CONFIG = FMLPaths.CONFIGDIR.get().resolve("herobrine_companion")
@@ -27,7 +28,19 @@ public class LLMConfig {
     public static Map<String, String> nbtStructures = new HashMap<>();
 
     public static boolean isKeyMissing() {
-        return aiApiKey == null || aiApiKey.isEmpty() || aiApiKey.equals("YOUR_API_KEY_HERE");
+        return aiApiKey == null || aiApiKey.isBlank() || aiApiKey.equals("YOUR_API_KEY_HERE");
+    }
+
+    public static boolean isKeyMissingOrInvalid() {
+        return isKeyMissing() || apiKeyMarkedInvalid;
+    }
+
+    public static void markApiKeyInvalid() {
+        apiKeyMarkedInvalid = true;
+    }
+
+    public static void markApiKeyValid() {
+        apiKeyMarkedInvalid = false;
     }
 
     public static void load() {
@@ -58,6 +71,8 @@ public class LLMConfig {
 
     public static void save() {
         try {
+            markApiKeyValid();
+
             // 保存公开配置
             PUBLIC_CONFIG.getParentFile().mkdirs();
             ConfigData pData = new ConfigData();

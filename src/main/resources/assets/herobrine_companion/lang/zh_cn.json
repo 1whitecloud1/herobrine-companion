@@ -413,6 +413,7 @@
   "gui.herobrine_companion.lore_handbook_title": "传说手册",
   "gui.herobrine_companion.back": "<< 返回",
   "message.herobrine_companion.ai_config_missing": "请在 \\run\\config\\herobrine_companion.json 文件中配置您的 AI API 密钥。",
+  "message.herobrine_companion.ai_config_invalid": "当前 API 密钥无效或已失效，请重新填写。",
   "gui.herobrine_companion.jei.hero_trade": "Herobrine 交易",
   "gui.herobrine_companion.jei.hero_reward": "Herobrine信任度奖励",
   "item.herobrine_companion.tab_icon": "右键herobrine",

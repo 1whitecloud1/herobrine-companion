@@ -340,6 +340,13 @@ public class HeroEntity extends PathfinderMob implements Merchant {
             );
         }
 
+        // 当其他玩家开始追踪这个 Hero 时，补发一次完整外观快照，
+        // 包括多人模式下无法靠本地路径还原的自定义皮肤与 Curios/AW 背饰数据。
+        com.whitecloud233.modid.herobrine_companion.network.PacketHandler.sendToPlayer(
+                new com.whitecloud233.modid.herobrine_companion.network.SyncHeroCosmeticsPacket(this),
+                player
+        );
+
         // 👇 【新增修复】：当玩家开始追踪 Hero 实体时，强制同步其已领取的奖励状态
         if (!this.level().isClientSide && this.level() instanceof ServerLevel serverLevel && getOwnerUUID() != null) {
             HeroWorldData data = HeroWorldData.get(serverLevel);

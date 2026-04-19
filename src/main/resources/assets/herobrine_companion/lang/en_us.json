@@ -46,6 +46,7 @@
   "message.herobrine_companion.system_key_silent": "§cThe Key remains silent here...",
   "gui.herobrine_companion.lore_handbook_title": "Lore Handbook",
   "message.herobrine_companion.ai_config_missing": "Please configure your AI API Key in the \\run\\config\\herobrine_companion.json.",
+  "message.herobrine_companion.ai_config_invalid": "The current API key is invalid or expired. Please enter it again.",
   "gui.herobrine_companion.jei.hero_trade": "Herobrine's Trade",
   "gui.herobrine_companion.jei.hero_reward": "Heroine's Trust Rewards",
   "item.herobrine_companion.tab_icon": "Right-click Herobrine",

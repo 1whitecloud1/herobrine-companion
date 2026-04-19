@@ -1,8 +1,10 @@
 package com.whitecloud233.modid.herobrine_companion.entity.ai.goal;
 
+import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.modid.herobrine_companion.util.PlayerHealthCompat;
 import net.minecraft.core.BlockPos;
-import net.minecraft.network.protocol.game.ClientboundSetHealthPacket;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
@@ -13,15 +15,23 @@ import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.event.entity.living.LivingDamageEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
 
 import java.util.EnumSet;
 
+@Mod.EventBusSubscriber(modid = HerobrineCompanion.MODID)
 public class HeroObserveAndRescueGoal extends Goal {
     private final HeroEntity hero;
     private Player targetPlayer;
 
     private static final int COMBAT_TIMEOUT = 100;
     public static final float RESCUE_HEALTH_THRESHOLD = 6.0F;
+    private static final float RESCUE_HEALTH_RATIO = 0.30F;
+    private static final float POST_RESCUE_HEALTH_RATIO = 0.35F;
+    private static final String LAST_RESCUE_TIME_TAG = "LastRescueTime";
     // 10 分钟的冷却常量 (10分钟 * 60秒 * 20ticks)
     public static final int RESCUE_COOLDOWN = 12000;
 
@@ -44,7 +54,7 @@ public class HeroObserveAndRescueGoal extends Goal {
         Player player = this.hero.level().getPlayerByUUID(this.hero.getOwnerUUID());
         if (player == null || !player.isAlive()) return false;
 
-        // 判定主人的战斗状态 (残血判定已移交至 CombatAndChallengeHandler 进行事前拦截)
+        // 判定主人的战斗状态（残血救援判定现在由本类的 onLivingDamage 统一拦截）
         if (isInCombat(player)) {
             this.targetPlayer = player;
             return true;
@@ -130,6 +140,75 @@ public class HeroObserveAndRescueGoal extends Goal {
     }
 
     /**
+     * 【核心修复】：将陪伴救援的伤害拦截直接收口到救援 Goal，
+     * 并改为按玩家当前最大生命值计算救援线，兼容 Spice of Life 一类的加血上限模组。
+     */
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onLivingDamage(LivingDamageEvent event) {
+        if (!(event.getEntity() instanceof ServerPlayer player) || player.level().isClientSide) {
+            return;
+        }
+
+        // 挑战/假死演出期间由专属逻辑接管，避免与陪伴救援互相抢事件。
+        if (player.getPersistentData().getBoolean("IsChallengeActive")
+                || player.getPersistentData().getBoolean("HeroFakeOutPhase")) {
+            return;
+        }
+
+        PlayerHealthCompat.syncExternalMaxHealth(player);
+
+        float finalHealth = Math.min(player.getHealth(), player.getMaxHealth()) - event.getAmount();
+        if (finalHealth > getRescueTriggerHealth(player)) {
+            return;
+        }
+
+        ServerLevel level = (ServerLevel) player.level();
+        long currentTime = level.getGameTime();
+        HeroEntity rescuingHero = findRescuingHero(player, level, currentTime);
+        if (rescuingHero == null) {
+            return;
+        }
+
+        event.setCanceled(true);
+        event.setAmount(0);
+        markRescueTime(rescuingHero, currentTime);
+        performRescue(rescuingHero, player);
+    }
+
+    private static HeroEntity findRescuingHero(ServerPlayer player, ServerLevel level, long currentTime) {
+        for (HeroEntity hero : com.whitecloud233.modid.herobrine_companion.entity.ai.learning.HeroBrain.ACTIVE_HEROES) {
+            if (hero.level() == level && hero.isAlive() && hero.isCompanionMode()
+                    && hero.getOwnerUUID() != null && hero.getOwnerUUID().equals(player.getUUID())
+                    && canRescueNow(hero, currentTime)) {
+                return hero;
+            }
+        }
+        return null;
+    }
+
+    public static float getRescueTriggerHealth(Player player) {
+        float rescueHealthPool = PlayerHealthCompat.getRescueHealthPool(player);
+        float scaledThreshold = rescueHealthPool * RESCUE_HEALTH_RATIO;
+        return Math.min(player.getMaxHealth(), Math.max(RESCUE_HEALTH_THRESHOLD, scaledThreshold));
+    }
+
+    private static float getPostRescueHealth(Player player) {
+        float rescueHealthPool = PlayerHealthCompat.getRescueHealthPool(player);
+        float scaledHealth = rescueHealthPool * POST_RESCUE_HEALTH_RATIO;
+        float safeHealth = Math.max(RESCUE_HEALTH_THRESHOLD + 1.0F, scaledHealth);
+        return Math.min(player.getMaxHealth(), safeHealth);
+    }
+
+    private static boolean canRescueNow(HeroEntity hero, long currentTime) {
+        long lastRescue = hero.getPersistentData().getLong(LAST_RESCUE_TIME_TAG);
+        return lastRescue == 0 || (currentTime - lastRescue) > RESCUE_COOLDOWN;
+    }
+
+    private static void markRescueTime(HeroEntity hero, long currentTime) {
+        hero.getPersistentData().putLong(LAST_RESCUE_TIME_TAG, currentTime);
+    }
+
+    /**
      * 【核心独立救援逻辑】
      * 现在直接由 Event 拦截器调用，可以在玩家暴毙前瞬间发动
      */
@@ -161,19 +240,9 @@ public class HeroObserveAndRescueGoal extends Goal {
         targetPlayer.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 100, 1));
         targetPlayer.addEffect(new MobEffectInstance(MobEffects.ABSORPTION, 100, 1));
 
-        // 👇👇👇 【反锁血/反假死脱困协议】 👇👇👇
-        // 1. 直接拉起一段安全血线，打破客户端 UI 对半颗心的执念
-        targetPlayer.setHealth(Math.max(targetPlayer.getHealth(), RESCUE_HEALTH_THRESHOLD + 1.0F));
-
-        // 2. 强力同步：直接甩一个实体血量刷新包给客户端！
-        if (targetPlayer instanceof ServerPlayer serverPlayer) {
-            serverPlayer.connection.send(new ClientboundSetHealthPacket(
-                    serverPlayer.getHealth(),
-                    serverPlayer.getFoodData().getFoodLevel(),
-                    serverPlayer.getFoodData().getSaturationLevel()
-            ));
-        }
-        // 👆👆👆
+        // 先同步 Spice of Life 一类模组的 MAX_HEALTH modifier，再基于“基础生命池”恢复到安全血线。
+        PlayerHealthCompat.syncExternalMaxHealth(targetPlayer);
+        targetPlayer.setHealth(Math.max(targetPlayer.getHealth(), getPostRescueHealth(targetPlayer)));
 
         hero.getNavigation().stop();
     }

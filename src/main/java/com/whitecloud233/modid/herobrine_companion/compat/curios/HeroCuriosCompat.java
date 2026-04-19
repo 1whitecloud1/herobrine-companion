@@ -2,27 +2,28 @@ package com.whitecloud233.modid.herobrine_companion.compat.curios;
 
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.compat.ArmourerWorkshop.HeroAWCompat;
+import com.whitecloud233.modid.herobrine_companion.network.PacketHandler;
+import com.whitecloud233.modid.herobrine_companion.network.SyncHeroCosmeticsPacket;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.items.IItemHandlerModifiable;
 import net.minecraftforge.items.SlotItemHandler;
+import org.jetbrains.annotations.NotNull;
 import top.theillusivec4.curios.api.CuriosApi;
-import top.theillusivec4.curios.api.type.capability.ICuriosItemHandler;
 
 public class HeroCuriosCompat {
 
     public static Slot createCurioSlot(HeroEntity hero, String curioId, int index, int x, int y) {
-        ICuriosItemHandler handler = CuriosApi.getCuriosInventory(hero).orElse(null);
-        if (handler != null) {
-            var stacksHandler = handler.getCurios().get(curioId);
+        var optionalHandler = CuriosApi.getCuriosInventory(hero).resolve();
+        if (optionalHandler.isPresent()) {
+            var stacksHandler = optionalHandler.get().getCurios().get(curioId);
             if (stacksHandler != null) {
-                IItemHandlerModifiable backend = (IItemHandlerModifiable) stacksHandler.getStacks();
+                var backend = stacksHandler.getStacks();
 
                 if (index >= backend.getSlots()) return null;
 
                 return new SlotItemHandler(backend, index, x, y) {
                     @Override
-                    public boolean mayPlace(ItemStack stack) {
+                    public boolean mayPlace(@NotNull ItemStack stack) {
                         // 1. 先检查是否是时装工坊的物品
                         if (HeroAWCompat.isLoaded() && HeroAWCompat.isAwItem(stack)) {
                             return true;
@@ -36,6 +37,9 @@ public class HeroCuriosCompat {
                     public void setChanged() {
                         super.setChanged();
                         hero.isStateDirty = true; // 触发脏标记！
+                        if (!hero.level().isClientSide) {
+                            PacketHandler.sendToTracking(new SyncHeroCosmeticsPacket(hero), hero);
+                        }
                     }
                 };
             }
@@ -44,9 +48,9 @@ public class HeroCuriosCompat {
     }
 
     public static ItemStack getBackSlotItem(HeroEntity hero) {
-        ICuriosItemHandler handler = CuriosApi.getCuriosInventory(hero).orElse(null);
-        if (handler != null) {
-            var stacksHandler = handler.getCurios().get("back");
+        var optionalHandler = CuriosApi.getCuriosInventory(hero).resolve();
+        if (optionalHandler.isPresent()) {
+            var stacksHandler = optionalHandler.get().getCurios().get("back");
             if (stacksHandler != null) {
                 return stacksHandler.getStacks().getStackInSlot(0);
             }
@@ -55,13 +59,16 @@ public class HeroCuriosCompat {
     }
 
     public static void setBackSlotItem(HeroEntity hero, ItemStack stack) {
-        ICuriosItemHandler handler = CuriosApi.getCuriosInventory(hero).orElse(null);
-        if (handler != null) {
-            var stacksHandler = handler.getCurios().get("back");
+        var optionalHandler = CuriosApi.getCuriosInventory(hero).resolve();
+        if (optionalHandler.isPresent()) {
+            var stacksHandler = optionalHandler.get().getCurios().get("back");
             if (stacksHandler != null) {
-                ((IItemHandlerModifiable) stacksHandler.getStacks()).setStackInSlot(0, stack);
+                stacksHandler.getStacks().setStackInSlot(0, stack);
                 // 👇【新增】：代码强行修改饰品时也触发脏标记
                 hero.isStateDirty = true;
+                if (!hero.level().isClientSide) {
+                    PacketHandler.sendToTracking(new SyncHeroCosmeticsPacket(hero), hero);
+                }
             }
         }
     }

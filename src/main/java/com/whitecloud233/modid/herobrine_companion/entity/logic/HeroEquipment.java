@@ -44,7 +44,6 @@ public class HeroEquipment {
     }
 
     public static void setCuriosBackItemFromTag(HeroEntity hero, CompoundTag tag) {
-        if (tag == null || tag.isEmpty()) return;
         if (ModList.get().isLoaded("curios")) {
             CuriosSafeInvoker.setBackItemFromTag(hero, tag);
         }
@@ -65,7 +64,7 @@ public class HeroEquipment {
         }
 
         static void setBackItemFromTag(HeroEntity hero, CompoundTag tag) {
-            ItemStack stack = ItemStack.of(tag);
+            ItemStack stack = tag != null && !tag.isEmpty() ? ItemStack.of(tag) : ItemStack.EMPTY;
             com.whitecloud233.modid.herobrine_companion.compat.curios.HeroCuriosCompat.setBackSlotItem(hero, stack);
         }
 

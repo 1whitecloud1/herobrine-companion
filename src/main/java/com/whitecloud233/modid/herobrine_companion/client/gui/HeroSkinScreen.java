@@ -17,6 +17,8 @@ import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.util.tinyfd.TinyFileDialogs;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -156,7 +158,7 @@ public class HeroSkinScreen extends Screen {
                     80, 20,
                     Component.translatable("gui.herobrine_companion.confirm"),
                     button -> {
-                        PacketHandler.sendToServer(new ToggleSkinPacket(this.entityId, HeroEntity.SKIN_CUSTOM, this.customSkinName));
+                        PacketHandler.sendToServer(new ToggleSkinPacket(this.entityId, HeroEntity.SKIN_CUSTOM, this.customSkinName, readCustomSkinBytes()));
                     },
                     null
                 );
@@ -264,6 +266,21 @@ public class HeroSkinScreen extends Screen {
                 e.printStackTrace();
             }
         }, "SkinFileChooserThread").start();
+    }
+
+    private byte[] readCustomSkinBytes() {
+        if (this.customSkinName == null || this.customSkinName.isBlank()) {
+            return new byte[0];
+        }
+
+        try {
+            return Files.readAllBytes(Path.of(this.customSkinName));
+        } catch (Exception e) {
+            if (this.minecraft != null && this.minecraft.player != null) {
+                this.minecraft.player.displayClientMessage(Component.literal("Failed to read custom skin file: " + e.getMessage()), false);
+            }
+            return new byte[0];
+        }
     }
 
     @Override

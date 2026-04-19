@@ -3,7 +3,6 @@ package com.whitecloud233.modid.herobrine_companion.client.fight.event;
 import com.whitecloud233.modid.herobrine_companion.client.fight.HeroChallengeManager;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.tags.DamageTypeTags;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -53,7 +52,16 @@ public class ChallengeEventHandler {
 
         // 2. 玩家在“虚晃一枪”期间受到的伤害锁血与无敌
         if (event.getEntity() instanceof ServerPlayer player) {
-            if (player.getPersistentData().getBoolean("HeroFakeOutPhase")) {
+            boolean isFakeOutPhase = player.getPersistentData().getBoolean("HeroFakeOutPhase");
+            boolean isChallengeActive = player.getPersistentData().getBoolean("IsChallengeActive");
+
+            // 如果假死标记残留到了日常/陪伴模式，立刻清掉，避免后续每次受伤都被锁成半颗心。
+            if (isFakeOutPhase && !isChallengeActive) {
+                player.getPersistentData().remove("HeroFakeOutPhase");
+                return;
+            }
+
+            if (isFakeOutPhase) {
                 // 玩家进入绝对的剧情无敌状态，防虚空伤害
                 event.setCanceled(true);
                 player.setHealth(1.0f);

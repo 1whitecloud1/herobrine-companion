@@ -11,6 +11,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.saveddata.SavedData;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 
@@ -43,11 +44,12 @@ public class HeroWorldData {
         public boolean hasSpawnedFromChat = false;
         public int skinVariant = 0;
         public String customSkinName = "";
+        public byte[] customSkinData = new byte[0];
         public CompoundTag tempBrainData = null;
         public long respawnReadyTime = 0;
 
         @Override
-        public CompoundTag save(CompoundTag tag) {
+        public @NotNull CompoundTag save(@NotNull CompoundTag tag) {
             tag.putInt("Trust", trust);
             tag.putIntArray("ClaimedRewards", claimedRewards.stream().mapToInt(i -> i).toArray());
             tag.put("BrainMemory", brainMemory);
@@ -61,6 +63,7 @@ public class HeroWorldData {
             tag.putBoolean("HasSpawnedFromChat", hasSpawnedFromChat);
             tag.putInt("SkinVariant", skinVariant);
             tag.putString("CustomSkinName", customSkinName);
+            tag.putByteArray("CustomSkinData", customSkinData);
             if (tempBrainData != null) tag.put("TempBrainData", tempBrainData);
             tag.putLong("RespawnReadyTime", respawnReadyTime);
             return tag;
@@ -82,6 +85,7 @@ public class HeroWorldData {
             if (tag.contains("HasSpawnedFromChat")) profile.hasSpawnedFromChat = tag.getBoolean("HasSpawnedFromChat");
             if (tag.contains("SkinVariant")) profile.skinVariant = tag.getInt("SkinVariant");
             if (tag.contains("CustomSkinName")) profile.customSkinName = tag.getString("CustomSkinName");
+            if (tag.contains("CustomSkinData", Tag.TAG_BYTE_ARRAY)) profile.customSkinData = tag.getByteArray("CustomSkinData");
             if (tag.contains("TempBrainData")) profile.tempBrainData = tag.getCompound("TempBrainData");
             if (tag.contains("RespawnReadyTime")) profile.respawnReadyTime = tag.getLong("RespawnReadyTime");
             return profile;
@@ -96,7 +100,8 @@ public class HeroWorldData {
 
         private static GlobalPos readGlobalPos(CompoundTag tag) {
             try {
-                ResourceLocation dimLoc = new ResourceLocation(tag.getString("Dimension"));
+                ResourceLocation dimLoc = ResourceLocation.tryParse(tag.getString("Dimension"));
+                if (dimLoc == null) return null;
                 ResourceKey<Level> dimKey = ResourceKey.create(Registries.DIMENSION, dimLoc);
                 return GlobalPos.of(dimKey, NbtUtils.readBlockPos(tag.getCompound("Pos")));
             } catch (Exception e) { return null; }
@@ -112,7 +117,7 @@ public class HeroWorldData {
         public boolean migrated = false;
 
         @Override
-        public CompoundTag save(CompoundTag tag) {
+        public @NotNull CompoundTag save(@NotNull CompoundTag tag) {
             if (activeChallengerUUID != null) tag.putUUID("ActiveChallengerUUID", activeChallengerUUID);
             tag.putBoolean("Migrated", migrated);
             return tag;
@@ -129,7 +134,7 @@ public class HeroWorldData {
     // 用于读取旧版 God Object 数据的临时类，实现无损热迁移
     public static class LegacyData extends SavedData {
         public CompoundTag rawData;
-        @Override public CompoundTag save(CompoundTag t) { return rawData; }
+        @Override public @NotNull CompoundTag save(@NotNull CompoundTag t) { return rawData; }
         public static LegacyData load(CompoundTag t) {
             LegacyData l = new LegacyData();
             l.rawData = t;
@@ -151,7 +156,8 @@ public class HeroWorldData {
 
     public static HeroWorldData get(ServerLevel level) {
         // 确保所有数据统一绑定在主世界 (Overworld)
-        return new HeroWorldData(level.getServer().getLevel(Level.OVERWORLD));
+        ServerLevel overworld = Objects.requireNonNull(level.getServer().getLevel(Level.OVERWORLD));
+        return new HeroWorldData(overworld);
     }
 
     /**
@@ -185,6 +191,7 @@ public class HeroWorldData {
                     profile.hasSpawnedFromChat = oldData.hasSpawnedFromChat;
                     profile.skinVariant = oldData.skinVariant;
                     profile.customSkinName = oldData.customSkinName;
+                    profile.customSkinData = oldData.customSkinData;
                     profile.tempBrainData = oldData.tempBrainData;
                     profile.respawnReadyTime = oldData.respawnReadyTime;
 
@@ -210,7 +217,7 @@ public class HeroWorldData {
         return overworld.getDataStorage().computeIfAbsent(
                 PlayerProfile::load,
                 PlayerProfile::new,
-                "herobrine_companion_player_" + uuid.toString()
+                "herobrine_companion_player_" + uuid
         );
     }
 
@@ -303,6 +310,14 @@ public class HeroWorldData {
         if (uuid == null) return;
         PlayerProfile profile = getProfile(uuid);
         profile.customSkinName = name;
+        profile.setDirty();
+    }
+
+    public byte[] getCustomSkinData(UUID uuid) { return getProfile(uuid).customSkinData; }
+    public void setCustomSkinData(UUID uuid, byte[] data) {
+        if (uuid == null) return;
+        PlayerProfile profile = getProfile(uuid);
+        profile.customSkinData = data != null ? data : new byte[0];
         profile.setDirty();
     }
 

@@ -42,7 +42,7 @@ public class AIObservationPacket {
             Minecraft mc = Minecraft.getInstance();
             if (mc.player != null) {
                 // 1. 检查客户端是否配置了有效的 API Key 以及是否开启了视觉
-                boolean isAiReady = !LLMConfig.isKeyMissing() && com.whitecloud233.modid.herobrine_companion.config.Config.aiVisionEnabled;
+                boolean isAiReady = !LLMConfig.isKeyMissingOrInvalid() && com.whitecloud233.modid.herobrine_companion.config.Config.aiVisionEnabled;
 
                 if (isAiReady) {
                     // 发起大模型请求（消耗当前玩家的 API）

@@ -5,6 +5,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.whitecloud233.modid.herobrine_companion.item.SourceFlowItem;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
@@ -155,6 +156,7 @@ public class AIService {
                 .thenCompose(response -> {
                     if (response.statusCode() == 200) {
                         try {
+                            LLMConfig.markApiKeyValid();
                             JsonObject json = JsonParser.parseString(response.body()).getAsJsonObject();
                             JsonObject responseMessageObj = json.getAsJsonArray("choices").get(0).getAsJsonObject().getAsJsonObject("message");
                             String aiReply = responseMessageObj.has("content") && !responseMessageObj.get("content").isJsonNull()
@@ -188,6 +190,11 @@ public class AIService {
                             return CompletableFuture.completedFuture("Data stream disrupted...");
                         }
                     } else {
+                        if (isInvalidApiKeyResponse(response.statusCode(), response.body())) {
+                            LLMConfig.markApiKeyInvalid();
+                            reopenApiKeyInputScreen();
+                            return CompletableFuture.completedFuture("§c" + Component.translatable("message.herobrine_companion.ai_config_invalid").getString());
+                        }
                         return CompletableFuture.completedFuture("Connection to reality fading... (API Error: " + response.statusCode() + ")");
                     }
                 })
@@ -400,5 +407,27 @@ public class AIService {
             java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("name=\"" + paramName + "\"[^>]*>([\\s\\S]*?)</parameter>").matcher(xml);
             if (matcher.find()) return matcher.group(1).trim();
         } catch (Exception e) {} return null;
+    }
+
+    private static boolean isInvalidApiKeyResponse(int statusCode, String responseBody) {
+        if (statusCode == 401 || statusCode == 403) {
+            return true;
+        }
+        if (responseBody == null || responseBody.isEmpty()) {
+            return false;
+        }
+
+        String normalizedBody = responseBody.toLowerCase(Locale.ROOT);
+        return normalizedBody.contains("invalid api key")
+                || normalizedBody.contains("incorrect api key")
+                || normalizedBody.contains("invalid_api_key")
+                || normalizedBody.contains("api key not valid")
+                || normalizedBody.contains("authentication failed")
+                || normalizedBody.contains("unauthorized");
+    }
+
+    private static void reopenApiKeyInputScreen() {
+        Minecraft mc = Minecraft.getInstance();
+        mc.tell(() -> mc.setScreen(new com.whitecloud233.modid.herobrine_companion.config.ApiKeyInputScreen(new ChatScreen(""))));
     }
 }
