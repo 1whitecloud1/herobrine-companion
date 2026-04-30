@@ -12,6 +12,14 @@ import java.util.Optional;
 
 public class HeroEquipment {
 
+    private static ItemStack parseItemStackOrEmpty(HeroEntity hero, CompoundTag tag) {
+        if (tag == null || tag.isEmpty() || !tag.contains("id", Tag.TAG_STRING)) {
+            return ItemStack.EMPTY;
+        }
+
+        return ItemStack.parse(hero.registryAccess(), tag).orElse(ItemStack.EMPTY);
+    }
+
     // ================= [原生装备序列化 1.21.1] =================
     public static ListTag getArmorItemsTag(HeroEntity hero) {
         ListTag tag = new ListTag();
@@ -50,14 +58,12 @@ public class HeroEquipment {
 
         if (armor != null && !armor.isEmpty()) {
             for(int i = 0; i < armor.size() && i < armorSlots.length; ++i) {
-                Optional<ItemStack> stack = ItemStack.parse(hero.registryAccess(), armor.getCompound(i));
-                hero.setItemSlot(armorSlots[i], stack.orElse(ItemStack.EMPTY));
+                hero.setItemSlot(armorSlots[i], parseItemStackOrEmpty(hero, armor.getCompound(i)));
             }
         }
         if (hands != null && !hands.isEmpty()) {
             for(int i = 0; i < hands.size() && i < handSlots.length; ++i) {
-                Optional<ItemStack> stack = ItemStack.parse(hero.registryAccess(), hands.getCompound(i));
-                hero.setItemSlot(handSlots[i], stack.orElse(ItemStack.EMPTY));
+                hero.setItemSlot(handSlots[i], parseItemStackOrEmpty(hero, hands.getCompound(i)));
             }
         }
     }
@@ -71,7 +77,6 @@ public class HeroEquipment {
     }
 
     public static void setCuriosBackItemFromTag(HeroEntity hero, CompoundTag tag) {
-        if (tag == null || tag.isEmpty()) return;
         if (ModList.get().isLoaded("curios")) {
             CuriosSafeInvoker.setBackItemFromTag(hero, tag);
         }
@@ -94,8 +99,7 @@ public class HeroEquipment {
         }
 
         static void setBackItemFromTag(HeroEntity hero, CompoundTag tag) {
-            Optional<ItemStack> stack = ItemStack.parse(hero.registryAccess(), tag);
-            com.whitecloud233.herobrine_companion.compat.curios.HeroCuriosCompat.setBackSlotItem(hero, stack.orElse(ItemStack.EMPTY));
+            com.whitecloud233.herobrine_companion.compat.curios.HeroCuriosCompat.setBackSlotItem(hero, parseItemStackOrEmpty(hero, tag));
         }
 
         static boolean isBackSlotEmpty(HeroEntity hero) {

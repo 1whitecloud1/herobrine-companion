@@ -17,6 +17,8 @@ import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.util.tinyfd.TinyFileDialogs;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -156,7 +158,7 @@ public class HeroSkinScreen extends Screen {
                             if (this.selectedSkinId != option.variantId) {
                                 this.selectedSkinId = option.variantId;
                                 if (option.variantId != HeroEntity.SKIN_CUSTOM) {
-                                    PacketHandler.sendToServer(new ToggleSkinPacket(this.entityId, option.variantId));
+                                    PacketHandler.sendToServer(new ToggleSkinPacket(this.entityId, HeroEntity.SKIN_CUSTOM, this.customSkinName, readCustomSkinBytes()));
                                 }
                                 this.rebuildWidgets();
                             }
@@ -242,7 +244,20 @@ public class HeroSkinScreen extends Screen {
             }
         }, "SkinFileChooserThread").start();
     }
+    private byte[] readCustomSkinBytes() {
+        if (this.customSkinName == null || this.customSkinName.isBlank()) {
+            return new byte[0];
+        }
 
+        try {
+            return Files.readAllBytes(Path.of(this.customSkinName));
+        } catch (Exception e) {
+            if (this.minecraft != null && this.minecraft.player != null) {
+                this.minecraft.player.displayClientMessage(Component.literal("Failed to read custom skin file: " + e.getMessage()), false);
+            }
+            return new byte[0];
+        }
+    }
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         // 1.21.1: renderBackground 需要这几个额外参数来正确渲染暗色遮罩

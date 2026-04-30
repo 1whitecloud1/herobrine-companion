@@ -29,6 +29,8 @@ public class HeroStateManager {
             data.setCustomSkinName(ownerUUID, hero.getCustomSkinName());
         } else {
             data.setSkinVariant(ownerUUID, hero.getSkinVariant());
+            data.setCustomSkinName(ownerUUID, "");
+            data.setCustomSkinData(ownerUUID, new byte[0]);
         }
 
         // 同步信任度与装备
@@ -65,6 +67,8 @@ public class HeroStateManager {
         hero.setSkinVariant(data.getSkinVariant(ownerUUID));
         if (data.getSkinVariant(ownerUUID) == HeroEntity.SKIN_CUSTOM) {
             hero.setCustomSkinName(data.getCustomSkinName(ownerUUID));
+        } else {
+            hero.setCustomSkinName("");
         }
 
         // 2. 恢复信任度 (如果实体信任度丢失则恢复)
@@ -112,7 +116,10 @@ public class HeroStateManager {
                     new com.whitecloud233.herobrine_companion.network.SavePosePacket(hero.getId(), hero.isPoseEditing, hero.customPoseAngles), hero
             );
         }
-    }
+            com.whitecloud233.herobrine_companion.network.PacketHandler.sendToTracking(
+                    new com.whitecloud233.herobrine_companion.network.SyncHeroCosmeticsPacket(hero), hero
+            );
+        }
 
     // ================== [2. 玩家 NBT 临时挂起与读取 (跨维度/死亡/战斗剔除)] ==================
 
@@ -130,6 +137,7 @@ public class HeroStateManager {
         heroData.putInt("SkinVariant", hero.getSkinVariant());
         if (hero.getSkinVariant() == HeroEntity.SKIN_CUSTOM) {
             heroData.putString("CustomSkinName", hero.getCustomSkinName());
+            heroData.putByteArray("CustomSkinData", HeroWorldData.get((ServerLevel) hero.level()).getCustomSkinData(hero.getOwnerUUID()));
         }
 
         // 提取装备
@@ -173,6 +181,9 @@ public class HeroStateManager {
             hero.setSkinVariant(heroData.getInt("SkinVariant"));
             if (hero.getSkinVariant() == HeroEntity.SKIN_CUSTOM && heroData.contains("CustomSkinName")) {
                 hero.setCustomSkinName(heroData.getString("CustomSkinName"));
+                if (hero.getOwnerUUID() != null && hero.level() instanceof ServerLevel serverLevel && heroData.contains("CustomSkinData", 7)) {
+                    HeroWorldData.get(serverLevel).setCustomSkinData(hero.getOwnerUUID(), heroData.getByteArray("CustomSkinData"));
+                }
             }
         }
 

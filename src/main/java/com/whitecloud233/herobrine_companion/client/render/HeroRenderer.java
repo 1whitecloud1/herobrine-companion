@@ -3,6 +3,7 @@ package com.whitecloud233.herobrine_companion.client.render;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.mojang.logging.LogUtils;
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.client.model.HeroModel;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
@@ -21,21 +22,27 @@ import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
+import org.slf4j.Logger;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 public class HeroRenderer extends LivingEntityRenderer<HeroEntity, PlayerModel<HeroEntity>> {
 
-    private static final ResourceLocation HERO_TEXTURE = ResourceLocation.fromNamespaceAndPath(HerobrineCompanion.MODID, "textures/entity/hero.png");
-    private static final ResourceLocation HEROBRINE_TEXTURE = ResourceLocation.fromNamespaceAndPath(HerobrineCompanion.MODID, "textures/entity/herobrine.png");
+    private static final Logger LOGGER = LogUtils.getLogger();
+
+    private static final ResourceLocation HERO_TEXTURE = ResourceLocation.tryParse(HerobrineCompanion.MODID + ":textures/entity/hero.png");
+    private static final ResourceLocation HEROBRINE_TEXTURE = ResourceLocation.tryParse(HerobrineCompanion.MODID + ":textures/entity/herobrine.png");
 
     private static final Map<String, ResourceLocation> LOCAL_SKIN_CACHE = new HashMap<>();
+    private static final Map<UUID, ResourceLocation> SYNCED_SKIN_CACHE = new HashMap<>();
+    private static final Map<UUID, Integer> SYNCED_SKIN_HASH_CACHE = new HashMap<>();
 
-    // 用于骗过 AW 的纯原版玩家模型
     // 用于骗过 AW 的纯原版玩家模型
     private final PlayerModel<HeroEntity> dummyVanillaModel;
 
@@ -115,6 +122,10 @@ public class HeroRenderer extends LivingEntityRenderer<HeroEntity, PlayerModel<H
         if (variant == HeroEntity.SKIN_HEROBRINE) return HEROBRINE_TEXTURE;
         if (variant == HeroEntity.SKIN_HERO) return HERO_TEXTURE;
         if (variant == HeroEntity.SKIN_CUSTOM) {
+            ResourceLocation syncedSkin = getSyncedSkin(entity.getUUID());
+            if (syncedSkin != null) {
+                return syncedSkin;
+            }
             String customPath = entity.getCustomSkinName();
             if (customPath != null && !customPath.isEmpty()) return getLocalSkin(customPath);
         }
@@ -138,6 +149,38 @@ public class HeroRenderer extends LivingEntityRenderer<HeroEntity, PlayerModel<H
             }
         }
         return HERO_TEXTURE;
+    }
+    private static ResourceLocation getSyncedSkin(UUID heroId) {
+        if (heroId == null) {
+            return null;
+        }
+
+        int currentHash = HeroClientSkinCache.getHash(heroId);
+        ResourceLocation cachedTexture = SYNCED_SKIN_CACHE.get(heroId);
+        if (cachedTexture != null && Integer.valueOf(currentHash).equals(SYNCED_SKIN_HASH_CACHE.get(heroId))) {
+            return cachedTexture;
+        }
+
+        byte[] skinData = HeroClientSkinCache.get(heroId);
+        if (skinData.length == 0) {
+            SYNCED_SKIN_CACHE.remove(heroId);
+            SYNCED_SKIN_HASH_CACHE.remove(heroId);
+            return null;
+        }
+
+        try (InputStream inputStream = new ByteArrayInputStream(skinData)) {
+            NativeImage image = NativeImage.read(inputStream);
+            DynamicTexture texture = new DynamicTexture(image);
+            ResourceLocation location = Minecraft.getInstance().getTextureManager().register("synced_hero_skin_" + heroId.toString().replace('-', '_'), texture);
+            SYNCED_SKIN_CACHE.put(heroId, location);
+            SYNCED_SKIN_HASH_CACHE.put(heroId, currentHash);
+            return location;
+        } catch (Exception e) {
+            LOGGER.warn("Failed to register synced hero skin for {}", heroId, e);
+            SYNCED_SKIN_CACHE.remove(heroId);
+            SYNCED_SKIN_HASH_CACHE.remove(heroId);
+            return null;
+        }
     }
 
     @Override

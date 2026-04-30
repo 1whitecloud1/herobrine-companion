@@ -14,6 +14,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.saveddata.SavedData;
 
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
@@ -46,6 +47,8 @@ public class HeroWorldData {
         public GlobalPos lastKnownHeroPos = null;
         public boolean hasSpawnedFromChat = false;
         public int skinVariant = 0;
+        public byte[] customSkinData = new byte[0];
+
         public String customSkinName = "";
         public CompoundTag tempBrainData = null;
         public long respawnReadyTime = 0;
@@ -65,6 +68,8 @@ public class HeroWorldData {
             if (lastKnownHeroPos != null) tag.put("LastKnownHeroPos", writeGlobalPos(lastKnownHeroPos));
             tag.putBoolean("HasSpawnedFromChat", hasSpawnedFromChat);
             tag.putInt("SkinVariant", skinVariant);
+            tag.putByteArray("CustomSkinData", customSkinData);
+
             tag.putString("CustomSkinName", customSkinName);
             if (tempBrainData != null) tag.put("TempBrainData", tempBrainData);
             tag.putLong("RespawnReadyTime", respawnReadyTime);
@@ -87,6 +92,8 @@ public class HeroWorldData {
             if (tag.contains("LastKnownHeroPos")) profile.lastKnownHeroPos = readGlobalPos(tag.getCompound("LastKnownHeroPos"));
             if (tag.contains("HasSpawnedFromChat")) profile.hasSpawnedFromChat = tag.getBoolean("HasSpawnedFromChat");
             if (tag.contains("SkinVariant")) profile.skinVariant = tag.getInt("SkinVariant");
+            if (tag.contains("CustomSkinData", Tag.TAG_BYTE_ARRAY)) profile.customSkinData = tag.getByteArray("CustomSkinData");
+
             if (tag.contains("CustomSkinName")) profile.customSkinName = tag.getString("CustomSkinName");
             if (tag.contains("TempBrainData")) profile.tempBrainData = tag.getCompound("TempBrainData");
             if (tag.contains("RespawnReadyTime")) profile.respawnReadyTime = tag.getLong("RespawnReadyTime");
@@ -167,7 +174,8 @@ public class HeroWorldData {
 
     public static HeroWorldData get(ServerLevel level) {
         // 确保所有数据统一绑定在主世界 (Overworld)
-        return new HeroWorldData(level.getServer().getLevel(Level.OVERWORLD));
+        ServerLevel overworld = Objects.requireNonNull(level.getServer().getLevel(Level.OVERWORLD));
+        return new HeroWorldData(overworld);
     }
 
     /**
@@ -205,6 +213,7 @@ public class HeroWorldData {
                     profile.hasSpawnedFromChat = oldData.hasSpawnedFromChat;
                     profile.skinVariant = oldData.skinVariant;
                     profile.customSkinName = oldData.customSkinName;
+                    profile.customSkinData = oldData.customSkinData;
                     profile.tempBrainData = oldData.tempBrainData;
                     profile.respawnReadyTime = oldData.respawnReadyTime;
 
@@ -322,7 +331,13 @@ public class HeroWorldData {
         profile.customSkinName = name;
         profile.setDirty();
     }
-
+    public byte[] getCustomSkinData(UUID uuid) { return getProfile(uuid).customSkinData; }
+    public void setCustomSkinData(UUID uuid, byte[] data) {
+        if (uuid == null) return;
+        PlayerProfile profile = getProfile(uuid);
+        profile.customSkinData = data != null ? data : new byte[0];
+        profile.setDirty();
+    }
     public CompoundTag getTempBrainData(UUID uuid) { return getProfile(uuid).tempBrainData; }
     public void setTempBrainData(UUID uuid, CompoundTag data) {
         if (uuid == null) return;

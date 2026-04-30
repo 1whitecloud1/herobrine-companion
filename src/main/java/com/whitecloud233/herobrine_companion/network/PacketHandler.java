@@ -120,7 +120,11 @@ public class PacketHandler {
                 AIObservationPacket.STREAM_CODEC,
                 AIObservationPacket::handle
         );
-
+        registrar.playToClient(
+                SyncHeroCosmeticsPacket.TYPE,
+                SyncHeroCosmeticsPacket.STREAM_CODEC,
+                SyncHeroCosmeticsPacket::handle
+        );
         // ============================================
         // [新增] 试炼崩坏演出相关数据包
         // ============================================
@@ -240,6 +244,10 @@ public class PacketHandler {
     }
 
     public static void sendToPlayer(SPacketFakeCrash packet, ServerPlayer player) {
+        PacketDistributor.sendToPlayer(player, packet);
+    }
+
+    public static void sendToPlayer(SyncHeroCosmeticsPacket packet, ServerPlayer player) {
         PacketDistributor.sendToPlayer(player, packet);
     }
 

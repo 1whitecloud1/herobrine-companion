@@ -187,6 +187,8 @@ public class HeroChallengeManager {
             if (hero.getOwnerUUID() != null) {
                 Player owner = hero.level().getPlayerByUUID(hero.getOwnerUUID());
                 if (owner instanceof ServerPlayer serverPlayer) {
+                    clearPlayerChallengeFlags(serverPlayer);
+
                     owner.sendSystemMessage(Component.translatable("message.herobrine_companion.challenge_victory").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD));
                     hero.increaseTrust(5);
 
@@ -279,6 +281,7 @@ public class HeroChallengeManager {
     public static void failChallenge(ServerPlayer player) {
         CompoundTag playerData = player.getPersistentData();
         playerData.putBoolean("IsChallengeActive", false);
+        playerData.remove("HeroFakeOutPhase");
 
         ServerLevel level = (ServerLevel) player.level();
         HeroEntity activeHero = null;
@@ -367,9 +370,12 @@ public class HeroChallengeManager {
         }
     }
 
-    // ==========================================
-    // [新增] 试炼第一阶段：虚晃一枪（撤回神力）
-    // ==========================================
+    private static void clearPlayerChallengeFlags(ServerPlayer player) {
+        CompoundTag playerData = player.getPersistentData();
+        playerData.remove("HeroFakeOutPhase");
+        playerData.remove("IsChallengeActive");
+    }
+
     // ==========================================
     // [新增] 试炼第一阶段：虚晃一枪（撤回神力）
     // ==========================================
