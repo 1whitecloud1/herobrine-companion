@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.client.event;
 
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.modid.herobrine_companion.client.service.ConversationStore;
 import com.whitecloud233.modid.herobrine_companion.client.service.LocalChatService;
 import com.whitecloud233.modid.herobrine_companion.item.PoemOfTheEndItem;
 import net.minecraft.client.Minecraft;
@@ -26,6 +27,7 @@ public class ClientForgeEvents {
         // 修改说明：LocalChatService 在第一次 getInstance() 时会自动连接数据库。
         // 这里调用 loadChatRules() 是为了确保每次进游戏都重新读取一遍规则。
         LocalChatService.getInstance().loadChatRules();
+        ConversationStore.getInstance().loadForCurrentSession();
     }
 
     @SubscribeEvent

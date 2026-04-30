@@ -1,7 +1,9 @@
 package com.whitecloud233.modid.herobrine_companion.client.gui;
 
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.whitecloud233.modid.herobrine_companion.client.gui.ConversationManagerScreen;
 import com.whitecloud233.modid.herobrine_companion.client.event.ClientHooks;
+import com.whitecloud233.modid.herobrine_companion.client.service.ConversationStore;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.event.ModEvents;
 import com.whitecloud233.modid.herobrine_companion.network.ClearAreaPacket;
@@ -149,12 +151,24 @@ public class HeroScreen extends Screen {
 
         // Chat Action
         this.actionList.addDynamicAction(() -> Component.translatable(ClientHooks.isApiEnabled() ? "gui.herobrine_companion.chat_cloud" : "gui.herobrine_companion.chat_local"), button -> {
+            String activeConversationTitle = null;
+            if (this.minecraft != null && this.minecraft.player != null) {
+                ConversationStore.getInstance().ensureActiveConversation(this.minecraft.player.getUUID());
+                activeConversationTitle = ConversationStore.getInstance().getActiveConversationTitle(this.minecraft.player.getUUID());
+            }
             this.onClose();
             ClientHooks.enableChat();
             Minecraft.getInstance().setScreen(new net.minecraft.client.gui.screens.ChatScreen(""));
             String msgKey = ClientHooks.isApiEnabled() ? "message.herobrine_companion.system_cloud_connected" : "message.herobrine_companion.system_local_mode";
             Minecraft.getInstance().gui.getChat().addMessage(Component.translatable(msgKey));
+            if (ClientHooks.isApiEnabled() && activeConversationTitle != null) {
+                Minecraft.getInstance().gui.getChat().addMessage(Component.translatable("message.herobrine_companion.chat_active_conversation", activeConversationTitle));
+            }
         }, null);
+
+        this.actionList.addAction(Component.translatable("gui.herobrine_companion.chat_conversations"), button -> {
+            Minecraft.getInstance().setScreen(new ConversationManagerScreen(this.entityId));
+        }, Tooltip.create(Component.translatable("gui.herobrine_companion.chat_conversations_tooltip")));
 
         boolean protectionUnlocked = visited;
 

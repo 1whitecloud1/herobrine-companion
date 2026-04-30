@@ -6,10 +6,12 @@ import net.minecraftforge.fml.loading.FMLPaths;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 public class LLMConfig {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static final String DEFAULT_API_KEY_PLACEHOLDER = "YOUR_API_KEY_HERE";
     private static boolean apiKeyMarkedInvalid = false;
 
     // 1. 公开配置：放在 config 文件夹，会被整合包打包
@@ -20,15 +22,86 @@ public class LLMConfig {
     private static final File PRIVATE_SECRETS = FMLPaths.GAMEDIR.get()
             .resolve("herobrine_ai_secrets.json").toFile();
 
+    public enum Provider {
+        DEEPSEEK_OFFICIAL("deepseek_official", "https://api.deepseek.com/chat/completions", "deepseek-chat"),
+        OPENROUTER("openrouter", "https://openrouter.ai/api/v1/chat/completions", "deepseek/deepseek-v3.2-251201"),
+        QINIU_CLOUD("qiniu_cloud", "https://api.qnaigc.com/v1/chat/completions", "deepseek/deepseek-v3.2-251201");
+
+        private final String id;
+        private final String endpoint;
+        private final String defaultModel;
+
+        Provider(String id, String endpoint, String defaultModel) {
+            this.id = id;
+            this.endpoint = endpoint;
+            this.defaultModel = defaultModel;
+        }
+
+        public String getId() {
+            return this.id;
+        }
+
+        public String getEndpoint() {
+            return this.endpoint;
+        }
+
+        public String getDefaultModel() {
+            return this.defaultModel;
+        }
+
+        public Provider next() {
+            Provider[] providers = values();
+            return providers[(this.ordinal() + 1) % providers.length];
+        }
+
+        public static Provider fromSavedValue(String value) {
+            if (value == null || value.isBlank()) {
+                return null;
+            }
+
+            String normalized = value.trim().toLowerCase(Locale.ROOT);
+            for (Provider provider : values()) {
+                if (provider.id.equals(normalized) || provider.name().toLowerCase(Locale.ROOT).equals(normalized)) {
+                    return provider;
+                }
+            }
+            return null;
+        }
+
+        public static Provider fromLegacyEndpoint(String endpoint) {
+            if (endpoint == null || endpoint.isBlank()) {
+                return QINIU_CLOUD;
+            }
+
+            String normalized = endpoint.toLowerCase(Locale.ROOT);
+            if (normalized.contains("openrouter.ai")) {
+                return OPENROUTER;
+            }
+            if (normalized.contains("deepseek.com")) {
+                return DEEPSEEK_OFFICIAL;
+            }
+            if (normalized.contains("qnaigc.com") || normalized.contains("qiniu")) {
+                return QINIU_CLOUD;
+            }
+            return QINIU_CLOUD;
+        }
+
+        public static Provider resolve(String savedProvider, String legacyEndpoint) {
+            Provider provider = fromSavedValue(savedProvider);
+            return provider != null ? provider : fromLegacyEndpoint(legacyEndpoint);
+        }
+    }
+
     // 静态变量
-    public static String aiApiKey = "YOUR_API_KEY_HERE";
-    public static String aiEndpoint = "https://api.qnaigc.com/v1/chat/completions";
-    public static String aiModel = "deepseek/deepseek-v3.2-251201";
+    public static Provider aiProvider = Provider.QINIU_CLOUD;
+    public static String aiApiKey = DEFAULT_API_KEY_PLACEHOLDER;
+    public static String aiEndpoint = Provider.QINIU_CLOUD.getEndpoint();
+    public static String aiModel = Provider.QINIU_CLOUD.getDefaultModel();
     public static String aiSystemPrompt = "You are Herobrine...";
     public static Map<String, String> nbtStructures = new HashMap<>();
 
     public static boolean isKeyMissing() {
-        return aiApiKey == null || aiApiKey.isBlank() || aiApiKey.equals("YOUR_API_KEY_HERE");
+        return aiApiKey == null || aiApiKey.isBlank() || aiApiKey.equals(DEFAULT_API_KEY_PLACEHOLDER);
     }
 
     public static boolean isKeyMissingOrInvalid() {
@@ -43,7 +116,93 @@ public class LLMConfig {
         apiKeyMarkedInvalid = false;
     }
 
+    public static String getDefaultApiKeyPlaceholder() {
+        return DEFAULT_API_KEY_PLACEHOLDER;
+    }
+
+    public static Provider getProvider() {
+        if (aiProvider == null) {
+            aiProvider = Provider.fromLegacyEndpoint(aiEndpoint);
+        }
+        return aiProvider;
+    }
+
+    public static void setProvider(Provider provider) {
+        aiProvider = provider == null ? Provider.QINIU_CLOUD : provider;
+        aiEndpoint = aiProvider.getEndpoint();
+    }
+
+    public static String getResolvedEndpoint() {
+        return getProvider().getEndpoint();
+    }
+
+    public static String getResolvedModel() {
+        return aiModel == null || aiModel.isBlank() ? getProvider().getDefaultModel() : aiModel.trim();
+    }
+
+    public static int getEstimatedContextWindowTokens() {
+        String model = getResolvedModel().toLowerCase(Locale.ROOT);
+        int explicitWindow = inferContextWindowFromModel(model);
+        if (explicitWindow > 0) {
+            return explicitWindow;
+        }
+
+        if (model.contains("deepseek-chat") || model.contains("deepseek-v3") || model.contains("deepseek-r1")) {
+            return 64_000;
+        }
+        if (getProvider() == Provider.OPENROUTER) {
+            return 64_000;
+        }
+        return 32_000;
+    }
+
+    public static int getSuggestedCompletionReserveTokens() {
+        int contextWindow = getEstimatedContextWindowTokens();
+        if (contextWindow >= 128_000) {
+            return 12_000;
+        }
+        if (contextWindow >= 64_000) {
+            return 8_000;
+        }
+        if (contextWindow >= 32_000) {
+            return 6_000;
+        }
+        return 4_000;
+    }
+
+    private static int inferContextWindowFromModel(String model) {
+        if (model == null || model.isBlank()) {
+            return 0;
+        }
+
+        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("(\\d{1,4})(k|m)", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(model);
+        int inferredWindow = 0;
+        while (matcher.find()) {
+            int value = Integer.parseInt(matcher.group(1));
+            String unit = matcher.group(2).toLowerCase(Locale.ROOT);
+            int candidate = "m".equals(unit) ? value * 1_000_000 : value * 1_000;
+            inferredWindow = Math.max(inferredWindow, candidate);
+        }
+        return inferredWindow;
+    }
+
+    private static void normalizeSettings() {
+        setProvider(Provider.resolve(aiProvider == null ? null : aiProvider.getId(), aiEndpoint));
+        if (aiApiKey == null || aiApiKey.isBlank()) {
+            aiApiKey = DEFAULT_API_KEY_PLACEHOLDER;
+        } else {
+            aiApiKey = aiApiKey.trim();
+        }
+        aiModel = getResolvedModel();
+        if (nbtStructures == null) {
+            nbtStructures = new HashMap<>();
+        }
+    }
+
     public static void load() {
+        aiProvider = Provider.QINIU_CLOUD;
+        aiEndpoint = aiProvider.getEndpoint();
+
         // 加载公开设置
         if (PUBLIC_CONFIG.exists()) {
             try (InputStreamReader reader = new InputStreamReader(new FileInputStream(PUBLIC_CONFIG), StandardCharsets.UTF_8)) {
@@ -60,17 +219,20 @@ public class LLMConfig {
         if (PRIVATE_SECRETS.exists()) {
             try (InputStreamReader reader = new InputStreamReader(new FileInputStream(PRIVATE_SECRETS), StandardCharsets.UTF_8)) {
                 SecretData data = GSON.fromJson(reader, SecretData.class);
-                if (data != null && data.aiApiKey != null) {
-                    aiApiKey = data.aiApiKey;
-                    if (data.aiEndpoint != null) aiEndpoint = data.aiEndpoint;
+                if (data != null) {
+                    if (data.aiApiKey != null) aiApiKey = data.aiApiKey;
+                    setProvider(Provider.resolve(data.aiProvider, data.aiEndpoint));
                 }
             } catch (Exception e) { e.printStackTrace(); }
         }
+
+        normalizeSettings();
         save();
     }
 
     public static void save() {
         try {
+            normalizeSettings();
             markApiKeyValid();
 
             // 保存公开配置
@@ -82,8 +244,11 @@ public class LLMConfig {
             }
 
             // 保存私密密钥
+            PRIVATE_SECRETS.getParentFile().mkdirs();
             SecretData sData = new SecretData();
-            sData.aiApiKey = aiApiKey; sData.aiEndpoint = aiEndpoint;
+            sData.aiApiKey = aiApiKey;
+            sData.aiEndpoint = getResolvedEndpoint();
+            sData.aiProvider = getProvider().getId();
             try (Writer writer = new OutputStreamWriter(new FileOutputStream(PRIVATE_SECRETS), StandardCharsets.UTF_8)) {
                 GSON.toJson(sData, writer);
             }
@@ -91,5 +256,5 @@ public class LLMConfig {
     }
 
     private static class ConfigData { String aiModel; String aiSystemPrompt; Map<String, String> nbtStructures; }
-    private static class SecretData { String aiApiKey; String aiEndpoint; }
+    private static class SecretData { String aiApiKey; String aiEndpoint; String aiProvider; }
 }

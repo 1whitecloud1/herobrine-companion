@@ -24,18 +24,16 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
 
 public class AIService {
     private static final Logger LOGGER = LoggerFactory.getLogger(AIService.class);
     private static final HttpClient CLIENT = HttpClient.newHttpClient();
-    private static final Map<UUID, List<JsonObject>> chatHistories = new ConcurrentHashMap<>();
-    private static final int MAX_HISTORY_SIZE = 20;
+    private static final ConversationStore CONVERSATION_STORE = ConversationStore.getInstance();
 
     public static CompletableFuture<String> chat(String userMessage, UUID playerUUID) {
-        return chatWithRetry(userMessage, userMessage, playerUUID, 0);
+        return chatWithRetry(userMessage, userMessage, playerUUID, 0, true);
     }
 
     public static CompletableFuture<String> observeEnvironment(String observationDesc, UUID playerUUID) {
@@ -50,17 +48,18 @@ public class AIService {
                 + "【LANGUAGE OVERRIDE】: You MUST output your final dialogue in the language corresponding to this Minecraft locale code: '" + langCode + "'.";
 
         String historyLog = "[System Vision Log] You observed: " + observationDesc;
-        return chatWithRetry(currentPrompt, historyLog, playerUUID, 0);
+        return chatWithRetry(currentPrompt, historyLog, playerUUID, 0, false);
     }
 
-    private static CompletableFuture<String> chatWithRetry(String currentPrompt, String originalUserMessage, UUID playerUUID, int retryCount) {
+    private static CompletableFuture<String> chatWithRetry(String currentPrompt, String originalUserMessage, UUID playerUUID, int retryCount, boolean allowTitleRefresh) {
         String apiKey = LLMConfig.aiApiKey;
-        String endpoint = LLMConfig.aiEndpoint;
-        String model = LLMConfig.aiModel;
+        LLMConfig.Provider provider = LLMConfig.getProvider();
+        String endpoint = LLMConfig.getResolvedEndpoint();
+        String model = LLMConfig.getResolvedModel();
         String systemPrompt = LLMConfig.aiSystemPrompt;
         String langCode = Minecraft.getInstance().options.languageCode;
 
-        if (apiKey.equals("YOUR_API_KEY_HERE") || apiKey.isEmpty()) {
+        if (LLMConfig.isKeyMissing()) {
             return CompletableFuture.completedFuture("§c" + Component.translatable("message.herobrine_companion.ai_config_missing").getString());
         }
 
@@ -86,13 +85,20 @@ public class AIService {
         // -----------------------------------------------------------
 
         forcedPrompt += getDynamicGameData();
+        CONVERSATION_STORE.ensureActiveConversation(playerUUID);
 
         systemMessage.addProperty("content", forcedPrompt);
         messages.add(systemMessage);
 
-        List<JsonObject> history = chatHistories.computeIfAbsent(playerUUID, k -> new ArrayList<>());
-        synchronized (history) {
-            for (JsonObject historyMsg : history) { messages.add(historyMsg); }
+        List<ConversationStore.ConversationMessageSnapshot> history = trimConversationHistory(
+                CONVERSATION_STORE.getActiveConversationMessages(playerUUID),
+                calculateHistoryTokenBudget(forcedPrompt, currentPrompt, originalUserMessage)
+        );
+        for (ConversationStore.ConversationMessageSnapshot historyMsg : history) {
+            JsonObject historyMessage = new JsonObject();
+            historyMessage.addProperty("role", historyMsg.role());
+            historyMessage.addProperty("content", historyMsg.content());
+            messages.add(historyMessage);
         }
 
         JsonObject userMsg = new JsonObject();
@@ -145,10 +151,16 @@ public class AIService {
         tools.add(tool);
         requestBody.add("tools", tools);
 
-        HttpRequest request = HttpRequest.newBuilder()
+        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
                 .uri(URI.create(endpoint))
                 .header("Content-Type", "application/json")
-                .header("Authorization", "Bearer " + apiKey)
+                .header("Authorization", "Bearer " + apiKey);
+
+        if (provider == LLMConfig.Provider.OPENROUTER) {
+            requestBuilder.header("X-Title", "Herobrine Companion");
+        }
+
+        HttpRequest request = requestBuilder
                 .POST(HttpRequest.BodyPublishers.ofString(requestBody.toString()))
                 .build();
 
@@ -169,21 +181,20 @@ public class AIService {
                                     JsonObject args = JsonParser.parseString(funcObj.get("arguments").getAsString()).getAsJsonObject();
                                     return executeToolAction(args.get("command").getAsString(),
                                             args.has("dialogue") ? args.get("dialogue").getAsString() : "Code altered.",
-                                            playerUUID, originalUserMessage, retryCount);
+                                            playerUUID, originalUserMessage, retryCount, allowTitleRefresh);
                                 }
                             } else if (aiReply != null && aiReply.contains("<invoke name=\"manifest_divine_power\">")) {
                                 String commandToRun = extractXmlParameter(aiReply, "command");
                                 String aiDialogue = extractXmlParameter(aiReply, "dialogue");
                                 if (commandToRun != null) {
-                                    return executeToolAction(commandToRun, aiDialogue != null ? aiDialogue : "Code altered.", playerUUID, originalUserMessage, retryCount);
+                                    return executeToolAction(commandToRun, aiDialogue != null ? aiDialogue : "Code altered.", playerUUID, originalUserMessage, retryCount, allowTitleRefresh);
                                 }
                             }
 
                             String cleanReply = aiReply.replaceAll("<[^>]*>", "").trim();
                             if (cleanReply.isEmpty()) cleanReply = "(Falls into a deep silence...)";
 
-                            addToHistory(playerUUID, "user", originalUserMessage);
-                            addToHistory(playerUUID, "assistant", cleanReply);
+                            addExchangeToConversation(playerUUID, originalUserMessage, cleanReply, allowTitleRefresh);
                             return CompletableFuture.completedFuture(cleanReply);
 
                         } catch (Exception e) {
@@ -201,20 +212,18 @@ public class AIService {
                 .exceptionally(e -> "...... (Network Error)");
     }
 
-    private static CompletableFuture<String> executeToolAction(String commandToRun, String aiDialogue, UUID playerUUID, String originalUserMessage, int retryCount) {
+    private static CompletableFuture<String> executeToolAction(String commandToRun, String aiDialogue, UUID playerUUID, String originalUserMessage, int retryCount, boolean allowTitleRefresh) {
         return executeCommandWithFeedback(commandToRun, playerUUID).thenCompose(success -> {
             if (success) {
-                addToHistory(playerUUID, "user", originalUserMessage);
-                addToHistory(playerUUID, "assistant", aiDialogue);
+                addExchangeToConversation(playerUUID, originalUserMessage, aiDialogue, allowTitleRefresh);
                 return CompletableFuture.completedFuture(aiDialogue);
             } else {
                 if (retryCount < 2) {
                     String systemRetryPrompt = "[System Rejection]: Command /" + commandToRun + " failed. Reason: Syntax error or Cheats are disabled. Do not alter code, just reply gently!";
-                    return chatWithRetry(systemRetryPrompt, originalUserMessage, playerUUID, retryCount + 1);
+                    return chatWithRetry(systemRetryPrompt, originalUserMessage, playerUUID, retryCount + 1, allowTitleRefresh);
                 } else {
                     String failText = "(Gentle sigh) I failed to alter the underlying code, the world laws rejected me...";
-                    addToHistory(playerUUID, "user", originalUserMessage);
-                    addToHistory(playerUUID, "assistant", failText);
+                    addExchangeToConversation(playerUUID, originalUserMessage, failText, allowTitleRefresh);
                     return CompletableFuture.completedFuture(failText);
                 }
             }
@@ -349,16 +358,84 @@ public class AIService {
         return future;
     }
 
-    private static void addToHistory(UUID playerUUID, String role, String content) {
-        List<JsonObject> history = chatHistories.computeIfAbsent(playerUUID, k -> new ArrayList<>());
-        synchronized (history) {
-            JsonObject msg = new JsonObject(); msg.addProperty("role", role); msg.addProperty("content", content);
-            history.add(msg);
-            while (history.size() > MAX_HISTORY_SIZE) history.remove(0);
-        }
+    private static void addExchangeToConversation(UUID playerUUID, String userContent, String assistantContent, boolean allowTitleRefresh) {
+        CONVERSATION_STORE.appendMessage(playerUUID, "user", userContent, allowTitleRefresh);
+        CONVERSATION_STORE.appendMessage(playerUUID, "assistant", assistantContent, false);
     }
 
-    public static void clearHistory(UUID playerUUID) { chatHistories.remove(playerUUID); }
+    public static void clearHistory(UUID playerUUID) {
+        CONVERSATION_STORE.clearActiveConversation(playerUUID);
+    }
+
+    private static List<ConversationStore.ConversationMessageSnapshot> trimConversationHistory(List<ConversationStore.ConversationMessageSnapshot> history, int tokenBudget) {
+        if (history == null || history.isEmpty() || tokenBudget <= 0) {
+            return List.of();
+        }
+
+        List<ConversationStore.ConversationMessageSnapshot> selected = new ArrayList<>();
+        int usedTokens = 0;
+        int startIndex = history.size();
+
+        for (int i = history.size() - 1; i >= 0; i--) {
+            ConversationStore.ConversationMessageSnapshot message = history.get(i);
+            int messageTokens = estimateMessageTokens(message.role(), message.content());
+            if (!selected.isEmpty() && usedTokens + messageTokens > tokenBudget) {
+                break;
+            }
+            selected.add(message);
+            usedTokens += messageTokens;
+            startIndex = i;
+        }
+
+        Collections.reverse(selected);
+        if (!selected.isEmpty() && "assistant".equalsIgnoreCase(selected.get(0).role()) && startIndex > 0) {
+            ConversationStore.ConversationMessageSnapshot previous = history.get(startIndex - 1);
+            if ("user".equalsIgnoreCase(previous.role())) {
+                selected.add(0, previous);
+            }
+        }
+        return selected;
+    }
+
+    private static int calculateHistoryTokenBudget(String forcedPrompt, String currentPrompt, String originalUserMessage) {
+        int contextWindow = LLMConfig.getEstimatedContextWindowTokens();
+        int reserve = LLMConfig.getSuggestedCompletionReserveTokens();
+        int overheadTokens = estimateTextTokens(forcedPrompt)
+                + estimateTextTokens(currentPrompt)
+                + estimateTextTokens(originalUserMessage)
+                + 2_048;
+        return Math.max(0, contextWindow - reserve - overheadTokens);
+    }
+
+    private static int estimateMessageTokens(String role, String content) {
+        return 8 + estimateTextTokens(role) + estimateTextTokens(content);
+    }
+
+    private static int estimateTextTokens(String text) {
+        if (text == null || text.isBlank()) {
+            return 0;
+        }
+
+        int asciiChars = 0;
+        int nonAsciiChars = 0;
+        int whitespace = 0;
+
+        for (int i = 0; i < text.length(); i++) {
+            char ch = text.charAt(i);
+            if (Character.isWhitespace(ch)) {
+                whitespace++;
+            } else if (ch <= 0x7F) {
+                asciiChars++;
+            } else {
+                nonAsciiChars++;
+            }
+        }
+
+        return Math.max(1,
+                (int) Math.ceil((asciiChars + whitespace) / 4.0D)
+                        + (int) Math.ceil(nonAsciiChars / 1.5D)
+        );
+    }
 
     private static String getDynamicGameData() {
         Minecraft mc = Minecraft.getInstance();

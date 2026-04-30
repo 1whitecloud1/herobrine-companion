@@ -2,6 +2,7 @@ package com.whitecloud233.modid.herobrine_companion.client.event;
 
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.modid.herobrine_companion.client.service.AIService;
+import com.whitecloud233.modid.herobrine_companion.client.service.ConversationStore;
 import com.whitecloud233.modid.herobrine_companion.client.service.LLMConfig;
 import com.whitecloud233.modid.herobrine_companion.client.service.LocalChatService;
 import net.minecraft.client.Minecraft;
@@ -134,11 +135,6 @@ public class ClientChatHandler {
     private static void exitChat() {
         ClientHooks.disableChat();
 
-        // 在退出聊天时，清空大模型对当前玩家的短期记忆上下文
-        if (Minecraft.getInstance().player != null) {
-            AIService.clearHistory(Minecraft.getInstance().player.getUUID());
-        }
-
         Minecraft.getInstance().gui.getChat().addMessage(
                 Component.translatable("message.herobrine_companion.chat_exit")
         );
@@ -149,10 +145,6 @@ public class ClientChatHandler {
     public static void onPlayerLogOut(ClientPlayerNetworkEvent.LoggingOut event) {
         // 使用我们刚写的新方法，彻底重置聊天状态和 API 开启状态
         ClientHooks.resetAll();
-
-        // 清理大模型的记忆上下文
-        if (event.getPlayer() != null) {
-            AIService.clearHistory(event.getPlayer().getUUID());
-        }
+        ConversationStore.getInstance().saveAndClearSession();
     }
 }
