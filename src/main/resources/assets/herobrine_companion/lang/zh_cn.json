@@ -216,13 +216,38 @@
   "message.herobrine_companion.not_your_hero": "这里不是你绑定的 Herobrine!",
   "gui.herobrine_companion.api_setup.title": "Herobrine AI 设置",
   "gui.herobrine_companion.api_setup.api_key": "API 密钥",
+
+  "gui.herobrine_companion.conversation_manager.title": "对话管理",
+  "gui.herobrine_companion.conversation_manager.active": "当前对话：%s",
+  "gui.herobrine_companion.conversation_manager.search": "搜索",
+  "gui.herobrine_companion.conversation_manager.search_hint": "搜索标题或聊天内容",
+  "gui.herobrine_companion.conversation_manager.search_empty": "没有匹配的对话",
+  "gui.herobrine_companion.conversation_manager.hint": "点击列表即可切换记忆。搜索会同时检索对话标题和聊天内容；导出会把当前线程保存为本地文本文件。新建对话会从空白上下文开始，旧对话会按世界/服务器持续保存，直到你手动删除。",
+  "gui.herobrine_companion.conversation_manager.new": "新建对话",
+  "gui.herobrine_companion.conversation_manager.export": "导出记录",
+  "gui.herobrine_companion.conversation_manager.continue": "进入聊天",
+  "gui.herobrine_companion.conversation_manager.delete": "删除对话",
+  "gui.herobrine_companion.conversation_manager.default_name": "对话",
+  "message.herobrine_companion.conversation_export_success": "§7[系统] 已导出对话：%s",
+  "message.herobrine_companion.conversation_export_path": "§7[系统] 保存位置：%s",
+  "message.herobrine_companion.conversation_export_failed": "§c[系统] 导出当前对话失败。",
+  "gui.herobrine_companion.chat_conversations": "对话管理",
+  "gui.herobrine_companion.chat_conversations_tooltip": "新建、切换或删除会持久保存的云端对话线程",
+  "gui.herobrine_companion.api_setup.model": "模型名称",
   "gui.herobrine_companion.api_setup.confirm_save": "确认并保存",
-  "gui.herobrine_companion.api_setup.prompt_input": "请输入您的 AI API 密钥",
-  "gui.herobrine_companion.api_setup.prompt_safe": "您的密钥将安全保存在根文件夹中。",
-
-
-
-
+  "gui.herobrine_companion.api_setup.cancel": "取消",
+  "gui.herobrine_companion.api_setup.prompt_input": "请点击下方三个服务商按钮之一，再填写 API 密钥与模型名称",
+  "gui.herobrine_companion.api_setup.prompt_provider": "会自动切换到对应官方接口地址，无需手动修改供应商链接",
+  "gui.herobrine_companion.api_setup.prompt_safe": "您的密钥将安全保存在游戏根目录中。",
+  "gui.herobrine_companion.api_setup.provider_button": "服务商：%s",
+  "gui.herobrine_companion.api_setup.provider.deepseek": "DeepSeek 官方",
+  "gui.herobrine_companion.api_setup.provider.openrouter": "OpenRouter",
+  "gui.herobrine_companion.api_setup.provider.qiniu": "七牛云",
+  "gui.herobrine_companion.api_setup.provider_hint.deepseek": "推荐模型：%s。使用 DeepSeek 官方兼容 OpenAI 的接口。",
+  "gui.herobrine_companion.api_setup.provider_hint.openrouter": "示例模型：%s。可填写 OpenRouter 上支持的任意模型 ID。",
+  "gui.herobrine_companion.api_setup.provider_hint.qiniu": "示例模型：%s。使用七牛云大模型网关，无需手动填写端点。",
+  "gui.herobrine_companion.api_setup.endpoint": "接口地址：%s",
+  "gui.herobrine_companion.api_setup.warning_required": "API 密钥与模型名称不能为空",
 
   "item.herobrine_companion.poem_of_the_end.mode.0": "§6[模式] §f普通 (Normal)",
   "item.herobrine_companion.poem_of_the_end.mode.1": "§6[模式] §c破境 (Realm Breaker)",
@@ -234,6 +259,7 @@
   "item.herobrine_companion.poem_of_the_end.mode.usage.1": "§7右键: 发射雷枪",
   "item.herobrine_companion.poem_of_the_end.mode.usage.2": "§7右键: 召唤落雷",
   "item.herobrine_companion.poem_of_the_end.mode.usage.3": "§7长按左键: 极速连击与裂痕",
+  "message.herobrine_companion.ai_config_invalid": "当前 API 密钥无效或已失效，请重新填写。",
 
 
   "message.herobrine_companion.state_protector_1": "我看到了这个世界的潜力……还有你的。",

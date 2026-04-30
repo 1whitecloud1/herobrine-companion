@@ -53,6 +53,13 @@ versionRange = "*"
 ordering = "AFTER"
 side = "BOTH"
 
+[[dependencies."${mod_id}"]]
+modId = "solcarrot"
+type = "optional"
+versionRange = "*"
+ordering = "AFTER"
+side = "BOTH"
+
 # JEI 物品管理器 (Just Enough Items)
 [[dependencies."${mod_id}"]]
 modId = "jei"

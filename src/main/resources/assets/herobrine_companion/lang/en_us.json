@@ -141,10 +141,8 @@
   "message.herobrine_companion.not_your_hero": "This is not your Herobrine!",
   "gui.herobrine_companion.api_setup.title": "Herobrine AI Setup",
   "gui.herobrine_companion.api_setup.api_key": "API Key",
-  "gui.herobrine_companion.api_setup.confirm_save": "Confirm & Save",
-  "gui.herobrine_companion.api_setup.prompt_input": "Please input your AI API Key",
-  "gui.herobrine_companion.api_setup.prompt_safe": "Your Key will be saved safely in the root folder.",
-
+  "message.herobrine_companion.chat_active_conversation": "§7[System] Active conversation: %s",
+  "message.herobrine_companion.ai_config_missing": "Please open the AI setup screen and choose DeepSeek, OpenRouter, or Qiniu Cloud, then enter your API key and model.",
 
   "message.herobrine_companion.chat_hero": "%s",
   "message.herobrine_companion.chat_you": "§b[You] §f%s",
@@ -249,7 +247,6 @@
   "gui.herobrine_companion.requests_tooltip": "Accept requests from Hero for rewards.",
   "message.herobrine_companion.invite_cancel": "Go",
   "gui.herobrine_companion.lore_handbook_title": "Lore Handbook",
-  "message.herobrine_companion.ai_config_missing": "Please configure your AI API Key in the \\run\\config\\herobrine_companion.json.",
 
   "message.herobrine_companion.area_cleansed": "The code for this area has been rewritten. It should be safe now.",
   "message.herobrine_companion.trust_increase": "§a[System] Trust increased by %s (Current: %s)",
@@ -274,6 +271,37 @@
   "gui.herobrine_companion.confirm": "Confirm",
   "gui.herobrine_companion.wardrobe": "Wardrobe",
   "gui.herobrine_companion.wardrobe_tooltip": "Manage Equipment & Cosmetics",
+  "gui.herobrine_companion.conversation_manager.title": "Conversation Manager",
+  "gui.herobrine_companion.conversation_manager.active": "Active: %s",
+  "gui.herobrine_companion.conversation_manager.search": "Search",
+  "gui.herobrine_companion.conversation_manager.search_hint": "Search titles or chat content",
+  "gui.herobrine_companion.conversation_manager.search_empty": "No matching conversations",
+  "gui.herobrine_companion.conversation_manager.hint": "Click a conversation to switch memory. Search checks both titles and chat content. Export saves the current thread as a local text file. New conversations start empty, old ones stay saved per world/server until you delete them.",
+  "gui.herobrine_companion.conversation_manager.new": "New Chat",
+  "gui.herobrine_companion.conversation_manager.export": "Export",
+  "gui.herobrine_companion.conversation_manager.continue": "Open Chat",
+  "gui.herobrine_companion.conversation_manager.delete": "Delete",
+  "gui.herobrine_companion.conversation_manager.default_name": "Conversation",
+  "message.herobrine_companion.conversation_export_success": "§7[System] Conversation exported: %s",
+  "message.herobrine_companion.conversation_export_path": "§7[System] Saved to: %s",
+  "message.herobrine_companion.conversation_export_failed": "§c[System] Failed to export the current conversation.",
+  "gui.herobrine_companion.chat_conversations": "Conversations",
+  "gui.herobrine_companion.chat_conversations_tooltip": "Create, switch, and delete persistent cloud chat threads",
+  "gui.herobrine_companion.api_setup.model": "Model Name",
+  "gui.herobrine_companion.api_setup.confirm_save": "Confirm & Save",
+  "gui.herobrine_companion.api_setup.cancel": "Cancel",
+  "gui.herobrine_companion.api_setup.prompt_input": "Tap one of the three provider buttons, then enter your API key and model name",
+  "gui.herobrine_companion.api_setup.prompt_provider": "The matching official endpoint will be applied automatically, so no provider URL edits are needed.",
+  "gui.herobrine_companion.api_setup.prompt_safe": "Your key will be saved safely in the game root folder.",
+  "gui.herobrine_companion.api_setup.provider_button": "Provider: %s",
+  "gui.herobrine_companion.api_setup.provider.deepseek": "DeepSeek Official",
+  "gui.herobrine_companion.api_setup.provider.openrouter": "OpenRouter",
+  "gui.herobrine_companion.api_setup.provider.qiniu": "Qiniu Cloud",
+  "gui.herobrine_companion.api_setup.provider_hint.deepseek": "Recommended model: %s. Uses DeepSeek's official OpenAI-compatible endpoint.",
+  "gui.herobrine_companion.api_setup.provider_hint.openrouter": "Example model: %s. You can enter any model ID supported by OpenRouter.",
+  "gui.herobrine_companion.api_setup.provider_hint.qiniu": "Example model: %s. Uses Qiniu Cloud's model gateway without manual endpoint edits.",
+  "gui.herobrine_companion.api_setup.endpoint": "Endpoint: %s",
+  "gui.herobrine_companion.api_setup.warning_required": "API key and model name are required.",
 
 
   "gui.herobrine_companion.config.title": "Herobrine Companion Config",
@@ -301,6 +329,7 @@
   "gui.herobrine_companion.config.transcendence_permit": "Transcendence Permit: %s",
   "gui.herobrine_companion.config.transcendence_permit.tooltip": "Enable/Disable the Transcendence Permit item usage.",
 
+  "message.herobrine_companion.ai_config_invalid": "The current API key is invalid or expired. Please enter it again.",
 
 
 

@@ -2,6 +2,7 @@ package com.whitecloud233.herobrine_companion.client.event;
 
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.client.service.AIService;
+import com.whitecloud233.herobrine_companion.client.service.ConversationStore;
 import com.whitecloud233.herobrine_companion.client.service.LLMConfig;
 import com.whitecloud233.herobrine_companion.client.service.LocalChatService;
 import net.minecraft.client.Minecraft;
@@ -57,7 +58,7 @@ public class ClientChatHandler {
                     // -----------------------------
                     // 【云端模式】走 AI 大模型 API
                     // -----------------------------
-                    if (LLMConfig.isKeyMissing()) {
+                    if (LLMConfig.isKeyMissingOrInvalid()) {
                         // 【核心防御】：发现没填 Key，直接强制弹出 UI 引导，不发网络请求
                         mc.tell(() -> {
                             mc.setScreen(new com.whitecloud233.herobrine_companion.config.ApiKeyInputScreen(new ChatScreen("")));
@@ -154,6 +155,7 @@ public class ClientChatHandler {
         // 清理大模型的记忆上下文
         if (event.getPlayer() != null) {
             AIService.clearHistory(event.getPlayer().getUUID());
+            ConversationStore.getInstance().saveAndClearSession();
         }
     }
 }

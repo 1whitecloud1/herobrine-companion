@@ -38,7 +38,7 @@ public record AIObservationPacket(int heroId, String observationDesc, String fal
             if (mc.player != null) {
                 // 1. 检查客户端是否配置了有效的 API Key 以及是否开启了视觉
                 // 注意：由于旧代码中有 LLMConfig，你需要确保它的引用有效，这里沿用你的逻辑
-                boolean isAiReady = !LLMConfig.isKeyMissing() && Config.aiVisionEnabled;
+                boolean isAiReady = !LLMConfig.isKeyMissingOrInvalid() && Config.aiVisionEnabled;
 
                 if (isAiReady) {
                     // 发起大模型请求（消耗当前玩家的 API）

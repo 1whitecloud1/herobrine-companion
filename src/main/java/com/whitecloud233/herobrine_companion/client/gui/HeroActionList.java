@@ -27,7 +27,9 @@ public class HeroActionList extends ObjectSelectionList<HeroActionList.ActionEnt
         this.addEntry(entry);
         return entry.button;
     }
-
+    public void clearActions() {
+        this.clearEntries();
+    }
     @Override
     public int getRowWidth() {
         return this.width - 10;
