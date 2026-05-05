@@ -64,11 +64,11 @@ public class ApiKeyInputScreen extends Screen {
             LLMConfig.aiModel = this.modelBox.getValue().trim();
             LLMConfig.save(); // 写入根目录私密文件
             this.minecraft.setScreen(this.lastScreen);
-        }).pos(centerX - (contentWidth / 2), 175).size(106, 20).build());
+        }).pos(centerX - (contentWidth / 2), 170).size(106, 20).build());
 
         this.addRenderableWidget(Button.builder(Component.translatable("gui.herobrine_companion.api_setup.cancel"), (button) ->
                 this.minecraft.setScreen(this.lastScreen))
-                .pos(centerX + 4, 175)
+                .pos(centerX + 4, 170)
                 .size(106, 20)
                 .build());
 

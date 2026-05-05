@@ -10,6 +10,8 @@ import com.whitecloud233.modid.herobrine_companion.client.model.GhostSteveModel;
 import com.whitecloud233.modid.herobrine_companion.client.model.HeroDragonModel;
 import com.whitecloud233.modid.herobrine_companion.client.model.HeroModel;
 import com.whitecloud233.modid.herobrine_companion.client.render.*;
+import com.whitecloud233.modid.herobrine_companion.compat.ArmourerWorkshop.HeroAWCompat;
+import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.event.ModEvents;
 import com.whitecloud233.modid.herobrine_companion.item.PoemOfTheEndItem;
 import com.whitecloud233.modid.herobrine_companion.world.inventory.ModMenus;
@@ -76,6 +78,58 @@ public class ClientEvents {
     }
 
     @SubscribeEvent
+    public static void addRendererLayers(EntityRenderersEvent.AddLayers event) {
+        if (!HeroAWCompat.isLoaded()) {
+            return;
+        }
+
+        var heroRenderer = event.getRenderer(ModEvents.HERO.get());
+        var playerRenderer = event.getSkin("default");
+        if (playerRenderer == null) {
+            playerRenderer = event.getSkin("slim");
+        }
+
+        boolean attached = HeroAWCompat.attachAW(heroRenderer, playerRenderer);
+        if (!attached) {
+            LOGGER.warn(">>> [AW INIT] 未能在 AddLayers 阶段为 Hero 绑定 Armourer's Workshop 渲染上下文。 <<<");
+        }
+    }
+
+    private static boolean ensureHeroAwRendererAttached(Minecraft mc) {
+        if (mc == null || mc.level == null || !HeroAWCompat.isLoaded()) {
+            return false;
+        }
+
+        HeroEntity hero = null;
+        for (var entity : mc.level.entitiesForRendering()) {
+            if (entity instanceof HeroEntity heroEntity) {
+                hero = heroEntity;
+                break;
+            }
+        }
+        if (hero == null) {
+            return false;
+        }
+
+        var dispatcher = mc.getEntityRenderDispatcher();
+        var heroRenderer = dispatcher.getRenderer(hero);
+        if (HeroAWCompat.isAttached(heroRenderer)) {
+            return true;
+        }
+
+        var playerRenderer = dispatcher.getSkinMap().get("default");
+        if (playerRenderer == null) {
+            playerRenderer = dispatcher.getSkinMap().get("slim");
+        }
+
+        boolean attached = HeroAWCompat.attachAW(heroRenderer, playerRenderer);
+        if (attached) {
+            LOGGER.info(">>> [AW INIT] 已在客户端 tick 兜底阶段为 Hero 绑定 Armourer's Workshop 渲染上下文。 <<<");
+        }
+        return attached;
+    }
+
+    @SubscribeEvent
     public static void onClientSetup(FMLClientSetupEvent event) {
         event.enqueueWork(() -> {
             MenuScreens.register(ModMenus.HERO_CONTRACT_MENU.get(), HeroContractScreen::new);
@@ -100,6 +154,10 @@ public class ClientEvents {
             if (event.phase != TickEvent.Phase.END) return;
             
             Minecraft mc = Minecraft.getInstance();
+
+            if (mc.level != null && mc.player != null && mc.player.tickCount % 40 == 0) {
+                ensureHeroAwRendererAttached(mc);
+            }
 
             // === 实时检查并注入渲染器 ===
             if (mc.level != null) {

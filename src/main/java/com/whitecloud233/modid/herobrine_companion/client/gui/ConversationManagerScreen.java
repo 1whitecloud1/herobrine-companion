@@ -2,6 +2,7 @@ package com.whitecloud233.modid.herobrine_companion.client.gui;
 
 import com.whitecloud233.modid.herobrine_companion.client.event.ClientHooks;
 import com.whitecloud233.modid.herobrine_companion.client.service.ConversationStore;
+import com.whitecloud233.modid.herobrine_companion.config.LLMSettingsScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -55,12 +56,19 @@ public class ConversationManagerScreen extends Screen {
         int startX = centerX - PANEL_WIDTH / 2;
         int startY = centerY - PANEL_HEIGHT / 2;
 
-        this.searchBox = new EditBox(this.font, startX + 10, startY + 38, PANEL_WIDTH - 20, 20,
+        this.searchBox = new EditBox(this.font, startX + 10, startY + 38, PANEL_WIDTH - 104, 20,
                 Component.translatable("gui.herobrine_companion.conversation_manager.search"));
         this.searchBox.setMaxLength(80);
         this.searchBox.setSuggestion(Component.translatable("gui.herobrine_companion.conversation_manager.search_hint").getString());
         this.searchBox.setResponder(value -> this.refreshConversationList());
         this.addRenderableWidget(this.searchBox);
+
+        this.addRenderableWidget(new HeroScreen.ThemedButton(
+                startX + PANEL_WIDTH - 86, startY + 38, 76, 20,
+                Component.translatable("gui.herobrine_companion.conversation_manager.llm_settings"),
+                button -> Minecraft.getInstance().setScreen(new LLMSettingsScreen(this)),
+                null
+        ));
 
         this.conversationList = new HeroActionList(this.minecraft, PANEL_WIDTH - 20, 96, startY + 66, 24);
         this.conversationList.setLeftPos(startX + 10);

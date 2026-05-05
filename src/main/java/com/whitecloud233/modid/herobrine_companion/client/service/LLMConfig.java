@@ -98,6 +98,10 @@ public class LLMConfig {
     public static String aiEndpoint = Provider.QINIU_CLOUD.getEndpoint();
     public static String aiModel = Provider.QINIU_CLOUD.getDefaultModel();
     public static String aiSystemPrompt = "You are Herobrine...";
+    public static boolean aiStreamingEnabled = false;
+    public static double aiTemperature = 0.95D;
+    public static double aiTopP = 0.92D;
+    public static int aiMaxOutputTokens = 512;
     public static Map<String, String> nbtStructures = new HashMap<>();
 
     public static boolean isKeyMissing() {
@@ -138,6 +142,21 @@ public class LLMConfig {
 
     public static String getResolvedModel() {
         return aiModel == null || aiModel.isBlank() ? getProvider().getDefaultModel() : aiModel.trim();
+    }
+    public static boolean isStreamingEnabled() {
+        return aiStreamingEnabled;
+    }
+
+    public static double getConfiguredTemperature() {
+        return clampDouble(aiTemperature, 0.0D, 2.0D, 0.95D);
+    }
+
+    public static double getConfiguredTopP() {
+        return clampDouble(aiTopP, 0.1D, 1.0D, 0.92D);
+    }
+
+    public static int getConfiguredMaxOutputTokens() {
+        return clampInt(aiMaxOutputTokens, 64, 4096, 512);
     }
 
     public static int getEstimatedContextWindowTokens() {
@@ -194,6 +213,12 @@ public class LLMConfig {
             aiApiKey = aiApiKey.trim();
         }
         aiModel = getResolvedModel();
+        aiSystemPrompt = aiSystemPrompt == null ? "" : aiSystemPrompt.replace("\r\n", "\n").replace('\r', '\n');
+        aiStreamingEnabled = aiStreamingEnabled;
+        aiTemperature = getConfiguredTemperature();
+        aiTopP = getConfiguredTopP();
+        aiMaxOutputTokens = getConfiguredMaxOutputTokens();
+
         if (nbtStructures == null) {
             nbtStructures = new HashMap<>();
         }
@@ -210,6 +235,11 @@ public class LLMConfig {
                 if (data != null) {
                     if (data.aiModel != null) aiModel = data.aiModel;
                     if (data.aiSystemPrompt != null) aiSystemPrompt = data.aiSystemPrompt;
+                    if (data.aiStreamingEnabled != null) aiStreamingEnabled = data.aiStreamingEnabled;
+                    if (data.aiTemperature != null) aiTemperature = data.aiTemperature;
+                    if (data.aiTopP != null) aiTopP = data.aiTopP;
+                    if (data.aiMaxOutputTokens != null) aiMaxOutputTokens = data.aiMaxOutputTokens;
+
                     if (data.nbtStructures != null) nbtStructures = data.nbtStructures;
                 }
             } catch (Exception e) { e.printStackTrace(); }
@@ -238,7 +268,13 @@ public class LLMConfig {
             // 保存公开配置
             PUBLIC_CONFIG.getParentFile().mkdirs();
             ConfigData pData = new ConfigData();
-            pData.aiModel = aiModel; pData.aiSystemPrompt = aiSystemPrompt; pData.nbtStructures = nbtStructures;
+            pData.aiModel = aiModel;
+            pData.aiSystemPrompt = aiSystemPrompt;
+            pData.aiStreamingEnabled = aiStreamingEnabled;
+            pData.aiTemperature = aiTemperature;
+            pData.aiTopP = aiTopP;
+            pData.aiMaxOutputTokens = aiMaxOutputTokens;
+            pData.nbtStructures = nbtStructures;
             try (Writer writer = new OutputStreamWriter(new FileOutputStream(PUBLIC_CONFIG), StandardCharsets.UTF_8)) {
                 GSON.toJson(pData, writer);
             }
@@ -255,6 +291,29 @@ public class LLMConfig {
         } catch (Exception e) { e.printStackTrace(); }
     }
 
-    private static class ConfigData { String aiModel; String aiSystemPrompt; Map<String, String> nbtStructures; }
-    private static class SecretData { String aiApiKey; String aiEndpoint; String aiProvider; }
+
+    private static double clampDouble(double value, double min, double max, double fallback) {
+        if (Double.isNaN(value) || Double.isInfinite(value)) {
+            return fallback;
+        }
+        return Math.max(min, Math.min(max, value));
+    }
+
+    private static int clampInt(int value, int min, int max, int fallback) {
+        if (value <= 0) {
+            return fallback;
+        }
+        return Math.max(min, Math.min(max, value));
+    }
+
+    private static class ConfigData {
+        String aiModel;
+        String aiSystemPrompt;
+        Boolean aiStreamingEnabled;
+        Double aiTemperature;
+        Double aiTopP;
+        Integer aiMaxOutputTokens;
+        Map<String, String> nbtStructures;
+
+    } private static class SecretData { String aiApiKey; String aiEndpoint; String aiProvider; }
 }

@@ -15,9 +15,13 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Mod.EventBusSubscriber(modid = HerobrineCompanion.MODID, value = Dist.CLIENT)
 public class ClientChatHandler {
+    private static final int STREAM_PREVIEW_MAX_CHARS = 96;
+
     // 定义退出聊天的关键词
     private static final Set<String> EXIT_COMMANDS = Set.of("bye", "exit", "quit", "再见", "退出", "拜拜");
 
@@ -66,14 +70,28 @@ public class ClientChatHandler {
                     }
 
                     if (mc.player != null) {
-                        AIService.chat(message, mc.player.getUUID()).thenAccept(reply -> {
-                            // 拿到大模型的回复后，切回主线程将其显示在聊天框
-                            mc.tell(() -> {
+                        if (LLMConfig.isStreamingEnabled()) {
+                            AtomicLong lastOverlayUpdate = new AtomicLong(0L);
+                            AtomicInteger lastOverlayLength = new AtomicInteger(0);
+
+                            AIService.chat(message, mc.player.getUUID(), partial ->
+                                    updateStreamingOverlay(mc, partial, lastOverlayUpdate, lastOverlayLength)
+                            ).thenAccept(reply -> mc.tell(() -> {
+                                showExitHint();
                                 mc.gui.getChat().addMessage(
                                         Component.translatable("message.herobrine_companion.chat_hero", Component.literal(reply))
                                 );
+                            }));
+                        } else {
+                            AIService.chat(message, mc.player.getUUID()).thenAccept(reply -> {
+                                // 拿到大模型的回复后，切回主线程将其显示在聊天框
+                                mc.tell(() -> {
+                                    mc.gui.getChat().addMessage(
+                                            Component.translatable("message.herobrine_companion.chat_hero", Component.literal(reply))
+                                    );
+                                });
                             });
-                        });
+                        }
                     }
                 } else {
                     // -----------------------------
@@ -113,7 +131,10 @@ public class ClientChatHandler {
                 }
 
                 // 显示退出提示
-                showExitHint();
+                // 显示退出提示
+                if (!ClientHooks.isApiEnabled() || !LLMConfig.isStreamingEnabled()) {
+                    showExitHint();
+                }
 
                 // 保持聊天栏不退出
                 // 利用 mc.tell 提交一个主线程任务，在下一帧立刻再把 ChatScreen 弹出来
@@ -131,9 +152,34 @@ public class ClientChatHandler {
                 false
         );
     }
+    private static void updateStreamingOverlay(Minecraft mc, String partialText, AtomicLong lastOverlayUpdate, AtomicInteger lastOverlayLength) {
+        if (partialText == null || partialText.isBlank()) {
+            return;
+        }
 
+        long now = System.currentTimeMillis();
+        int currentLength = partialText.length();
+        long lastUpdate = lastOverlayUpdate.get();
+        int lastLength = lastOverlayLength.get();
+        if ((now - lastUpdate) < 45L && (currentLength - lastLength) < 3) {
+            return;
+        }
+
+        lastOverlayUpdate.set(now);
+        lastOverlayLength.set(currentLength);
+        String preview = partialText.length() > STREAM_PREVIEW_MAX_CHARS
+                ? partialText.substring(partialText.length() - STREAM_PREVIEW_MAX_CHARS)
+                : partialText;
+
+        mc.tell(() -> mc.gui.setOverlayMessage(Component.literal("§e<Herobrine> §f" + preview + "▌"), false));
+    }
     private static void exitChat() {
         ClientHooks.disableChat();
+        // 在退出聊天时，清空大模型对当前玩家的短期记忆上下文
+        if (Minecraft.getInstance().player != null) {
+            AIService.clearHistory(Minecraft.getInstance().player.getUUID());
+        }
+        Minecraft.getInstance().gui.setOverlayMessage(Component.empty(), false);
 
         Minecraft.getInstance().gui.getChat().addMessage(
                 Component.translatable("message.herobrine_companion.chat_exit")
@@ -145,6 +191,11 @@ public class ClientChatHandler {
     public static void onPlayerLogOut(ClientPlayerNetworkEvent.LoggingOut event) {
         // 使用我们刚写的新方法，彻底重置聊天状态和 API 开启状态
         ClientHooks.resetAll();
-        ConversationStore.getInstance().saveAndClearSession();
+        // 清理大模型的记忆上下文
+        if (event.getPlayer() != null) {
+            AIService.clearHistory(event.getPlayer().getUUID());
+            ConversationStore.getInstance().saveAndClearSession();
+        }
+        Minecraft.getInstance().gui.setOverlayMessage(Component.empty(), false);
     }
 }
