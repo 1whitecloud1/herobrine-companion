@@ -137,9 +137,10 @@ dependencies {
     // [新增] 显式引入 Rhino，并使用 implementation 确保编译和运行都可用
     compileOnly "dev.latvian.mods:rhino:2101.+"
     runtimeOnly "dev.latvian.mods:rhino:2101.+"
-    //compileOnly "curse.maven:fdlib-1271749:7653105"
-   // runtimeOnly "curse.maven:fdlib-1271749:7653105"
-    // JEI dependency (Optional)
+
+    compileOnly "curse.maven:epic-fight-mod-405076:7956628"
+    runtimeOnly "curse.maven:epic-fight-mod-405076:7956628"
+
     compileOnly "mezz.jei:jei-${minecraft_version}-common-api:${jei_version}"
     compileOnly "mezz.jei:jei-${minecraft_version}-neoforge-api:${jei_version}"
     // at runtime, use the full JEI jar for NeoForge (only for dev environment)

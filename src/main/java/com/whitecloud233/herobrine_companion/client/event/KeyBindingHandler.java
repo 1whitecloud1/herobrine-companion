@@ -7,15 +7,11 @@ import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Player;
-import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import org.lwjgl.glfw.GLFW;
 
-// 1.21.1 更新：使用 EventBusSubscriber 替代原先在 Mod 类内部的注解调用
-@EventBusSubscriber(modid = "herobrine_companion", value = Dist.CLIENT)
 public class KeyBindingHandler {
 
     // 注册 5 键 (主键盘)
@@ -29,12 +25,8 @@ public class KeyBindingHandler {
     private static int chargeTicks = 0;
 
     // 必须在 Mod 事件总线上注册按键
-    @EventBusSubscriber(modid = "herobrine_companion", value = Dist.CLIENT, bus = EventBusSubscriber.Bus.MOD)
-    public static class ModBusEvents {
-        @SubscribeEvent
-        public static void onKeyRegister(RegisterKeyMappingsEvent event) {
-            event.register(SKILL_KEY);
-        }
+    public static void onKeyRegister(RegisterKeyMappingsEvent event) {
+        event.register(SKILL_KEY);
     }
 
     // 1.21.1 更新：TickEvent 被拆分成了具体的 Pre 和 Post，不再需要检查 event.phase

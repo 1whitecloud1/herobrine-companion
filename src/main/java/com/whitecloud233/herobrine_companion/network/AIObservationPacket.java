@@ -12,7 +12,13 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
 public record AIObservationPacket(int heroId, String observationDesc, String fallbackKey, int fallbackVariants) implements CustomPacketPayload {
+    private static final Map<String, Long> RECENT_OBSERVATIONS = new ConcurrentHashMap<>();
+    private static final long DUPLICATE_SUPPRESS_WINDOW_MS = 5_000L;
 
     // 定义数据包的唯一类型 ID
     public static final Type<AIObservationPacket> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath("herobrine_companion", "ai_observation"));
@@ -36,6 +42,10 @@ public record AIObservationPacket(int heroId, String observationDesc, String fal
         context.enqueueWork(() -> {
             Minecraft mc = Minecraft.getInstance();
             if (mc.player != null) {
+                if (shouldSuppressDuplicate(mc.player.getUUID())) {
+                    return;
+                }
+
                 // 1. 检查客户端是否配置了有效的 API Key 以及是否开启了视觉
                 // 注意：由于旧代码中有 LLMConfig，你需要确保它的引用有效，这里沿用你的逻辑
                 boolean isAiReady = !LLMConfig.isKeyMissingOrInvalid() && Config.aiVisionEnabled;
@@ -60,6 +70,23 @@ public record AIObservationPacket(int heroId, String observationDesc, String fal
                 }
             }
         });
+    }
+
+    private boolean shouldSuppressDuplicate(UUID playerUUID) {
+        if (playerUUID == null) {
+            return false;
+        }
+
+        String normalizedObservation = this.observationDesc() == null ? "" : this.observationDesc().trim().toLowerCase();
+        if (normalizedObservation.isEmpty()) {
+            return false;
+        }
+
+        long now = System.currentTimeMillis();
+        String key = playerUUID + ":" + this.heroId() + ":" + normalizedObservation;
+        Long previous = RECENT_OBSERVATIONS.put(key, now);
+        RECENT_OBSERVATIONS.entrySet().removeIf(entry -> now - entry.getValue() > DUPLICATE_SUPPRESS_WINDOW_MS);
+        return previous != null && now - previous <= DUPLICATE_SUPPRESS_WINDOW_MS;
     }
 
     // 显示原版备用台词的方法

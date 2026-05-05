@@ -69,6 +69,11 @@ public class PacketHandler {
                 ToggleSkinPacket.STREAM_CODEC,
                 ToggleSkinPacket::handle
         );
+        registrar.playToServer(
+                HeroPunishmentPacket.TYPE,
+                HeroPunishmentPacket.STREAM_CODEC,
+                HeroPunishmentPacket::handle
+        );
         registrar.playToClient(
                 TriggerEternalOathPacket.TYPE,
                 TriggerEternalOathPacket.STREAM_CODEC,
@@ -205,6 +210,10 @@ public class PacketHandler {
     }
 
     public static void sendToServer(ToggleSkinPacket packet) {
+        PacketDistributor.sendToServer(packet);
+    }
+
+    public static void sendToServer(HeroPunishmentPacket packet) {
         PacketDistributor.sendToServer(packet);
     }
 

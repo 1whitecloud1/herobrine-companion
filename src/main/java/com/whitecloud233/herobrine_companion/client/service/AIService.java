@@ -19,13 +19,18 @@ import net.minecraft.world.level.Level;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 
@@ -33,9 +38,20 @@ public class AIService {
     private static final Logger LOGGER = LoggerFactory.getLogger(AIService.class);
     private static final HttpClient CLIENT = HttpClient.newHttpClient();
     private static final ConversationStore CONVERSATION_STORE = ConversationStore.getInstance();
+    private static final Map<UUID, Deque<String>> RECENT_REPLIES = new ConcurrentHashMap<>();
+    private static final int MAX_RECENT_REPLIES = 6;
+    private static final String ACTION_TOGGLE_COMPANION = "action:toggle_companion";
+    private static final String ACTION_MASSIVE_LIGHTNING = "action:massive_lightning";
+    private static final String ACTION_SUMMON_TO_PLAYER = "action:summon_to_player";
+    private static final String ACTION_TELEPORT_TO_HERO = "action:teleport_to_hero";
 
     public static CompletableFuture<String> chat(String userMessage, UUID playerUUID) {
-        return chatWithRetry(userMessage, userMessage, playerUUID, 0, true);
+        return chat(userMessage, playerUUID, null);
+    }
+
+    public static CompletableFuture<String> chat(String userMessage, UUID playerUUID, Consumer<String> partialConsumer) {
+        return chatWithRetry(userMessage, userMessage, playerUUID, 0, true, true, true, 0,
+                partialConsumer, LLMConfig.isStreamingEnabled());
     }
 
 
@@ -48,13 +64,18 @@ public class AIService {
                 + "Please give a brief comment (under 30 words).\n"
                 + "【CRITICAL WARNING】: No brackets in reply! Only output dialogue. DO NOT use tools.\n"
                 + "【CURRENT TONE/STYLE】: " + style + ". (IMPORTANT: You MUST speak at least one actual sentence, do NOT be completely silent or only use actions).\n"
+                + "【VARIETY RULE】: Avoid repeating the same opening, catchphrase, or sentence structure from your recent remarks.\n"
                 + "【LANGUAGE OVERRIDE】: You MUST output your final dialogue in the language corresponding to this Minecraft locale code: '" + langCode + "'.";
 
         String historyLog = "[System Vision Log] You observed: " + observationDesc;
-        return chatWithRetry(currentPrompt, historyLog, playerUUID, 0, false);
+        return chatWithRetry(currentPrompt, historyLog, playerUUID, 0, false, false, false, 0,
+                null, LLMConfig.isStreamingEnabled());
     }
 
-    private static CompletableFuture<String> chatWithRetry(String currentPrompt, String originalUserMessage, UUID playerUUID, int retryCount, boolean allowTitleRefresh) {
+    private static CompletableFuture<String> chatWithRetry(String currentPrompt, String originalUserMessage, UUID playerUUID, int retryCount,
+                                                           boolean allowTitleRefresh, boolean includeConversationHistory,
+                                                           boolean persistConversation, int variationRetryCount,
+                                                           Consumer<String> partialConsumer, boolean useStreaming) {
         String apiKey = LLMConfig.aiApiKey;
         LLMConfig.Provider provider = LLMConfig.getProvider();
         String endpoint = LLMConfig.getResolvedEndpoint();
@@ -68,7 +89,12 @@ public class AIService {
 
         JsonObject requestBody = new JsonObject();
         requestBody.addProperty("model", model);
-        requestBody.addProperty("stream", false);
+        requestBody.addProperty("stream", useStreaming);
+        requestBody.addProperty("temperature", Math.min(2.0D, LLMConfig.getConfiguredTemperature() + (includeConversationHistory ? 0.0D : 0.1D)));
+        requestBody.addProperty("top_p", LLMConfig.getConfiguredTopP());
+        requestBody.addProperty("presence_penalty", 0.35D);
+        requestBody.addProperty("frequency_penalty", 0.45D);
+        requestBody.addProperty("max_tokens", LLMConfig.getConfiguredMaxOutputTokens());
 
         JsonArray messages = new JsonArray();
         JsonObject systemMessage = new JsonObject();
@@ -88,20 +114,24 @@ public class AIService {
         // -----------------------------------------------------------
 
         forcedPrompt += getDynamicGameData();
-        CONVERSATION_STORE.ensureActiveConversation(playerUUID);
+        if (includeConversationHistory || persistConversation) {
+            CONVERSATION_STORE.ensureActiveConversation(playerUUID);
+        }
 
         systemMessage.addProperty("content", forcedPrompt);
         messages.add(systemMessage);
 
-        List<ConversationStore.ConversationMessageSnapshot> history = trimConversationHistory(
-                CONVERSATION_STORE.getActiveConversationMessages(playerUUID),
-                calculateHistoryTokenBudget(forcedPrompt, currentPrompt, originalUserMessage)
-        );
-        for (ConversationStore.ConversationMessageSnapshot historyMsg : history) {
-            JsonObject historyMessage = new JsonObject();
-            historyMessage.addProperty("role", historyMsg.role());
-            historyMessage.addProperty("content", historyMsg.content());
-            messages.add(historyMessage);
+        if (includeConversationHistory) {
+            List<ConversationStore.ConversationMessageSnapshot> history = trimConversationHistory(
+                    CONVERSATION_STORE.getActiveConversationMessages(playerUUID),
+                    calculateHistoryTokenBudget(forcedPrompt, currentPrompt, originalUserMessage)
+            );
+            for (ConversationStore.ConversationMessageSnapshot historyMsg : history) {
+                JsonObject historyMessage = new JsonObject();
+                historyMessage.addProperty("role", historyMsg.role());
+                historyMessage.addProperty("content", historyMsg.content());
+                messages.add(historyMessage);
+            }
         }
 
         JsonObject userMsg = new JsonObject();
@@ -123,8 +153,7 @@ public class AIService {
                 "1. [Follow/Summon/Teleport]: CRITICAL: If the player asks you to come to them, output 'action:summon_to_player'. If the player asks to teleport to YOU, output 'action:teleport_to_hero'. Do NOT just say you are already there! Use action:toggle_companion to toggle follow state. " +
                 "2. [Dimension/Locate]: execute in <dimension_id> run tp @s ~ 100 ~ (e.g. execute in minecraft:the_nether run tp @s ~ 100 ~). locate biome/structure. Use specific mod IDs if requested. " +
                 "3. [Creation/Give]: place template ID ~5 ~ ~ or place structure. give @s ID count. " +
-                "4. [Punishment]: summon lightning_bolt ^ ^ ^10 or action:massive_lightning. " +
-                "5. [Admin]: gamemode creative @s (mock them), gamemode survival @s (strip power). " +
+                "4. [Punishment]: summon lightning_bolt ^ ^ ^10 or action:massive_lightning. If the player's current words, tone, and conversation context make you decide on a final punishment, you may also use action:punishment_kill_player or action:punishment_kick_player. That judgment is entirely yours; do not wait for any separate unlock state. " +    "5. [Admin]: gamemode creative @s (mock them), gamemode survival @s (strip power). " +
                 "6. [Environment]: time set day/night, weather clear/thunder. " +
                 "RULE: You are the lonely god. Command blocks are your creation.";
         function.addProperty("description", divineSpellbook);
@@ -159,6 +188,10 @@ public class AIService {
                 .header("Content-Type", "application/json")
                 .header("Authorization", "Bearer " + apiKey);
 
+        if (useStreaming) {
+            requestBuilder.header("Accept", "text/event-stream");
+        }
+
         if (provider == LLMConfig.Provider.OPENROUTER) {
             requestBuilder.header("X-Title", "Herobrine Companion");
         }
@@ -166,6 +199,11 @@ public class AIService {
         HttpRequest request = requestBuilder
                 .POST(HttpRequest.BodyPublishers.ofString(requestBody.toString()))
                 .build();
+
+        if (useStreaming) {
+            return sendStreamingRequest(request, currentPrompt, originalUserMessage, playerUUID, retryCount,
+                    allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount, partialConsumer);
+        }
 
         return CLIENT.sendAsync(request, HttpResponse.BodyHandlers.ofString())
                 .thenCompose(response -> {
@@ -184,21 +222,24 @@ public class AIService {
                                     JsonObject args = JsonParser.parseString(funcObj.get("arguments").getAsString()).getAsJsonObject();
                                     return executeToolAction(args.get("command").getAsString(),
                                             args.has("dialogue") ? args.get("dialogue").getAsString() : "Code altered.",
-                                            playerUUID, originalUserMessage, retryCount, allowTitleRefresh);
+                                            playerUUID, originalUserMessage, retryCount, allowTitleRefresh,
+                                            includeConversationHistory, persistConversation, variationRetryCount,
+                                            partialConsumer, useStreaming);
                                 }
                             } else if (aiReply != null && aiReply.contains("<invoke name=\"manifest_divine_power\">")) {
                                 String commandToRun = extractXmlParameter(aiReply, "command");
                                 String aiDialogue = extractXmlParameter(aiReply, "dialogue");
                                 if (commandToRun != null) {
-                                    return executeToolAction(commandToRun, aiDialogue != null ? aiDialogue : "Code altered.", playerUUID, originalUserMessage, retryCount, allowTitleRefresh);
+                                    return executeToolAction(commandToRun, aiDialogue != null ? aiDialogue : "Code altered.", playerUUID,
+                                            originalUserMessage, retryCount, allowTitleRefresh,
+                                            includeConversationHistory, persistConversation, variationRetryCount,
+                                            partialConsumer, useStreaming);
                                 }
                             }
 
-                            String cleanReply = aiReply.replaceAll("<[^>]*>", "").trim();
-                            if (cleanReply.isEmpty()) cleanReply = "(Falls into a deep silence...)";
-
-                            addExchangeToConversation(playerUUID, originalUserMessage, cleanReply, allowTitleRefresh);
-                            return CompletableFuture.completedFuture(cleanReply);
+                            return finalizeTextReply(aiReply, currentPrompt, originalUserMessage, playerUUID, retryCount,
+                                    allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount,
+                                    partialConsumer, useStreaming);
 
                         } catch (Exception e) {
                             return CompletableFuture.completedFuture("Data stream disrupted...");
@@ -215,18 +256,185 @@ public class AIService {
                 .exceptionally(e -> "...... (Network Error)");
     }
 
-    private static CompletableFuture<String> executeToolAction(String commandToRun, String aiDialogue, UUID playerUUID, String originalUserMessage, int retryCount, boolean allowTitleRefresh) {
+    private static CompletableFuture<String> sendStreamingRequest(HttpRequest request, String currentPrompt, String originalUserMessage,
+                                                                  UUID playerUUID, int retryCount, boolean allowTitleRefresh,
+                                                                  boolean includeConversationHistory, boolean persistConversation,
+                                                                  int variationRetryCount, Consumer<String> partialConsumer) {
+        return CompletableFuture.supplyAsync(() -> readStreamingResponse(request, partialConsumer))
+                .thenCompose(streamingResponse -> {
+                    if (streamingResponse.statusCode == 200) {
+                        LLMConfig.markApiKeyValid();
+                        if ("manifest_divine_power".equals(streamingResponse.toolName) && streamingResponse.toolArguments != null && !streamingResponse.toolArguments.isBlank()) {
+                            try {
+                                JsonObject args = JsonParser.parseString(streamingResponse.toolArguments).getAsJsonObject();
+                                return executeToolAction(args.get("command").getAsString(),
+                                        args.has("dialogue") ? args.get("dialogue").getAsString() : "Code altered.",
+                                        playerUUID, originalUserMessage, retryCount, allowTitleRefresh,
+                                        includeConversationHistory, persistConversation, variationRetryCount,
+                                        partialConsumer, true);
+                            } catch (Exception e) {
+                                LOGGER.warn("Failed to parse streamed tool call arguments", e);
+                            }
+                        }
+
+                        return finalizeTextReply(streamingResponse.reply, currentPrompt, originalUserMessage, playerUUID, retryCount,
+                                allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount,
+                                partialConsumer, true);
+                    }
+
+                    if (isInvalidApiKeyResponse(streamingResponse.statusCode, streamingResponse.errorBody)) {
+                        LLMConfig.markApiKeyInvalid();
+                        reopenApiKeyInputScreen();
+                        return CompletableFuture.completedFuture("§c" + Component.translatable("message.herobrine_companion.ai_config_invalid").getString());
+                    }
+                    return CompletableFuture.completedFuture("Connection to reality fading... (API Error: " + streamingResponse.statusCode + ")");
+                })
+                .exceptionally(e -> "...... (Network Error)");
+    }
+
+    private static StreamingResponse readStreamingResponse(HttpRequest request, Consumer<String> partialConsumer) {
+        try {
+            HttpResponse<InputStream> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofInputStream());
+            if (response.statusCode() != 200) {
+                try (InputStream errorStream = response.body()) {
+                    String errorBody = new String(errorStream.readAllBytes(), StandardCharsets.UTF_8);
+                    return StreamingResponse.error(response.statusCode(), errorBody);
+                }
+            }
+
+            try (InputStream inputStream = response.body();
+                 BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
+                StringBuilder replyBuilder = new StringBuilder();
+                StreamToolAccumulator toolAccumulator = new StreamToolAccumulator();
+                StreamEmitState emitState = new StreamEmitState();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    if (line.isBlank()) {
+                        continue;
+                    }
+
+                    String trimmedLine = line.trim();
+                    if (trimmedLine.startsWith("data:")) {
+                        String data = trimmedLine.substring(5).trim();
+                        if (data.isEmpty()) {
+                            continue;
+                        }
+                        if ("[DONE]".equals(data)) {
+                            break;
+                        }
+                        processStreamingPayload(data, replyBuilder, toolAccumulator, partialConsumer, emitState);
+                    } else if (trimmedLine.startsWith("{")) {
+                        processStreamingPayload(trimmedLine, replyBuilder, toolAccumulator, partialConsumer, emitState);
+                    }
+                }
+                return StreamingResponse.success(replyBuilder.toString(), toolAccumulator.getToolName(), toolAccumulator.getToolArguments());
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static void processStreamingPayload(String payload, StringBuilder replyBuilder, StreamToolAccumulator toolAccumulator,
+                                                Consumer<String> partialConsumer, StreamEmitState emitState) {
+        try {
+            JsonObject json = JsonParser.parseString(payload).getAsJsonObject();
+            JsonArray choices = json.getAsJsonArray("choices");
+            if (choices == null || choices.isEmpty()) {
+                return;
+            }
+
+            JsonObject choice = choices.get(0).getAsJsonObject();
+            JsonObject delta = null;
+            if (choice.has("delta") && choice.get("delta").isJsonObject()) {
+                delta = choice.getAsJsonObject("delta");
+            } else if (choice.has("message") && choice.get("message").isJsonObject()) {
+                delta = choice.getAsJsonObject("message");
+            }
+
+            if (delta == null) {
+                return;
+            }
+
+            if (delta.has("content") && !delta.get("content").isJsonNull()) {
+                String deltaText = delta.get("content").getAsString();
+                if (!deltaText.isEmpty()) {
+                    replyBuilder.append(deltaText);
+                    emitStreamingText(partialConsumer, replyBuilder, emitState);
+                }
+            }
+
+            if (delta.has("tool_calls") && delta.get("tool_calls").isJsonArray()) {
+                toolAccumulator.absorb(delta.getAsJsonArray("tool_calls"));
+            }
+        } catch (Exception e) {
+            LOGGER.debug("Ignoring malformed streaming payload: {}", payload, e);
+        }
+    }
+
+    private static void emitStreamingText(Consumer<String> partialConsumer, StringBuilder replyBuilder, StreamEmitState emitState) {
+        if (partialConsumer == null || replyBuilder.isEmpty()) {
+            return;
+        }
+
+        long now = System.currentTimeMillis();
+        int currentLength = replyBuilder.length();
+        if ((now - emitState.lastEmitAt) < 40L && (currentLength - emitState.lastEmitLength) < 2) {
+            return;
+        }
+
+        emitState.lastEmitAt = now;
+        emitState.lastEmitLength = currentLength;
+        partialConsumer.accept(replyBuilder.toString());
+    }
+
+    private static CompletableFuture<String> finalizeTextReply(String aiReply, String currentPrompt, String originalUserMessage,
+                                                               UUID playerUUID, int retryCount, boolean allowTitleRefresh,
+                                                               boolean includeConversationHistory, boolean persistConversation,
+                                                               int variationRetryCount, Consumer<String> partialConsumer,
+                                                               boolean useStreaming) {
+        String cleanReply = (aiReply == null ? "" : aiReply).replaceAll("<[^>]*>", "").trim();
+        if (cleanReply.isEmpty()) cleanReply = "(Falls into a deep silence...)";
+
+        if (variationRetryCount < 1 && shouldRegenerateForRepetition(playerUUID, cleanReply)) {
+            String antiRepeatPrompt = currentPrompt
+                    + "\n[ANTI-REPETITION]: Your previous draft sounds too similar to your recent replies."
+                    + " Rewrite it with a different opening, different wording, and a fresh sentence structure."
+                    + " Keep the same meaning, keep it natural, and do not mention this instruction.";
+            return chatWithRetry(antiRepeatPrompt, originalUserMessage, playerUUID, retryCount,
+                    allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount + 1,
+                    partialConsumer, useStreaming);
+        }
+
+        rememberRecentReply(playerUUID, cleanReply);
+        if (persistConversation) {
+            addExchangeToConversation(playerUUID, originalUserMessage, cleanReply, allowTitleRefresh);
+        }
+        return CompletableFuture.completedFuture(cleanReply);
+    }
+
+    private static CompletableFuture<String> executeToolAction(String commandToRun, String aiDialogue, UUID playerUUID, String originalUserMessage,
+                                                               int retryCount, boolean allowTitleRefresh, boolean includeConversationHistory,
+                                                               boolean persistConversation, int variationRetryCount,
+                                                               Consumer<String> partialConsumer, boolean useStreaming) {
         return executeCommandWithFeedback(commandToRun, playerUUID).thenCompose(success -> {
             if (success) {
-                addExchangeToConversation(playerUUID, originalUserMessage, aiDialogue, allowTitleRefresh);
+                rememberRecentReply(playerUUID, aiDialogue);
+                if (persistConversation) {
+                    addExchangeToConversation(playerUUID, originalUserMessage, aiDialogue, allowTitleRefresh);
+                }
                 return CompletableFuture.completedFuture(aiDialogue);
             } else {
                 if (retryCount < 2) {
                     String systemRetryPrompt = "[System Rejection]: Command /" + commandToRun + " failed. Reason: Syntax error or Cheats are disabled. Do not alter code, just reply gently!";
-                    return chatWithRetry(systemRetryPrompt, originalUserMessage, playerUUID, retryCount + 1, allowTitleRefresh);
+                    return chatWithRetry(systemRetryPrompt, originalUserMessage, playerUUID, retryCount + 1,
+                            allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount,
+                            partialConsumer, useStreaming);
                 } else {
                     String failText = "(Gentle sigh) I failed to alter the underlying code, the world laws rejected me...";
-                    addExchangeToConversation(playerUUID, originalUserMessage, failText, allowTitleRefresh);
+                    rememberRecentReply(playerUUID, failText);
+                    if (persistConversation) {
+                        addExchangeToConversation(playerUUID, originalUserMessage, failText, allowTitleRefresh);
+                    }
                     return CompletableFuture.completedFuture(failText);
                 }
             }
@@ -238,11 +446,12 @@ public class AIService {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) { future.complete(false); return future; }
         mc.tell(() -> {
-            if (!"action:toggle_companion".equals(command) && !mc.player.hasPermissions(2)) {
+            if (!isPermissionBypassAction(command) && !mc.player.hasPermissions(2)) {
                 mc.gui.getChat().addMessage(Component.literal("§4[System Block] Cheats are disabled in this world, Herobrine's physical interference is revoked!"));
                 future.complete(false); return;
             }
-            if ("action:toggle_companion".equals(command)) {
+
+            if (ACTION_TOGGLE_COMPANION.equals(command)) {
                 if (mc.level != null) {
                     for (net.minecraft.world.entity.Entity entity : mc.level.entitiesForRendering()) {
                         if (entity instanceof com.whitecloud233.herobrine_companion.entity.HeroEntity) {
@@ -252,7 +461,7 @@ public class AIService {
                     }
                 }
                 future.complete(false);
-            } else if ("action:massive_lightning".equals(command)) {
+            } else if (ACTION_MASSIVE_LIGHTNING.equals(command)) {
                 if (mc.hasSingleplayerServer() && mc.getSingleplayerServer() != null) {
                     mc.getSingleplayerServer().execute(() -> {
                         try {
@@ -268,7 +477,47 @@ public class AIService {
                         } catch (Exception e) { future.complete(false); }
                     });
                 } else future.complete(false);
-            } else if ("action:summon_to_player".equals(command) || command.startsWith("tp @e[type=herobrine_companion:hero")) {
+            } else if (com.whitecloud233.herobrine_companion.network.HeroPunishmentPacket.ACTION_KILL_PLAYER.equals(command)) {
+                if (mc.hasSingleplayerServer() && mc.getSingleplayerServer() != null) {
+                    var server = mc.getSingleplayerServer();
+                    server.execute(() -> {
+                        try {
+                            ServerPlayer serverPlayer = server.getPlayerList().getPlayer(targetPlayerUUID);
+                            if (serverPlayer == null) { future.complete(false); return; }
+
+                            if (serverPlayer.isAlive()) {
+                                serverPlayer.kill();
+                            }
+                            future.complete(true);
+                        } catch (Exception e) { future.complete(false); }
+                    });
+                } else {
+                    com.whitecloud233.herobrine_companion.network.PacketHandler.sendToServer(
+                            new com.whitecloud233.herobrine_companion.network.HeroPunishmentPacket(command)
+                    );
+                    future.complete(true);
+                }
+
+            } else if (com.whitecloud233.herobrine_companion.network.HeroPunishmentPacket.ACTION_KICK_PLAYER.equals(command)) {
+                if (mc.hasSingleplayerServer() && mc.getSingleplayerServer() != null) {
+                    var server = mc.getSingleplayerServer();
+                    server.execute(() -> {
+                        try {
+                            ServerPlayer serverPlayer = server.getPlayerList().getPlayer(targetPlayerUUID);
+                            if (serverPlayer == null) { future.complete(false); return; }
+
+                            serverPlayer.connection.disconnect(Component.literal("Herobrine has cast you out."));
+                            future.complete(true);
+                        } catch (Exception e) { future.complete(false); }
+                    });
+                } else {
+                    com.whitecloud233.herobrine_companion.network.PacketHandler.sendToServer(
+                            new com.whitecloud233.herobrine_companion.network.HeroPunishmentPacket(command)
+                    );
+                    future.complete(true);
+                }
+
+            } else if (ACTION_SUMMON_TO_PLAYER.equals(command) || command.startsWith("tp @e[type=herobrine_companion:hero")) {
                 if (mc.hasSingleplayerServer() && mc.getSingleplayerServer() != null) {
                     var server = mc.getSingleplayerServer();
                     server.execute(() -> {
@@ -293,8 +542,9 @@ public class AIService {
                 }
 
 
-            } else if ("action:teleport_to_hero".equals(command) || command.startsWith("tp @s @e[type=herobrine_companion:hero")) {
+            } else if (ACTION_TELEPORT_TO_HERO.equals(command) || command.startsWith("tp @s @e[type=herobrine_companion:hero")) {
                 // 【行为2：玩家传送到 AI 身边】
+
                 if (mc.hasSingleplayerServer() && mc.getSingleplayerServer() != null) {
                     var server = mc.getSingleplayerServer();
                     server.execute(() -> {
@@ -349,13 +599,181 @@ public class AIService {
         });
         return future;
     }
+    private static boolean isPermissionBypassAction(String command) {
+        return ACTION_TOGGLE_COMPANION.equals(command)
+                || isExtremePunishmentAction(command);
+    }
+
+    private static boolean isExtremePunishmentAction(String command) {
+        return com.whitecloud233.herobrine_companion.network.HeroPunishmentPacket.ACTION_KILL_PLAYER.equals(command)
+                || com.whitecloud233.herobrine_companion.network.HeroPunishmentPacket.ACTION_KICK_PLAYER.equals(command);
+    }
+
     private static void addExchangeToConversation(UUID playerUUID, String userContent, String assistantContent, boolean allowTitleRefresh) {
         CONVERSATION_STORE.appendMessage(playerUUID, "user", userContent, allowTitleRefresh);
         CONVERSATION_STORE.appendMessage(playerUUID, "assistant", assistantContent, false);
     }
 
+    private static void rememberRecentReply(UUID playerUUID, String reply) {
+        if (playerUUID == null || reply == null || reply.isBlank()) {
+            return;
+        }
+
+        String normalized = normalizeForRepeatCheck(reply);
+        if (normalized.isEmpty()) {
+            return;
+        }
+
+        RECENT_REPLIES.compute(playerUUID, (uuid, existing) -> {
+            Deque<String> deque = existing == null ? new ArrayDeque<>() : existing;
+            deque.addLast(normalized);
+            while (deque.size() > MAX_RECENT_REPLIES) {
+                deque.removeFirst();
+            }
+            return deque;
+        });
+    }
+
+    private static boolean shouldRegenerateForRepetition(UUID playerUUID, String reply) {
+        if (playerUUID == null || reply == null || reply.isBlank()) {
+            return false;
+        }
+
+        Deque<String> recentReplies = RECENT_REPLIES.get(playerUUID);
+        if (recentReplies == null || recentReplies.isEmpty()) {
+            return false;
+        }
+
+        String normalizedReply = normalizeForRepeatCheck(reply);
+        if (normalizedReply.isEmpty()) {
+            return false;
+        }
+
+        for (String previous : recentReplies) {
+            if (isLikelyRepeatedReply(previous, normalizedReply)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isLikelyRepeatedReply(String previous, String current) {
+        if (previous == null || current == null || previous.isEmpty() || current.isEmpty()) {
+            return false;
+        }
+        if (previous.equals(current)) {
+            return true;
+        }
+        if (previous.length() >= 10 && current.length() >= 10 && (previous.contains(current) || current.contains(previous))) {
+            return true;
+        }
+
+        Set<String> previousTokens = tokenizeForRepeatCheck(previous);
+        Set<String> currentTokens = tokenizeForRepeatCheck(current);
+        if (previousTokens.isEmpty() || currentTokens.isEmpty()) {
+            return false;
+        }
+
+        Set<String> intersection = new HashSet<>(previousTokens);
+        intersection.retainAll(currentTokens);
+        Set<String> union = new HashSet<>(previousTokens);
+        union.addAll(currentTokens);
+        double similarity = union.isEmpty() ? 0.0D : (double) intersection.size() / (double) union.size();
+        return similarity >= 0.82D;
+    }
+
+    private static String normalizeForRepeatCheck(String text) {
+        return text == null ? "" : text.toLowerCase(Locale.ROOT)
+                .replaceAll("§.", "")
+                .replaceAll("<[^>]+>", " ")
+                .replaceAll("[\\p{Punct}]+", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
+    }
+
+    private static Set<String> tokenizeForRepeatCheck(String text) {
+        String normalized = normalizeForRepeatCheck(text);
+        if (normalized.isEmpty()) {
+            return Set.of();
+        }
+
+        Set<String> tokens = new HashSet<>();
+        for (String token : normalized.split(" ")) {
+            if (token.length() >= 2) {
+                tokens.add(token);
+            }
+        }
+        return tokens;
+    }
+
     public static void clearHistory(UUID playerUUID) {
         CONVERSATION_STORE.clearActiveConversation(playerUUID);
+        RECENT_REPLIES.remove(playerUUID);
+    }
+
+    private static class StreamEmitState {
+        private long lastEmitAt;
+        private int lastEmitLength;
+    }
+
+    private static class StreamToolAccumulator {
+        private final Map<Integer, StreamToolCall> toolCalls = new TreeMap<>();
+
+        private void absorb(JsonArray deltaToolCalls) {
+            for (int i = 0; i < deltaToolCalls.size(); i++) {
+                JsonObject toolCallObj = deltaToolCalls.get(i).getAsJsonObject();
+                int index = toolCallObj.has("index") && !toolCallObj.get("index").isJsonNull()
+                        ? toolCallObj.get("index").getAsInt()
+                        : i;
+                StreamToolCall toolCall = this.toolCalls.computeIfAbsent(index, ignored -> new StreamToolCall());
+                if (toolCallObj.has("function") && toolCallObj.get("function").isJsonObject()) {
+                    JsonObject functionObj = toolCallObj.getAsJsonObject("function");
+                    if (functionObj.has("name") && !functionObj.get("name").isJsonNull()) {
+                        toolCall.name.append(functionObj.get("name").getAsString());
+                    }
+                    if (functionObj.has("arguments") && !functionObj.get("arguments").isJsonNull()) {
+                        toolCall.arguments.append(functionObj.get("arguments").getAsString());
+                    }
+                }
+            }
+        }
+
+        private String getToolName() {
+            return this.toolCalls.isEmpty() ? null : this.toolCalls.values().iterator().next().name.toString();
+        }
+
+        private String getToolArguments() {
+            return this.toolCalls.isEmpty() ? null : this.toolCalls.values().iterator().next().arguments.toString();
+        }
+    }
+
+    private static class StreamToolCall {
+        private final StringBuilder name = new StringBuilder();
+        private final StringBuilder arguments = new StringBuilder();
+    }
+
+    private static class StreamingResponse {
+        private final int statusCode;
+        private final String errorBody;
+        private final String reply;
+        private final String toolName;
+        private final String toolArguments;
+
+        private StreamingResponse(int statusCode, String errorBody, String reply, String toolName, String toolArguments) {
+            this.statusCode = statusCode;
+            this.errorBody = errorBody;
+            this.reply = reply;
+            this.toolName = toolName;
+            this.toolArguments = toolArguments;
+        }
+
+        private static StreamingResponse success(String reply, String toolName, String toolArguments) {
+            return new StreamingResponse(200, null, reply, toolName, toolArguments);
+        }
+
+        private static StreamingResponse error(int statusCode, String errorBody) {
+            return new StreamingResponse(statusCode, errorBody, null, null, null);
+        }
     }
 
     private static List<ConversationStore.ConversationMessageSnapshot> trimConversationHistory(List<ConversationStore.ConversationMessageSnapshot> history, int tokenBudget) {
