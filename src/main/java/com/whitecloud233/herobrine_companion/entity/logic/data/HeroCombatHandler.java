@@ -36,7 +36,7 @@ public class HeroCombatHandler {
             // 👇👇👇【核心修复：上次你漏掉了这里！】拦截非主人的攻击，防止夺舍漏洞
             UUID ownerUUID = hero.getOwnerUUID();
             if (ownerUUID != null && !ownerUUID.equals(player.getUUID())) {
-                player.sendSystemMessage(Component.translatable("message.herobrine_companion.not_your_hero").withStyle(net.minecraft.ChatFormatting.RED));
+                player.sendSystemMessage(hero.createNotYourHeroMessage());
                 return false;
             }
             // 👆👆👆

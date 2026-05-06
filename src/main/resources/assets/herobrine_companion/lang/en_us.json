@@ -267,6 +267,8 @@
   "message.herobrine_companion.combat_comment": "Decent combat skills. A bit rough though.",
   "message.herobrine_companion.contract_failed": "Contract Failed. Invalid offering.",
   "message.herobrine_companion.contract_signed": "Contract Signed. Trust established.",
+  "message.herobrine_companion.hero_owner_hint": "This Hero belongs to %s.",
+  "message.herobrine_companion.hero_owner_unknown": "an unknown player",
 
   "message.herobrine_companion.fix_anomaly": "Another anomaly cleared. The world is slightly more stable.",
   "gui.herobrine_companion.jei.hero_trade": "Herobrine's Trade",

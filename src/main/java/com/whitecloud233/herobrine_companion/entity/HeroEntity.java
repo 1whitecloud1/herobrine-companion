@@ -1,5 +1,6 @@
 package com.whitecloud233.herobrine_companion.entity;
 
+import com.mojang.authlib.GameProfile;
 import com.whitecloud233.herobrine_companion.entity.ai.HeroMoveControl;
 import com.whitecloud233.herobrine_companion.entity.ai.HeroAI;
 import com.whitecloud233.herobrine_companion.entity.ai.learning.HeroBrain;
@@ -270,10 +271,7 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         if (owner != null && !owner.equals(player.getUUID())) {
             if (!this.level().isClientSide) {
                 // 给企图交互的玩家发送一条仅他可见的红色提示
-                player.sendSystemMessage(
-                        net.minecraft.network.chat.Component.translatable("message.herobrine_companion.not_your_hero")
-                                .withStyle(ChatFormatting.RED)
-                );
+                player.sendSystemMessage(this.createNotYourHeroMessage());
             }
             // 拒绝交互
             return InteractionResult.FAIL;
@@ -522,6 +520,32 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     }
     @Nullable public UUID getOwnerUUID() { return this.entityData.get(OWNER_UUID).orElse(null); }
     public void setOwnerUUID(@Nullable UUID uuid) { this.entityData.set(OWNER_UUID, Optional.ofNullable(uuid)); }
+    public Component getOwnerDisplayNameComponent() {
+        UUID ownerUUID = this.getOwnerUUID();
+        if (ownerUUID == null) {
+            return Component.translatable("message.herobrine_companion.hero_owner_unknown");
+        }
+
+        Player onlineOwner = this.level().getPlayerByUUID(ownerUUID);
+        if (onlineOwner != null) {
+            return Component.literal(onlineOwner.getGameProfile().getName());
+        }
+
+        if (this.level().getServer() != null) {
+            java.util.Optional<GameProfile> cachedProfile = this.level().getServer().getProfileCache().get(ownerUUID);
+            if (cachedProfile.isPresent() && cachedProfile.get().getName() != null && !cachedProfile.get().getName().isEmpty()) {
+                return Component.literal(cachedProfile.get().getName());
+            }
+        }
+
+        return Component.translatable("message.herobrine_companion.hero_owner_unknown");
+    }
+    public Component createNotYourHeroMessage() {
+        return Component.translatable("message.herobrine_companion.not_your_hero")
+                .append(Component.literal(" "))
+                .append(Component.translatable("message.herobrine_companion.hero_owner_hint", this.getOwnerDisplayNameComponent()))
+                .withStyle(ChatFormatting.RED);
+    }
     @Nullable public BlockPos getInvitedPos() { return this.entityData.get(INVITED_POS).orElse(null); }
     public void setInvitedPos(@Nullable BlockPos pos) { this.entityData.set(INVITED_POS, Optional.ofNullable(pos)); }
     public int getInvitedAction() { return this.entityData.get(INVITED_ACTION); }

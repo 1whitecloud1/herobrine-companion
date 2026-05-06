@@ -40,6 +40,7 @@ import java.util.Queue;
 import java.util.Set;
 
 public record ClearAreaPacket() implements CustomPacketPayload {
+    private static final int DEFAULT_VOID_DOMAIN_RADIUS = 8;
 
     public static final CustomPacketPayload.Type<ClearAreaPacket> TYPE = new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath(HerobrineCompanion.MODID, "clear_area"));
     
@@ -50,54 +51,62 @@ public record ClearAreaPacket() implements CustomPacketPayload {
         return TYPE;
     }
 
-    public static void handle(@SuppressWarnings("unused") ClearAreaPacket payload, IPayloadContext context) {
+    public static void handle(ClearAreaPacket ignoredPayload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (context.player() instanceof ServerPlayer player) {
-                // Check if player has visited the new dimension
-                if (!player.getPersistentData().getBoolean("HasVisitedHeroDimension")) {
-                    player.sendSystemMessage(Component.translatable("message.herobrine_companion.hero_not_ready"));
-                    return;
-                }
-
-                ServerLevel level = player.serverLevel();
-                
-                if (level.dimension() != Level.OVERWORLD) {
-                    player.sendSystemMessage(Component.translatable("message.herobrine_companion.void_domain_overworld_only"));
-                    return;
-                }
-
-                CompoundTag playerData = player.getPersistentData();
-                int usageCount = playerData.getInt("VoidDomainUsageCount");
-
-                if (usageCount >= 2) {
-                    player.sendSystemMessage(Component.translatable("message.herobrine_companion.void_domain_limit"));
-                    return;
-                }
-
-                playerData.putInt("VoidDomainUsageCount", usageCount + 1);
-
-                player.sendSystemMessage(Component.translatable("message.herobrine_companion.void_domain_init", usageCount + 1));
-                
-                player.addEffect(new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, 600, 255, false, false));
-                player.addEffect(new MobEffectInstance(MobEffects.SLOW_FALLING, 600, 1, false, false));
-
-                // Control generation position: Center on player's chunk
-                // If you want to control it more precisely (e.g. offset), modify 'center' here.
-                // Currently it is centered on the player.
-                ChunkPos center = player.chunkPosition();
-                int radius = 8; 
-                
-                Queue<ChunkPos> chunksToClear = new ArrayDeque<>();
-                for (int x = -radius; x <= radius; x++) {
-                    for (int z = -radius; z <= radius; z++) {
-                        chunksToClear.add(new ChunkPos(center.x + x, center.z + z));
-                    }
-                }
-
-                VoidDomainTask task = new VoidDomainTask(level, chunksToClear, player);
-                NeoForge.EVENT_BUS.register(task);
+                startVoidDomain(player, DEFAULT_VOID_DOMAIN_RADIUS, true, true,
+                        Component.translatable("message.herobrine_companion.void_domain_init",
+                                player.getPersistentData().getInt("VoidDomainUsageCount") + 1));
             }
         });
+    }
+
+    public static boolean startVoidDomain(ServerPlayer player, int radius, boolean requireHeroDimensionVisit,
+                                          boolean enforceUsageLimit, Component startMessage) {
+        if (player == null) {
+            return false;
+        }
+
+        if (requireHeroDimensionVisit && !player.getPersistentData().getBoolean("HasVisitedHeroDimension")) {
+            player.sendSystemMessage(Component.translatable("message.herobrine_companion.hero_not_ready"));
+            return false;
+        }
+
+        ServerLevel level = player.serverLevel();
+        if (level.dimension() != Level.OVERWORLD) {
+            player.sendSystemMessage(Component.translatable("message.herobrine_companion.void_domain_overworld_only"));
+            return false;
+        }
+
+        CompoundTag playerData = player.getPersistentData();
+        int usageCount = playerData.getInt("VoidDomainUsageCount");
+        if (enforceUsageLimit && usageCount >= 2) {
+            player.sendSystemMessage(Component.translatable("message.herobrine_companion.void_domain_limit"));
+            return false;
+        }
+
+        if (enforceUsageLimit) {
+            playerData.putInt("VoidDomainUsageCount", usageCount + 1);
+        }
+
+        player.sendSystemMessage(startMessage);
+        player.addEffect(new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, 600, 255, false, false));
+        player.addEffect(new MobEffectInstance(MobEffects.SLOW_FALLING, 600, 1, false, false));
+
+        Queue<ChunkPos> chunksToClear = createChunkQueue(player.chunkPosition(), Math.max(1, radius));
+        VoidDomainTask task = new VoidDomainTask(level, chunksToClear, player);
+        NeoForge.EVENT_BUS.register(task);
+        return true;
+    }
+
+    private static Queue<ChunkPos> createChunkQueue(ChunkPos center, int radius) {
+        Queue<ChunkPos> chunksToClear = new ArrayDeque<>();
+        for (int x = -radius; x <= radius; x++) {
+            for (int z = -radius; z <= radius; z++) {
+                chunksToClear.add(new ChunkPos(center.x + x, center.z + z));
+            }
+        }
+        return chunksToClear;
     }
 
     public static class VoidDomainTask {
@@ -208,22 +217,19 @@ public record ClearAreaPacket() implements CustomPacketPayload {
             
             // 4. Manual Light Injection
             for (int i = 0; i < sections.length; i++) {
-                LevelChunkSection section = sections[i];
                 int sectionY = chunk.getSectionYFromSectionIndex(i);
                 SectionPos sectionPos = SectionPos.of(chunkPos, sectionY);
 
                 var skyListener = lightEngine.getLayerListener(LightLayer.SKY);
-                if (skyListener != null) {
-                    DataLayer dataLayer = skyListener.getDataLayerData(sectionPos);
-                    
-                    if (dataLayer == null) {
-                        lightEngine.checkBlock(sectionPos.origin().offset(8, 8, 8));
-                        dataLayer = skyListener.getDataLayerData(sectionPos);
-                    }
-                    
-                    if (dataLayer != null) {
-                        Arrays.fill(dataLayer.getData(), (byte) 0xFF);
-                    }
+                DataLayer dataLayer = skyListener.getDataLayerData(sectionPos);
+
+                if (dataLayer == null) {
+                    lightEngine.checkBlock(sectionPos.origin().offset(8, 8, 8));
+                    dataLayer = skyListener.getDataLayerData(sectionPos);
+                }
+
+                if (dataLayer != null) {
+                    Arrays.fill(dataLayer.getData(), (byte) 0xFF);
                 }
             }
         }

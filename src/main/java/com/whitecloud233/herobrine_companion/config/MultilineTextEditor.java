@@ -195,11 +195,11 @@ public class MultilineTextEditor extends AbstractWidget {
 
     @Override
     public boolean charTyped(char codePoint, int modifiers) {
-        if (!this.isFocused() || !StringUtil.isAllowedChatCharacter(codePoint)) {
+        if (!this.isFocused() || !isAllowedEditorCodePoint(codePoint)) {
             return false;
         }
 
-        this.insertText(Character.toString(codePoint));
+        this.insertText(String.valueOf(codePoint));
         return true;
     }
 
@@ -565,14 +565,28 @@ public class MultilineTextEditor extends AbstractWidget {
 
         String normalized = value.replace("\r\n", "\n").replace('\r', '\n');
         StringBuilder builder = new StringBuilder(normalized.length());
-        for (int i = 0; i < normalized.length(); i++) {
-            char ch = normalized.charAt(i);
-            if (ch == '\n' || StringUtil.isAllowedChatCharacter(ch)) {
-                builder.append(ch);
+        normalized.codePoints().forEach(codePoint -> {
+            if (isAllowedEditorCodePoint(codePoint)) {
+                builder.appendCodePoint(codePoint);
             }
-        }
+        });
         return builder.toString();
     }
+
+    private static boolean isAllowedEditorCodePoint(int codePoint) {
+        if (!Character.isValidCodePoint(codePoint) || codePoint > Character.MAX_VALUE) {
+            return false;
+        }
+
+        if (codePoint == '\n' || codePoint == '\t') {
+            return true;
+        }
+
+        return !Character.isISOControl(codePoint)
+                && codePoint != 0x7F
+                && codePoint != 0x00A7;
+    }
+
 
     @Override
     protected void updateWidgetNarration(NarrationElementOutput narrationElementOutput) {

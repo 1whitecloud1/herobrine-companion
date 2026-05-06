@@ -204,7 +204,9 @@
   "key.categories.herobrine_companion": "Herobrine的陪伴",
   "key.herobrine_companion.cleave_skill": "存档毁灭术",
   "message.herobrine_companion.item_disabled_in_config": "该物品已在配置文件中被禁用。",
-
+  "message.herobrine_companion.not_your_hero": "这里不是你绑定的 Herobrine!",
+  "message.herobrine_companion.hero_owner_hint": "这是 %s 玩家绑定的 Herobrine。",
+  "message.herobrine_companion.hero_owner_unknown": "未知玩家",
   "gui.herobrine_companion.config.soul_bound_pact": "灵魂之契: %s",
   "gui.herobrine_companion.config.soul_bound_pact.tooltip": "启用/禁用灵魂之契物品的使用。",
 
@@ -213,7 +215,7 @@
 
   "gui.herobrine_companion.config.transcendence_permit": "凌越之允: %s",
   "gui.herobrine_companion.config.transcendence_permit.tooltip": "启用/禁用凌越之允物品的使用。",
-  "message.herobrine_companion.not_your_hero": "这里不是你绑定的 Herobrine!",
+
   "gui.herobrine_companion.api_setup.title": "Herobrine AI 设置",
   "gui.herobrine_companion.api_setup.api_key": "API 密钥",
   "gui.herobrine_companion.api_setup.streaming": "流式输出",

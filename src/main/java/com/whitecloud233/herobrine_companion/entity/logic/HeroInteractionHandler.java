@@ -29,7 +29,7 @@ public class HeroInteractionHandler {
             // 👇👇👇【核心修复】：绝对主权隔离！非主人禁止交互
             if (hero.getOwnerUUID() != null && !hero.getOwnerUUID().equals(player.getUUID())) {
                 if (!hero.level().isClientSide) {
-                    player.sendSystemMessage(Component.translatable("message.herobrine_companion.not_your_hero").withStyle(net.minecraft.ChatFormatting.RED));
+                    player.sendSystemMessage(hero.createNotYourHeroMessage());
                 }
                 return InteractionResult.FAIL;
             }

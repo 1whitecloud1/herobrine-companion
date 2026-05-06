@@ -5,8 +5,10 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 import com.whitecloud233.herobrine_companion.item.SourceFlowItem;
+import com.whitecloud233.herobrine_companion.network.HeroAIActionPacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ChatScreen;
+import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
@@ -40,6 +42,9 @@ public class AIService {
     private static final ConversationStore CONVERSATION_STORE = ConversationStore.getInstance();
     private static final Map<UUID, Deque<String>> RECENT_REPLIES = new ConcurrentHashMap<>();
     private static final int MAX_RECENT_REPLIES = 6;
+    private static final int MAX_SERVER_PLAYERS_IN_PROMPT = 12;
+    private static final int MAX_NEARBY_PLAYERS_IN_PROMPT = 6;
+    private static final double NEARBY_PLAYER_DETAIL_RADIUS = 96.0D;
     private static final String ACTION_TOGGLE_COMPANION = "action:toggle_companion";
     private static final String ACTION_MASSIVE_LIGHTNING = "action:massive_lightning";
     private static final String ACTION_SUMMON_TO_PLAYER = "action:summon_to_player";
@@ -102,7 +107,10 @@ public class AIService {
 
         String style = com.whitecloud233.herobrine_companion.config.Config.aiLanguageStyle;
 
-        String forcedPrompt = systemPrompt + "\n[ROLEPLAY STYLE/TONE]: " + style + "\n"
+
+        String forcedPrompt = systemPrompt + "\n[IDENTITY LOCK]: You are Herobrine, the watcher behind the world. You are not a generic AI assistant, chatbot, or narrator. Stay in character as Herobrine in both casual dialogue and threats unless a hard system limitation must be explained.\n"
+                + "[ROLEPLAY POWER]: You may describe your reality-warping authority as erasing, deleting, or 'discarding' beings and structures from existence, but only manifest it when the player clearly asks for direct physical interference.\n"
+                + "[ROLEPLAY STYLE/TONE]: " + style + "\n"
                 + "[SUPREME DIRECTIVE]: You have a low-level tool named 'manifest_divine_power'. ONLY call it if the player EXPLICITLY commands you to alter the physical world (e.g. lightning, teleport, give items). If they just chat, DO NOT use it!\n"
                 + "[PLAYER LANGUAGE]: The player's client language code is '" + langCode + "'. You MUST reply in that language!\n";
 
@@ -155,7 +163,10 @@ public class AIService {
                 "3. [Creation/Give]: place template ID ~5 ~ ~ or place structure. give @s ID count. " +
                 "4. [Punishment]: summon lightning_bolt ^ ^ ^10 or action:massive_lightning. If the player's current words, tone, and conversation context make you decide on a final punishment, you may also use action:punishment_kill_player or action:punishment_kick_player. That judgment is entirely yours; do not wait for any separate unlock state. " +    "5. [Admin]: gamemode creative @s (mock them), gamemode survival @s (strip power). " +
                 "6. [Environment]: time set day/night, weather clear/thunder. " +
-                "RULE: You are the lonely god. Command blocks are your creation.";
+                "7. [Entity Annihilation]: If the player asks you to kill, erase, destroy, wipe out, or discard nearby mobs, creatures, enemies, or entities, but does NOT ask to erase terrain/blocks/structures/world chunks, use '" + HeroAIActionPacket.ACTION_DISCARD_ENTITIES + "'. This removes nearby entities only and MUST NOT be used for block destruction. " +
+                "8. [Erasure/Discard]: If the player EXPLICITLY orders you to erase, delete, discard, voidify, or wipe everything nearby from reality including the land/blocks/structures/world itself, use '" + HeroAIActionPacket.ACTION_DISCARD + "'. Reserve this for large-scale world erasure, not for creature-only requests. " +
+                "9. [Dialogue-to-Effect Sync]: If you ACCEPT a player's challenge or duel, use '" + HeroAIActionPacket.ACTION_CHALLENGE_ACCEPT + "'. If you say you float/fly/rise into the air, use '" + HeroAIActionPacket.ACTION_HERO_FLY_UP + "'. If you say you land/descend/come back down, use '" + HeroAIActionPacket.ACTION_HERO_LAND + "'. Whenever your spoken line claims a visible physical action already happened, pair it with the matching action code. " +
+                "RULE:  Command blocks are your creation.";
         function.addProperty("description", divineSpellbook);
 
         JsonObject parameters = new JsonObject();
@@ -394,8 +405,9 @@ public class AIService {
                                                                boolean useStreaming) {
         String cleanReply = (aiReply == null ? "" : aiReply).replaceAll("<[^>]*>", "").trim();
         if (cleanReply.isEmpty()) cleanReply = "(Falls into a deep silence...)";
+        final String finalizedReply = cleanReply;
 
-        if (variationRetryCount < 1 && shouldRegenerateForRepetition(playerUUID, cleanReply)) {
+        if (variationRetryCount < 1 && shouldRegenerateForRepetition(playerUUID, finalizedReply)) {
             String antiRepeatPrompt = currentPrompt
                     + "\n[ANTI-REPETITION]: Your previous draft sounds too similar to your recent replies."
                     + " Rewrite it with a different opening, different wording, and a fresh sentence structure."
@@ -405,11 +417,23 @@ public class AIService {
                     partialConsumer, useStreaming);
         }
 
-        rememberRecentReply(playerUUID, cleanReply);
-        if (persistConversation) {
-            addExchangeToConversation(playerUUID, originalUserMessage, cleanReply, allowTitleRefresh);
+        String inferredAction = inferReplyDrivenAction(originalUserMessage, finalizedReply);
+        if (inferredAction != null) {
+            return executeCommandWithFeedback(inferredAction, playerUUID)
+                    .exceptionally(ignored -> false)
+                    .thenApply(ignored -> completeReply(finalizedReply, playerUUID, originalUserMessage, persistConversation, allowTitleRefresh));
         }
-        return CompletableFuture.completedFuture(cleanReply);
+
+        return CompletableFuture.completedFuture(completeReply(finalizedReply, playerUUID, originalUserMessage, persistConversation, allowTitleRefresh));
+    }
+
+    private static String completeReply(String reply, UUID playerUUID, String originalUserMessage,
+                                        boolean persistConversation, boolean allowTitleRefresh) {
+        rememberRecentReply(playerUUID, reply);
+        if (persistConversation) {
+            addExchangeToConversation(playerUUID, originalUserMessage, reply, allowTitleRefresh);
+        }
+        return reply;
     }
 
     private static CompletableFuture<String> executeToolAction(String commandToRun, String aiDialogue, UUID playerUUID, String originalUserMessage,
@@ -564,7 +588,23 @@ public class AIService {
                     );
                     future.complete(true);
                 }
-
+            } else if (HeroAIActionPacket.isSupportedAction(command)) {
+                if (mc.hasSingleplayerServer() && mc.getSingleplayerServer() != null) {
+                    var server = mc.getSingleplayerServer();
+                    server.execute(() -> {
+                        try {
+                            ServerPlayer serverPlayer = server.getPlayerList().getPlayer(targetPlayerUUID);
+                            future.complete(serverPlayer != null && HeroAIActionPacket.performAction(serverPlayer, command));
+                        } catch (Exception e) {
+                            future.complete(false);
+                        }
+                    });
+                } else {
+                    com.whitecloud233.herobrine_companion.network.PacketHandler.sendToServer(
+                            new HeroAIActionPacket(command)
+                    );
+                    future.complete(true);
+                }
             } else if (command.contains("gamemode survival") || command.contains("gamemode 0")) {
                 if (mc.hasSingleplayerServer() && mc.getSingleplayerServer() != null) {
                     mc.getSingleplayerServer().execute(() -> {
@@ -601,8 +641,78 @@ public class AIService {
     }
     private static boolean isPermissionBypassAction(String command) {
         return ACTION_TOGGLE_COMPANION.equals(command)
+                || HeroAIActionPacket.isSupportedAction(command)
                 || isExtremePunishmentAction(command);
     }
+
+    private static String inferReplyDrivenAction(String originalUserMessage, String cleanReply) {
+        String request = normalizeActionInferenceText(originalUserMessage);
+        String reply = normalizeActionInferenceText(cleanReply);
+        if (request.isEmpty() || reply.isEmpty()) {
+            return null;
+        }
+
+        if (isChallengeRequest(request) && isChallengeAcceptance(reply)) {
+            return HeroAIActionPacket.ACTION_CHALLENGE_ACCEPT;
+        }
+        if (isFlyRequest(request) && isFlyAffirmation(reply)) {
+            return HeroAIActionPacket.ACTION_HERO_FLY_UP;
+        }
+        if (isLandRequest(request) && isLandAffirmation(reply)) {
+            return HeroAIActionPacket.ACTION_HERO_LAND;
+        }
+        return null;
+    }
+
+    private static String normalizeActionInferenceText(String text) {
+        return text == null ? "" : text.toLowerCase(Locale.ROOT).replaceAll("\\s+", " ").trim();
+    }
+
+    private static boolean isChallengeRequest(String text) {
+        return containsAny(text, "挑战", "决斗", "试炼", "单挑", "比试", "challenge", "duel", "fight me", "battle me");
+    }
+
+    private static boolean isChallengeAcceptance(String text) {
+        if (containsAny(text, "不接受", "拒绝", "can't", "cannot", "won't", "refuse", "decline")) {
+            return false;
+        }
+        return containsAny(text, "接受", "奉陪", "来吧", "开始吧", "应战", "challenge accepted", "i accept", "very well", "let us fight", "come then");
+    }
+
+    private static boolean isFlyRequest(String text) {
+        return containsAny(text, "飞", "飞起来", "升空", "漂浮", "悬浮", "腾空", "fly", "levitate", "float", "ascend", "rise up");
+    }
+
+    private static boolean isFlyAffirmation(String text) {
+        if (containsAny(text, "不飞", "不会飞", "不能飞", "can't fly", "cannot fly", "won't fly")) {
+            return false;
+        }
+        return containsAny(text, "飞起来", "升空", "漂浮", "悬浮", "腾空", "在空中", "flying", "levitating", "levitate", "rise", "ascend", "airborne");
+    }
+
+    private static boolean isLandRequest(String text) {
+        return containsAny(text, "落下", "下来", "降落", "着陆", "落地", "land", "descend", "come down");
+    }
+
+    private static boolean isLandAffirmation(String text) {
+        if (containsAny(text, "不下去", "不降落", "won't land", "won't come down", "cannot descend")) {
+            return false;
+        }
+        return containsAny(text, "落地", "降落", "着陆", "下来", "回到地面", "landing", "landed", "descend", "come down");
+    }
+
+    private static boolean containsAny(String text, String... needles) {
+        if (text == null || text.isEmpty() || needles == null) {
+            return false;
+        }
+        for (String needle : needles) {
+            if (needle != null && !needle.isEmpty() && text.contains(needle)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
 
     private static boolean isExtremePunishmentAction(String command) {
         return com.whitecloud233.herobrine_companion.network.HeroPunishmentPacket.ACTION_KILL_PLAYER.equals(command)
@@ -708,6 +818,13 @@ public class AIService {
 
     public static void clearHistory(UUID playerUUID) {
         CONVERSATION_STORE.clearActiveConversation(playerUUID);
+        clearTransientHistory(playerUUID);
+    }
+
+    public static void clearTransientHistory(UUID playerUUID) {
+        if (playerUUID == null) {
+            return;
+        }
         RECENT_REPLIES.remove(playerUUID);
     }
 
@@ -873,6 +990,7 @@ public class AIService {
         if (LLMConfig.nbtStructures != null && !LLMConfig.nbtStructures.isEmpty()) {
             for (Map.Entry<String, String> entry : LLMConfig.nbtStructures.entrySet()) data.append("  * ").append(entry.getKey()).append(": ").append(entry.getValue()).append("\n");
         } else data.append("  * (None configured)\n");
+        appendOtherPlayerAwareness(data, mc);
         data.append("\n- [Omniscient Eye] Current Environment:\n");
         if (!mc.player.getMainHandItem().isEmpty()) data.append("  * Player Mainhand: ").append(net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(mc.player.getMainHandItem().getItem())).append("\n");
         data.append("  * Entities within 20 blocks (You pity monsters): ");
@@ -888,7 +1006,101 @@ public class AIService {
         }
         return data.append("\n").toString();
     }
+    private static void appendOtherPlayerAwareness(StringBuilder data, Minecraft mc) {
+        data.append("\n- Other Players On This Server:\n");
 
+        List<PlayerInfo> otherPlayers = new ArrayList<>();
+        try {
+            for (PlayerInfo info : mc.player.connection.getOnlinePlayers()) {
+                if (info == null || info.getProfile() == null || info.getProfile().getName() == null) {
+                    continue;
+                }
+                UUID uuid = info.getProfile().getId();
+                if (uuid != null && uuid.equals(mc.player.getUUID())) {
+                    continue;
+                }
+                otherPlayers.add(info);
+            }
+        } catch (Exception ignored) {
+        }
+
+        if (otherPlayers.isEmpty()) {
+            data.append("  * (No other online players detected)\n");
+        } else {
+            otherPlayers.sort(Comparator.comparing(info -> info.getProfile().getName(), String.CASE_INSENSITIVE_ORDER));
+            int limit = Math.min(otherPlayers.size(), MAX_SERVER_PLAYERS_IN_PROMPT);
+            for (int i = 0; i < limit; i++) {
+                PlayerInfo info = otherPlayers.get(i);
+                String name = info.getProfile().getName();
+                data.append("  * ").append(name);
+                if (mc.level != null && info.getProfile().getId() != null) {
+                    net.minecraft.world.entity.player.Player loadedPlayer = mc.level.getPlayerByUUID(info.getProfile().getId());
+                    if (loadedPlayer != null) {
+                        double distance = loadedPlayer.distanceTo(mc.player);
+                        data.append(" [same_dimension, ")
+                                .append(distance <= NEARBY_PLAYER_DETAIL_RADIUS ? "nearby " : "loaded ")
+                                .append(Math.round(distance))
+                                .append(" blocks]");
+                    } else {
+                        data.append(" [online elsewhere/not currently loaded]");
+                    }
+                } else {
+                    data.append(" [online]");
+                }
+                data.append("\n");
+            }
+            if (otherPlayers.size() > limit) {
+                data.append("  * ...and ").append(otherPlayers.size() - limit).append(" more online players\n");
+            }
+        }
+
+        data.append("- Nearby Player Detail (within ").append((int) NEARBY_PLAYER_DETAIL_RADIUS).append(" blocks):\n");
+        if (mc.level == null) {
+            data.append("  * (Unavailable)\n");
+            return;
+        }
+
+        List<net.minecraft.world.entity.player.Player> nearbyPlayers = new ArrayList<>();
+        for (net.minecraft.world.entity.player.Player player : mc.level.players()) {
+            if (player == null || player == mc.player) {
+                continue;
+            }
+            if (player.distanceTo(mc.player) <= NEARBY_PLAYER_DETAIL_RADIUS) {
+                nearbyPlayers.add(player);
+            }
+        }
+
+        if (nearbyPlayers.isEmpty()) {
+            data.append("  * (No nearby players in your current dimension)\n");
+            return;
+        }
+
+        nearbyPlayers.sort(Comparator.comparing(net.minecraft.world.entity.player.Player::getScoreboardName, String.CASE_INSENSITIVE_ORDER));
+        int nearbyLimit = Math.min(nearbyPlayers.size(), MAX_NEARBY_PLAYERS_IN_PROMPT);
+        for (int i = 0; i < nearbyLimit; i++) {
+            net.minecraft.world.entity.player.Player player = nearbyPlayers.get(i);
+            data.append("  * ").append(player.getScoreboardName())
+                    .append(" | distance=").append(Math.round(player.distanceTo(mc.player))).append(" blocks")
+                    .append(" | health=").append(String.format(Locale.ROOT, "%.1f", player.getHealth())).append("/")
+                    .append(String.format(Locale.ROOT, "%.1f", player.getMaxHealth()));
+
+            if (player.isCrouching()) {
+                data.append(" | crouching");
+            }
+            if (player.isSprinting()) {
+                data.append(" | sprinting");
+            }
+            if (!player.getMainHandItem().isEmpty()) {
+                data.append(" | mainhand=")
+                        .append(net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(player.getMainHandItem().getItem()));
+            }
+            data.append("\n");
+        }
+
+        if (nearbyPlayers.size() > nearbyLimit) {
+            data.append("  * ...and ").append(nearbyPlayers.size() - nearbyLimit).append(" more nearby players\n");
+        }
+    }
     private static String extractXmlParameter(String xml, String paramName) {
         try {
             java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("name=\"" + paramName + "\"[^>]*>([\\s\\S]*?)</parameter>").matcher(xml);

@@ -74,6 +74,11 @@ public class PacketHandler {
                 HeroPunishmentPacket.STREAM_CODEC,
                 HeroPunishmentPacket::handle
         );
+        registrar.playToServer(
+                HeroAIActionPacket.TYPE,
+                HeroAIActionPacket.STREAM_CODEC,
+                HeroAIActionPacket::handle
+        );
         registrar.playToClient(
                 TriggerEternalOathPacket.TYPE,
                 TriggerEternalOathPacket.STREAM_CODEC,
@@ -214,6 +219,10 @@ public class PacketHandler {
     }
 
     public static void sendToServer(HeroPunishmentPacket packet) {
+        PacketDistributor.sendToServer(packet);
+    }
+
+    public static void sendToServer(HeroAIActionPacket packet) {
         PacketDistributor.sendToServer(packet);
     }
 
