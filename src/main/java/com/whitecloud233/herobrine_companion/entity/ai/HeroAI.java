@@ -4,20 +4,53 @@ import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.ai.goal.*;
 import com.whitecloud233.herobrine_companion.entity.ai.learning.*;
 
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.goal.FloatGoal;
 import net.minecraft.world.entity.ai.goal.OpenDoorGoal;
 import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
 import net.minecraft.world.entity.ai.goal.WaterAvoidingRandomStrollGoal;
+import net.minecraft.world.entity.ai.goal.target.HurtByTargetGoal;
+import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
+import net.minecraft.world.entity.monster.Enemy;
 
 public class HeroAI {
 
+    private static boolean canSelectCombatTarget(LivingEntity candidate) {
+        return HeroBattleStanceGoal.canHeroAttackTarget(candidate);
+    }
+
     public static void registerGoals(HeroEntity hero) {
+        hero.targetSelector.addGoal(1, new HurtByTargetGoal(hero) {
+            @Override
+            public boolean canUse() {
+                return hero.isBattleModeActive() && super.canUse() && canSelectCombatTarget(hero.getTarget());
+            }
+
+            @Override
+            public boolean canContinueToUse() {
+                return hero.isBattleModeActive() && super.canContinueToUse() && canSelectCombatTarget(hero.getTarget());
+            }
+        });
+        hero.targetSelector.addGoal(2, new NearestAttackableTargetGoal<>(hero, Mob.class, 10, true, false,
+                candidate -> candidate instanceof Enemy && candidate.isAlive() && candidate != hero && canSelectCombatTarget(candidate)) {
+            @Override
+            public boolean canUse() {
+                return hero.isBattleModeActive() && super.canUse();
+            }
+
+            @Override
+            public boolean canContinueToUse() {
+                return hero.isBattleModeActive() && super.canContinueToUse();
+            }
+        });
+
         // 0. 基础生存
         hero.getGoalSelector().addGoal(0, new FloatGoal(hero));
         // [新增] 王者光环：让周围怪物臣服 (提升至最高优先级 0，被动生效)
         hero.getGoalSelector().addGoal(0, new HeroKingAuraGoal(hero));
-        // 👇 [新增]：赋予 Hero 自动开门的能力 (参数 true 代表走过去后会自动随手关门)
-      //  hero.getGoalSelector().addGoal(1, new OpenDoorGoal(hero, true));
+        hero.getGoalSelector().addGoal(1, new HeroFallbackRangedAttackGoal(hero));
+        hero.getGoalSelector().addGoal(1, new HeroBattleStanceGoal(hero));
         hero.getGoalSelector().addGoal(1, new HeroTeleportToPlayerGoal(hero));
         // 0.5 [新增] 玩家邀请互动 (最高优先级之一，响应玩家指令)
         hero.getGoalSelector().addGoal(1, new HeroInvitedActionGoal(hero));

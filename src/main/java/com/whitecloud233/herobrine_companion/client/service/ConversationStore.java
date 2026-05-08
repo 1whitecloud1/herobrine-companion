@@ -12,6 +12,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.lang.reflect.Type;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.time.Instant;
@@ -52,9 +53,8 @@ public class ConversationStore {
             this.storeData = new StoreData();
 
             if (this.loadedFile.exists()) {
-                try (FileReader reader = new FileReader(this.loadedFile)) {
-                    StoreData loaded = GSON.fromJson(reader, STORE_TYPE);
-                    if (loaded != null) {
+                try {
+                    StoreData loaded = this.readStoreData(this.loadedFile);     if (loaded != null) {
                         this.storeData = loaded;
                     }
                 } catch (Exception e) {
@@ -508,13 +508,79 @@ public class ConversationStore {
         }
         return new File(dir, sessionKey + ".json");
     }
+    private StoreData readStoreData(File file) throws Exception {
+        byte[] raw = Files.readAllBytes(file.toPath());
+        StoreData fallback = null;
+        for (Charset charset : this.getConversationCharsets()) {
+            StoreData parsed = this.tryParseStoreData(raw, charset);
+            if (parsed == null) {
+                continue;
+            }
+            if (!this.containsReplacementCharacters(parsed)) {
+                return parsed;
+            }
+            if (fallback == null) {
+                fallback = parsed;
+            }
+        }
+        return fallback;
+    }
+
+    private StoreData tryParseStoreData(byte[] raw, Charset charset) {
+        try {
+            return GSON.fromJson(new String(raw, charset), STORE_TYPE);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private List<Charset> getConversationCharsets() {
+        LinkedHashSet<Charset> charsets = new LinkedHashSet<>();
+        charsets.add(StandardCharsets.UTF_8);
+        charsets.add(Charset.defaultCharset());
+        charsets.add(Charset.forName("GB18030"));
+        return new ArrayList<>(charsets);
+    }
+
+    private boolean containsReplacementCharacters(StoreData data) {
+        if (data == null || data.players == null) {
+            return false;
+        }
+
+        for (PlayerConversationState state : data.players.values()) {
+            if (state == null || state.conversations == null) {
+                continue;
+            }
+            for (ConversationThread conversation : state.conversations) {
+                if (conversation == null) {
+                    continue;
+                }
+                if (this.hasReplacementCharacter(conversation.title)) {
+                    return true;
+                }
+                if (conversation.messages == null) {
+                    continue;
+                }
+                for (ConversationMessage message : conversation.messages) {
+                    if (message != null && (this.hasReplacementCharacter(message.role) || this.hasReplacementCharacter(message.content))) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean hasReplacementCharacter(String text) {
+        return text != null && text.indexOf('\uFFFD') >= 0;
+    }
 
     private void saveLocked() {
         if (this.loadedFile == null) {
             return;
         }
 
-        try (FileWriter writer = new FileWriter(this.loadedFile)) {
+        try (var writer = Files.newBufferedWriter(this.loadedFile.toPath(), StandardCharsets.UTF_8)) {
             GSON.toJson(this.storeData, writer);
         } catch (Exception e) {
             e.printStackTrace();

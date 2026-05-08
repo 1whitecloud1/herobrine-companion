@@ -104,6 +104,11 @@ public class PacketHandler {
                 StartChallengePacket.STREAM_CODEC,
                 StartChallengePacket::handle
         );
+        registrar.playToServer(
+                ToggleBattleModePacket.TYPE,
+                ToggleBattleModePacket.STREAM_CODEC,
+                ToggleBattleModePacket::handle
+        );
         registrar.playToClient(
                 PaleLightningPacket.TYPE,
                 PaleLightningPacket.STREAM_CODEC,
@@ -240,6 +245,10 @@ public class PacketHandler {
 
     public static void sendToPlayer(SyncRewardsPacket packet, ServerPlayer player) {
         PacketDistributor.sendToPlayer(player, packet);
+    }
+
+    public static void sendToServer(ToggleBattleModePacket packet) {
+        PacketDistributor.sendToServer(packet);
     }
 
     public static void sendToServer(SavePosePacket packet) {

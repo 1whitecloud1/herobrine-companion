@@ -35,6 +35,7 @@ public class HeroKingAuraGoal extends Goal {
 
     @Override
     public boolean canUse() {
+        if (this.hero.isBattleModeActive()) return false;
         if (!Config.heroKingAuraEnabled) return false;
         return this.hero.isAlive() && !this.hero.isSpectator();
     }
@@ -57,7 +58,10 @@ public class HeroKingAuraGoal extends Goal {
             clearAllMobs();
             return;
         }
-
+        if (this.hero.isBattleModeActive()) {
+            clearAllMobs();
+            return;
+        }
         ResourceKey<Level> currentDimension = this.hero.level().dimension();
         if (this.lastDimension != null && !this.lastDimension.equals(currentDimension)) {
             clearAllMobs();

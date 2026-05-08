@@ -195,6 +195,14 @@ public class LLMConfig {
         }
         return 4_000;
     }
+    public static int getEffectiveConversationHistoryTokenBudget() {
+        int contextWindow = getEstimatedContextWindowTokens();
+        return clampInt(contextWindow / 4, 2_048, 8_192, 4_096);
+    }
+
+    public static int getEffectiveConversationHistoryMessageLimit() {
+        return 18;
+    }
 
     private static int inferContextWindowFromModel(String model) {
         if (model == null || model.isBlank()) {

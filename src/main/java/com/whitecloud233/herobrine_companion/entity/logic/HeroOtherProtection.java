@@ -41,7 +41,13 @@ public class HeroOtherProtection {
     }
     // [新增方法] 检测脚底是否悬空并自动切换飞行状态
     private static void checkAutoFly(HeroEntity hero, Level level) {
-        // 获取脚下1格和2格的方块位置
+        if (hero.isBattleModeActive()) {
+            if (hero.isFloating()) {
+                hero.setFloating(false);
+                hero.setNoGravity(false);
+            }
+            return;
+        }      // 获取脚下1格和2格的方块位置
         BlockPos posBelow = hero.blockPosition().below();
         BlockPos posBelow2 = posBelow.below();
 

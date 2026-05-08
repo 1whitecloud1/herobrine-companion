@@ -2,6 +2,7 @@ package com.whitecloud233.herobrine_companion.datagen;
 
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import net.minecraft.data.PackOutput;
+import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.client.model.generators.ItemModelProvider;
 import net.neoforged.neoforge.common.data.ExistingFileHelper;
 
@@ -25,6 +26,9 @@ public class ModItemModelProvider extends ItemModelProvider {
         basicItem(HerobrineCompanion.SOUL_BOUND_PACT.get());
         basicItem(HerobrineCompanion.TRANSCENDENCE_PERMIT.get());
         basicItem(HerobrineCompanion.SOURCE_FLOW.get());
+        withExistingParent(HerobrineCompanion.POEM_OF_THE_END.getId().getPath(),
+                ResourceLocation.fromNamespaceAndPath(HerobrineCompanion.MODID, "item/poem_of_the_end_base"));
+
         // Lore System Items
         basicItem(HerobrineCompanion.LORE_HANDBOOK.get());
         basicItem(HerobrineCompanion.LORE_FRAGMENT.get());

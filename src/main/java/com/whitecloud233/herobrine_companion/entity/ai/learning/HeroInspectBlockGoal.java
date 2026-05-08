@@ -25,6 +25,7 @@ public class HeroInspectBlockGoal extends Goal {
 
     @Override
     public boolean canUse() {
+        if (this.hero.isBattleModeActive()) return false;
         if (this.hero.getTarget() != null) return false;
 
         if (this.cooldown > 0) {
@@ -60,6 +61,8 @@ public class HeroInspectBlockGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
+        if (this.hero.isBattleModeActive()) return false;
+
         return this.targetPos != null && this.timer < 100 && this.hero.distanceToSqr(Vec3.atCenterOf(this.targetPos)) < 256.0D;
     }
 

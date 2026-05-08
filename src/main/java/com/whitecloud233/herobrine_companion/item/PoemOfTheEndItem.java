@@ -1,5 +1,6 @@
 package com.whitecloud233.herobrine_companion.item;
 
+import com.whitecloud233.herobrine_companion.compat.epicfight.HeroEpicFightStateMapper;
 import com.whitecloud233.herobrine_companion.entity.projectile.CleaveBladeEntity;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.projectile.VoidRiftEntity;
@@ -81,7 +82,14 @@ public class PoemOfTheEndItem extends DiggerItem {
         }
         return MODE_NORMAL;
     }
-
+    public String getEpicFightWeaponStyleKey(ItemStack stack) {
+        return switch (getMode(stack)) {
+            case MODE_REALM_BREAKER -> HeroEpicFightStateMapper.HERO_WEAPON_STYLE_REALM_BREAKER;
+            case MODE_THUNDER_CALL -> HeroEpicFightStateMapper.HERO_WEAPON_STYLE_THUNDER;
+            case MODE_VOID_SHATTER -> HeroEpicFightStateMapper.HERO_WEAPON_STYLE_VOID_SHATTER;
+            default -> HeroEpicFightStateMapper.HERO_WEAPON_STYLE_BASIC;
+        };
+    }
     // 设置模式
     private void setMode(ItemStack stack, int mode) {
         CustomData.update(DataComponents.CUSTOM_DATA, stack, tag -> tag.putInt(TAG_MODE, mode));

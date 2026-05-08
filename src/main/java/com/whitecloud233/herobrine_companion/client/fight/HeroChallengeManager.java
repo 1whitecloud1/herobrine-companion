@@ -184,18 +184,46 @@ public class HeroChallengeManager {
         }
         if (playerWon && !hero.level().isClientSide) {
             hero.level().playSound(null, hero.blockPosition(), SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundSource.MASTER, 1.0f, 1.0f);
-            if (hero.getOwnerUUID() != null) {
-                Player owner = hero.level().getPlayerByUUID(hero.getOwnerUUID());
-                if (owner instanceof ServerPlayer serverPlayer) {
-                    clearPlayerChallengeFlags(serverPlayer);
+            ServerPlayer challengePlayer = resolveChallengePlayer(hero);
+            if (challengePlayer != null) {
+                clearPlayerChallengeFlags(challengePlayer);
+                challengePlayer.sendSystemMessage(Component.translatable("message.herobrine_companion.challenge_victory").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD));
+                hero.increaseTrust(5);
 
-                    owner.sendSystemMessage(Component.translatable("message.herobrine_companion.challenge_victory").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD));
-                    hero.increaseTrust(5);
+                returnToSavedDimension(hero, challengePlayer);
+            }
+        }
+    }
 
-                    returnToSavedDimension(hero, serverPlayer);
+    private static ServerPlayer resolveChallengePlayer(HeroEntity hero) {
+        if (hero.getServer() == null) {
+            return null;
+        }
+
+        if (hero.getOwnerUUID() != null) {
+            Player owner = hero.level().getPlayerByUUID(hero.getOwnerUUID());
+            if (owner instanceof ServerPlayer serverPlayer && serverPlayer.getPersistentData().getBoolean("IsChallengeActive")) {
+                return serverPlayer;
+            }
+        }
+
+        UUID activeChallenger = HeroWorldData.get(hero.getServer().overworld()).getActiveChallengerUUID();
+        if (activeChallenger != null) {
+            ServerPlayer lockedPlayer = hero.getServer().getPlayerList().getPlayer(activeChallenger);
+            if (lockedPlayer != null && lockedPlayer.getPersistentData().getBoolean("IsChallengeActive")) {
+                return lockedPlayer;
+            }
+        }
+
+        if (hero.level() instanceof ServerLevel serverLevel) {
+            for (ServerPlayer player : serverLevel.players()) {
+                if (player.getPersistentData().getBoolean("IsChallengeActive")) {
+                    return player;
                 }
             }
         }
+
+        return null;
     }
 
     private static void returnToSavedDimension(HeroEntity hero, ServerPlayer player) {

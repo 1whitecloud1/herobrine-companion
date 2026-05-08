@@ -47,6 +47,10 @@ public class HeroObserveAndRescueGoal extends Goal {
 
     @Override
     public boolean canUse() {
+        if (this.hero.isBattleModeActive()) {
+            return false;
+        }
+
         if (this.hero.level().getGameTime() - this.hero.getLastSummonedTime() < 40) {
             return false;
         }
@@ -66,6 +70,9 @@ public class HeroObserveAndRescueGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
+        if (this.hero.isBattleModeActive()) {
+            return false;
+        }
         if (this.targetPlayer == null || !this.targetPlayer.isAlive()) return false;
 
         boolean isCompanionOwner = isOwner(this.targetPlayer);

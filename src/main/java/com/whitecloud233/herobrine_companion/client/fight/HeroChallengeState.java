@@ -69,11 +69,10 @@ public class HeroChallengeState {
             // ==========================================
             // 【修改后（正确）：强制精准发包】
             // ==========================================
+            // 【核心修复】：在第 200 帧直接定向发送给仍处于假死演出的挑战玩家。
+            // 不能依赖 TRACKING_ENTITY，否则玩家掉入虚空后可能因为脱离 Boss 跟踪范围而收不到假崩溃包。
             if (timer == 200) {
-                // 此时玩家可能已经掉入虚空深处，超出了 Boss 的网络追踪范围！
-                // 必须直接遍历当前维度的玩家，进行强制发包！
                 for (ServerPlayer player : level.players()) {
-                    // 只发送给被标记了“正在经历假死演出”的倒霉玩家
                     if (player.getPersistentData().getBoolean("HeroFakeOutPhase")) {
                         com.whitecloud233.herobrine_companion.network.PacketHandler.sendToPlayer(
                                 new com.whitecloud233.herobrine_companion.client.fight.network.SPacketFakeCrash(),

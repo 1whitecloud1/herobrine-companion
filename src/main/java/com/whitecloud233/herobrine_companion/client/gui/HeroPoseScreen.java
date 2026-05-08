@@ -3,6 +3,7 @@ package com.whitecloud233.herobrine_companion.client.gui;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
+import com.mojang.logging.LogUtils;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity; // 【修复】去掉了错误的 .modid
 import com.whitecloud233.herobrine_companion.event.ModEvents;
 import com.whitecloud233.herobrine_companion.network.PacketHandler;
@@ -20,24 +21,25 @@ import net.minecraft.world.entity.Entity;
 // 【新增】1.21.1 实体渲染需要的 JOML 数学库
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
+import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
 
 import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
 import java.lang.reflect.Type;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.util.*;
 
 public class HeroPoseScreen extends Screen {
+    private static final Logger LOGGER = LogUtils.getLogger();
 
     private final int entityId;
     private HeroEntity dummyHero;
 
     // --- 视角与位置控制 ---
-    private float lookX = 180;
-    private float lookY = 0;
+    private float previewYaw = 180;
+    private float previewPitch = 0;
     private boolean isRotating = false;
     private boolean isPanning = false;
     private float renderOffsetX = 0;
@@ -102,6 +104,10 @@ public class HeroPoseScreen extends Screen {
         if (this.minecraft == null || this.minecraft.level == null) return;
 
         this.dummyHero = ModEvents.HERO.get().create(this.minecraft.level);
+        if (this.dummyHero == null) {
+            LOGGER.warn("Unable to create preview Hero entity for pose editor");
+            return;
+        }
         this.dummyHero.isPoseEditing = true;
 
         Entity realEntity = this.minecraft.level.getEntity(this.entityId);
@@ -271,7 +277,11 @@ public class HeroPoseScreen extends Screen {
         worldIdentifier = worldIdentifier.replaceAll("[^a-zA-Z0-9\\-_]", "_");
 
         File dir = new File(mc.gameDirectory, "config/herobrine_companion/poses");
-        if (!dir.exists()) dir.mkdirs();
+        try {
+            Files.createDirectories(dir.toPath());
+        } catch (Exception e) {
+            LOGGER.warn("Unable to create pose preset directory: {}", dir, e);
+        }
 
         return new File(dir, worldIdentifier + ".json");
     }
@@ -279,23 +289,69 @@ public class HeroPoseScreen extends Screen {
     private void loadPresetsFromFile() {
         File file = getPresetFile();
         if (file.exists()) {
-            try (FileReader reader = new FileReader(file)) {
-                Type type = new TypeToken<Map<String, float[][]>>(){}.getType();
-                savedPresets = GSON.fromJson(reader, type);
+            try {
+                savedPresets = this.readPresetMap(file);
                 if (savedPresets == null) savedPresets = new HashMap<>();
                 presetNames = new ArrayList<>(savedPresets.keySet());
             } catch (Exception e) {
-                e.printStackTrace();
+                LOGGER.warn("Unable to load pose presets from {}", file, e);
             }
         }
     }
 
     private void savePresetsToFile() {
-        try (FileWriter writer = new FileWriter(getPresetFile())) {
+        try (var writer = Files.newBufferedWriter(getPresetFile().toPath(), StandardCharsets.UTF_8)) {
             GSON.toJson(savedPresets, writer);
         } catch (Exception e) {
-            e.printStackTrace();
+            LOGGER.warn("Unable to save pose presets", e);
         }
+    }
+
+    private Map<String, float[][]> readPresetMap(File file) throws Exception {
+        byte[] raw = Files.readAllBytes(file.toPath());
+        Map<String, float[][]> fallback = null;
+        for (Charset charset : this.getPresetCharsets()) {
+            Map<String, float[][]> parsed = this.tryParsePresetMap(raw, charset);
+            if (parsed == null) {
+                continue;
+            }
+            if (!this.containsReplacementCharacter(parsed)) {
+                return parsed;
+            }
+            if (fallback == null) {
+                fallback = parsed;
+            }
+        }
+        return fallback;
+    }
+
+    private Map<String, float[][]> tryParsePresetMap(byte[] raw, Charset charset) {
+        try {
+            Type type = new TypeToken<Map<String, float[][]>>(){}.getType();
+            return GSON.fromJson(new String(raw, charset), type);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private List<Charset> getPresetCharsets() {
+        LinkedHashSet<Charset> charsets = new LinkedHashSet<>();
+        charsets.add(StandardCharsets.UTF_8);
+        charsets.add(Charset.defaultCharset());
+        charsets.add(Charset.forName("GB18030"));
+        return new ArrayList<>(charsets);
+    }
+
+    private boolean containsReplacementCharacter(Map<String, float[][]> presets) {
+        if (presets == null) {
+            return false;
+        }
+        for (String name : presets.keySet()) {
+            if (name != null && name.indexOf('\uFFFD') >= 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void updateSlidersToCurrentPart() {
@@ -308,12 +364,12 @@ public class HeroPoseScreen extends Screen {
 
     // 【核心修复 1】1.21.1 的 renderBackground 必须接收这 4 个参数
     @Override
-    public void renderBackground(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+    public void renderBackground(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         // 留空：禁用原版自带的世界模糊和黑色背景遮罩
     }
 
     @Override
-    public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+    public void render(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         // 【配合修复 1】传入全部参数
         this.renderBackground(guiGraphics, mouseX, mouseY, partialTick);
 
@@ -322,11 +378,11 @@ public class HeroPoseScreen extends Screen {
 
         // --- 1. 先在最底层渲染 3D 模型 ---
         if (this.dummyHero != null) {
-            this.dummyHero.yBodyRot = lookX;
-            this.dummyHero.setYRot(lookX);
-            this.dummyHero.yHeadRot = lookX;
-            this.dummyHero.yHeadRotO = lookX;
-            this.dummyHero.setXRot(lookY);
+            this.dummyHero.yBodyRot = previewYaw;
+            this.dummyHero.setYRot(previewYaw);
+            this.dummyHero.yHeadRot = previewYaw;
+            this.dummyHero.yHeadRotO = previewYaw;
+            this.dummyHero.setXRot(previewPitch);
 
             float renderX = centerX + renderOffsetX;
             float renderY = centerY + 90 + renderOffsetY;
@@ -432,14 +488,11 @@ public class HeroPoseScreen extends Screen {
     // 【核心修复 3】1.21.1 明确拆分了横向和纵向滚动，接收 4 个参数 (X, Y, scrollX, scrollY)
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-        // 在你的逻辑中，我们只需要处理纵向滚动 (scrollY)
-        double delta = scrollY;
-
         if (isPresetMenuOpen) {
             int listHeight = (this.height - 100) - 40;
             int maxScroll = Math.max(0, presetNames.size() * 24 - listHeight);
             if (maxScroll > 0) {
-                presetScrollOffset -= (float) (delta * 18.0f);
+                presetScrollOffset -= (float) (scrollY * 18.0f);
                 presetScrollOffset = Math.max(0, Math.min(presetScrollOffset, maxScroll));
                 return true;
             }
@@ -448,14 +501,14 @@ public class HeroPoseScreen extends Screen {
             int viewHeight = (this.height - 35) - 40;
             int maxScroll = Math.max(0, partKeys.length * 24 - viewHeight);
             if (mouseX < 110 && maxScroll > 0) {
-                scrollOffset -= (float) (delta * 18.0f);
+                scrollOffset -= (float) (scrollY * 18.0f);
                 scrollOffset = Math.max(0, Math.min(scrollOffset, maxScroll));
                 return true;
             }
 
             // --- 模型缩放功能 ---
             if (mouseX > 110 && mouseX < this.width - 140) {
-                renderScale += (float) (delta * 8.0f);
+                renderScale += (float) (scrollY * 8.0f);
                 renderScale = Math.max(20.0f, Math.min(250.0f, renderScale)); // 限制缩放大小
                 return true;
             }
@@ -505,8 +558,8 @@ public class HeroPoseScreen extends Screen {
                 renderOffsetX = 0;
                 renderOffsetY = 0;
                 renderScale = 75.0f;
-                lookX = 180;
-                lookY = 0;
+                previewYaw = 180;
+                previewPitch = 0;
             }
             return true;
         }
@@ -556,9 +609,9 @@ public class HeroPoseScreen extends Screen {
         // --- 模型拖动逻辑 ---
         if (!isPresetMenuOpen) {
             if (isRotating) { // 左键拖拽旋转
-                lookX += (float) dragX * 2.0f;
-                lookY -= (float) dragY * 2.0f;
-                lookY = Math.max(-90, Math.min(90, lookY));
+                previewYaw += (float) dragX * 2.0f;
+                previewPitch -= (float) dragY * 2.0f;
+                previewPitch = Math.max(-90, Math.min(90, previewPitch));
                 return true;
             } else if (isPanning) { // 右键拖拽平移
                 renderOffsetX += (float) dragX;

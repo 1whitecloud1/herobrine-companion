@@ -5,6 +5,7 @@ import com.mojang.serialization.MapCodec;
 import com.whitecloud233.herobrine_companion.block.EndRingPortalBlock;
 import com.whitecloud233.herobrine_companion.block.entity.EndRingPortalBlockEntity;
 import com.whitecloud233.herobrine_companion.client.event.ClientModSetup;
+import com.whitecloud233.herobrine_companion.compat.epicfight.HeroEpicFightCompat;
 import com.whitecloud233.herobrine_companion.config.Config;
 import com.whitecloud233.herobrine_companion.datagen.DataGenerators;
 import com.whitecloud233.herobrine_companion.event.ModEvents;
@@ -127,6 +128,7 @@ public class HerobrineCompanion {
     public HerobrineCompanion(IEventBus modEventBus, ModContainer modContainer) {
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::registerPayloads);
+        HeroEpicFightCompat.bootstrap(modEventBus);
 
         modEventBus.addListener(ModEvents::entityAttributeEvent);
         modEventBus.addListener(ModEvents::registerSpawnPlacements);
@@ -162,7 +164,10 @@ public class HerobrineCompanion {
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {
-        // ...
+
+        event.enqueueWork(() -> {
+            HeroEpicFightCompat.tryRegisterRuntimeBridge();
+        });
         if (com.whitecloud233.herobrine_companion.compat.ArmourerWorkshop.HeroAWCompat.isLoaded()) {
             LOGGER.info(">>> [DEBUG] 检测到 Armourer's Workshop 已加载，准备对接渲染系统 <<<");
         } else {

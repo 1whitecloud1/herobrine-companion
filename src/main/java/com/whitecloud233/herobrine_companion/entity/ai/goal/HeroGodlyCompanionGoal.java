@@ -66,6 +66,8 @@ public class HeroGodlyCompanionGoal extends Goal {
 
     @Override
     public boolean canUse() {
+        if (this.hero.isBattleModeActive()) return false;
+
         if (!this.hero.isCompanionMode()) return false;
         // 如果正在交易，禁止跟随移动
         if (this.hero.getTradingPlayer() != null) return false;
@@ -89,6 +91,7 @@ public class HeroGodlyCompanionGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
+        if (this.hero.isBattleModeActive()) return false;
         if (!this.hero.isCompanionMode()) return false;
         // 如果正在交易，立即停止跟随
         if (this.hero.getTradingPlayer() != null) return false;

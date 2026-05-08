@@ -55,6 +55,8 @@ public class HeroInvitedActionGoal extends Goal {
 
     @Override
     public boolean canUse() {
+        if (this.hero.isBattleModeActive()) return false;
+
         BlockPos pos = this.hero.getInvitedPos();
         if (pos == null) return false;
 
@@ -85,6 +87,7 @@ public class HeroInvitedActionGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
+        if (this.hero.isBattleModeActive()) return false;
         BlockPos currentInvitedPos = this.hero.getInvitedPos();
         if (currentInvitedPos == null || !currentInvitedPos.equals(this.targetPos)) {
             return false;

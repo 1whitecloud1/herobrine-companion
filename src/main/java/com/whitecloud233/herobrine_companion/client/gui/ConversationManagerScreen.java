@@ -11,6 +11,7 @@ import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
+import com.whitecloud233.herobrine_companion.client.service.AIService;
 
 import java.io.File;
 import java.util.List;
@@ -80,7 +81,7 @@ public class ConversationManagerScreen extends Screen {
                 button -> {
                     UUID uuid = this.getPlayerUUID();
                     if (uuid != null) {
-                        this.conversationStore.createConversation(uuid);
+                        AIService.createFreshConversation(uuid);
                         this.refreshConversationList();
                     }
                 },

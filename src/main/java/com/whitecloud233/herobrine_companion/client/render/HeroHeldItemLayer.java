@@ -4,6 +4,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.client.model.HeroModel;
+import com.whitecloud233.herobrine_companion.compat.epicfight.HeroEpicFightCompat;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.compat.ArmourerWorkshop.HeroAWCompat;
 import net.minecraft.client.model.PlayerModel;
@@ -29,6 +30,9 @@ public class HeroHeldItemLayer extends ItemInHandLayer<HeroEntity, PlayerModel<H
 
     @Override
     public void render(PoseStack poseStack, MultiBufferSource buffer, int packedLight, HeroEntity entity, float limbSwing, float limbSwingAmount, float partialTick, float ageInTicks, float netHeadYaw, float headPitch) {
+        if (HeroEpicFightCompat.shouldUseEpicFightHeldItemLayer(entity)) {
+            return;
+        }
         if (entity.isInspectingScythe()) {
             ItemStack scytheStack = new ItemStack(HerobrineCompanion.POEM_OF_THE_END.get());
             if (scytheStack.isEmpty()) return;

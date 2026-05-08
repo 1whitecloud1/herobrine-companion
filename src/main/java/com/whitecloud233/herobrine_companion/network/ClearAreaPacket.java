@@ -51,7 +51,7 @@ public record ClearAreaPacket() implements CustomPacketPayload {
         return TYPE;
     }
 
-    public static void handle(ClearAreaPacket ignoredPayload, IPayloadContext context) {
+    public static void handle(ClearAreaPacket payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (context.player() instanceof ServerPlayer player) {
                 startVoidDomain(player, DEFAULT_VOID_DOMAIN_RADIUS, true, true,

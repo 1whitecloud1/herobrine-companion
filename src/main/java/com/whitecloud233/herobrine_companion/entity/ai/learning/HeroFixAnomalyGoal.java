@@ -6,6 +6,7 @@ import com.whitecloud233.herobrine_companion.entity.GhostZombieEntity;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.event.HeroQuestHandler;
 import com.whitecloud233.herobrine_companion.world.structure.ModStructures;
+import com.whitecloud233.herobrine_companion.world.structure.UnstableZoneRuntime;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 
@@ -23,7 +24,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.structure.Structure;
 import net.minecraft.world.level.levelgen.structure.StructureStart;
-
+import java.util.ArrayList;
 import java.util.List;
 
 public class HeroFixAnomalyGoal extends Goal {
@@ -40,6 +41,8 @@ public class HeroFixAnomalyGoal extends Goal {
 
     @Override
     public boolean canUse() {
+        if (this.hero.isBattleModeActive()) return false;
+
         // [深度学习] 检查心智状态
         SimpleNeuralNetwork.MindState state = this.hero.getHeroBrain().getState();
         
@@ -112,8 +115,8 @@ public class HeroFixAnomalyGoal extends Goal {
                     BlockPos p = heroPos.offset(x, y, z);
                     BlockState state = this.hero.level().getBlockState(p);
 
-                    if (isGlitchBlock(state)) {
-                        if (this.hero.level() instanceof ServerLevel serverLevel && isInUnstableZone(serverLevel, p)) {
+                    if (this.hero.level() instanceof ServerLevel serverLevel) {
+                        if (isGlitchBlock(serverLevel, p, state)) {
                             return p;
                         }
                     }
@@ -122,28 +125,14 @@ public class HeroFixAnomalyGoal extends Goal {
         }
         return null;
     }
-    private boolean isInUnstableZone(ServerLevel level, BlockPos pos) {
-        Structure structure = level.registryAccess().registryOrThrow(Registries.STRUCTURE).get(ModStructures.UNSTABLE_ZONE_KEY);
-        if (structure == null) return false;
 
-        StructureStart start = level.structureManager().getStructureAt(pos, structure);
-        return start.isValid();
+    private boolean isGlitchBlock(ServerLevel level, BlockPos pos, BlockState state) {
+        return UnstableZoneRuntime.isTrackedAnomalyBlock(level, pos, state);
     }
-    private boolean isGlitchBlock(BlockState state) {
-        // [修改] 匹配 UnstableZonePiece 中新生成的方块列表
-        // 必须与 UnstableZonePiece.getRandomBlock 保持一致
-        if (state.is(Blocks.SPAWNER)) return true;
-        if (state.is(Blocks.CRYING_OBSIDIAN)) return true;
-        if (state.is(Blocks.GILDED_BLACKSTONE)) return true;
-        if (state.is(Blocks.TINTED_GLASS)) return true; // 遮光玻璃
-        if (state.is(Blocks.WET_SPONGE)) return true;   // 湿海绵
-        if (state.is(Blocks.NETHERRACK)) return true;   // 地狱岩
-        if (state.is(Blocks.SOUL_SOIL)) return true;    // 灵魂土
-        if (state.is(Blocks.BLACKSTONE)) return true;   // 黑石
-        if (state.is(Blocks.BASALT)) return true;       // 玄武岩
-        if (state.is(Blocks.MAGMA_BLOCK)) return true;  // 岩浆块
-        if (state.is(Blocks.END_STONE)) return true;    // [修改] 末地石
-        return false;
+
+    // [新增] 检查方块是否在 Unstable Zone 结构范围内
+    private boolean isInUnstableZone(ServerLevel level, BlockPos pos) {
+        return UnstableZoneRuntime.isInUnstableZone(level, pos);
     }
 
     @Override
@@ -213,21 +202,25 @@ public class HeroFixAnomalyGoal extends Goal {
 
         // 延迟一小段时间后清除方块，让雷电效果更明显
         serverLevel.getServer().tell(new net.minecraft.server.TickTask(serverLevel.getServer().getTickCount() + 5, () -> {
+            List<BlockPos> removedBlocks = new ArrayList<>();
             for (int x = -radius; x <= radius; x++) {
                 for (int y = -radius; y <= radius; y++) {
                     for (int z = -radius; z <= radius; z++) {
                         BlockPos p = center.offset(x, y, z);
                         BlockState state = serverLevel.getBlockState(p);
 
-                        if (isGlitchBlock(state)) {
+                        if (isGlitchBlock(serverLevel, p, state)) {
                             if (isInUnstableZone(serverLevel, p)) {
                                 serverLevel.destroyBlock(p, false);
+                                removedBlocks.add(p.immutable());
                                 serverLevel.sendParticles(ParticleTypes.LARGE_SMOKE, p.getX() + 0.5, p.getY() + 0.5, p.getZ() + 0.5, 5, 0.5, 0.5, 0.5, 0.05);
                             }
                         }
                     }
                 }
             }
+            UnstableZoneRuntime.removeTrackedBlocks(serverLevel, removedBlocks);
+
 
             // [新增] 触发对话
             if (this.hero.isCompanionMode() && this.hero.getOwnerUUID() != null) {

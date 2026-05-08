@@ -3,6 +3,7 @@ package com.whitecloud233.herobrine_companion.entity;
 import com.mojang.authlib.GameProfile;
 import com.whitecloud233.herobrine_companion.entity.ai.HeroMoveControl;
 import com.whitecloud233.herobrine_companion.entity.ai.HeroAI;
+import com.whitecloud233.herobrine_companion.entity.ai.combat.HeroCombatPlanner;
 import com.whitecloud233.herobrine_companion.entity.ai.learning.HeroBrain;
 import com.whitecloud233.herobrine_companion.entity.ai.learning.SimpleNeuralNetwork;
 import com.whitecloud233.herobrine_companion.entity.logic.*;
@@ -15,12 +16,14 @@ import com.whitecloud233.herobrine_companion.event.HeroVisuals;
 import com.whitecloud233.herobrine_companion.world.structure.ModStructures;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerBossEvent;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -31,9 +34,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.effect.MobEffectInstance;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.control.MoveControl;
@@ -42,7 +43,7 @@ import net.minecraft.world.entity.ai.navigation.FlyingPathNavigation;
 import net.minecraft.world.entity.ai.navigation.GroundPathNavigation;
 import net.minecraft.world.entity.ai.navigation.PathNavigation;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.*;
 import net.minecraft.world.item.trading.Merchant;
 import net.minecraft.world.item.trading.MerchantOffer;
 import net.minecraft.world.item.trading.MerchantOffers;
@@ -55,7 +56,9 @@ import java.util.Set;
 import java.util.UUID;
 
 public class HeroEntity extends PathfinderMob implements Merchant {
-
+    private static final String[] VIRTUAL_BULLET_KEYWORDS = new String[] {
+            "bullet", "ammo", "round", "cartridge", "shell", "slug", "musket_ball", "musketball"
+    };
     public static final EntityDataAccessor<Boolean> IS_FLOATING = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.BOOLEAN);
     public static final EntityDataAccessor<Integer> TRUST_LEVEL = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.INT);
     public static final EntityDataAccessor<Boolean> IS_COMPANION_MODE = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.BOOLEAN);
@@ -72,6 +75,25 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     // 👇 [新增] 挑战模式专用同步通道 (仅作为数据桥梁，不含逻辑)
     public static final EntityDataAccessor<Boolean> IS_CHALLENGE_ACTIVE = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.BOOLEAN);
     public static final EntityDataAccessor<Integer> CHALLENGE_TICKS = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.INT);
+    public static final EntityDataAccessor<Boolean> BATTLE_MODE_ACTIVE = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.BOOLEAN);
+    public static final EntityDataAccessor<Integer> BATTLE_ACTION_STATE = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.INT);
+    public static final EntityDataAccessor<Integer> BATTLE_ACTION_TICKS = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.INT);
+    public static final EntityDataAccessor<Integer> BATTLE_COMBO_STEP = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.INT);
+    public static final EntityDataAccessor<Integer> BATTLE_ACTION_SERIAL = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.INT);
+
+    public static final int BATTLE_ACTION_IDLE = 0;
+    public static final int BATTLE_ACTION_APPROACH = 1;
+    public static final int BATTLE_ACTION_LIGHT_COMBO_1 = 2;
+    public static final int BATTLE_ACTION_LIGHT_COMBO_2 = 3;
+    public static final int BATTLE_ACTION_HEAVY_HOLD = 4;
+    public static final int BATTLE_ACTION_HEAVY_RELEASE = 5;
+
+    public static final int BATTLE_BUFFER_NONE = 0;
+    public static final int BATTLE_BUFFER_APPROACH = 1;
+    public static final int BATTLE_BUFFER_LIGHT = 2;
+    public static final int BATTLE_BUFFER_DASH = 3;
+    public static final int BATTLE_BUFFER_AIR = 4;
+    public static final int BATTLE_BUFFER_SKILL = 5;
 
     public boolean isStateDirty = true;
     private final Set<Integer> claimedRewards = new HashSet<>();
@@ -83,6 +105,13 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     private int outOfWaterTimer = 0;
     private long lastSummonedTime = 0;
     private boolean isLoadedFromDisk = false;
+    private boolean handlingHeroHurt = false;
+    private int battleBufferedAction = BATTLE_BUFFER_NONE;
+    private int battleBufferTicks = 0;
+    private java.util.List<HeroCombatPlanner.ActionProfile> battleComboProfiles = java.util.List.of();
+    @Nullable private HeroCombatPlanner.ActionProfile battleDashProfile;
+    @Nullable private HeroCombatPlanner.ActionProfile battleAirProfile;
+    @Nullable private HeroCombatPlanner.ActionProfile currentBattleActionProfile;
     // --- 姿势编辑器专用数据 ---
     public boolean isPoseEditing = false;
     // 0=头, 1=身体, 2=右上臂, 3=右小臂, 4=左上臂, 5=左小臂, 6=右大腿, 7=右小腿, 8=左大腿, 9=左小腿
@@ -96,6 +125,7 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     );
     @Nullable private Player tradingPlayer;
     @Nullable private MerchantOffers offers;
+    private final FlyingPathNavigation flyingNavigation;
     private final HeroBrain brain;
     private final GroundPathNavigation groundNavigation;
 
@@ -117,11 +147,13 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         this.setPersistenceRequired();
         this.moveControl = new HeroMoveControl(this);
         this.brain = new HeroBrain(this);
+        this.flyingNavigation = this.navigation instanceof FlyingPathNavigation flying ? flying : new FlyingPathNavigation(this, level);
         this.groundNavigation = new GroundPathNavigation(this, level);
         this.groundNavigation.setCanFloat(false);
         // 👇 【新增】：在实体诞生时，强制让 Boss 血条默认保持隐藏
         this.bossEvent.setVisible(false);
         // 👇 [新增这一行]：允许地面寻路算法把门视为可开启的通道
+        this.refreshNavigationMode();
         this.groundNavigation.setCanOpenDoors(true);
     }
 
@@ -160,7 +192,7 @@ public class HeroEntity extends PathfinderMob implements Merchant {
 
     @Override
     public PathNavigation getNavigation() {
-        return this.isFloating() ? this.navigation : this.groundNavigation;
+        return this.navigation;
     }
 
     @Override
@@ -190,7 +222,9 @@ public class HeroEntity extends PathfinderMob implements Merchant {
             if (this.scytheAnimTick == 0 && this.entityData.get(INSPECTING_SCYTHE)) this.entityData.set(INSPECTING_SCYTHE, false);
             if (this.debugAnimTick == 0 && this.entityData.get(IS_DEBUGGING)) this.entityData.set(IS_DEBUGGING, false);
             if (this.thunderTicks == 0 && this.entityData.get(IS_CASTING_THUNDER)) this.entityData.set(IS_CASTING_THUNDER, false);
-            // 👇 【新增】：呼叫挑战状态管理器，守护底层物理状态
+            if (this.getEntityData().get(IS_CHALLENGE_ACTIVE) || this.isInspectingScythe() || this.isDebugAnim() || this.isCastingThunder()) {
+                this.resetBattleCombatState();
+            }  // 👇 【新增】：呼叫挑战状态管理器，守护底层物理状态
             com.whitecloud233.herobrine_companion.client.fight.HeroChallengeState.tick(this);
             // 👇 【新增】：同步血条逻辑
             if (this.getEntityData().get(IS_CHALLENGE_ACTIVE)) {
@@ -241,7 +275,11 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         super.aiStep();
         if (!this.isCompanionMode()) {
             boolean inIntro = level().dimension() == ModStructures.END_RING_DIMENSION_KEY && getTags().contains("hero_intro_sequence");
-            if (!inIntro) {
+            if (!inIntro && this.isBattleModeActive()) {
+                this.outOfWaterTimer = 0;
+                if (this.isFloating()) this.setFloating(false);
+                if (this.isNoGravity()) this.setNoGravity(false);
+            } else if (!inIntro) {
                 if (this.isInWater()) {
                     this.outOfWaterTimer = 40;
                     if (!this.isFloating()) this.setFloating(true);
@@ -282,6 +320,72 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         InteractionResult result = HeroLogic.onInteract(this, player, hand);
         return result != InteractionResult.PASS ? result : super.mobInteract(player, hand);
     }
+    @Override
+    public boolean canAttack(LivingEntity target) {
+        return !(target instanceof Player) && super.canAttack(target);
+    }
+
+    @Override
+    public ItemStack getProjectile(ItemStack weaponStack) {
+        ItemStack projectile = super.getProjectile(weaponStack);
+        if (!projectile.isEmpty()) {
+            return projectile;
+        }
+
+        if (weaponStack == null || weaponStack.isEmpty()) {
+            return ItemStack.EMPTY;
+        }
+
+        if (weaponStack.getItem() instanceof ProjectileWeaponItem || weaponStack.getItem() instanceof CrossbowItem) {
+            ItemStack virtualProjectile = this.getVirtualProjectileFor(weaponStack);
+            return virtualProjectile.isEmpty() ? new ItemStack(Items.ARROW) : virtualProjectile;
+        }
+
+        UseAnim useAnim = weaponStack.getUseAnimation();
+        if (useAnim == UseAnim.BOW || useAnim == UseAnim.CROSSBOW) {
+            ItemStack virtualProjectile = this.getVirtualProjectileFor(weaponStack);
+            return virtualProjectile.isEmpty() ? new ItemStack(Items.ARROW) : virtualProjectile;
+        }
+
+        return ItemStack.EMPTY;
+    }
+
+    private ItemStack getVirtualProjectileFor(ItemStack weaponStack) {
+        ResourceLocation weaponId = BuiltInRegistries.ITEM.getKey(weaponStack.getItem());
+        String weaponPath = weaponId != null ? weaponId.getPath().toLowerCase() : "";
+
+        if (!this.looksLikeGunWeapon(weaponPath)) {
+            return new ItemStack(Items.ARROW);
+        }
+
+        for (net.minecraft.world.item.Item item : BuiltInRegistries.ITEM) {
+            ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(item);
+            if (itemId == null) {
+                continue;
+            }
+
+            String itemPath = itemId.getPath().toLowerCase();
+            for (String keyword : VIRTUAL_BULLET_KEYWORDS) {
+                if (itemPath.contains(keyword)) {
+                    return new ItemStack(item);
+                }
+            }
+        }
+
+        return new ItemStack(Items.ARROW);
+    }
+
+    private boolean looksLikeGunWeapon(String weaponPath) {
+        return weaponPath.contains("gun")
+                || weaponPath.contains("firearm")
+                || weaponPath.contains("rifle")
+                || weaponPath.contains("pistol")
+                || weaponPath.contains("revolver")
+                || weaponPath.contains("musket")
+                || weaponPath.contains("shotgun")
+                || weaponPath.contains("cannon")
+                || weaponPath.contains("blaster");
+    }
 
     @Override
     public boolean hurt(DamageSource source, float amount) {
@@ -289,18 +393,60 @@ public class HeroEntity extends PathfinderMob implements Merchant {
             return false;
         }
 
-        boolean wasHurt = HeroLogic.onHurt(this, source, amount) || super.hurt(source, amount);
-
-        // 【配合防红】：即便在受伤处理的方法里也强行锁一次 0
-        if (wasHurt && this.getEntityData().get(IS_CHALLENGE_ACTIVE)) {
-            this.hurtTime = 0;
+        if (this.handlingHeroHurt) {
+            return false;
         }
 
-        return wasHurt;
+        boolean isChallenge = this.getEntityData().get(IS_CHALLENGE_ACTIVE)
+                || this.getPersistentData().getBoolean("IsChallengeActive");
+
+        this.handlingHeroHurt = true;
+        try {
+            HeroLogic.onHurt(this, source, amount);
+
+            if (!isChallenge) {
+                this.handleNonChallengeRetaliation(source);
+                this.hurtTime = 0;
+                this.invulnerableTime = Math.max(this.invulnerableTime, 4);
+                if (this.getHealth() < this.getMaxHealth()) {
+                    super.setHealth(this.getMaxHealth());
+                }
+                return false;
+            }
+
+            boolean wasHurt = super.hurt(source, amount);
+
+            // 【配合防红】：即便在受伤处理的方法里也强行锁一次 0
+            this.hurtTime = 0;
+
+            return wasHurt;
+        } finally {
+            this.handlingHeroHurt = false;
+        }
     }
+
+    private void handleNonChallengeRetaliation(DamageSource source) {
+        if (this.level().isClientSide || !this.isBattleModeActive() || source == null) {
+            return;
+        }
+
+        Entity attacker = source.getEntity();
+        if (attacker instanceof LivingEntity livingAttacker
+                && com.whitecloud233.herobrine_companion.entity.ai.goal.HeroBattleStanceGoal.canHeroAttackTarget(livingAttacker)) {
+            this.setLastHurtByMob(livingAttacker);
+            if (this.getTarget() != livingAttacker) {
+                this.setTarget(livingAttacker);
+            }
+        }
+    }
+
 
     @Override
     public void setHealth(float health) {
+        if (this.handlingHeroHurt && !this.getEntityData().get(IS_CHALLENGE_ACTIVE)) {
+            super.setHealth(this.getMaxHealth());
+            return;
+        }
         if (!this.getEntityData().get(IS_CHALLENGE_ACTIVE)) {
             // 平时强制满血无敌
             super.setHealth(this.getMaxHealth());
@@ -312,7 +458,19 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     // 👇【新增】：监听所有的装备穿脱和手持物品变化，一旦改变立即触发脏标记
     @Override
     public void setItemSlot(net.minecraft.world.entity.EquipmentSlot slot, net.minecraft.world.item.ItemStack stack) {
+        ItemStack previousStack = this.getItemBySlot(slot).copy();
+        boolean handSlotChanged = slot.getType() == net.minecraft.world.entity.EquipmentSlot.Type.HAND
+                && !ItemStack.matches(previousStack, stack);
+        if (handSlotChanged) {
+            this.stopUsingItem();
+        }
         super.setItemSlot(slot, stack);
+        if (handSlotChanged) {
+            if (!this.level().isClientSide) {
+                this.getNavigation().stop();
+            }
+            this.resetBattleCombatState();
+        }
         // 标记为脏，让下一次 100 tick 循环触发硬盘写入
         this.isStateDirty = true;
     }
@@ -372,7 +530,10 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         return PathfinderMob.createMobAttributes()
                 .add(Attributes.MAX_HEALTH, 20.0D)
                 .add(Attributes.MOVEMENT_SPEED, 0.30D)
-                .add(Attributes.FLYING_SPEED, 0.10D);
+                .add(Attributes.FLYING_SPEED, 0.10D)
+                .add(Attributes.ATTACK_SPEED, 5.0D)
+                .add(Attributes.ATTACK_DAMAGE, 6.0D)
+                .add(Attributes.FOLLOW_RANGE, 32.0D);
     }
 
     // 1.21.1: 使用 SynchedEntityData.Builder 注册
@@ -394,6 +555,11 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         builder.define(IS_CASTING_THUNDER, false);
         builder.define(IS_CHALLENGE_ACTIVE, false);
         builder.define(CHALLENGE_TICKS, 0);
+        builder.define(BATTLE_MODE_ACTIVE, false);
+        builder.define(BATTLE_ACTION_STATE, BATTLE_ACTION_IDLE);
+        builder.define(BATTLE_ACTION_TICKS, 0);
+        builder.define(BATTLE_COMBO_STEP, 0);
+        builder.define(BATTLE_ACTION_SERIAL, 0);
     }
 
     // 移除 HolderLookup.Provider 参数，恢复为 1 个参数
@@ -403,6 +569,7 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         compound.putInt("TrustLevel", getTrustLevel());
         compound.putInt("PatrolTimer", patrolTimer);
         compound.putBoolean("CompanionMode", isCompanionMode());
+        compound.putBoolean("BattleModeActive", isBattleModeActive());
         compound.putInt("SkinVariant", getSkinVariant());
         compound.putString("CustomSkinName", getCustomSkinName());
         if (getOwnerUUID() != null) {
@@ -433,6 +600,7 @@ public class HeroEntity extends PathfinderMob implements Merchant {
 
         if (compound.contains("TrustLevel")) setTrustLevel(compound.getInt("TrustLevel"));
         if (compound.contains("PatrolTimer")) patrolTimer = compound.getInt("PatrolTimer");
+        if (compound.contains("BattleModeActive")) setBattleModeActive(compound.getBoolean("BattleModeActive"));
         if (compound.contains("CompanionMode")) setCompanionMode(compound.getBoolean("CompanionMode"));
 // 👇 [核心修复] 恢复挑战模式的同步状态
         if (this.getPersistentData().getBoolean("IsChallengeActive")) {
@@ -489,7 +657,11 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     // Getters & Setters
     public boolean isLoadedFromDisk() { return this.isLoadedFromDisk; }
     public boolean isFloating() { return entityData.get(IS_FLOATING); }
-    public void setFloating(boolean floating) { entityData.set(IS_FLOATING, floating); }
+    public void setFloating(boolean floating) {
+        entityData.set(IS_FLOATING, floating);
+        this.refreshNavigationMode();
+    }
+
     public int getTrustLevel() { return entityData.get(TRUST_LEVEL); }
     public void setTrustLevel(int level) {
         entityData.set(TRUST_LEVEL, level);
@@ -499,6 +671,146 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     public void increaseTrust(int amount) { setTrustLevel(getTrustLevel() + amount); }
     public boolean isCompanionMode() { return entityData.get(IS_COMPANION_MODE); }
     public void setCompanionMode(boolean active) { entityData.set(IS_COMPANION_MODE, active); }
+    public boolean isBattleModeActive() { return entityData.get(BATTLE_MODE_ACTIVE); }
+    public void setBattleModeActive(boolean active) {
+        entityData.set(BATTLE_MODE_ACTIVE, active);
+        if (active) {
+            this.clearNearbySubmissionEffects();
+            this.setFloating(false);
+            this.setNoGravity(false);
+            this.resetBattleCombatState();
+        } else {
+            this.setTarget(null);
+            this.getNavigation().stop();
+            this.resetBattleCombatState();
+        }
+    }
+    public int getBattleActionState() { return entityData.get(BATTLE_ACTION_STATE); }
+    public void setBattleActionState(int state) { entityData.set(BATTLE_ACTION_STATE, state); }
+    public int getBattleActionTicks() { return entityData.get(BATTLE_ACTION_TICKS); }
+    public void setBattleActionTicks(int ticks) { entityData.set(BATTLE_ACTION_TICKS, ticks); }
+    public int getBattleComboStep() { return entityData.get(BATTLE_COMBO_STEP); }
+    public void setBattleComboStep(int step) { entityData.set(BATTLE_COMBO_STEP, step); }
+    public int getBattleActionSerial() { return entityData.get(BATTLE_ACTION_SERIAL); }
+    public void setBattleActionSerial(int serial) { entityData.set(BATTLE_ACTION_SERIAL, serial); }
+    public void setBattleDynamicProfiles(java.util.List<HeroCombatPlanner.ActionProfile> comboProfiles,
+                                         @Nullable HeroCombatPlanner.ActionProfile dashProfile,
+                                         @Nullable HeroCombatPlanner.ActionProfile airProfile) {
+        this.battleComboProfiles = comboProfiles != null ? java.util.List.copyOf(comboProfiles) : java.util.List.of();
+        this.battleDashProfile = dashProfile;
+        this.battleAirProfile = airProfile;
+    }
+    @Nullable
+    public HeroCombatPlanner.ActionProfile getBattleComboProfile(int comboIndex) {
+        if (this.battleComboProfiles == null || this.battleComboProfiles.isEmpty()) {
+            return null;
+        }
+        int normalizedIndex = Math.floorMod(comboIndex, this.battleComboProfiles.size());
+        return this.battleComboProfiles.get(normalizedIndex);
+    }
+    @Nullable
+    public HeroCombatPlanner.ActionProfile getBattleDashProfile() { return this.battleDashProfile; }
+    @Nullable
+    public HeroCombatPlanner.ActionProfile getBattleAirProfile() { return this.battleAirProfile; }
+    @Nullable
+    public HeroCombatPlanner.ActionProfile getCurrentBattleActionProfile() { return this.currentBattleActionProfile; }
+    public void setCurrentBattleActionProfile(@Nullable HeroCombatPlanner.ActionProfile profile) { this.currentBattleActionProfile = profile; }
+    public void beginBattleAction(int state) {
+        this.beginBattleAction(state, null);
+    }
+    public void beginBattleAction(int state, @Nullable HeroCombatPlanner.ActionProfile profile) {
+        this.clearBattleBufferedAction();
+        this.setBattleActionState(state);
+        this.setBattleActionTicks(0);
+        this.setCurrentBattleActionProfile(profile);
+        if (state == BATTLE_ACTION_LIGHT_COMBO_1 || state == BATTLE_ACTION_LIGHT_COMBO_2) {
+            this.setBattleActionSerial(this.getBattleActionSerial() + 1);
+        }
+    }
+    public boolean isBattleTapAction() {
+        int state = this.getBattleActionState();
+        return state == BATTLE_ACTION_LIGHT_COMBO_1 || state == BATTLE_ACTION_LIGHT_COMBO_2;
+    }
+    public boolean isBattleHoldAction() {
+        return this.getBattleActionState() == BATTLE_ACTION_HEAVY_HOLD || this.isCastingThunder();
+    }
+    public boolean isBattleReleaseAction() {
+        return this.getBattleActionState() == BATTLE_ACTION_HEAVY_RELEASE || this.shockTicks > 0;
+    }
+    public int getBattleBufferedAction() {
+        return this.battleBufferedAction;
+    }
+    public int getBattleBufferTicks() {
+        return this.battleBufferTicks;
+    }
+    public boolean hasBattleBufferedAction() {
+        return this.battleBufferedAction != BATTLE_BUFFER_NONE && this.battleBufferTicks > 0;
+    }
+    public void queueBattleBufferedAction(int bufferedAction, int ticks) {
+        if (!this.isBattleModeActive() || bufferedAction == BATTLE_BUFFER_NONE || ticks <= 0) {
+            this.clearBattleBufferedAction();
+            return;
+        }
+
+        this.battleBufferedAction = bufferedAction;
+        this.battleBufferTicks = Math.min(20, ticks);
+    }
+    public void tickBattleBufferedAction() {
+        if (!this.hasBattleBufferedAction()) {
+            this.clearBattleBufferedAction();
+            return;
+        }
+
+        this.battleBufferTicks--;
+        if (this.battleBufferTicks <= 0) {
+            this.clearBattleBufferedAction();
+        }
+    }
+    public void clearBattleBufferedAction() {
+        this.battleBufferedAction = BATTLE_BUFFER_NONE;
+        this.battleBufferTicks = 0;
+    }
+    public void resetBattleActionTimeline() {
+        this.clearBattleBufferedAction();
+        this.setBattleActionState(BATTLE_ACTION_IDLE);
+        this.setBattleActionTicks(0);
+        this.setCurrentBattleActionProfile(null);
+    }
+    public void resetBattleCombatState() {
+        this.resetBattleActionTimeline();
+        this.setBattleComboStep(0);
+    }
+    private void refreshNavigationMode() {
+        if (this.flyingNavigation == null || this.groundNavigation == null) {
+            return;
+        }
+
+        PathNavigation desiredNavigation = this.isFloating() ? this.flyingNavigation : this.groundNavigation;
+        if (this.navigation == desiredNavigation) {
+            return;
+        }
+
+        if (this.navigation != null) {
+            this.navigation.stop();
+        }
+        this.flyingNavigation.stop();
+        this.groundNavigation.stop();
+        this.navigation = desiredNavigation;
+    }
+    private void clearNearbySubmissionEffects() {
+        if (this.level() == null) {
+            return;
+        }
+
+        double clearRange = Math.max(24.0D, this.getAttributeValue(Attributes.FOLLOW_RANGE));
+        for (Mob mob : this.level().getEntitiesOfClass(Mob.class, this.getBoundingBox().inflate(clearRange), mob -> mob.isAlive() && mob != this)) {
+            mob.getPersistentData().putBoolean("HeroSubmission", false);
+            mob.getPersistentData().remove("HeroSubmissionYaw");
+            if (mob.isSilent()) {
+                mob.setSilent(false);
+            }
+        }
+    }
     public int getSkinVariant() { return entityData.get(SKIN_VARIANT); }
     // 修复 setSkinVariant 和 setCustomSkinName:
     public void setSkinVariant(int variant) {

@@ -3,6 +3,7 @@ package com.whitecloud233.herobrine_companion.entity.ai.learning;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.logic.data.HeroWorldData;
 import com.whitecloud233.herobrine_companion.world.structure.ModStructures;
+import com.whitecloud233.herobrine_companion.world.structure.UnstableZoneRuntime;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.core.registries.Registries;
@@ -52,10 +53,7 @@ public class HeroBrain {
     }
 
     private boolean isInUnstableZone(ServerLevel level, BlockPos pos) {
-        Structure structure = level.registryAccess().registryOrThrow(Registries.STRUCTURE).get(ModStructures.UNSTABLE_ZONE_KEY);
-        if (structure == null) return false;
-        StructureStart start = level.structureManager().getStructureAt(pos, structure);
-        return start.isValid();
+        return UnstableZoneRuntime.isInUnstableZone(level, pos);
     }
 
     private SimpleNeuralNetwork getNetwork(UUID playerUUID) {

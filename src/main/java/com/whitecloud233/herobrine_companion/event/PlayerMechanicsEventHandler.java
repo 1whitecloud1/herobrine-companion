@@ -3,6 +3,7 @@ package com.whitecloud233.herobrine_companion.event;
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.entity.logic.spawn.GlitchVillagerSpawner;
 import com.whitecloud233.herobrine_companion.entity.logic.spawn.HeroSpawner;
+import com.whitecloud233.herobrine_companion.world.structure.UnstableZoneRuntime;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.server.level.ServerLevel;
@@ -33,6 +34,7 @@ public class PlayerMechanicsEventHandler {
         if (event.getLevel() instanceof ServerLevel serverLevel) {
             spawner.tick(serverLevel);
             glitchVillagerSpawner.tick(serverLevel);
+            UnstableZoneRuntime.tick(serverLevel);
         }
     }
 

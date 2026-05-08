@@ -26,6 +26,7 @@ public class HeroPacifyAttackerGoal extends Goal {
 
     @Override
     public boolean canUse() {
+        if (this.hero.isBattleModeActive()) return false;
         if (!this.hero.isCompanionMode()) return false;
         if (this.cooldown > 0) {
             this.cooldown--;
@@ -101,6 +102,7 @@ public class HeroPacifyAttackerGoal extends Goal {
     
     @Override
     public boolean canContinueToUse() {
+        if (this.hero.isBattleModeActive()) return false;
         if (this.targetMonster == null || !this.targetMonster.isAlive()) return false;
         if (this.hero.getOwnerUUID() == null) return false;
         Player owner = this.hero.level().getPlayerByUUID(this.hero.getOwnerUUID());
