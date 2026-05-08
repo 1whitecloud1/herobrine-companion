@@ -1,13 +1,20 @@
 package com.whitecloud233.modid.herobrine_companion.compat.ArmourerWorkshop;
 
-import net.minecraft.client.Minecraft;
+import com.mojang.logging.LogUtils;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.registries.ForgeRegistries;
+import org.slf4j.Logger;
+
+import java.util.Collections;
+import java.util.Set;
+import java.util.WeakHashMap;
 
 public class HeroAWCompat {
+    private static final Logger LOGGER = LogUtils.getLogger();
+    private static final Set<EntityRenderer<?>> ATTACHED_RENDERERS = Collections.newSetFromMap(new WeakHashMap<>());
 
     public static boolean isLoaded() {
         return ModList.get().isLoaded("armourers_workshop");
@@ -21,10 +28,23 @@ public class HeroAWCompat {
     }
 
     // 外部调用入口
-    public static void attachAW(EntityRenderer<?> heroRenderer) {
-        if (isLoaded()) {
-            AWSafeInvoker.attachAW(heroRenderer);
+    public static synchronized boolean attachAW(EntityRenderer<?> heroRenderer, EntityRenderer<?> playerRenderer) {
+        if (!isLoaded() || heroRenderer == null || playerRenderer == null) {
+            return false;
         }
+        if (ATTACHED_RENDERERS.contains(heroRenderer)) {
+            return true;
+        }
+
+        boolean attached = AWSafeInvoker.attachAW(heroRenderer, playerRenderer);
+        if (attached) {
+            ATTACHED_RENDERERS.add(heroRenderer);
+        }
+        return attached;
+    }
+
+    public static synchronized boolean isAttached(EntityRenderer<?> heroRenderer) {
+        return heroRenderer != null && ATTACHED_RENDERERS.contains(heroRenderer);
     }
 
     // ==========================================
@@ -32,23 +52,23 @@ public class HeroAWCompat {
     // 只要没有安装时装工坊，JVM 就绝对不会加载这个类，杜绝崩溃！
     // ==========================================
     private static class AWSafeInvoker {
-        static void attachAW(EntityRenderer<?> heroRenderer) {
+        static boolean attachAW(EntityRenderer<?> heroRenderer, EntityRenderer<?> playerRenderer) {
             try {
-                var dispatcher = Minecraft.getInstance().getEntityRenderDispatcher();
-                EntityRenderer<?> playerRenderer = dispatcher.getSkinMap().get("default");
-
-                if (playerRenderer != null) {
-                    var playerContext = moe.plushie.armourers_workshop.core.client.other.EntityRendererContext.of(playerRenderer);
-                    var playerProfile = playerContext.entityProfile();
-
-                    var heroContext = moe.plushie.armourers_workshop.core.client.other.EntityRendererContext.of(heroRenderer);
-                    heroContext.setEntityType(EntityType.PLAYER);
-                    heroContext.setEntityProfile(playerProfile);
-
-                    System.out.println("✅ [Herobrine Companion] 成功为创世神注入 Armourer's Workshop 原生渲染核心！");
+                var playerContext = moe.plushie.armourers_workshop.core.client.other.EntityRendererContext.of(playerRenderer);
+                var playerProfile = playerContext.entityProfile();
+                if (playerProfile == null) {
+                    return false;
                 }
+
+                var heroContext = moe.plushie.armourers_workshop.core.client.other.EntityRendererContext.of(heroRenderer);
+                heroContext.setEntityType(EntityType.PLAYER);
+                heroContext.setEntityProfile(playerProfile);
+
+                LOGGER.info("[Herobrine Companion] Armourer's Workshop renderer attached to Hero renderer.");
+                return true;
             } catch (Throwable e) {
-                System.err.println("❌ [Herobrine Companion] 注入 AW 渲染核心失败: " + e.getMessage());
+                LOGGER.warn("[Herobrine Companion] Failed to attach Armourer's Workshop renderer context to Hero renderer.", e);
+                return false;
             }
         }
     }

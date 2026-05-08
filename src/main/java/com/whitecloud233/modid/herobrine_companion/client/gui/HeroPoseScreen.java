@@ -18,11 +18,13 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.Entity;
 
 import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
 import java.lang.reflect.Type;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -275,9 +277,8 @@ public class HeroPoseScreen extends Screen {
     private void loadPresetsFromFile() {
         File file = getPresetFile();
         if (file.exists()) {
-            try (FileReader reader = new FileReader(file)) {
-                Type type = new TypeToken<Map<String, float[][]>>(){}.getType();
-                savedPresets = GSON.fromJson(reader, type);
+            try {
+                savedPresets = this.readPresetMap(file);
                 if (savedPresets == null) savedPresets = new HashMap<>();
                 presetNames = new ArrayList<>(savedPresets.keySet());
             } catch (Exception e) {
@@ -287,11 +288,58 @@ public class HeroPoseScreen extends Screen {
     }
 
     private void savePresetsToFile() {
-        try (FileWriter writer = new FileWriter(getPresetFile())) {
+        try (var writer = Files.newBufferedWriter(getPresetFile().toPath(), StandardCharsets.UTF_8)) {
             GSON.toJson(savedPresets, writer);
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    private Map<String, float[][]> readPresetMap(File file) throws Exception {
+        byte[] raw = Files.readAllBytes(file.toPath());
+        Map<String, float[][]> fallback = null;
+        for (Charset charset : this.getPresetCharsets()) {
+            Map<String, float[][]> parsed = this.tryParsePresetMap(raw, charset);
+            if (parsed == null) {
+                continue;
+            }
+            if (!this.containsReplacementCharacter(parsed)) {
+                return parsed;
+            }
+            if (fallback == null) {
+                fallback = parsed;
+            }
+        }
+        return fallback;
+    }
+
+    private Map<String, float[][]> tryParsePresetMap(byte[] raw, Charset charset) {
+        try {
+            Type type = new TypeToken<Map<String, float[][]>>(){}.getType();
+            return GSON.fromJson(new String(raw, charset), type);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private List<Charset> getPresetCharsets() {
+        LinkedHashSet<Charset> charsets = new LinkedHashSet<>();
+        charsets.add(StandardCharsets.UTF_8);
+        charsets.add(Charset.defaultCharset());
+        charsets.add(Charset.forName("GB18030"));
+        return new ArrayList<>(charsets);
+    }
+
+    private boolean containsReplacementCharacter(Map<String, float[][]> presets) {
+        if (presets == null) {
+            return false;
+        }
+        for (String name : presets.keySet()) {
+            if (name != null && name.indexOf('\uFFFD') >= 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void updateSlidersToCurrentPart() {

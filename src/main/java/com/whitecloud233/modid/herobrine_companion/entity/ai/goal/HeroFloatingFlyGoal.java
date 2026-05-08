@@ -17,6 +17,7 @@ public class HeroFloatingFlyGoal extends Goal {
 
     @Override
     public boolean canUse() {
+        if (this.hero.isBattleModeActive()) return false;
         // [新增] 如果正在交易，禁止自由飞行
         if (this.hero.getTradingPlayer() != null) return false;
         return hero.isFloating() && hero.getNavigation().isDone() && hero.getRandom().nextInt(50) == 0;
@@ -24,6 +25,7 @@ public class HeroFloatingFlyGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
+        if (this.hero.isBattleModeActive()) return false;
         // [新增] 如果正在交易，立即停止
         if (this.hero.getTradingPlayer() != null) return false;
         return hero.isFloating() && hero.getNavigation().isInProgress();

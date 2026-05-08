@@ -2,10 +2,9 @@ package com.whitecloud233.modid.herobrine_companion.entity.ai.learning;
 
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroWorldData;
-import com.whitecloud233.modid.herobrine_companion.world.structure.ModStructures;
+import com.whitecloud233.modid.herobrine_companion.world.structure.UnstableZoneRuntime;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -14,12 +13,9 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.levelgen.structure.Structure;
-import net.minecraft.world.level.levelgen.structure.StructureStart;
 
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
@@ -59,10 +55,7 @@ public class HeroBrain {
     }
 
     private boolean isInUnstableZone(ServerLevel level, BlockPos pos) {
-        Structure structure = level.registryAccess().registryOrThrow(Registries.STRUCTURE).get(ModStructures.UNSTABLE_ZONE_KEY);
-        if (structure == null) return false;
-        StructureStart start = level.structureManager().getStructureAt(pos, structure);
-        return start.isValid();
+        return UnstableZoneRuntime.isInUnstableZone(level, pos);
     }
 
     private SimpleNeuralNetwork getNetwork(UUID playerUUID) {

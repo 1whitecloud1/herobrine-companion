@@ -3,6 +3,7 @@ package com.whitecloud233.modid.herobrine_companion.client.render;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.modid.herobrine_companion.compat.epicfight.HeroEpicFightCompat;
 import com.whitecloud233.modid.herobrine_companion.client.model.HeroModel;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.compat.ArmourerWorkshop.HeroAWCompat;
@@ -23,6 +24,9 @@ public class HeroHeldItemLayer extends RenderLayer<HeroEntity, PlayerModel<HeroE
 
     @Override
     public void render(PoseStack poseStack, MultiBufferSource buffer, int packedLight, HeroEntity entity, float limbSwing, float limbSwingAmount, float partialTick, float ageInTicks, float netHeadYaw, float headPitch) {
+        if (HeroEpicFightCompat.shouldUseEpicFightHeldItemLayer(entity)) {
+            return;
+        }
 
         // ==========================================
         // 状态 1：专属动作 —— 抚摸镰刀

@@ -9,7 +9,8 @@
     "DragonSittingScanningPhaseMixin",
     "EnderDragonSoundMixin",
     "MobSubmissionMixin",
-    "LevelMixin"
+    "LevelMixin",
+    "epicfight.JsonAssetLoaderMixin"
   ],
   "client": [
   ],

@@ -175,9 +175,9 @@ public class ClientChatHandler {
     }
     private static void exitChat() {
         ClientHooks.disableChat();
-        // 在退出聊天时，清空大模型对当前玩家的短期记忆上下文
+        // 在退出聊天时，仅清理运行期的短期去重缓存；已保存对话记录继续保留
         if (Minecraft.getInstance().player != null) {
-            AIService.clearHistory(Minecraft.getInstance().player.getUUID());
+            AIService.clearTransientHistory(Minecraft.getInstance().player.getUUID());
         }
         Minecraft.getInstance().gui.setOverlayMessage(Component.empty(), false);
 
@@ -186,14 +186,14 @@ public class ClientChatHandler {
         );
     }
 
-    // 当玩家退出当前存档或断开服务器时，强制重置所有聊天状态与大模型记忆
+    // 当玩家退出当前存档或断开服务器时，重置聊天状态并保存会话；不要清空已存档的聊天记录
     @SubscribeEvent
     public static void onPlayerLogOut(ClientPlayerNetworkEvent.LoggingOut event) {
         // 使用我们刚写的新方法，彻底重置聊天状态和 API 开启状态
         ClientHooks.resetAll();
-        // 清理大模型的记忆上下文
+        // 仅清理运行期记忆上下文，不删除已落盘的会话消息
         if (event.getPlayer() != null) {
-            AIService.clearHistory(event.getPlayer().getUUID());
+            AIService.clearTransientHistory(event.getPlayer().getUUID());
             ConversationStore.getInstance().saveAndClearSession();
         }
         Minecraft.getInstance().gui.setOverlayMessage(Component.empty(), false);

@@ -44,6 +44,10 @@ public class HeroIdleActionGoal extends Goal {
 
     @Override
     public boolean canUse() {
+        if (this.hero.isBattleModeActive()) {
+            return false;
+        }
+
         // 1. 如果有攻击目标，绝对不执行
         if (this.hero.getTarget() != null) {
             return false;
@@ -141,6 +145,10 @@ public class HeroIdleActionGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
+        if (this.hero.isBattleModeActive()) {
+            return false;
+        }
+
         // [新增] 如果中途进入邀请状态，立即停止
         if (this.hero.getInvitedPos() != null) {
             return false;

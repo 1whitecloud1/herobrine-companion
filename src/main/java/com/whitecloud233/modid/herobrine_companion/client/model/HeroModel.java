@@ -1,7 +1,10 @@
 package com.whitecloud233.modid.herobrine_companion.client.model;
 
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.modid.herobrine_companion.compat.epicfight.HeroEpicFightCompat;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.modid.herobrine_companion.entity.ai.HeroCombatWeaponHelper;
+import com.whitecloud233.modid.herobrine_companion.item.PoemOfTheEndItem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.PlayerModel;
 import net.minecraft.client.model.geom.ModelLayerLocation;
@@ -10,11 +13,13 @@ import net.minecraft.client.model.geom.PartPose;
 import net.minecraft.client.model.geom.builders.*;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
+import net.minecraft.world.entity.HumanoidArm;
+import com.mojang.blaze3d.vertex.PoseStack;
 
 public class HeroModel extends PlayerModel<HeroEntity> {
 
     public static final ModelLayerLocation LAYER_LOCATION = new ModelLayerLocation(
-            new ResourceLocation(HerobrineCompanion.MODID, "hero"), "main");
+            ResourceLocation.tryParse(HerobrineCompanion.MODID + ":hero"), "main");
 
     public final ModelPart rightArmLower;
     public final ModelPart leftArmLower;
@@ -184,6 +189,16 @@ public class HeroModel extends PlayerModel<HeroEntity> {
             return;
         }
 
+        if (HeroEpicFightCompat.shouldUseEpicFightPose(entity)) {
+            copyAllModelProperties();
+            return;
+        }
+
+        if (entity.isBattleModeActive() && !entity.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE)) {
+            setupBattleModeAnim(entity, limbSwing, limbSwingAmount, ageInTicks);
+            return;
+        }
+
         float partialTick = ageInTicks - entity.tickCount;
         float floatAmount = entity.getFloatingAmount(partialTick);
 
@@ -245,6 +260,217 @@ public class HeroModel extends PlayerModel<HeroEntity> {
         com.whitecloud233.modid.herobrine_companion.client.fight.animation.HeroChallengeAnimations.setupChallengeAnims(this, entity, ageInTicks);
 
         copyAllModelProperties();
+    }
+
+    private void setupBattleModeAnim(HeroEntity entity, float limbSwing, float limbSwingAmount, float ageInTicks) {
+        float walkAmount = Mth.clamp(limbSwingAmount, 0.0F, 1.0F);
+        float battleBreath = Mth.sin(ageInTicks * 0.18F) * 0.04F;
+        float guardBlend = 0.82F;
+
+        applyBattleHeight(-1.0F + battleBreath * 0.25F);
+
+        this.body.xRot = Mth.lerp(guardBlend, this.body.xRot, -0.18F);
+        this.body.yRot = Mth.lerp(guardBlend, this.body.yRot, 0.0F);
+        this.body.zRot = Mth.lerp(guardBlend, this.body.zRot, 0.0F);
+        this.head.xRot = Mth.lerp(guardBlend, this.head.xRot, -0.08F + battleBreath);
+
+        this.rightArm.xRot = Mth.lerp(guardBlend, this.rightArm.xRot, -1.1F + battleBreath);
+        this.rightArm.yRot = Mth.lerp(guardBlend, this.rightArm.yRot, -0.18F);
+        this.rightArm.zRot = Mth.lerp(guardBlend, this.rightArm.zRot, 0.10F);
+        this.leftArm.xRot = Mth.lerp(guardBlend, this.leftArm.xRot, -0.55F - battleBreath * 0.5F);
+        this.leftArm.yRot = Mth.lerp(guardBlend, this.leftArm.yRot, 0.24F);
+        this.leftArm.zRot = Mth.lerp(guardBlend, this.leftArm.zRot, -0.18F);
+
+        this.rightArmLower.xRot = Mth.lerp(guardBlend, this.rightArmLower.xRot, -0.35F);
+        this.leftArmLower.xRot = Mth.lerp(guardBlend, this.leftArmLower.xRot, -0.18F);
+
+        if (HeroCombatWeaponHelper.isRangedLoadout(entity.getMainHandItem())) {
+            applyRangedBattlePose(entity, limbSwing, walkAmount, ageInTicks);
+            syncBattleTorsoAnchors();
+            copyAllModelProperties();
+            return;
+        }
+
+        switch (entity.getBattleActionState()) {
+            case HeroEntity.BATTLE_ACTION_APPROACH -> applyApproachPose(limbSwing, walkAmount, ageInTicks);
+            case HeroEntity.BATTLE_ACTION_LIGHT_COMBO_1 -> applyComboPose(entity, true, ageInTicks);
+            case HeroEntity.BATTLE_ACTION_LIGHT_COMBO_2 -> applyComboPose(entity, false, ageInTicks);
+            default -> applyBattleIdlePose(ageInTicks);
+        }
+
+        syncBattleTorsoAnchors();
+        copyAllModelProperties();
+    }
+
+    private void applyRangedBattlePose(HeroEntity entity, float limbSwing, float walkAmount, float ageInTicks) {
+        float idlePulse = Mth.sin(ageInTicks * 0.14F) * 0.03F;
+        float aimBlend = entity.isUsingItem() ? 1.0F : 0.55F;
+        float headYaw = this.head.yRot;
+        float headPitch = this.head.xRot;
+        float strafe = Mth.cos(limbSwing * 0.8F) * 0.55F * walkAmount;
+
+        applyBattleHeight(-1.15F + idlePulse * 0.25F);
+        this.body.xRot += 0.06F + walkAmount * 0.04F;
+        this.body.yRot += headYaw * 0.18F;
+        this.head.yRot *= 0.72F;
+
+        this.rightLeg.xRot = 0.18F - strafe;
+        this.leftLeg.xRot = -0.12F + strafe;
+        this.rightLegLower.xRot = Mth.clamp(strafe * 0.35F + 0.08F, -0.12F, 0.36F);
+        this.leftLegLower.xRot = Mth.clamp(-strafe * 0.35F + 0.08F, -0.12F, 0.36F);
+        this.rightLeg.zRot = 0.04F;
+        this.leftLeg.zRot = -0.04F;
+
+        this.rightArm.xRot = Mth.lerp(aimBlend, this.rightArm.xRot, -1.38F + headPitch * 0.85F);
+        this.rightArm.yRot = Mth.lerp(aimBlend, this.rightArm.yRot, -0.16F + headYaw * 0.35F);
+        this.rightArm.zRot = Mth.lerp(aimBlend, this.rightArm.zRot, 0.02F);
+        this.rightArmLower.xRot = Mth.lerp(aimBlend, this.rightArmLower.xRot, -0.45F);
+
+        this.leftArm.xRot = Mth.lerp(aimBlend, this.leftArm.xRot, entity.isUsingItem() ? -1.24F + headPitch * 0.92F : -0.62F + idlePulse);
+        this.leftArm.yRot = Mth.lerp(aimBlend, this.leftArm.yRot, entity.isUsingItem() ? 0.52F + headYaw * 0.55F : 0.28F);
+        this.leftArm.zRot = Mth.lerp(aimBlend, this.leftArm.zRot, entity.isUsingItem() ? -0.14F : -0.22F);
+        this.leftArmLower.xRot = Mth.lerp(aimBlend, this.leftArmLower.xRot, entity.isUsingItem() ? -0.72F : -0.24F);
+
+        if (!entity.isUsingItem()) {
+            this.rightArm.xRot += strafe * 0.18F;
+            this.leftArm.xRot -= strafe * 0.12F;
+        }
+    }
+
+    private void applyBattleIdlePose(float ageInTicks) {
+        float idlePulse = Mth.sin(ageInTicks * 0.16F) * 0.04F;
+        applyBattleHeight(-1.0F + idlePulse * 0.15F);
+        this.rightArm.xRot += idlePulse;
+        this.leftArm.xRot -= idlePulse * 0.5F;
+        this.rightLeg.xRot = 0.12F + idlePulse * 0.8F;
+        this.leftLeg.xRot = -0.12F - idlePulse * 0.8F;
+        this.rightLegLower.xRot = 0.08F;
+        this.leftLegLower.xRot = 0.04F;
+    }
+
+    private void applyApproachPose(float limbSwing, float walkAmount, float ageInTicks) {
+        float stride = Mth.cos(limbSwing * 0.85F) * 0.9F * walkAmount;
+        float counterStride = Mth.cos(limbSwing * 0.85F + (float)Math.PI) * 0.9F * walkAmount;
+        float combatBounce = Mth.sin(ageInTicks * 0.35F) * 0.04F * walkAmount;
+
+        applyBattleHeight(-1.35F + combatBounce);
+        this.body.xRot += 0.08F * walkAmount;
+        this.rightLeg.xRot = stride;
+        this.leftLeg.xRot = counterStride;
+        this.rightLegLower.xRot = Mth.clamp(-stride * 0.55F, -0.25F, 0.45F);
+        this.leftLegLower.xRot = Mth.clamp(-counterStride * 0.55F, -0.25F, 0.45F);
+
+        this.rightArm.xRot += counterStride * 0.32F;
+        this.leftArm.xRot += stride * 0.24F;
+        this.rightArm.zRot += counterStride * 0.08F;
+        this.leftArm.zRot -= stride * 0.08F;
+        this.head.yRot *= 0.6F;
+    }
+
+    private void applyComboPose(HeroEntity entity, boolean firstCombo, float ageInTicks) {
+        float progress = Mth.clamp(entity.getBattleActionTicks() / (float)getBattleActionDuration(entity, firstCombo), 0.0F, 1.0F);
+        float windup = smoothWindow(progress, 0.0F, 0.24F);
+        float strike = smoothWindow(progress, 0.22F, 0.68F);
+        float recovery = smoothWindow(progress, 0.60F, 1.0F);
+        float torsoTwist = firstCombo ? -0.55F : 0.42F;
+        float followThrough = firstCombo ? 0.95F : 1.08F;
+        float weaponShake = Mth.sin(ageInTicks * 1.6F + (firstCombo ? 0.0F : 0.7F)) * 0.035F * strike;
+
+        applyBattleHeight(-1.6F + strike * 0.18F);
+        this.body.xRot += 0.12F * windup + 0.22F * strike - 0.14F * recovery;
+        this.body.yRot += torsoTwist * strike - torsoTwist * 0.35F * recovery;
+        this.head.yRot += -torsoTwist * 0.35F * strike;
+        this.head.xRot += -0.10F * strike + 0.08F * recovery;
+
+        this.rightArm.xRot = Mth.lerp(windup, this.rightArm.xRot, firstCombo ? -1.8F : -1.55F);
+        this.rightArm.yRot = Mth.lerp(windup, this.rightArm.yRot, firstCombo ? -0.95F : 0.55F);
+        this.rightArm.zRot = Mth.lerp(windup, this.rightArm.zRot, firstCombo ? 0.24F : -0.32F);
+
+        this.rightArm.xRot = Mth.lerp(strike, this.rightArm.xRot, firstCombo ? 0.55F : -0.10F);
+        this.rightArm.yRot = Mth.lerp(strike, this.rightArm.yRot, followThrough);
+        this.rightArm.zRot = Mth.lerp(strike, this.rightArm.zRot, firstCombo ? -0.78F : 0.62F);
+        this.rightArm.xRot += weaponShake;
+        this.rightArm.zRot += weaponShake * 0.7F;
+
+        this.leftArm.xRot = Mth.lerp(windup + strike * 0.35F, this.leftArm.xRot, firstCombo ? -0.35F : -0.65F);
+        this.leftArm.yRot = Mth.lerp(windup + strike * 0.35F, this.leftArm.yRot, firstCombo ? 0.55F : -0.18F);
+        this.leftArm.zRot = Mth.lerp(windup + strike * 0.35F, this.leftArm.zRot, firstCombo ? -0.32F : -0.42F);
+
+        this.rightArmLower.xRot = Mth.lerp(windup + strike, this.rightArmLower.xRot, firstCombo ? -1.05F : -0.82F);
+        this.leftArmLower.xRot = Mth.lerp(windup + strike * 0.45F, this.leftArmLower.xRot, -0.35F);
+
+        this.rightLeg.xRot = Mth.lerp(strike, this.rightLeg.xRot, firstCombo ? -0.48F : 0.32F);
+        this.leftLeg.xRot = Mth.lerp(strike, this.leftLeg.xRot, firstCombo ? 0.38F : -0.42F);
+        this.rightLegLower.xRot = Mth.lerp(strike, this.rightLegLower.xRot, firstCombo ? 0.24F : 0.12F);
+        this.leftLegLower.xRot = Mth.lerp(strike, this.leftLegLower.xRot, firstCombo ? 0.12F : 0.28F);
+        this.rightLeg.zRot = Mth.lerp(strike, this.rightLeg.zRot, firstCombo ? 0.08F : -0.05F);
+        this.leftLeg.zRot = Mth.lerp(strike, this.leftLeg.zRot, firstCombo ? -0.05F : 0.08F);
+
+        this.rightArm.xRot = Mth.lerp(recovery, this.rightArm.xRot, -0.92F);
+        this.rightArm.yRot = Mth.lerp(recovery, this.rightArm.yRot, -0.16F);
+        this.rightArm.zRot = Mth.lerp(recovery, this.rightArm.zRot, 0.08F);
+        this.leftArm.xRot = Mth.lerp(recovery, this.leftArm.xRot, -0.52F);
+        this.leftArm.yRot = Mth.lerp(recovery, this.leftArm.yRot, 0.20F);
+        this.leftArm.zRot = Mth.lerp(recovery, this.leftArm.zRot, -0.15F);
+    }
+
+    private void applyBattleHeight(float offsetY) {
+        this.body.y = offsetY;
+        this.head.y = offsetY;
+        this.hat.y = this.head.y;
+
+        this.rightArm.y = 2.0F + offsetY;
+        this.leftArm.y = 2.0F + offsetY;
+        this.rightLeg.y = 12.0F + offsetY;
+        this.leftLeg.y = 12.0F + offsetY;
+
+        this.jacket.y = this.body.y;
+        this.rightSleeve.y = this.rightArm.y;
+        this.leftSleeve.y = this.leftArm.y;
+        this.rightPants.y = this.rightLeg.y;
+        this.leftPants.y = this.leftLeg.y;
+    }
+
+    private void syncBattleTorsoAnchors() {
+        float bodyOffsetY = this.body.y;
+
+        org.joml.Vector3f rightShoulder = new org.joml.Vector3f(-5.0F, 2.0F, 0.0F);
+        rightShoulder.rotateX(this.body.xRot).rotateY(this.body.yRot).rotateZ(this.body.zRot);
+        this.rightArm.setPos(rightShoulder.x, bodyOffsetY + rightShoulder.y, rightShoulder.z);
+
+        org.joml.Vector3f leftShoulder = new org.joml.Vector3f(5.0F, 2.0F, 0.0F);
+        leftShoulder.rotateX(this.body.xRot).rotateY(this.body.yRot).rotateZ(this.body.zRot);
+        this.leftArm.setPos(leftShoulder.x, bodyOffsetY + leftShoulder.y, leftShoulder.z);
+
+        this.head.setPos(0.0F, bodyOffsetY, 0.0F);
+        this.hat.setPos(0.0F, this.head.y, 0.0F);
+        this.jacket.setPos(0.0F, this.body.y, 0.0F);
+        this.rightSleeve.setPos(this.rightArm.x, this.rightArm.y, this.rightArm.z);
+        this.leftSleeve.setPos(this.leftArm.x, this.leftArm.y, this.leftArm.z);
+        this.rightPants.setPos(this.rightLeg.x, this.rightLeg.y, this.rightLeg.z);
+        this.leftPants.setPos(this.leftLeg.x, this.leftLeg.y, this.leftLeg.z);
+    }
+
+    private int getBattleActionDuration(HeroEntity entity, boolean firstCombo) {
+        if (entity.getMainHandItem().getItem() instanceof PoemOfTheEndItem poem) {
+            return switch (poem.getMode(entity.getMainHandItem())) {
+                case PoemOfTheEndItem.MODE_VOID_SHATTER -> firstCombo ? 7 : 8;
+                case PoemOfTheEndItem.MODE_REALM_BREAKER, PoemOfTheEndItem.MODE_THUNDER_CALL -> firstCombo ? 14 : 16;
+                default -> firstCombo ? 10 : 12;
+            };
+        }
+        return firstCombo ? 8 : 10;
+    }
+
+    private float smoothWindow(float value, float start, float end) {
+        if (end <= start) {
+            return value >= end ? 1.0F : 0.0F;
+        }
+        return smoothStep(Mth.clamp((value - start) / (end - start), 0.0F, 1.0F));
+    }
+
+    private float smoothStep(float value) {
+        return value * value * (3.0F - 2.0F * value);
     }
 
     private void setupScytheInspectAnim(HeroEntity entity, float ageInTicks) {
@@ -352,5 +578,13 @@ public class HeroModel extends PlayerModel<HeroEntity> {
         this.leftSleeveLower.copyFrom(this.leftArmLower);
         this.rightPantsLower.copyFrom(this.rightLegLower);
         this.leftPantsLower.copyFrom(this.leftLegLower);
+    }
+
+    @Override
+    public void translateToHand(HumanoidArm arm, PoseStack poseStack) {
+        ModelPart upperArm = arm == HumanoidArm.RIGHT ? this.rightArm : this.leftArm;
+        ModelPart lowerArm = arm == HumanoidArm.RIGHT ? this.rightArmLower : this.leftArmLower;
+        upperArm.translateAndRotate(poseStack);
+        lowerArm.translateAndRotate(poseStack);
     }
 }

@@ -2,7 +2,12 @@ package com.whitecloud233.modid.herobrine_companion.client.fight.event;
 
 import com.whitecloud233.modid.herobrine_companion.client.fight.HeroChallengeManager;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.modid.herobrine_companion.util.EndRingContext;
+import com.whitecloud233.modid.herobrine_companion.world.structure.ModStructures;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -66,6 +71,36 @@ public class ChallengeEventHandler {
                 event.setCanceled(true);
                 player.setHealth(1.0f);
             }
+        }
+    }
+
+    @SubscribeEvent
+    public static void onPlayerTick(TickEvent.PlayerTickEvent event) {
+        if (event.phase != TickEvent.Phase.END) {
+            return;
+        }
+
+        if (!(event.player instanceof ServerPlayer player) || !player.isAlive()) {
+            return;
+        }
+
+        if (player.level().dimension() != ModStructures.END_RING_DIMENSION_KEY
+                || !player.getPersistentData().getBoolean("HeroFakeOutPhase")) {
+            return;
+        }
+
+        player.fallDistance = 0;
+
+        MobEffectInstance slowFalling = player.getEffect(MobEffects.SLOW_FALLING);
+        if (slowFalling == null || slowFalling.getDuration() < 10) {
+            player.addEffect(new MobEffectInstance(MobEffects.SLOW_FALLING, 40, 0, false, false));
+        }
+
+        // 【终极防脱轨安全网】：如果演出过程中出现意外坠落，立刻拉回擂台上空，保证后续假崩溃页与胜利回传能继续执行。
+        if (player.getY() < 75.0D) {
+            player.teleportTo(EndRingContext.CENTER_X, EndRingContext.CENTER_Y, EndRingContext.CENTER_Z);
+            player.setDeltaMovement(0, -0.08D, 0);
+            player.fallDistance = 0;
         }
     }
 }

@@ -50,6 +50,8 @@ public class PacketHandler {
 
         // [新增] 注册 AI 观察环境数据包
         INSTANCE.registerMessage(id++, AIObservationPacket.class, AIObservationPacket::encode, AIObservationPacket::new, AIObservationPacket::handle);
+        INSTANCE.registerMessage(id++, HeroAIActionPacket.class, HeroAIActionPacket::encode, HeroAIActionPacket::new, HeroAIActionPacket::handle);
+        INSTANCE.registerMessage(id++, ToggleBattleModePacket.class, ToggleBattleModePacket::encode, ToggleBattleModePacket::new, ToggleBattleModePacket::handle);
 // [新增] 注册第一阶段：虚晃一枪（世界崩坏）数据包
         // 【新增】：你漏掉了这个崩坏演出数据包！！
         INSTANCE.registerMessage(id++, com.whitecloud233.modid.herobrine_companion.client.fight.network.SPacketStartCollapse.class,
@@ -69,8 +71,10 @@ public class PacketHandler {
         // 👇 【新增】：注册召唤实体、传送到实体身边的两个数据包
         INSTANCE.registerMessage(id++, SummonHeroPacket.class,
                 SummonHeroPacket::toBytes, SummonHeroPacket::new, SummonHeroPacket::handle);
-        INSTANCE.registerMessage(id, TeleportToHeroPacket.class,
+        INSTANCE.registerMessage(id++, TeleportToHeroPacket.class,
                 TeleportToHeroPacket::toBytes, TeleportToHeroPacket::new, TeleportToHeroPacket::handle);
+        INSTANCE.registerMessage(id++, HeroPunishmentPacket.class,
+                HeroPunishmentPacket::encode, HeroPunishmentPacket::new, HeroPunishmentPacket::handle);
     }
 
 

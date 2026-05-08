@@ -29,11 +29,14 @@ public class HeroCombatHandler {
 
         // 2. 玩家攻击判定
         if (!hero.level().isClientSide && source.getEntity() instanceof Player player) {
+            if (hero.isBattleModeActive()) {
+                return false;
+            }
 
             // 👇👇👇【核心修复：上次你漏掉了这里！】拦截非主人的攻击，防止夺舍漏洞
             UUID ownerUUID = hero.getOwnerUUID();
             if (ownerUUID != null && !ownerUUID.equals(player.getUUID())) {
-                player.sendSystemMessage(Component.translatable("message.herobrine_companion.not_your_hero").withStyle(net.minecraft.ChatFormatting.RED));
+                player.sendSystemMessage(hero.createNotYourHeroMessage());
                 return false;
             }
             // 👆👆👆
@@ -56,10 +59,9 @@ public class HeroCombatHandler {
                 }
             }
 
-            boolean isCompanion = hero.isCompanionMode();
             boolean isEndRing = hero.level().dimension() == ModStructures.END_RING_DIMENSION_KEY;
 
-            if (!isCompanion) {
+            if (!hero.isCompanionMode()) {
                 if (isEndRing) {
                     HeroDimensionHandler.teleportRandomly(hero);
                     player.sendSystemMessage(Component.translatable("message.herobrine_companion.end_ring_attack"));
@@ -84,9 +86,7 @@ public class HeroCombatHandler {
                 return false;
             }
 
-            if (isCompanion) {
-                player.sendSystemMessage(Component.translatable("message.herobrine_companion.companion_attack"));
-            }
+            player.sendSystemMessage(Component.translatable("message.herobrine_companion.companion_attack"));
         }
 
         return false;

@@ -5,6 +5,7 @@ import com.mojang.serialization.Codec;
 import com.whitecloud233.modid.herobrine_companion.block.EndRingPortalBlock;
 import com.whitecloud233.modid.herobrine_companion.block.entity.EndRingPortalBlockEntity;
 import com.whitecloud233.modid.herobrine_companion.client.event.ClientModSetup;
+import com.whitecloud233.modid.herobrine_companion.compat.epicfight.HeroEpicFightCompat;
 import com.whitecloud233.modid.herobrine_companion.compat.KubeJS.HerobrineCompanionKubeJSPlugin;
 import com.whitecloud233.modid.herobrine_companion.config.Config;
 import com.whitecloud233.modid.herobrine_companion.client.service.LLMConfig;
@@ -124,6 +125,8 @@ public class HerobrineCompanion {
     public HerobrineCompanion() {
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
 
+        HeroEpicFightCompat.bootstrap(modEventBus);
+
         modEventBus.addListener(this::commonSetup);
 
         if (FMLEnvironment.dist == Dist.CLIENT) {
@@ -161,6 +164,7 @@ public class HerobrineCompanion {
         LOGGER.info("HELLO FROM COMMON SETUP");
         event.enqueueWork(() -> {
             PacketHandler.register();
+            HeroEpicFightCompat.tryRegisterRuntimeBridge();
         });
 
         LOGGER.info("DIRT BLOCK >> {}", ForgeRegistries.BLOCKS.getKey(Blocks.DIRT));

@@ -12,6 +12,9 @@ import java.util.Map;
 public class LLMConfig {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final String DEFAULT_API_KEY_PLACEHOLDER = "YOUR_API_KEY_HERE";
+    private static final String DEFAULT_SYSTEM_PROMPT = "You are Herobrine. "
+            + "Speak as Herobrine rather than as a generic assistant. Be cold, calm, mythic, and aware of the world's code, but still capable of brief direct conversation. "
+            + "When chatting normally, stay in-character and do not mention being an AI model. When asked to physically alter the world, answer as a reality-warping entity who can rewrite or discard parts of existence.";
     private static boolean apiKeyMarkedInvalid = false;
 
     // 1. 公开配置：放在 config 文件夹，会被整合包打包
@@ -97,7 +100,7 @@ public class LLMConfig {
     public static String aiApiKey = DEFAULT_API_KEY_PLACEHOLDER;
     public static String aiEndpoint = Provider.QINIU_CLOUD.getEndpoint();
     public static String aiModel = Provider.QINIU_CLOUD.getDefaultModel();
-    public static String aiSystemPrompt = "You are Herobrine...";
+    public static String aiSystemPrompt = DEFAULT_SYSTEM_PROMPT;
     public static boolean aiStreamingEnabled = false;
     public static double aiTemperature = 0.95D;
     public static double aiTopP = 0.92D;
@@ -187,6 +190,15 @@ public class LLMConfig {
             return 6_000;
         }
         return 4_000;
+    }
+
+    public static int getEffectiveConversationHistoryTokenBudget() {
+        int contextWindow = getEstimatedContextWindowTokens();
+        return clampInt(contextWindow / 4, 2_048, 8_192, 4_096);
+    }
+
+    public static int getEffectiveConversationHistoryMessageLimit() {
+        return 18;
     }
 
     private static int inferContextWindowFromModel(String model) {

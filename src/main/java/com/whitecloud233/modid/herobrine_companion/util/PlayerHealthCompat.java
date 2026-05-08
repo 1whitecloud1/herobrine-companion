@@ -1,12 +1,12 @@
 package com.whitecloud233.modid.herobrine_companion.util;
 
 import com.mojang.logging.LogUtils;
-import com.whitecloud233.modid.herobrine_companion.platform.PlatformServices;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
+import net.minecraftforge.fml.ModList;
 import org.slf4j.Logger;
 
 import java.lang.reflect.Method;
@@ -37,7 +37,7 @@ public final class PlayerHealthCompat {
      * 让 Spice of Life 先把 MAX_HEALTH modifier 刷到玩家身上，避免读取到过期的生命上限。
      */
     public static void syncExternalMaxHealth(Player player) {
-        if (player == null || !isSolLoaded()) {
+        if (player == null || !ModList.get().isLoaded(SOL_MOD_ID)) {
             return;
         }
 
@@ -74,7 +74,7 @@ public final class PlayerHealthCompat {
     }
 
     private static float getSpiceBonusHealth(Player player) {
-        if (!isSolLoaded()) {
+        if (!ModList.get().isLoaded(SOL_MOD_ID)) {
             return 0.0F;
         }
 
@@ -151,13 +151,5 @@ public final class PlayerHealthCompat {
 
         solReflectionFailed = true;
         LOGGER.warn("{}; falling back to vanilla max-health handling.", message, exception);
-    }
-
-    private static boolean isSolLoaded() {
-        try {
-            return PlatformServices.environment().isModLoaded(SOL_MOD_ID);
-        } catch (IllegalStateException ignored) {
-            return false;
-        }
     }
 }

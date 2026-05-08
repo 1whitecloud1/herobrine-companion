@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Set;
 
 public class HerobrineCompanionMixinPlugin implements IMixinConfigPlugin {
+    private static final String EPIC_FIGHT_JSON_ASSET_LOADER = "yesman.epicfight.api.asset.JsonAssetLoader";
 
     private boolean isHeroKingAuraEnabled = true;
 
@@ -52,6 +53,14 @@ public class HerobrineCompanionMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
+        if (isEpicFightMixin(mixinClassName)) {
+            String targetToProbe = normalizeClassName(targetClassName);
+            if ((targetToProbe == null || targetToProbe.isBlank()) && mixinClassName.endsWith("JsonAssetLoaderMixin")) {
+                targetToProbe = EPIC_FIGHT_JSON_ASSET_LOADER;
+            }
+            return targetToProbe != null && !targetToProbe.isBlank() && classExists(targetToProbe);
+        }
+
         // 判断是否是我们需要控制的 Mixin
         if (mixinClassName.endsWith("DragonSittingScanningPhaseMixin") || 
             mixinClassName.endsWith("EnderDragonMixin")) {
@@ -60,6 +69,32 @@ public class HerobrineCompanionMixinPlugin implements IMixinConfigPlugin {
             return this.isHeroKingAuraEnabled;
         }
         return true;
+    }
+
+    private static boolean isEpicFightMixin(String mixinClassName) {
+        return mixinClassName != null && mixinClassName.contains(".mixin.epicfight.");
+    }
+
+    private static String normalizeClassName(String className) {
+        if (className == null || className.isBlank()) {
+            return className;
+        }
+
+        String normalized = className.trim();
+        if (normalized.startsWith("L") && normalized.endsWith(";")) {
+            normalized = normalized.substring(1, normalized.length() - 1);
+        }
+
+        return normalized.replace('/', '.');
+    }
+
+    private static boolean classExists(String className) {
+        try {
+            Class.forName(normalizeClassName(className), false, HerobrineCompanionMixinPlugin.class.getClassLoader());
+            return true;
+        } catch (ClassNotFoundException | LinkageError ignored) {
+            return false;
+        }
     }
 
     @Override

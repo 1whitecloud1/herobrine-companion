@@ -36,6 +36,7 @@ public class HeroKingAuraGoal extends Goal {
     @Override
     public boolean canUse() {
         if (!Config.heroKingAuraEnabled) return false;
+        if (this.hero.isBattleModeActive()) return false;
         // [新增] 如果正在交易，暂时关闭光环，避免干扰
         if (this.hero.getTradingPlayer() != null) return false;
         return this.hero.isAlive() && !this.hero.isSpectator();
@@ -56,6 +57,11 @@ public class HeroKingAuraGoal extends Goal {
     @Override
     public void tick() {
         if (!Config.heroKingAuraEnabled) {
+            clearAllMobs();
+            return;
+        }
+
+        if (this.hero.isBattleModeActive()) {
             clearAllMobs();
             return;
         }

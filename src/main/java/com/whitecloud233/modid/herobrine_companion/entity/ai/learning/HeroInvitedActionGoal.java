@@ -57,6 +57,8 @@ public class HeroInvitedActionGoal extends Goal {
 
     @Override
     public boolean canUse() {
+        if (this.hero.isBattleModeActive()) return false;
+
         BlockPos pos = this.hero.getInvitedPos();
         if (pos == null) return false;
         
@@ -93,6 +95,8 @@ public class HeroInvitedActionGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
+        if (this.hero.isBattleModeActive()) return false;
+
         // [新增] 如果正在交易，立即停止
         if (this.hero.getTradingPlayer() != null) return false;
 

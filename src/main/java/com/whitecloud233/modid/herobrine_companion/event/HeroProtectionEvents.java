@@ -24,8 +24,8 @@ public class HeroProtectionEvents {
             event.setCanceled(true);
         }
         if (newTarget instanceof HeroEntity hero) {
-            // [修复] 如果是在挑战模式下，允许被其他实体锁定
-            if (!hero.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE)) {
+            // 挑战/战斗模式下允许被敌人锁定，避免 AI 一边追踪一边被事件清空目标造成状态循环
+            if (!canHeroBeAttacked(hero)) {
                 event.setCanceled(true);
             }
         }
@@ -40,8 +40,13 @@ public class HeroProtectionEvents {
         }
 
         if (event.getEntity() instanceof HeroEntity hero) {
-            // [修复] 只有在日常模式下才取消攻击事件，挑战模式放行
-            if (!hero.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE)) {
+            if (hero.isBattleModeActive() && isPlayerSource(event.getSource())) {
+                event.setCanceled(true);
+                return;
+            }
+
+            // 只有日常非战斗模式取消攻击事件；战斗/挑战模式放行给 AI 与 Epic Fight 状态机处理
+            if (!canHeroBeAttacked(hero)) {
                 event.setCanceled(true);
             }
         }
@@ -54,8 +59,13 @@ public class HeroProtectionEvents {
         }
 
         if (event.getEntity() instanceof HeroEntity hero) {
-            // [修复] 只有在日常模式下才取消伤害事件，挑战模式放行
-            if (!hero.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE)) {
+            if (hero.isBattleModeActive() && isPlayerSource(event.getSource())) {
+                event.setCanceled(true);
+                return;
+            }
+
+            // 只有日常非战斗模式取消伤害事件；战斗/挑战模式放行
+            if (!canHeroBeAttacked(hero)) {
                 event.setCanceled(true);
             }
         }
@@ -72,8 +82,8 @@ public class HeroProtectionEvents {
                 if (mob instanceof Warden warden) warden.clearAnger(player);
             }
             if (target instanceof HeroEntity hero) {
-                // [修复] 日常模式下清除怪物仇恨，挑战模式允许混战
-                if (!hero.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE)) {
+                // 日常模式下清除怪物仇恨，战斗/挑战模式允许混战
+                if (!canHeroBeAttacked(hero)) {
                     mob.setTarget(null);
                     if (mob instanceof Warden warden) warden.clearAnger(target);
                 }
@@ -82,5 +92,15 @@ public class HeroProtectionEvents {
                 wither.setTarget(null);
             }
         }
+    }
+
+    private static boolean canHeroBeAttacked(HeroEntity hero) {
+        return hero.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE)
+                || hero.getPersistentData().getBoolean("IsChallengeActive")
+                || hero.isBattleModeActive();
+    }
+
+    private static boolean isPlayerSource(net.minecraft.world.damagesource.DamageSource source) {
+        return source != null && source.getEntity() instanceof Player;
     }
 }

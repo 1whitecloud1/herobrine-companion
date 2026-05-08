@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.client.gui;
 
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.whitecloud233.modid.herobrine_companion.compat.epicfight.HeroEpicFightCompat;
 import com.whitecloud233.modid.herobrine_companion.client.gui.ConversationManagerScreen;
 import com.whitecloud233.modid.herobrine_companion.client.event.ClientHooks;
 import com.whitecloud233.modid.herobrine_companion.client.service.ConversationStore;
@@ -14,6 +15,7 @@ import com.whitecloud233.modid.herobrine_companion.network.OpenWardrobePacket;
 import com.whitecloud233.modid.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.modid.herobrine_companion.network.PeacefulPacket;
 import com.whitecloud233.modid.herobrine_companion.network.ToggleCompanionPacket;
+import com.whitecloud233.modid.herobrine_companion.network.ToggleBattleModePacket;
 import com.whitecloud233.modid.herobrine_companion.network.StartChallengePacket;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
@@ -28,6 +30,9 @@ import net.minecraft.world.entity.Entity;
 import java.util.UUID;
 
 public class HeroScreen extends Screen {
+    private static final String DUMMY_BATTLE_SYNC_INIT = "HeroScreen.init.syncDummyBattleMode";
+    private static final String DUMMY_BATTLE_SYNC_BUTTON = "HeroScreen.button.toggleBattlePreview";
+    private static final String DUMMY_BATTLE_SYNC_RENDER = "HeroScreen.render.syncDummyBattleMode";
 
     private final int entityId;
     private HeroEntity dummyHero;
@@ -72,6 +77,7 @@ public class HeroScreen extends Screen {
             Entity realEntity = this.minecraft.level.getEntity(this.entityId);
             if (realEntity instanceof HeroEntity realHero) {
                 this.dummyHero.setSkinVariant(realHero.getSkinVariant());
+                this.dummyHero.setBattleModeActiveFrom(DUMMY_BATTLE_SYNC_INIT, realHero.isBattleModeActive());
                 if (realHero.getSkinVariant() == HeroEntity.SKIN_CUSTOM) {
                     this.dummyHero.setCustomSkinName(realHero.getCustomSkinName());
                 }
@@ -243,6 +249,40 @@ public class HeroScreen extends Screen {
             this.onClose();
         }, Tooltip.create(Component.translatable(companionUnlocked ? "gui.herobrine_companion.companion_tooltip_unlocked" : "gui.herobrine_companion.companion_tooltip_locked", 50, currentTrust))).active = companionUnlocked;
 
+        this.actionList.addDynamicAction(() -> {
+            boolean currentState = false;
+            boolean challengeActive = false;
+            if (this.minecraft.level != null) {
+                Entity e = this.minecraft.level.getEntity(this.entityId);
+                if (e instanceof HeroEntity h) {
+                    currentState = h.isBattleModeActive();
+                    challengeActive = h.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE);
+                }
+            }
+
+            String key;
+            if (challengeActive) {
+                key = "gui.herobrine_companion.battle_mode_blocked";
+            } else {
+                key = currentState
+                        ? "gui.herobrine_companion.battle_mode_disable"
+                        : "gui.herobrine_companion.battle_mode_enable";
+            }
+
+            return Component.translatable(key).withStyle(style -> style.withColor(0xFF4FC3F7));
+        }, button -> {
+            PacketHandler.sendToServer(new ToggleBattleModePacket(this.entityId));
+            Entity entity = this.minecraft != null && this.minecraft.level != null ? this.minecraft.level.getEntity(this.entityId) : null;
+            boolean challengeActive = entity instanceof HeroEntity hero && hero.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE);
+            if (this.dummyHero != null && !challengeActive) {
+                this.dummyHero.setBattleModeActiveFrom(DUMMY_BATTLE_SYNC_BUTTON, !this.dummyHero.isBattleModeActive());
+            }
+        }, Tooltip.create(Component.translatable(
+                HeroEpicFightCompat.isLoaded()
+                        ? "gui.herobrine_companion.battle_mode_tooltip"
+                        : HeroEpicFightCompat.getInstallHintKey()
+        )));
+
         boolean finalVisited = visited;
         this.actionList.addDynamicAction(() -> {
             if (!finalVisited) {
@@ -373,14 +413,23 @@ public class HeroScreen extends Screen {
 
         int trust = 0;
         UUID uuid = null;
+        boolean battleMode = false;
+        String epicFightDisplay = HeroEpicFightCompat.getBridgeStatus().name();
         if (this.minecraft.level != null) {
             Entity realEntity = this.minecraft.level.getEntity(this.entityId);
             if (realEntity instanceof HeroEntity hero) {
                 trust = hero.getTrustLevel();
                 uuid = hero.getUUID();
+                battleMode = hero.isBattleModeActive();
+                if (battleMode) {
+                    epicFightDisplay = HeroEpicFightCompat.getBridgeStatus().name() + " " + HeroEpicFightCompat.describeCurrentSnapshot(hero);
+                }
 
                 // 【核心修复】：持续刷新渲染时的皮肤与姿势状态
                 this.dummyHero.setSkinVariant(hero.getSkinVariant());
+                if (this.dummyHero.isBattleModeActive() != hero.isBattleModeActive()) {
+                    this.dummyHero.setBattleModeActiveFrom(DUMMY_BATTLE_SYNC_RENDER, hero.isBattleModeActive());
+                }
                 if (hero.getSkinVariant() == HeroEntity.SKIN_CUSTOM) {
                     this.dummyHero.setCustomSkinName(hero.getCustomSkinName());
                 }
@@ -394,10 +443,12 @@ public class HeroScreen extends Screen {
         }
 
         drawInfoField(guiGraphics, indent + 5, varY + lineHeight, Component.translatable("gui.herobrine_companion.trust_level"), Component.literal(String.valueOf(trust)));
-        drawInfoField(guiGraphics, indent + 5, varY + lineHeight * 2, Component.translatable("gui.herobrine_companion.active_time"), Component.literal(this.dummyHero.tickCount + "").append(Component.translatable("gui.herobrine_companion.ticks")));
-        drawInfoField(guiGraphics, indent + 5, varY + lineHeight * 3, Component.translatable("gui.herobrine_companion.entity_id"), Component.literal(uuid == null ? "N/A" : "..." + uuid.toString().substring(0, 4)));
+        drawInfoField(guiGraphics, indent + 5, varY + lineHeight * 2, Component.translatable("gui.herobrine_companion.battle_mode_status"), Component.translatable(battleMode ? "gui.herobrine_companion.battle_mode_status_on" : "gui.herobrine_companion.battle_mode_status_off"));
+        drawInfoField(guiGraphics, indent + 5, varY + lineHeight * 3, Component.translatable("gui.herobrine_companion.active_time"), Component.literal(this.dummyHero.tickCount + "").append(Component.translatable("gui.herobrine_companion.ticks")));
+        drawInfoField(guiGraphics, indent + 5, varY + lineHeight * 4, Component.translatable("gui.herobrine_companion.epicfight_bridge"), Component.literal(epicFightDisplay));
+        drawInfoField(guiGraphics, indent + 5, varY + lineHeight * 5, Component.translatable("gui.herobrine_companion.entity_id"), Component.literal(uuid == null ? "N/A" : "..." + uuid.toString().substring(0, 4)));
 
-        int barY = varY + lineHeight * 4 + 5;
+        int barY = varY + lineHeight * 6 + 5;
         guiGraphics.drawString(this.font, Component.translatable("gui.herobrine_companion.sync_status"), indent, barY, COL_INFO, false);
         int maxTrust = 100;
 

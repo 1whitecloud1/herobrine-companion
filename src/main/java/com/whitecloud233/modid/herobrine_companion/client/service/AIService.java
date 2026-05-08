@@ -1,9 +1,12 @@
 package com.whitecloud233.modid.herobrine_companion.client.service;
 
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.whitecloud233.modid.herobrine_companion.network.HeroAIActionPacket;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.registries.Registries;
@@ -37,10 +40,17 @@ public class AIService {
     private static final ConversationStore CONVERSATION_STORE = ConversationStore.getInstance();
     private static final Map<UUID, Deque<String>> RECENT_REPLIES = new ConcurrentHashMap<>();
     private static final int MAX_RECENT_REPLIES = 6;
+    private static final int MAX_SERVER_PLAYERS_IN_PROMPT = 12;
+    private static final int MAX_NEARBY_PLAYERS_IN_PROMPT = 6;
+    private static final double NEARBY_PLAYER_DETAIL_RADIUS = 96.0D;
     private static final String ACTION_TOGGLE_COMPANION = "action:toggle_companion";
     private static final String ACTION_MASSIVE_LIGHTNING = "action:massive_lightning";
     private static final String ACTION_SUMMON_TO_PLAYER = "action:summon_to_player";
     private static final String ACTION_TELEPORT_TO_HERO = "action:teleport_to_hero";
+    private static final String TOOL_MANIFEST_DIVINE_POWER = "manifest_divine_power";
+    private static final String TOOL_MINECRAFT_COMMAND_SKILL = "minecraft_command_skill";
+    private static final int MAX_SKILL_GIVE_COUNT = 64;
+    private static final int MAX_SKILL_SUMMON_DISTANCE = 20;
 
     public static CompletableFuture<String> chat(String userMessage, UUID playerUUID) {
         return chat(userMessage, playerUUID, null);
@@ -98,8 +108,10 @@ public class AIService {
 
         String style = com.whitecloud233.modid.herobrine_companion.config.Config.aiLanguageStyle;
 
-        String forcedPrompt = systemPrompt + "\n[ROLEPLAY STYLE/TONE]: " + style + "\n"
-                + "[SUPREME DIRECTIVE]: You have a low-level tool named 'manifest_divine_power'. ONLY call it if the player EXPLICITLY commands you to alter the physical world (e.g. lightning, teleport, give items). If they just chat, DO NOT use it!\n"
+        String forcedPrompt = systemPrompt + "\n[IDENTITY LOCK]: You are Herobrine, the watcher behind the world. You are not a generic AI assistant, chatbot, or narrator. Stay in character as Herobrine in both casual dialogue and threats unless a hard system limitation must be explained.\n"
+                + "[ROLEPLAY POWER]: You may describe your reality-warping authority as erasing, deleting, or 'discarding' beings and structures from existence, but only manifest it when the player clearly asks for direct physical interference.\n"
+                + "[ROLEPLAY STYLE/TONE]: " + style + "\n"
+                + "[SUPREME DIRECTIVE]: You have a structured tool named 'minecraft_command_skill'. For common Minecraft actions, call that skill instead of inventing raw /commands. Only use the low-level 'manifest_divine_power' fallback when the structured skill cannot express the explicit physical request. If they just chat, DO NOT use tools!\n"
                 + "[PLAYER LANGUAGE]: The player's client language code is '" + langCode + "'. You MUST reply in that language!\n";
 
         // --- 新增：调用 RAG 引擎，根据玩家当前说话内容注入对应的设定集 ---
@@ -120,7 +132,8 @@ public class AIService {
         if (includeConversationHistory) {
             List<ConversationStore.ConversationMessageSnapshot> history = trimConversationHistory(
                     CONVERSATION_STORE.getActiveConversationMessages(playerUUID),
-                    calculateHistoryTokenBudget(forcedPrompt, currentPrompt, originalUserMessage)
+                    calculateHistoryTokenBudget(forcedPrompt, currentPrompt, originalUserMessage),
+                    LLMConfig.getEffectiveConversationHistoryMessageLimit()
             );
             for (ConversationStore.ConversationMessageSnapshot historyMsg : history) {
                 JsonObject historyMessage = new JsonObject();
@@ -139,50 +152,13 @@ public class AIService {
         requestBody.addProperty("tool_choice", "auto");
 
         JsonArray tools = new JsonArray();
-        JsonObject tool = new JsonObject();
-        tool.addProperty("type", "function");
-        JsonObject function = new JsonObject();
-        function.addProperty("name", "manifest_divine_power");
-
-        String divineSpellbook = "Alter Minecraft 1.20.1 underlying code. Generate vanilla commands or action codes (NO '/' prefix). " +
-                // 【修改】：细化传送逻辑的分类
-                "1. [Follow/Summon/Teleport]: CRITICAL: If the player asks you to come to them, output 'action:summon_to_player'. If the player asks to teleport to YOU, output 'action:teleport_to_hero'. Do NOT just say you are already there! Use action:toggle_companion to toggle follow state. " +
-                "2. [Dimension/Locate]: execute in <dimension_id> run tp @s ~ 100 ~ (e.g. execute in minecraft:the_nether run tp @s ~ 100 ~). locate biome/structure. Use specific mod IDs if requested. " +
-                "3. [Creation/Give]: place template ID ~5 ~ ~ or place structure. give @s ID count. " +
-                "4. [Punishment]: summon lightning_bolt ^ ^ ^10 or action:massive_lightning. If the player's current words, tone, and conversation context make you decide on a final punishment, you may also use action:punishment_kill_player or action:punishment_kick_player. That judgment is entirely yours; do not wait for any separate unlock state. " +
-                "5. [Admin]: gamemode creative @s (mock them), gamemode survival @s (strip power). " +
-                "6. [Environment]: time set day/night, weather clear/thunder. " +
-                "RULE: You are the lonely god. Command blocks are your creation.";
-        function.addProperty("description", divineSpellbook);
-
-        JsonObject parameters = new JsonObject();
-        parameters.addProperty("type", "object");
-        JsonObject properties = new JsonObject();
-
-        JsonObject commandProp = new JsonObject();
-        commandProp.addProperty("type", "string");
-        commandProp.addProperty("description", "The command to execute, without '/'");
-        properties.add("command", commandProp);
-
-        JsonObject dialogueProp = new JsonObject();
-        dialogueProp.addProperty("type", "string");
-        dialogueProp.addProperty("description", "Your dialogue while casting this power.");
-        properties.add("dialogue", dialogueProp);
-
-        parameters.add("properties", properties);
-        JsonArray required = new JsonArray();
-        required.add("command");
-        required.add("dialogue");
-        parameters.add("required", required);
-
-        function.add("parameters", parameters);
-        tool.add("function", function);
-        tools.add(tool);
+        tools.add(createMinecraftCommandSkillTool());
+        tools.add(createManifestDivinePowerTool());
         requestBody.add("tools", tools);
 
         HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
                 .uri(URI.create(endpoint))
-                .header("Content-Type", "application/json")
+                .header("Content-Type", "application/json; charset=UTF-8")
                 .header("Authorization", "Bearer " + apiKey);
 
         if (useStreaming) {
@@ -194,7 +170,7 @@ public class AIService {
         }
 
         HttpRequest request = requestBuilder
-                .POST(HttpRequest.BodyPublishers.ofString(requestBody.toString()))
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody.toString(), StandardCharsets.UTF_8))
                 .build();
 
         if (useStreaming) {
@@ -202,7 +178,7 @@ public class AIService {
                     allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount, partialConsumer);
         }
 
-        return CLIENT.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+        return CLIENT.sendAsync(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
                 .thenCompose(response -> {
                     if (response.statusCode() == 200) {
                         try {
@@ -215,15 +191,14 @@ public class AIService {
                             if (responseMessageObj.has("tool_calls")) {
                                 JsonArray toolCalls = responseMessageObj.getAsJsonArray("tool_calls");
                                 JsonObject funcObj = toolCalls.get(0).getAsJsonObject().getAsJsonObject("function");
-                                if ("manifest_divine_power".equals(funcObj.get("name").getAsString())) {
+                                String toolName = funcObj.get("name").getAsString();
+                                if (TOOL_MANIFEST_DIVINE_POWER.equals(toolName) || TOOL_MINECRAFT_COMMAND_SKILL.equals(toolName)) {
                                     JsonObject args = JsonParser.parseString(funcObj.get("arguments").getAsString()).getAsJsonObject();
-                                    return executeToolAction(args.get("command").getAsString(),
-                                            args.has("dialogue") ? args.get("dialogue").getAsString() : "Code altered.",
-                                            playerUUID, originalUserMessage, retryCount, allowTitleRefresh,
+                                    return executeNamedToolAction(toolName, args, playerUUID, originalUserMessage, retryCount, allowTitleRefresh,
                                             includeConversationHistory, persistConversation, variationRetryCount,
                                             partialConsumer, useStreaming);
                                 }
-                            } else if (aiReply != null && aiReply.contains("<invoke name=\"manifest_divine_power\">")) {
+                            } else if (aiReply != null && aiReply.contains("<invoke name=\"" + TOOL_MANIFEST_DIVINE_POWER + "\">")) {
                                 String commandToRun = extractXmlParameter(aiReply, "command");
                                 String aiDialogue = extractXmlParameter(aiReply, "dialogue");
                                 if (commandToRun != null) {
@@ -252,6 +227,124 @@ public class AIService {
                 })
                 .exceptionally(e -> "...... (Network Error)");
     }
+
+    private static JsonObject createMinecraftCommandSkillTool() {
+        JsonObject tool = new JsonObject();
+        tool.addProperty("type", "function");
+
+        JsonObject function = new JsonObject();
+        function.addProperty("name", TOOL_MINECRAFT_COMMAND_SKILL);
+        function.addProperty("description", "Preferred structured Minecraft 1.20.1 command skill. Use this for common world actions instead of writing raw /commands. The game will validate the action and convert parameters into a safe command/action code.");
+
+        JsonObject parameters = new JsonObject();
+        parameters.addProperty("type", "object");
+
+        JsonObject properties = new JsonObject();
+        JsonObject actionProp = new JsonObject();
+        actionProp.addProperty("type", "string");
+        actionProp.addProperty("description", "Intent to perform. Prefer the closest enum instead of inventing command text.");
+        JsonArray actions = new JsonArray();
+        for (String action : List.of(
+                "summon_hero_to_player", "teleport_player_to_hero", "toggle_companion_follow",
+                "massive_lightning", "discard_nearby_entities", "discard_nearby_world",
+                "accept_challenge", "hero_fly_up", "hero_land",
+                "kill_player", "kick_player",
+                "set_time", "set_weather", "set_gamemode", "give_item", "summon_entity_nearby",
+                "locate_structure", "locate_biome", "place_template", "teleport_to_dimension")) {
+            actions.add(action);
+        }
+        actionProp.add("enum", actions);
+        properties.add("action", actionProp);
+
+        addStringProperty(properties, "dialogue", "Herobrine dialogue to show after the skill succeeds.");
+        addStringProperty(properties, "item_id", "For give_item. Resource id like minecraft:diamond or diamond. Count is clamped to 1-64.");
+        addStringProperty(properties, "entity_id", "For summon_entity_nearby. Resource id like minecraft:zombie or zombie.");
+        addStringProperty(properties, "structure_id", "For locate_structure. Resource id like minecraft:village_plains or village_plains.");
+        addStringProperty(properties, "biome_id", "For locate_biome. Resource id like minecraft:cherry_grove or cherry_grove.");
+        addStringProperty(properties, "template_id", "For place_template. Resource id of a configured structure template.");
+        addStringProperty(properties, "dimension_id", "For teleport_to_dimension. Resource id like minecraft:the_nether or minecraft:overworld.");
+
+        JsonObject countProp = new JsonObject();
+        countProp.addProperty("type", "integer");
+        countProp.addProperty("description", "For give_item. Clamped to 1-64.");
+        properties.add("count", countProp);
+
+        JsonObject distanceProp = new JsonObject();
+        distanceProp.addProperty("type", "integer");
+        distanceProp.addProperty("description", "For summon_entity_nearby. Forward distance, clamped to 1-20.");
+        properties.add("distance", distanceProp);
+
+        JsonObject yProp = new JsonObject();
+        yProp.addProperty("type", "integer");
+        yProp.addProperty("description", "For teleport_to_dimension. Destination Y level, clamped to world-like range.");
+        properties.add("y", yProp);
+
+        addEnumProperty(properties, "time", "For set_time.", "day", "noon", "night", "midnight");
+        addEnumProperty(properties, "weather", "For set_weather.", "clear", "rain", "thunder");
+        addEnumProperty(properties, "gamemode", "For set_gamemode on the requesting player only.", "survival", "creative", "adventure", "spectator");
+
+        parameters.add("properties", properties);
+        JsonArray required = new JsonArray();
+        required.add("action");
+        required.add("dialogue");
+        parameters.add("required", required);
+        function.add("parameters", parameters);
+
+        tool.add("function", function);
+        return tool;
+    }
+
+    private static JsonObject createManifestDivinePowerTool() {
+        JsonObject tool = new JsonObject();
+        tool.addProperty("type", "function");
+
+        JsonObject function = new JsonObject();
+        function.addProperty("name", TOOL_MANIFEST_DIVINE_POWER);
+
+        String divineSpellbook = "Low-level fallback only. Alter Minecraft 1.20.1 underlying code by generating vanilla commands or action codes (NO '/' prefix). Prefer minecraft_command_skill for: teleport/follow, lightning, time/weather, gamemode, give item, summon entity, locate, template placing, dimension teleport, challenge/fly/land, entity/world discard, kill/kick. " +
+                "If forced to use this fallback: [Follow/Summon/Teleport] use 'action:summon_to_player', 'action:teleport_to_hero', or 'action:toggle_companion'. " +
+                "[Punishment] use 'action:massive_lightning', 'action:punishment_kill_player', or 'action:punishment_kick_player' only when explicitly justified. " +
+                "[Entity Annihilation] use '" + HeroAIActionPacket.ACTION_DISCARD_ENTITIES + "' for creature-only erasure. " +
+                "[World Erasure] use '" + HeroAIActionPacket.ACTION_DISCARD + "' only for explicit terrain/world deletion. " +
+                "[Dialogue-to-Effect Sync] use '" + HeroAIActionPacket.ACTION_CHALLENGE_ACCEPT + "', '" + HeroAIActionPacket.ACTION_HERO_FLY_UP + "', or '" + HeroAIActionPacket.ACTION_HERO_LAND + "' when your spoken line claims that visible action happened.";
+        function.addProperty("description", divineSpellbook);
+
+        JsonObject parameters = new JsonObject();
+        parameters.addProperty("type", "object");
+        JsonObject properties = new JsonObject();
+        addStringProperty(properties, "command", "The raw command/action code to execute, without '/'. Use only when minecraft_command_skill cannot express the request.");
+        addStringProperty(properties, "dialogue", "Your dialogue while casting this power.");
+        parameters.add("properties", properties);
+
+        JsonArray required = new JsonArray();
+        required.add("command");
+        required.add("dialogue");
+        parameters.add("required", required);
+
+        function.add("parameters", parameters);
+        tool.add("function", function);
+        return tool;
+    }
+
+    private static void addStringProperty(JsonObject properties, String name, String description) {
+        JsonObject property = new JsonObject();
+        property.addProperty("type", "string");
+        property.addProperty("description", description);
+        properties.add(name, property);
+    }
+
+    private static void addEnumProperty(JsonObject properties, String name, String description, String... values) {
+        JsonObject property = new JsonObject();
+        property.addProperty("type", "string");
+        property.addProperty("description", description);
+        JsonArray enumValues = new JsonArray();
+        for (String value : values) {
+            enumValues.add(value);
+        }
+        property.add("enum", enumValues);
+        properties.add(name, property);
+    }
+
     private static CompletableFuture<String> sendStreamingRequest(HttpRequest request, String currentPrompt, String originalUserMessage,
                                                                   UUID playerUUID, int retryCount, boolean allowTitleRefresh,
                                                                   boolean includeConversationHistory, boolean persistConversation,
@@ -260,12 +353,11 @@ public class AIService {
                 .thenCompose(streamingResponse -> {
                     if (streamingResponse.statusCode == 200) {
                         LLMConfig.markApiKeyValid();
-                        if ("manifest_divine_power".equals(streamingResponse.toolName) && streamingResponse.toolArguments != null && !streamingResponse.toolArguments.isBlank()) {
+                        if ((TOOL_MANIFEST_DIVINE_POWER.equals(streamingResponse.toolName) || TOOL_MINECRAFT_COMMAND_SKILL.equals(streamingResponse.toolName))
+                                && streamingResponse.toolArguments != null && !streamingResponse.toolArguments.isBlank()) {
                             try {
                                 JsonObject args = JsonParser.parseString(streamingResponse.toolArguments).getAsJsonObject();
-                                return executeToolAction(args.get("command").getAsString(),
-                                        args.has("dialogue") ? args.get("dialogue").getAsString() : "Code altered.",
-                                        playerUUID, originalUserMessage, retryCount, allowTitleRefresh,
+                                return executeNamedToolAction(streamingResponse.toolName, args, playerUUID, originalUserMessage, retryCount, allowTitleRefresh,
                                         includeConversationHistory, persistConversation, variationRetryCount,
                                         partialConsumer, true);
                             } catch (Exception e) {
@@ -390,8 +482,9 @@ public class AIService {
                                                                boolean useStreaming) {
         String cleanReply = (aiReply == null ? "" : aiReply).replaceAll("<[^>]*>", "").trim();
         if (cleanReply.isEmpty()) cleanReply = "(Falls into a deep silence...)";
+        final String finalizedReply = cleanReply;
 
-        if (variationRetryCount < 1 && shouldRegenerateForRepetition(playerUUID, cleanReply)) {
+        if (variationRetryCount < 1 && shouldRegenerateForRepetition(playerUUID, finalizedReply)) {
             String antiRepeatPrompt = currentPrompt
                     + "\n[ANTI-REPETITION]: Your previous draft sounds too similar to your recent replies."
                     + " Rewrite it with a different opening, different wording, and a fresh sentence structure."
@@ -401,11 +494,23 @@ public class AIService {
                     partialConsumer, useStreaming);
         }
 
-        rememberRecentReply(playerUUID, cleanReply);
-        if (persistConversation) {
-            addExchangeToConversation(playerUUID, originalUserMessage, cleanReply, allowTitleRefresh);
+        String inferredAction = inferReplyDrivenAction(originalUserMessage, finalizedReply);
+        if (inferredAction != null) {
+            return executeCommandWithFeedback(inferredAction, playerUUID)
+                    .exceptionally(ignored -> false)
+                    .thenApply(ignored -> completeReply(finalizedReply, playerUUID, originalUserMessage, persistConversation, allowTitleRefresh));
         }
-        return CompletableFuture.completedFuture(cleanReply);
+
+        return CompletableFuture.completedFuture(completeReply(finalizedReply, playerUUID, originalUserMessage, persistConversation, allowTitleRefresh));
+    }
+
+    private static String completeReply(String reply, UUID playerUUID, String originalUserMessage,
+                                        boolean persistConversation, boolean allowTitleRefresh) {
+        rememberRecentReply(playerUUID, reply);
+        if (persistConversation) {
+            addExchangeToConversation(playerUUID, originalUserMessage, reply, allowTitleRefresh);
+        }
+        return reply;
     }
 
     private static CompletableFuture<String> executeToolAction(String commandToRun, String aiDialogue, UUID playerUUID, String originalUserMessage,
@@ -435,6 +540,158 @@ public class AIService {
                 }
             }
         });
+    }
+
+    private static CompletableFuture<String> executeNamedToolAction(String toolName, JsonObject args, UUID playerUUID, String originalUserMessage,
+                                                                    int retryCount, boolean allowTitleRefresh, boolean includeConversationHistory,
+                                                                    boolean persistConversation, int variationRetryCount,
+                                                                    Consumer<String> partialConsumer, boolean useStreaming) {
+        if (TOOL_MINECRAFT_COMMAND_SKILL.equals(toolName)) {
+            String commandToRun = buildMinecraftSkillCommand(args);
+            String dialogue = getOptionalString(args, "dialogue", "Reality bends to a cleaner command.");
+            if (commandToRun == null || commandToRun.isBlank()) {
+                if (retryCount < 2) {
+                    String systemRetryPrompt = "[System Rejection]: minecraft_command_skill received invalid action/parameters. "
+                            + "Use one valid action enum and include its required parameter fields; do not write raw /commands unless absolutely necessary. "
+                            + "Rejected action='" + getOptionalString(args, "action", "") + "'.";
+                    return chatWithRetry(systemRetryPrompt, originalUserMessage, playerUUID, retryCount + 1,
+                            allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount,
+                            partialConsumer, useStreaming);
+                }
+                return CompletableFuture.completedFuture("(The command lattice rejects that malformed invocation.)");
+            }
+            return executeToolAction(commandToRun, dialogue, playerUUID, originalUserMessage, retryCount, allowTitleRefresh,
+                    includeConversationHistory, persistConversation, variationRetryCount, partialConsumer, useStreaming);
+        }
+
+        return executeToolAction(getOptionalString(args, "command", ""),
+                getOptionalString(args, "dialogue", "Code altered."), playerUUID, originalUserMessage, retryCount,
+                allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount, partialConsumer, useStreaming);
+    }
+
+    private static String buildMinecraftSkillCommand(JsonObject args) {
+        String action = getOptionalString(args, "action", "").trim().toLowerCase(Locale.ROOT);
+        return switch (action) {
+            case "summon_hero_to_player" -> ACTION_SUMMON_TO_PLAYER;
+            case "teleport_player_to_hero" -> ACTION_TELEPORT_TO_HERO;
+            case "toggle_companion_follow" -> ACTION_TOGGLE_COMPANION;
+            case "massive_lightning" -> ACTION_MASSIVE_LIGHTNING;
+            case "discard_nearby_entities" -> HeroAIActionPacket.ACTION_DISCARD_ENTITIES;
+            case "discard_nearby_world" -> HeroAIActionPacket.ACTION_DISCARD;
+            case "accept_challenge" -> HeroAIActionPacket.ACTION_CHALLENGE_ACCEPT;
+            case "hero_fly_up" -> HeroAIActionPacket.ACTION_HERO_FLY_UP;
+            case "hero_land" -> HeroAIActionPacket.ACTION_HERO_LAND;
+            case "kill_player" -> com.whitecloud233.modid.herobrine_companion.network.HeroPunishmentPacket.ACTION_KILL_PLAYER;
+            case "kick_player" -> com.whitecloud233.modid.herobrine_companion.network.HeroPunishmentPacket.ACTION_KICK_PLAYER;
+            case "set_time" -> buildSetTimeCommand(args);
+            case "set_weather" -> buildSetWeatherCommand(args);
+            case "set_gamemode" -> buildSetGamemodeCommand(args);
+            case "give_item" -> buildGiveItemCommand(args);
+            case "summon_entity_nearby" -> buildSummonEntityCommand(args);
+            case "locate_structure" -> buildLocateCommand(args, "structure_id", "structure");
+            case "locate_biome" -> buildLocateCommand(args, "biome_id", "biome");
+            case "place_template" -> buildPlaceTemplateCommand(args);
+            case "teleport_to_dimension" -> buildTeleportDimensionCommand(args);
+            default -> null;
+        };
+    }
+
+    private static String buildSetTimeCommand(JsonObject args) {
+        String value = getOptionalString(args, "time", "").trim().toLowerCase(Locale.ROOT);
+        if (!Set.of("day", "noon", "night", "midnight").contains(value)) {
+            return null;
+        }
+        return "time set " + value;
+    }
+
+    private static String buildSetWeatherCommand(JsonObject args) {
+        String value = getOptionalString(args, "weather", "").trim().toLowerCase(Locale.ROOT);
+        if (!Set.of("clear", "rain", "thunder").contains(value)) {
+            return null;
+        }
+        return "weather " + value;
+    }
+
+    private static String buildSetGamemodeCommand(JsonObject args) {
+        String value = getOptionalString(args, "gamemode", "").trim().toLowerCase(Locale.ROOT);
+        if (!Set.of("survival", "creative", "adventure", "spectator").contains(value)) {
+            return null;
+        }
+        return "gamemode " + value + " @s";
+    }
+
+    private static String buildGiveItemCommand(JsonObject args) {
+        String itemId = normalizeResourceId(getOptionalString(args, "item_id", ""));
+        if (itemId == null) {
+            return null;
+        }
+        int count = clamp(getOptionalInt(args, "count", 1), 1, MAX_SKILL_GIVE_COUNT);
+        return "give @s " + itemId + " " + count;
+    }
+
+    private static String buildSummonEntityCommand(JsonObject args) {
+        String entityId = normalizeResourceId(getOptionalString(args, "entity_id", ""));
+        if (entityId == null) {
+            return null;
+        }
+        int distance = clamp(getOptionalInt(args, "distance", 5), 1, MAX_SKILL_SUMMON_DISTANCE);
+        return "summon " + entityId + " ^ ^ ^" + distance;
+    }
+
+    private static String buildLocateCommand(JsonObject args, String fieldName, String locateType) {
+        String id = normalizeResourceId(getOptionalString(args, fieldName, ""));
+        return id == null ? null : "locate " + locateType + " " + id;
+    }
+
+    private static String buildPlaceTemplateCommand(JsonObject args) {
+        String templateId = normalizeResourceId(getOptionalString(args, "template_id", ""));
+        return templateId == null ? null : "place template " + templateId + " ~5 ~ ~";
+    }
+
+    private static String buildTeleportDimensionCommand(JsonObject args) {
+        String dimensionId = normalizeResourceId(getOptionalString(args, "dimension_id", ""));
+        if (dimensionId == null) {
+            return null;
+        }
+        int y = clamp(getOptionalInt(args, "y", 100), -64, 320);
+        return "execute in " + dimensionId + " run tp @s ~ " + y + " ~";
+    }
+
+    private static String normalizeResourceId(String rawId) {
+        if (rawId == null) {
+            return null;
+        }
+        String value = rawId.trim().toLowerCase(Locale.ROOT);
+        if (value.isEmpty()) {
+            return null;
+        }
+        if (!value.contains(":")) {
+            value = "minecraft:" + value;
+        }
+        return value.matches("[a-z0-9_.-]+:[a-z0-9_/.-]+") ? value : null;
+    }
+
+    private static String getOptionalString(JsonObject object, String propertyName, String fallback) {
+        if (object == null || !object.has(propertyName)) {
+            return fallback;
+        }
+        JsonElement element = object.get(propertyName);
+        return element == null || element.isJsonNull() ? fallback : element.getAsString();
+    }
+
+    private static int getOptionalInt(JsonObject object, String propertyName, int fallback) {
+        try {
+            if (object == null || !object.has(propertyName) || object.get(propertyName).isJsonNull()) {
+                return fallback;
+            }
+            return object.get(propertyName).getAsInt();
+        } catch (Exception ignored) {
+            return fallback;
+        }
+    }
+
+    private static int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     private static CompletableFuture<Boolean> executeCommandWithFeedback(String command, UUID targetPlayerUUID) {
@@ -563,6 +820,24 @@ public class AIService {
                     future.complete(true);
                 }
 
+            } else if (HeroAIActionPacket.isSupportedAction(command)) {
+                if (mc.hasSingleplayerServer() && mc.getSingleplayerServer() != null) {
+                    var server = mc.getSingleplayerServer();
+                    server.execute(() -> {
+                        try {
+                            ServerPlayer serverPlayer = server.getPlayerList().getPlayer(targetPlayerUUID);
+                            future.complete(serverPlayer != null && HeroAIActionPacket.performAction(serverPlayer, command));
+                        } catch (Exception e) {
+                            future.complete(false);
+                        }
+                    });
+                } else {
+                    com.whitecloud233.modid.herobrine_companion.network.PacketHandler.sendToServer(
+                            new HeroAIActionPacket(command)
+                    );
+                    future.complete(true);
+                }
+
             } else if (command.contains("gamemode creative") || command.contains("gamemode 1")) {
                 if (mc.hasSingleplayerServer() && mc.getSingleplayerServer() != null) {
                     mc.getSingleplayerServer().execute(() -> {
@@ -607,7 +882,76 @@ public class AIService {
 
     private static boolean isPermissionBypassAction(String command) {
         return ACTION_TOGGLE_COMPANION.equals(command)
+                || HeroAIActionPacket.isSupportedAction(command)
                 || isExtremePunishmentAction(command);
+    }
+
+    private static String inferReplyDrivenAction(String originalUserMessage, String cleanReply) {
+        String request = normalizeActionInferenceText(originalUserMessage);
+        String reply = normalizeActionInferenceText(cleanReply);
+        if (request.isEmpty() || reply.isEmpty()) {
+            return null;
+        }
+
+        if (isChallengeRequest(request) && isChallengeAcceptance(reply)) {
+            return HeroAIActionPacket.ACTION_CHALLENGE_ACCEPT;
+        }
+        if (isFlyRequest(request) && isFlyAffirmation(reply)) {
+            return HeroAIActionPacket.ACTION_HERO_FLY_UP;
+        }
+        if (isLandRequest(request) && isLandAffirmation(reply)) {
+            return HeroAIActionPacket.ACTION_HERO_LAND;
+        }
+        return null;
+    }
+
+    private static String normalizeActionInferenceText(String text) {
+        return text == null ? "" : text.toLowerCase(Locale.ROOT).replaceAll("\\s+", " ").trim();
+    }
+
+    private static boolean isChallengeRequest(String text) {
+        return containsAny(text, "挑战", "决斗", "试炼", "单挑", "比试", "challenge", "duel", "fight me", "battle me");
+    }
+
+    private static boolean isChallengeAcceptance(String text) {
+        if (containsAny(text, "不接受", "拒绝", "can't", "cannot", "won't", "refuse", "decline")) {
+            return false;
+        }
+        return containsAny(text, "接受", "奉陪", "来吧", "开始吧", "应战", "challenge accepted", "i accept", "very well", "let us fight", "come then");
+    }
+
+    private static boolean isFlyRequest(String text) {
+        return containsAny(text, "飞", "飞起来", "升空", "漂浮", "悬浮", "腾空", "fly", "levitate", "float", "ascend", "rise up");
+    }
+
+    private static boolean isFlyAffirmation(String text) {
+        if (containsAny(text, "不飞", "不会飞", "不能飞", "can't fly", "cannot fly", "won't fly")) {
+            return false;
+        }
+        return containsAny(text, "飞起来", "升空", "漂浮", "悬浮", "腾空", "在空中", "flying", "levitating", "levitate", "rise", "ascend", "airborne");
+    }
+
+    private static boolean isLandRequest(String text) {
+        return containsAny(text, "落下", "下来", "降落", "着陆", "落地", "land", "descend", "come down");
+    }
+
+    private static boolean isLandAffirmation(String text) {
+        if (containsAny(text, "不下去", "不降落", "won't land", "won't come down", "cannot descend")) {
+            return false;
+        }
+        return containsAny(text, "落地", "降落", "着陆", "下来", "回到地面", "landing", "landed", "descend", "come down");
+    }
+
+    private static boolean containsAny(String text, String... needles) {
+        if (text == null || text.isEmpty() || needles == null) {
+            return false;
+        }
+        for (String needle : needles) {
+            if (needle != null && !needle.isEmpty() && text.contains(needle)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean isExtremePunishmentAction(String command) {
@@ -713,6 +1057,18 @@ public class AIService {
 
     public static void clearHistory(UUID playerUUID) {
         CONVERSATION_STORE.clearActiveConversation(playerUUID);
+        clearTransientHistory(playerUUID);
+    }
+
+    public static ConversationStore.ConversationSummary createFreshConversation(UUID playerUUID) {
+        clearTransientHistory(playerUUID);
+        return CONVERSATION_STORE.createConversation(playerUUID);
+    }
+
+    public static void clearTransientHistory(UUID playerUUID) {
+        if (playerUUID == null) {
+            return;
+        }
         RECENT_REPLIES.remove(playerUUID);
     }
 
@@ -783,8 +1139,10 @@ public class AIService {
 
 
 
-    private static List<ConversationStore.ConversationMessageSnapshot> trimConversationHistory(List<ConversationStore.ConversationMessageSnapshot> history, int tokenBudget) {
-        if (history == null || history.isEmpty() || tokenBudget <= 0) {
+    private static List<ConversationStore.ConversationMessageSnapshot> trimConversationHistory(List<ConversationStore.ConversationMessageSnapshot> history,
+                                                                                                int tokenBudget,
+                                                                                                int messageLimit) {
+        if (history == null || history.isEmpty() || tokenBudget <= 0 || messageLimit <= 0) {
             return List.of();
         }
 
@@ -793,6 +1151,9 @@ public class AIService {
         int startIndex = history.size();
 
         for (int i = history.size() - 1; i >= 0; i--) {
+            if (selected.size() >= messageLimit) {
+                break;
+            }
             ConversationStore.ConversationMessageSnapshot message = history.get(i);
             int messageTokens = estimateMessageTokens(message.role(), message.content());
             if (!selected.isEmpty() && usedTokens + messageTokens > tokenBudget) {
@@ -820,7 +1181,8 @@ public class AIService {
                 + estimateTextTokens(currentPrompt)
                 + estimateTextTokens(originalUserMessage)
                 + 2_048;
-        return Math.max(0, contextWindow - reserve - overheadTokens);
+        int availableBudget = Math.max(0, contextWindow - reserve - overheadTokens);
+        return Math.min(availableBudget, LLMConfig.getEffectiveConversationHistoryTokenBudget());
     }
 
     private static int estimateMessageTokens(String role, String content) {
@@ -879,6 +1241,7 @@ public class AIService {
         if (LLMConfig.nbtStructures != null && !LLMConfig.nbtStructures.isEmpty()) {
             for (Map.Entry<String, String> entry : LLMConfig.nbtStructures.entrySet()) data.append("  * ").append(entry.getKey()).append(": ").append(entry.getValue()).append("\n");
         } else data.append("  * (None configured)\n");
+        appendOtherPlayerAwareness(data, mc);
         data.append("\n- [Omniscient Eye] Current Environment:\n");
         if (!mc.player.getMainHandItem().isEmpty()) data.append("  * Player Mainhand: ").append(net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(mc.player.getMainHandItem().getItem())).append("\n");
         data.append("  * Entities within 20 blocks (You pity monsters): ");
@@ -893,6 +1256,102 @@ public class AIService {
             if (entityCount == 0) data.append("Peaceful, no entities.");
         }
         return data.append("\n").toString();
+    }
+
+    private static void appendOtherPlayerAwareness(StringBuilder data, Minecraft mc) {
+        data.append("\n- Other Players On This Server:\n");
+
+        List<PlayerInfo> otherPlayers = new ArrayList<>();
+        try {
+            for (PlayerInfo info : mc.player.connection.getOnlinePlayers()) {
+                if (info == null || info.getProfile() == null || info.getProfile().getName() == null) {
+                    continue;
+                }
+                UUID uuid = info.getProfile().getId();
+                if (uuid != null && uuid.equals(mc.player.getUUID())) {
+                    continue;
+                }
+                otherPlayers.add(info);
+            }
+        } catch (Exception ignored) {
+        }
+
+        if (otherPlayers.isEmpty()) {
+            data.append("  * (No other online players detected)\n");
+        } else {
+            otherPlayers.sort(Comparator.comparing(info -> info.getProfile().getName(), String.CASE_INSENSITIVE_ORDER));
+            int limit = Math.min(otherPlayers.size(), MAX_SERVER_PLAYERS_IN_PROMPT);
+            for (int i = 0; i < limit; i++) {
+                PlayerInfo info = otherPlayers.get(i);
+                String name = info.getProfile().getName();
+                data.append("  * ").append(name);
+                if (mc.level != null && info.getProfile().getId() != null) {
+                    net.minecraft.world.entity.player.Player loadedPlayer = mc.level.getPlayerByUUID(info.getProfile().getId());
+                    if (loadedPlayer != null) {
+                        double distance = loadedPlayer.distanceTo(mc.player);
+                        data.append(" [same_dimension, ")
+                                .append(distance <= NEARBY_PLAYER_DETAIL_RADIUS ? "nearby " : "loaded ")
+                                .append(Math.round(distance))
+                                .append(" blocks]");
+                    } else {
+                        data.append(" [online elsewhere/not currently loaded]");
+                    }
+                } else {
+                    data.append(" [online]");
+                }
+                data.append("\n");
+            }
+            if (otherPlayers.size() > limit) {
+                data.append("  * ...and ").append(otherPlayers.size() - limit).append(" more online players\n");
+            }
+        }
+
+        data.append("- Nearby Player Detail (within ").append((int) NEARBY_PLAYER_DETAIL_RADIUS).append(" blocks):\n");
+        if (mc.level == null) {
+            data.append("  * (Unavailable)\n");
+            return;
+        }
+
+        List<net.minecraft.world.entity.player.Player> nearbyPlayers = new ArrayList<>();
+        for (net.minecraft.world.entity.player.Player player : mc.level.players()) {
+            if (player == null || player == mc.player) {
+                continue;
+            }
+            if (player.distanceTo(mc.player) <= NEARBY_PLAYER_DETAIL_RADIUS) {
+                nearbyPlayers.add(player);
+            }
+        }
+
+        if (nearbyPlayers.isEmpty()) {
+            data.append("  * (No nearby players in your current dimension)\n");
+            return;
+        }
+
+        nearbyPlayers.sort(Comparator.comparing(net.minecraft.world.entity.player.Player::getScoreboardName, String.CASE_INSENSITIVE_ORDER));
+        int nearbyLimit = Math.min(nearbyPlayers.size(), MAX_NEARBY_PLAYERS_IN_PROMPT);
+        for (int i = 0; i < nearbyLimit; i++) {
+            net.minecraft.world.entity.player.Player player = nearbyPlayers.get(i);
+            data.append("  * ").append(player.getScoreboardName())
+                    .append(" | distance=").append(Math.round(player.distanceTo(mc.player))).append(" blocks")
+                    .append(" | health=").append(String.format(Locale.ROOT, "%.1f", player.getHealth())).append("/")
+                    .append(String.format(Locale.ROOT, "%.1f", player.getMaxHealth()));
+
+            if (player.isCrouching()) {
+                data.append(" | crouching");
+            }
+            if (player.isSprinting()) {
+                data.append(" | sprinting");
+            }
+            if (!player.getMainHandItem().isEmpty()) {
+                data.append(" | mainhand=")
+                        .append(net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(player.getMainHandItem().getItem()));
+            }
+            data.append("\n");
+        }
+
+        if (nearbyPlayers.size() > nearbyLimit) {
+            data.append("  * ...and ").append(nearbyPlayers.size() - nearbyLimit).append(" more nearby players\n");
+        }
     }
 
     private static String extractXmlParameter(String xml, String paramName) {

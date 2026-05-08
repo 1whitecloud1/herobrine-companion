@@ -29,7 +29,8 @@ public class ModItemModelProvider extends ItemModelProvider {
         simpleItem(HerobrineCompanion.RECALL_STONE);
         simpleItem(HerobrineCompanion.SOUL_BOUND_PACT);
         simpleItem(HerobrineCompanion.TRANSCENDENCE_PERMIT);
-        simpleItem(HerobrineCompanion.POEM_OF_THE_END);
+        withExistingParent(HerobrineCompanion.POEM_OF_THE_END.getId().getPath(),
+                new ResourceLocation(HerobrineCompanion.MODID, "item/poem_of_the_end_base"));
         simpleItem(HerobrineCompanion.LORE_FRAGMENT);
         simpleItem(HerobrineCompanion.LORE_HANDBOOK);
         simpleItem(HerobrineCompanion.TAB_ICON);

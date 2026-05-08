@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.client.gui;
 
 import com.whitecloud233.modid.herobrine_companion.client.event.ClientHooks;
+import com.whitecloud233.modid.herobrine_companion.client.service.AIService;
 import com.whitecloud233.modid.herobrine_companion.client.service.ConversationStore;
 import com.whitecloud233.modid.herobrine_companion.config.LLMSettingsScreen;
 import net.minecraft.client.Minecraft;
@@ -81,7 +82,7 @@ public class ConversationManagerScreen extends Screen {
                 button -> {
                     UUID uuid = this.getPlayerUUID();
                     if (uuid != null) {
-                        this.conversationStore.createConversation(uuid);
+                        AIService.createFreshConversation(uuid);
                         this.refreshConversationList();
                     }
                 },

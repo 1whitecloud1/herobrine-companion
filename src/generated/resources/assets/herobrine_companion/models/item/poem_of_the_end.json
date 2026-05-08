@@ -1,6 +1,3 @@
 {
-  "parent": "minecraft:item/generated",
-  "textures": {
-    "layer0": "herobrine_companion:item/poem_of_the_end"
-  }
+  "parent": "herobrine_companion:item/poem_of_the_end_base"
 }

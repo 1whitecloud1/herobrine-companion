@@ -1,16 +1,18 @@
 package com.whitecloud233.modid.herobrine_companion.world.inventory;
 
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroStateManager;
 import com.whitecloud233.modid.herobrine_companion.world.inventory.ModMenus;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
+import net.minecraftforge.items.IItemHandlerModifiable;
 import net.minecraftforge.items.SlotItemHandler;
 import net.minecraftforge.items.wrapper.EntityArmorInvWrapper;
-import net.minecraftforge.items.wrapper.EntityHandsInvWrapper;
 import net.minecraftforge.fml.ModList;
 
 public class HeroWardrobeMenu extends AbstractContainerMenu {
@@ -31,6 +33,12 @@ public class HeroWardrobeMenu extends AbstractContainerMenu {
         for (int i = 0; i < 4; ++i) {
             this.addSlot(new SlotItemHandler(armorInv, 3 - i, 26, 8 + i * 18) {
                 @Override public int getMaxStackSize() { return 1; }
+
+                @Override
+                public void setChanged() {
+                    super.setChanged();
+                    markHeroEquipmentDirtyAndBackup(hero);
+                }
             });
         }
 
@@ -39,14 +47,9 @@ public class HeroWardrobeMenu extends AbstractContainerMenu {
             CuriosSafeInvoker.addCurioSlot(this, this.hero);
         }
 
-        // 3. 右下角：原版双手武器槽
-        EntityHandsInvWrapper handsInv = new EntityHandsInvWrapper(this.hero);
-        this.addSlot(new SlotItemHandler(handsInv, 0, 134, 26) {
-            @Override public int getMaxStackSize() { return 1; }
-        });
-        this.addSlot(new SlotItemHandler(handsInv, 1, 134, 44) {
-            @Override public int getMaxStackSize() { return 1; }
-        });
+        // 3. 右下角：显式主手/副手槽，避免 EntityHandsInvWrapper 在换装时产生中间态串槽
+        this.addSlot(createHandSlot(this.hero, EquipmentSlot.MAINHAND, 134, 26));
+        this.addSlot(createHandSlot(this.hero, EquipmentSlot.OFFHAND, 134, 44));
 
         // --- 下方：玩家背包与快捷栏 ---
         for (int row = 0; row < 3; ++row) {
@@ -61,6 +64,41 @@ public class HeroWardrobeMenu extends AbstractContainerMenu {
 
     public HeroEntity getHero() { return this.hero; }
     @Override public boolean stillValid(Player player) { return this.hero != null && this.hero.isAlive() && this.hero.distanceTo(player) < 8.0F; }
+
+    @Override
+    public void removed(Player player) {
+        super.removed(player);
+        if (this.hero != null) {
+            this.hero.isStateDirty = true;
+            if (!this.hero.level().isClientSide) {
+                HeroStateManager.backupToGlobal(this.hero);
+            }
+        }
+    }
+
+    private static Slot createHandSlot(HeroEntity hero, EquipmentSlot equipmentSlot, int x, int y) {
+        return new SlotItemHandler(new HeroHandItemHandler(hero, equipmentSlot), 0, x, y) {
+            @Override public int getMaxStackSize() { return 1; }
+
+            @Override
+            public void setChanged() {
+                super.setChanged();
+                markHeroEquipmentDirtyAndBackup(hero);
+            }
+        };
+    }
+
+    private static void markHeroEquipmentDirtyAndBackup(HeroEntity hero) {
+        if (hero == null) {
+            return;
+        }
+
+        hero.isStateDirty = true;
+        if (!hero.level().isClientSide) {
+            HeroStateManager.backupToGlobal(hero);
+        }
+    }
+
     @Override
     public ItemStack quickMoveStack(Player player, int index) {
         ItemStack itemstack = ItemStack.EMPTY;
@@ -139,6 +177,93 @@ public class HeroWardrobeMenu extends AbstractContainerMenu {
             Slot backSlot = com.whitecloud233.modid.herobrine_companion.compat.curios.HeroCuriosCompat.createCurioSlot(hero, "back", 0, 134, 8);
             if (backSlot != null) {
                 menu.addSlot(backSlot);
+            }
+        }
+    }
+
+    private static class HeroHandItemHandler implements IItemHandlerModifiable {
+        private final HeroEntity hero;
+        private final EquipmentSlot equipmentSlot;
+
+        private HeroHandItemHandler(HeroEntity hero, EquipmentSlot equipmentSlot) {
+            this.hero = hero;
+            this.equipmentSlot = equipmentSlot;
+        }
+
+        @Override
+        public int getSlots() {
+            return 1;
+        }
+
+        @Override
+        public ItemStack getStackInSlot(int slot) {
+            validateSlot(slot);
+            return this.hero.getItemBySlot(this.equipmentSlot);
+        }
+
+        @Override
+        public void setStackInSlot(int slot, ItemStack stack) {
+            validateSlot(slot);
+            ItemStack normalized = stack.isEmpty() ? ItemStack.EMPTY : stack.copy();
+            if (!normalized.isEmpty()) {
+                normalized.setCount(1);
+            }
+            this.hero.setItemSlot(this.equipmentSlot, normalized);
+            markHeroEquipmentDirtyAndBackup(this.hero);
+        }
+
+        @Override
+        public ItemStack insertItem(int slot, ItemStack stack, boolean simulate) {
+            validateSlot(slot);
+            if (stack.isEmpty() || !this.isItemValid(slot, stack) || !this.getStackInSlot(slot).isEmpty()) {
+                return stack;
+            }
+
+            ItemStack remainder = stack.copy();
+            ItemStack inserted = remainder.split(1);
+            if (!simulate) {
+                this.setStackInSlot(slot, inserted);
+            }
+            return remainder;
+        }
+
+        @Override
+        public ItemStack extractItem(int slot, int amount, boolean simulate) {
+            validateSlot(slot);
+            if (amount <= 0) {
+                return ItemStack.EMPTY;
+            }
+
+            ItemStack existing = this.getStackInSlot(slot);
+            if (existing.isEmpty()) {
+                return ItemStack.EMPTY;
+            }
+
+            ItemStack extracted = existing.copy();
+            extracted.setCount(Math.min(amount, extracted.getCount()));
+            if (!simulate) {
+                ItemStack remaining = existing.copy();
+                remaining.shrink(extracted.getCount());
+                this.setStackInSlot(slot, remaining);
+            }
+            return extracted;
+        }
+
+        @Override
+        public int getSlotLimit(int slot) {
+            validateSlot(slot);
+            return 1;
+        }
+
+        @Override
+        public boolean isItemValid(int slot, ItemStack stack) {
+            validateSlot(slot);
+            return true;
+        }
+
+        private static void validateSlot(int slot) {
+            if (slot != 0) {
+                throw new IndexOutOfBoundsException("Hero hand slot index out of range: " + slot);
             }
         }
     }

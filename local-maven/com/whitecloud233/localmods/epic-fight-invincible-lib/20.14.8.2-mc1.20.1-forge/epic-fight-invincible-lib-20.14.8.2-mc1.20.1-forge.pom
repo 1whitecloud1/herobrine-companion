@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.whitecloud233.localmods</groupId>
+    <artifactId>epic-fight-invincible-lib</artifactId>
+    <version>20.14.8.2-mc1.20.1-forge</version>
+    <packaging>jar</packaging>
+    <name>epic-fight-invincible-lib</name>
+    <description>Local Maven wrapper for the Epic Fight Invincible library JAR used by the dev workspace.</description>
+</project>
+

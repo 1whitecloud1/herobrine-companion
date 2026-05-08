@@ -76,6 +76,10 @@ repositories {
         dir 'libs'
     }
     maven {
+        name = "Local Project Maven"
+        url = uri("${projectDir}/local-maven")
+    }
+    maven {
         name = "Curse Maven"
         url = "https://www.cursemaven.com"
         content {
@@ -177,6 +181,17 @@ dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
     // compileOnly fg.deobf(files("libs/armourersworkshop-forge-1.20.1-3.2.7-beta.jar"))
+    compileOnly fg.deobf("curse.maven:epicfight-nightfall-1307848:8003764")
+   runtimeOnly fg.deobf("curse.maven:epicfight-nightfall-1307848:8003764")
+
+   compileOnly fg.deobf("com.whitecloud233.localmods:epic-fight-invincible-lib:20.14.8.2-mc1.20.1-forge")
+   runtimeOnly fg.deobf("com.whitecloud233.localmods:epic-fight-invincible-lib:20.14.8.2-mc1.20.1-forge")
+
+   compileOnly fg.deobf("curse.maven:epic-fight-avalon-1268823:7619938")
+   runtimeOnly fg.deobf("curse.maven:epic-fight-avalon-1268823:7619938")
+
+    compileOnly fg.deobf("curse.maven:epic-fight-mod-405076:7919289")
+   runtimeOnly fg.deobf("curse.maven:epic-fight-mod-405076:7919289")
 
 // 引入 Armourer's Workshop 进行测试和 API 调用 (需替换为真实的 ID)
     // 引入 Armourer's Workshop 进行测试和 API 调用 (软依赖声明)

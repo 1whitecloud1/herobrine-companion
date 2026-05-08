@@ -4,7 +4,6 @@ import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import net.minecraft.network.chat.Component; // [引用]
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.entity.ai.control.MoveControl;
 import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -61,12 +60,17 @@ public class HeroChallengeState {
 
             // ... 前面的方块乱飞爆炸代码保持不变 ...
 
-            // 【新增】：在第 200 帧（大约 10 秒，玩家掉入虚空深处时），强制丢出死机界面包！
+            // 【核心修复】：在第 200 帧直接定向发送给仍处于假死演出的挑战玩家。
+            // 不能依赖 TRACKING_ENTITY，否则玩家掉入虚空后可能因为脱离 Boss 跟踪范围而收不到假崩溃包。
             if (timer == 200) {
-                com.whitecloud233.modid.herobrine_companion.network.PacketHandler.sendToTracking(
-                        new com.whitecloud233.modid.herobrine_companion.client.fight.network.SPacketFakeCrash(),
-                        hero
-                );
+                for (ServerPlayer player : level.players()) {
+                    if (player.getPersistentData().getBoolean("HeroFakeOutPhase")) {
+                        com.whitecloud233.modid.herobrine_companion.network.PacketHandler.sendToPlayer(
+                                new com.whitecloud233.modid.herobrine_companion.client.fight.network.SPacketFakeCrash(),
+                                player
+                        );
+                    }
+                }
             }
 
             // 【核心修改】：删除原本 timer >= 300 自动调用 endChallenge 的代码！

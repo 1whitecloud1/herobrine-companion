@@ -46,9 +46,6 @@ public class HeroRenderer extends LivingEntityRenderer<HeroEntity, PlayerModel<H
     private static final Map<UUID, ResourceLocation> SYNCED_SKIN_CACHE = new HashMap<>();
     private static final Map<UUID, Integer> SYNCED_SKIN_HASH_CACHE = new HashMap<>();
 
-    // 用于记录 AW 是否已经被注入到当前渲染器
-    private boolean awInitialized = false;
-
     public HeroRenderer(EntityRendererProvider.Context context) {
         super(context, new HeroModel(context.bakeLayer(HeroModel.LAYER_LOCATION), false), 0.5f);
 
@@ -158,15 +155,6 @@ public class HeroRenderer extends LivingEntityRenderer<HeroEntity, PlayerModel<H
 
     @Override
     public void render(HeroEntity entity, float entityYaw, float partialTicks, PoseStack poseStack, MultiBufferSource buffer, int packedLight) {
-
-        // ==========================================
-        // 【注入时刻】在创世神被渲染时，强行接通 AW 引擎！
-        // ==========================================
-        if (!awInitialized && com.whitecloud233.modid.herobrine_companion.compat.ArmourerWorkshop.HeroAWCompat.isLoaded()) {
-            com.whitecloud233.modid.herobrine_companion.compat.ArmourerWorkshop.HeroAWCompat.attachAW(this);
-            awInitialized = true; // 终身只需注入一次
-        }
-
         float floatAmount = entity.getFloatingAmount(partialTicks);
         if (floatAmount > 0.01f) {
             float ageInTicks = entity.tickCount + partialTicks;
@@ -185,8 +173,7 @@ public class HeroRenderer extends LivingEntityRenderer<HeroEntity, PlayerModel<H
             poseStack.translate(mainJitterX, mainJitterY, mainJitterZ);
         }
 
-        // super.render 将会触发底层的渲染，而因为我们上面注入了 AW 档案，
-        // AW 潜伏在里面的 Mixin 会立刻被激活并全自动画上衣服和武器！
+        // AW 渲染上下文在客户端初始化阶段接通，这里只负责正常渲染 Hero 本体。
         super.render(entity, entityYaw, partialTicks, poseStack, buffer, packedLight);
         poseStack.popPose();
 
