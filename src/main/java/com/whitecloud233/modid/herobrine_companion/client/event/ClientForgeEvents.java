@@ -4,6 +4,8 @@ import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.modid.herobrine_companion.client.service.ConversationStore;
 import com.whitecloud233.modid.herobrine_companion.client.service.LocalChatService;
 import com.whitecloud233.modid.herobrine_companion.item.PoemOfTheEndItem;
+import com.whitecloud233.modid.herobrine_companion.network.PacketHandler;
+import com.whitecloud233.modid.herobrine_companion.network.ai.UpdateClientLanguagePacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Player;
@@ -16,11 +18,13 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.util.ObfuscationReflectionHelper;
 
 import java.lang.reflect.Method;
+import java.util.Locale;
 
 @Mod.EventBusSubscriber(modid = HerobrineCompanion.MODID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class ClientForgeEvents {
 
     private static Method startAttackMethod;
+    private static String lastSyncedLanguageCode;
 
     @SubscribeEvent
     public static void onClientPlayerLogin(ClientPlayerNetworkEvent.LoggingIn event) {
@@ -28,6 +32,12 @@ public class ClientForgeEvents {
         // 这里调用 loadChatRules() 是为了确保每次进游戏都重新读取一遍规则。
         LocalChatService.getInstance().loadChatRules();
         ConversationStore.getInstance().loadForCurrentSession();
+        lastSyncedLanguageCode = null;
+    }
+
+    @SubscribeEvent
+    public static void onClientPlayerLogout(ClientPlayerNetworkEvent.LoggingOut event) {
+        lastSyncedLanguageCode = null;
     }
 
     @SubscribeEvent
@@ -37,11 +47,35 @@ public class ClientForgeEvents {
             if (mc.player != null && mc.level != null && !mc.isPaused()) {
                 handlePoemRapidFire(mc);
             }
+            syncLanguageToServerIfNeeded(mc);
         }
+    }
+
+    private static void syncLanguageToServerIfNeeded(Minecraft mc) {
+        if (mc == null || mc.player == null || mc.getConnection() == null) {
+            return;
+        }
+        String currentLanguageCode = normalizeLanguageCode(mc.options.languageCode);
+        if (currentLanguageCode.equals(lastSyncedLanguageCode)) {
+            return;
+        }
+        PacketHandler.sendToServer(new UpdateClientLanguagePacket(currentLanguageCode));
+        lastSyncedLanguageCode = currentLanguageCode;
+    }
+
+    private static String normalizeLanguageCode(String rawLanguageCode) {
+        if (rawLanguageCode == null) {
+            return "en_us";
+        }
+        String normalized = rawLanguageCode.trim().toLowerCase(Locale.ROOT).replace('-', '_');
+        return normalized.isEmpty() ? "en_us" : normalized;
     }
 
     private static void handlePoemRapidFire(Minecraft mc) {
         Player player = mc.player;
+        if (player == null) {
+            return;
+        }
         ItemStack stack = player.getMainHandItem();
 
         if (stack.getItem() instanceof PoemOfTheEndItem && mc.options.keyAttack.isDown()) {

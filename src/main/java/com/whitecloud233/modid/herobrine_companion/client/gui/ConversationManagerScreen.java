@@ -3,12 +3,12 @@ package com.whitecloud233.modid.herobrine_companion.client.gui;
 import com.whitecloud233.modid.herobrine_companion.client.event.ClientHooks;
 import com.whitecloud233.modid.herobrine_companion.client.service.AIService;
 import com.whitecloud233.modid.herobrine_companion.client.service.ConversationStore;
+import com.whitecloud233.modid.herobrine_companion.config.ApiKeyInputScreen;
 import com.whitecloud233.modid.herobrine_companion.config.LLMSettingsScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
@@ -57,7 +57,14 @@ public class ConversationManagerScreen extends Screen {
         int startX = centerX - PANEL_WIDTH / 2;
         int startY = centerY - PANEL_HEIGHT / 2;
 
-        this.searchBox = new EditBox(this.font, startX + 10, startY + 38, PANEL_WIDTH - 104, 20,
+        this.addRenderableWidget(new HeroScreen.ThemedButton(
+                startX + 10, startY + 38, 76, 20,
+                Component.translatable("gui.herobrine_companion.conversation_manager.api_setup"),
+                button -> Minecraft.getInstance().setScreen(new ApiKeyInputScreen(this)),
+                null
+        ));
+
+        this.searchBox = new EditBox(this.font, startX + 92, startY + 38, PANEL_WIDTH - 186, 20,
                 Component.translatable("gui.herobrine_companion.conversation_manager.search"));
         this.searchBox.setMaxLength(80);
         this.searchBox.setSuggestion(Component.translatable("gui.herobrine_companion.conversation_manager.search_hint").getString());
@@ -213,7 +220,7 @@ public class ConversationManagerScreen extends Screen {
         this.conversationStore.ensureActiveConversation(playerUUID);
         String activeTitle = this.conversationStore.getActiveConversationTitle(playerUUID);
         ClientHooks.enableChat();
-        mc.setScreen(new ChatScreen(""));
+        mc.setScreen(new HeroChatScreen(""));
 
         String modeKey = ClientHooks.isApiEnabled()
                 ? "message.herobrine_companion.system_cloud_connected"

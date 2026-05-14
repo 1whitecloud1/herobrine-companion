@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.event;
 
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.modid.herobrine_companion.destructiongod.entity.DestructionGodHerobrineEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.*;
 import com.whitecloud233.modid.herobrine_companion.entity.projectile.CleaveBladeEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.projectile.RealmBreakerLightningEntity;
@@ -30,6 +31,13 @@ public class ModEvents {
             () -> EntityType.Builder.of(HeroEntity::new, MobCategory.CREATURE)
                     .sized(0.6F, 1.8F) // Normal player size
                     .build("hero"));
+
+    public static final RegistryObject<EntityType<DestructionGodHerobrineEntity>> DESTRUCTION_GOD_HEROBRINE = ENTITY_TYPES.register("destruction_god_herobrine",
+            () -> EntityType.Builder.of(DestructionGodHerobrineEntity::new, MobCategory.MONSTER)
+                    .sized(0.6F, 1.95F)
+                    .fireImmune()
+                    .clientTrackingRange(12)
+                    .build("destruction_god_herobrine"));
 
     public static final RegistryObject<EntityType<GhostCreeperEntity>> GHOST_CREEPER = ENTITY_TYPES.register("ghost_creeper",
             () -> EntityType.Builder.of(GhostCreeperEntity::new, MobCategory.MONSTER)
@@ -87,6 +95,7 @@ public class ModEvents {
     @SubscribeEvent
     public static void entityAttributeEvent(EntityAttributeCreationEvent event) {
         event.put(HERO.get(), HeroEntity.createAttributes().build());
+        event.put(DESTRUCTION_GOD_HEROBRINE.get(), DestructionGodHerobrineEntity.createAttributes().build());
         event.put(GHOST_CREEPER.get(), Creeper.createAttributes().build());
         event.put(GHOST_ZOMBIE.get(), Zombie.createAttributes().build());
         event.put(GHOST_SKELETON.get(), Skeleton.createAttributes().build());

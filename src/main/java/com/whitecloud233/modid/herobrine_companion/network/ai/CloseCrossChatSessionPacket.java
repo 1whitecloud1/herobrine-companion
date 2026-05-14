@@ -1,0 +1,31 @@
+package com.whitecloud233.modid.herobrine_companion.network.ai;
+
+import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroCrossChatManager;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraftforge.network.NetworkEvent;
+
+import java.util.function.Supplier;
+
+public class CloseCrossChatSessionPacket {
+    public CloseCrossChatSessionPacket() {
+    }
+
+    public CloseCrossChatSessionPacket(FriendlyByteBuf buf) {
+    }
+
+    public void encode(FriendlyByteBuf buf) {
+    }
+
+    public void handle(Supplier<NetworkEvent.Context> contextSupplier) {
+        NetworkEvent.Context context = contextSupplier.get();
+        context.enqueueWork(() -> {
+            ServerPlayer sender = context.getSender();
+            if (sender != null) {
+                HeroCrossChatManager.INSTANCE.closeSession(sender);
+            }
+        });
+        context.setPacketHandled(true);
+    }
+}
+

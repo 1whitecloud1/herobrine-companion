@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.event;
 
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroCrossChatManager;
 import com.whitecloud233.modid.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.modid.herobrine_companion.network.SyncHeroVisitPacket;
 import net.minecraft.server.level.ServerPlayer;
@@ -35,5 +36,6 @@ public class PlayerConnectionHandler {
     private static void syncVisitState(ServerPlayer player) {
         boolean visited = player.getPersistentData().getBoolean("HasVisitedHeroDimension");
         PacketHandler.sendToPlayer(new SyncHeroVisitPacket(visited), player);
+        HeroCrossChatManager.INSTANCE.syncClientState(player);
     }
 }
