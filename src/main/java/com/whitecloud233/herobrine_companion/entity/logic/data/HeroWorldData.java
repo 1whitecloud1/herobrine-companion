@@ -13,10 +13,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.saveddata.SavedData;
 
-import java.util.HashSet;
-import java.util.Objects;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 
 /**
@@ -29,6 +26,9 @@ import java.util.UUID;
  * 大幅度降低磁盘 I/O 瓶颈并解决服务器 TPS 卡顿问题。
  */
 public class HeroWorldData {
+    public static final int DEFAULT_AUTO_HB_TURN_LIMIT = 8;
+    public static final int MIN_AUTO_HB_TURN_LIMIT = 1;
+    public static final int MAX_AUTO_HB_TURN_LIMIT = 20;
 
     // ==========================================
     // 1. 数据结构分离：个人档案 (PlayerProfile)
@@ -52,6 +52,10 @@ public class HeroWorldData {
         public String customSkinName = "";
         public CompoundTag tempBrainData = null;
         public long respawnReadyTime = 0;
+        public boolean allowIncomingCrossChat = true;
+        public String clientLanguageCode = "en_us";
+        public int autoHbTurnLimit = DEFAULT_AUTO_HB_TURN_LIMIT;
+
 
         // 1.21.1：必须显式传入 HolderLookup.Provider
         @Override
@@ -73,6 +77,9 @@ public class HeroWorldData {
             tag.putString("CustomSkinName", customSkinName);
             if (tempBrainData != null) tag.put("TempBrainData", tempBrainData);
             tag.putLong("RespawnReadyTime", respawnReadyTime);
+            tag.putBoolean("AllowIncomingCrossChat", allowIncomingCrossChat);
+            tag.putString("ClientLanguageCode", normalizeLanguageCode(clientLanguageCode));
+            tag.putInt("AutoHbTurnLimit", normalizeAutoHbTurnLimit(autoHbTurnLimit));
             return tag;
         }
 
@@ -97,7 +104,20 @@ public class HeroWorldData {
             if (tag.contains("CustomSkinName")) profile.customSkinName = tag.getString("CustomSkinName");
             if (tag.contains("TempBrainData")) profile.tempBrainData = tag.getCompound("TempBrainData");
             if (tag.contains("RespawnReadyTime")) profile.respawnReadyTime = tag.getLong("RespawnReadyTime");
+            if (tag.contains("AllowIncomingCrossChat")) profile.allowIncomingCrossChat = tag.getBoolean("AllowIncomingCrossChat");
+            if (tag.contains("AutoHbTurnLimit")) profile.autoHbTurnLimit = normalizeAutoHbTurnLimit(tag.getInt("AutoHbTurnLimit"));
+            if (tag.contains("ClientLanguageCode")) profile.clientLanguageCode = normalizeLanguageCode(tag.getString("ClientLanguageCode"));
             return profile;
+        }
+        private static String normalizeLanguageCode(String rawLanguageCode) {
+            if (rawLanguageCode == null) {
+                return "en_us";
+            }
+            String normalized = rawLanguageCode.trim().toLowerCase(Locale.ROOT).replace('-', '_');
+            return normalized.isEmpty() ? "en_us" : normalized;
+        }
+        private static int normalizeAutoHbTurnLimit(int turnLimit) {
+            return Math.max(MIN_AUTO_HB_TURN_LIMIT, Math.min(MAX_AUTO_HB_TURN_LIMIT, turnLimit));
         }
 
         private static CompoundTag writeGlobalPos(GlobalPos pos) {
@@ -216,6 +236,9 @@ public class HeroWorldData {
                     profile.customSkinData = oldData.customSkinData;
                     profile.tempBrainData = oldData.tempBrainData;
                     profile.respawnReadyTime = oldData.respawnReadyTime;
+                    profile.allowIncomingCrossChat = oldData.allowIncomingCrossChat;
+                    profile.clientLanguageCode = oldData.clientLanguageCode;
+                    profile.autoHbTurnLimit = oldData.autoHbTurnLimit;
 
                     profile.setDirty(); // 保存为独立文件
                 }
@@ -367,6 +390,47 @@ public class HeroWorldData {
         if (uuid == null) return;
         PlayerProfile profile = getProfile(uuid);
         profile.hasSpawnedFromChat = spawned;
+        profile.setDirty();
+    }
+
+    public boolean isAllowIncomingCrossChat(UUID uuid) {
+        return getProfile(uuid).allowIncomingCrossChat;
+    }
+
+    public void setAllowIncomingCrossChat(UUID uuid, boolean allowIncomingCrossChat) {
+        if (uuid == null) return;
+        PlayerProfile profile = getProfile(uuid);
+        profile.allowIncomingCrossChat = allowIncomingCrossChat;
+        profile.setDirty();
+    }
+
+    public String getClientLanguageCode(UUID uuid) {
+        return PlayerProfile.normalizeLanguageCode(getProfile(uuid).clientLanguageCode);
+    }
+
+    public void setClientLanguageCode(UUID uuid, String clientLanguageCode) {
+        if (uuid == null) return;
+        PlayerProfile profile = getProfile(uuid);
+        String normalized = PlayerProfile.normalizeLanguageCode(clientLanguageCode);
+        if (Objects.equals(profile.clientLanguageCode, normalized)) {
+            return;
+        }
+        profile.clientLanguageCode = normalized;
+        profile.setDirty();
+    }
+
+    public int getAutoHbTurnLimit(UUID uuid) {
+        return PlayerProfile.normalizeAutoHbTurnLimit(getProfile(uuid).autoHbTurnLimit);
+    }
+
+    public void setAutoHbTurnLimit(UUID uuid, int turnLimit) {
+        if (uuid == null) return;
+        PlayerProfile profile = getProfile(uuid);
+        int normalized = PlayerProfile.normalizeAutoHbTurnLimit(turnLimit);
+        if (profile.autoHbTurnLimit == normalized) {
+            return;
+        }
+        profile.autoHbTurnLimit = normalized;
         profile.setDirty();
     }
 }

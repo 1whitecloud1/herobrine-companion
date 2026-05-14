@@ -4,6 +4,7 @@ package com.whitecloud233.herobrine_companion.network;
 import com.whitecloud233.herobrine_companion.client.fight.network.CPacketCollapseFinished;
 import com.whitecloud233.herobrine_companion.client.fight.network.SPacketFakeCrash;
 import com.whitecloud233.herobrine_companion.client.fight.network.SPacketStartCollapse;
+import com.whitecloud233.herobrine_companion.network.ai.*;
 
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.server.level.ServerPlayer;
@@ -177,6 +178,32 @@ public class PacketHandler {
                 TeleportToHeroPacket.STREAM_CODEC,
                 TeleportToHeroPacket::handle
         );
+
+        registrar.playToClient(AppendCrossChatHistoryPacket.TYPE, AppendCrossChatHistoryPacket.STREAM_CODEC, AppendCrossChatHistoryPacket::handle);
+        registrar.playToServer(CloseCrossChatSessionPacket.TYPE, CloseCrossChatSessionPacket.STREAM_CODEC, CloseCrossChatSessionPacket::handle);
+        registrar.playToClient(HeroCrossChatPromptPacket.TYPE, HeroCrossChatPromptPacket.STREAM_CODEC, HeroCrossChatPromptPacket::handle);
+        registrar.playToServer(HeroCrossChatResultPacket.TYPE, HeroCrossChatResultPacket.STREAM_CODEC, HeroCrossChatResultPacket::handle);
+        registrar.playToClient(OpenCrossChatInvitePacket.TYPE, OpenCrossChatInvitePacket.STREAM_CODEC, OpenCrossChatInvitePacket::handle);
+        registrar.playToClient(OpenCrossSessionHubPacket.TYPE, OpenCrossSessionHubPacket.STREAM_CODEC, OpenCrossSessionHubPacket::handle);
+        registrar.playToClient(OpenHeroChatPacket.TYPE, OpenHeroChatPacket.STREAM_CODEC, OpenHeroChatPacket::handle);
+        registrar.playToClient(PresentCrossChatAiLinePacket.TYPE, PresentCrossChatAiLinePacket.STREAM_CODEC, PresentCrossChatAiLinePacket::handle);
+        registrar.playToServer(RequestCrossChatSessionPacket.TYPE, RequestCrossChatSessionPacket.STREAM_CODEC, RequestCrossChatSessionPacket::handle);
+        registrar.playToServer(RespondCrossChatInvitePacket.TYPE, RespondCrossChatInvitePacket.STREAM_CODEC, RespondCrossChatInvitePacket::handle);
+        registrar.playToServer(SendCrossChatHbMessagePacket.TYPE, SendCrossChatHbMessagePacket.STREAM_CODEC, SendCrossChatHbMessagePacket::handle);
+        registrar.playToServer(SendCrossChatMessagePacket.TYPE, SendCrossChatMessagePacket.STREAM_CODEC, SendCrossChatMessagePacket::handle);
+        registrar.playToServer(SetCrossChatAutoChatPacket.TYPE, SetCrossChatAutoChatPacket.STREAM_CODEC, SetCrossChatAutoChatPacket::handle);
+        registrar.playToServer(SetCrossChatAutoTurnLimitPacket.TYPE, SetCrossChatAutoTurnLimitPacket.STREAM_CODEC, SetCrossChatAutoTurnLimitPacket::handle);
+        registrar.playToServer(SetCrossChatPermissionPacket.TYPE, SetCrossChatPermissionPacket.STREAM_CODEC, SetCrossChatPermissionPacket::handle);
+        registrar.playToClient(SyncCrossChatStatePacket.TYPE, SyncCrossChatStatePacket.STREAM_CODEC, SyncCrossChatStatePacket::handle);
+        registrar.playToServer(UpdateClientLanguagePacket.TYPE, UpdateClientLanguagePacket.STREAM_CODEC, UpdateClientLanguagePacket::handle);
+    }
+
+    public static void sendToServer(CustomPacketPayload packet) {
+        PacketDistributor.sendToServer(packet);
+    }
+
+    public static void sendToPlayer(CustomPacketPayload packet, ServerPlayer player) {
+        PacketDistributor.sendToPlayer(player, packet);
     }
 
     public static void sendToServer(PeacefulPacket packet) {

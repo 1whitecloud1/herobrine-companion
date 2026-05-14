@@ -60,10 +60,96 @@ public class AIService {
     }
 
     public static CompletableFuture<String> chat(String userMessage, UUID playerUUID, Consumer<String> partialConsumer) {
-        return chatWithRetry(userMessage, userMessage, playerUUID, 0, true, true, true, 0,
-                partialConsumer, LLMConfig.isStreamingEnabled());
+        return chatWithRetry(userMessage, userMessage, playerUUID, playerUUID, 0, true, true, true, 0,
+                partialConsumer, LLMConfig.isStreamingEnabled(), null, false);
     }
 
+    public static CompletableFuture<String> chatForScopedSession(String userMessage, UUID conversationScopeId, UUID authorityPlayerUUID) {
+        return chatForScopedSession(userMessage, conversationScopeId, authorityPlayerUUID, null);
+    }
+
+    public static CompletableFuture<String> chatForScopedSession(String userMessage, UUID conversationScopeId, UUID authorityPlayerUUID, String outputLanguageCode) {
+        return chatWithRetry(userMessage, userMessage, conversationScopeId, authorityPlayerUUID, 0,
+                false, false, false, 0, null, LLMConfig.isStreamingEnabled(), outputLanguageCode, false);
+    }
+
+    public static CompletableFuture<String> chatForCrossSession(String prompt, String seedText, UUID conversationScopeId, UUID authorityPlayerUUID, String outputLanguageCode) {
+        UUID isolatedScopeId = buildCrossSessionScopeId(conversationScopeId, authorityPlayerUUID);
+        String effectiveSeedText = (seedText == null || seedText.isBlank()) ? prompt : seedText;
+        return chatWithRetry(prompt, effectiveSeedText, isolatedScopeId, authorityPlayerUUID, 0,
+                false, false, false, 0, null, LLMConfig.isStreamingEnabled(), outputLanguageCode, true);
+    }
+
+    public static CompletableFuture<String> localizeText(String sourceText, String targetLanguageCode, UUID authorityPlayerUUID) {
+        String sanitizedSource = sourceText == null ? "" : sourceText.trim();
+        if (sanitizedSource.isEmpty()) {
+            return CompletableFuture.completedFuture("");
+        }
+
+        String normalizedLanguageCode = resolveOutputLanguageCode(targetLanguageCode);
+        if (LLMConfig.isSetupIncomplete() || LLMConfig.isKeyMissingOrInvalid()) {
+            return CompletableFuture.completedFuture(sanitizedSource);
+        }
+
+        String apiKey = LLMConfig.aiApiKey;
+        LLMConfig.Provider provider = LLMConfig.getProvider();
+        String endpoint = LLMConfig.getResolvedEndpoint();
+        String model = LLMConfig.getResolvedModel();
+
+        JsonObject requestBody = new JsonObject();
+        requestBody.addProperty("model", model);
+        requestBody.addProperty("stream", false);
+        requestBody.addProperty("temperature", 0.2D);
+        requestBody.addProperty("top_p", 0.9D);
+        requestBody.addProperty("max_tokens", Math.min(256, LLMConfig.getConfiguredMaxOutputTokens()));
+
+        JsonArray messages = new JsonArray();
+        JsonObject systemMessage = new JsonObject();
+        systemMessage.addProperty("role", "system");
+        systemMessage.addProperty("content", buildLocalizationSystemPrompt(normalizedLanguageCode));
+        messages.add(systemMessage);
+
+        JsonObject userMessage = new JsonObject();
+        userMessage.addProperty("role", "user");
+        userMessage.addProperty("content", sanitizedSource);
+        messages.add(userMessage);
+        requestBody.add("messages", messages);
+
+        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
+                .uri(URI.create(endpoint))
+                .header("Content-Type", "application/json; charset=UTF-8")
+                .header("Authorization", "Bearer " + apiKey);
+
+        if (provider == LLMConfig.Provider.OPENROUTER) {
+            requestBuilder.header("X-Title", "Herobrine Companion");
+        }
+
+        HttpRequest request = requestBuilder
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody.toString(), StandardCharsets.UTF_8))
+                .build();
+
+        return CLIENT.sendAsync(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
+                .thenApply(response -> {
+                    if (response.statusCode() == 200) {
+                        try {
+                            LLMConfig.markApiKeyValid();
+                            JsonObject json = JsonParser.parseString(response.body()).getAsJsonObject();
+                            JsonObject responseMessageObj = json.getAsJsonArray("choices").get(0).getAsJsonObject().getAsJsonObject("message");
+                            String localized = responseMessageObj.has("content") && !responseMessageObj.get("content").isJsonNull()
+                                    ? responseMessageObj.get("content").getAsString() : sanitizedSource;
+                            return sanitizeLocalizedText(localized, sanitizedSource);
+                        } catch (Exception ignored) {
+                            return sanitizedSource;
+                        }
+                    }
+                    if (isInvalidApiKeyResponse(response.statusCode(), response.body())) {
+                        LLMConfig.markApiKeyInvalid();
+                        reopenApiKeyInputScreen();
+                    }
+                    return sanitizedSource;
+                })
+                .exceptionally(ignored -> sanitizedSource);
+    }
 
     public static CompletableFuture<String> observeEnvironment(String observationDesc, UUID playerUUID) {
         String langCode = Minecraft.getInstance().options.languageCode;
@@ -78,22 +164,27 @@ public class AIService {
                 + "【LANGUAGE OVERRIDE】: You MUST output your final dialogue in the language corresponding to this Minecraft locale code: '" + langCode + "'.";
 
         String historyLog = "[System Vision Log] You observed: " + observationDesc;
-        return chatWithRetry(currentPrompt, historyLog, playerUUID, 0, false, false, false, 0,
-                null, LLMConfig.isStreamingEnabled());
+        return chatWithRetry(currentPrompt, historyLog, playerUUID, playerUUID, 0, false, false, false, 0,
+                null, LLMConfig.isStreamingEnabled(), langCode, false);
     }
 
-    private static CompletableFuture<String> chatWithRetry(String currentPrompt, String originalUserMessage, UUID playerUUID, int retryCount,
+    private static CompletableFuture<String> chatWithRetry(String currentPrompt, String originalUserMessage,
+                                                           UUID conversationScopeId, UUID authorityPlayerUUID, int retryCount,
                                                            boolean allowTitleRefresh, boolean includeConversationHistory,
                                                            boolean persistConversation, int variationRetryCount,
-                                                           Consumer<String> partialConsumer, boolean useStreaming) {
+                                                           Consumer<String> partialConsumer, boolean useStreaming,
+                                                           String outputLanguageCode,
+                                                           boolean crossSessionMode) {
+        UUID effectiveScopeId = conversationScopeId != null ? conversationScopeId : authorityPlayerUUID;
+        UUID effectiveAuthorityPlayerId = authorityPlayerUUID != null ? authorityPlayerUUID : effectiveScopeId;
         String apiKey = LLMConfig.aiApiKey;
         LLMConfig.Provider provider = LLMConfig.getProvider();
         String endpoint = LLMConfig.getResolvedEndpoint();
         String model = LLMConfig.getResolvedModel();
         String systemPrompt = LLMConfig.aiSystemPrompt;
-        String langCode = Minecraft.getInstance().options.languageCode;
+        String langCode = resolveOutputLanguageCode(outputLanguageCode);
 
-        if (LLMConfig.isKeyMissing()) {
+        if (LLMConfig.isSetupIncomplete()) {
             return CompletableFuture.completedFuture("§c" + Component.translatable("message.herobrine_companion.ai_config_missing").getString());
         }
 
@@ -112,7 +203,6 @@ public class AIService {
 
         String style = com.whitecloud233.herobrine_companion.config.Config.aiLanguageStyle;
 
-
         String forcedPrompt = systemPrompt + "\n[IDENTITY LOCK]: You are Herobrine, the watcher behind the world. You are not a generic AI assistant, chatbot, or narrator. Stay in character as Herobrine in both casual dialogue and threats unless a hard system limitation must be explained.\n"
                 + "[ROLEPLAY POWER]: You may describe your reality-warping authority as erasing, deleting, or 'discarding' beings and structures from existence, but only manifest it when the player clearly asks for direct physical interference.\n"
                 + "[ROLEPLAY STYLE/TONE]: " + style + "\n"
@@ -120,15 +210,17 @@ public class AIService {
                 + "[PLAYER LANGUAGE]: The player's client language code is '" + langCode + "'. You MUST reply in that language!\n";
 
         // --- 新增：调用 RAG 引擎，根据玩家当前说话内容注入对应的设定集 ---
-        String ragKnowledge = LoreRAGManager.getRelevantLoreInjectedPrompt(originalUserMessage, playerUUID);
+        String ragKnowledge = LoreRAGManager.getRelevantLoreInjectedPrompt(originalUserMessage, effectiveAuthorityPlayerId);
         if (!ragKnowledge.isEmpty()) {
             forcedPrompt += "\n\n[DYNAMIC KNOWLEDGE RETRIEVAL]:" + ragKnowledge;
         }
         // -----------------------------------------------------------
 
-        forcedPrompt += getDynamicGameData();
+        if (!crossSessionMode) {
+            forcedPrompt += getDynamicGameData();
+        }
         if (includeConversationHistory || persistConversation) {
-            CONVERSATION_STORE.ensureActiveConversation(playerUUID);
+            CONVERSATION_STORE.ensureActiveConversation(effectiveScopeId);
         }
 
         systemMessage.addProperty("content", forcedPrompt);
@@ -136,7 +228,7 @@ public class AIService {
 
         if (includeConversationHistory) {
             List<ConversationStore.ConversationMessageSnapshot> history = trimConversationHistory(
-                    CONVERSATION_STORE.getActiveConversationMessages(playerUUID),
+                    CONVERSATION_STORE.getActiveConversationMessages(effectiveScopeId),
                     calculateHistoryTokenBudget(forcedPrompt, currentPrompt, originalUserMessage),
                     LLMConfig.getEffectiveConversationHistoryMessageLimit()
             );
@@ -158,7 +250,8 @@ public class AIService {
 
         JsonArray tools = new JsonArray();
         tools.add(createMinecraftCommandSkillTool());
-        tools.add(createManifestDivinePowerTool()); requestBody.add("tools", tools);
+        tools.add(createManifestDivinePowerTool());
+        requestBody.add("tools", tools);
 
         HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
                 .uri(URI.create(endpoint))
@@ -178,8 +271,8 @@ public class AIService {
                 .build();
 
         if (useStreaming) {
-            return sendStreamingRequest(request, currentPrompt, originalUserMessage, playerUUID, retryCount,
-                    allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount, partialConsumer);
+            return sendStreamingRequest(request, currentPrompt, originalUserMessage, effectiveScopeId, effectiveAuthorityPlayerId, retryCount,
+                    allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount, partialConsumer, outputLanguageCode, crossSessionMode);
         }
 
         return CLIENT.sendAsync(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
@@ -198,24 +291,24 @@ public class AIService {
                                 String toolName = funcObj.get("name").getAsString();
                                 if (TOOL_MANIFEST_DIVINE_POWER.equals(toolName) || TOOL_MINECRAFT_COMMAND_SKILL.equals(toolName)) {
                                     JsonObject args = JsonParser.parseString(funcObj.get("arguments").getAsString()).getAsJsonObject();
-                                    return executeNamedToolAction(toolName, args, playerUUID, originalUserMessage, retryCount, allowTitleRefresh,
+                                    return executeNamedToolAction(toolName, args, effectiveScopeId, effectiveAuthorityPlayerId, originalUserMessage, retryCount, allowTitleRefresh,
                                             includeConversationHistory, persistConversation, variationRetryCount,
-                                            partialConsumer, useStreaming);
+                                            partialConsumer, useStreaming, outputLanguageCode, crossSessionMode);
                                 }
                             } else if (aiReply != null && aiReply.contains("<invoke name=\"" + TOOL_MANIFEST_DIVINE_POWER + "\">")) {
                                 String commandToRun = extractXmlParameter(aiReply, "command");
                                 String aiDialogue = extractXmlParameter(aiReply, "dialogue");
                                 if (commandToRun != null) {
-                                    return executeToolAction(commandToRun, aiDialogue != null ? aiDialogue : "Code altered.", playerUUID,
+                                    return executeToolAction(commandToRun, aiDialogue != null ? aiDialogue : "Code altered.", effectiveScopeId, effectiveAuthorityPlayerId,
                                             originalUserMessage, retryCount, allowTitleRefresh,
                                             includeConversationHistory, persistConversation, variationRetryCount,
-                                            partialConsumer, useStreaming);
+                                            partialConsumer, useStreaming, outputLanguageCode, crossSessionMode);
                                 }
                             }
 
-                            return finalizeTextReply(aiReply, currentPrompt, originalUserMessage, playerUUID, retryCount,
+                            return finalizeTextReply(aiReply, currentPrompt, originalUserMessage, effectiveScopeId, effectiveAuthorityPlayerId, retryCount,
                                     allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount,
-                                    partialConsumer, useStreaming);
+                                    partialConsumer, useStreaming, outputLanguageCode, crossSessionMode);
 
                         } catch (Exception e) {
                             return CompletableFuture.completedFuture("Data stream disrupted...");
@@ -231,6 +324,7 @@ public class AIService {
                 })
                 .exceptionally(e -> "...... (Network Error)");
     }
+
     private static JsonObject createMinecraftCommandSkillTool() {
         JsonObject tool = new JsonObject();
         tool.addProperty("type", "function");
@@ -349,9 +443,11 @@ public class AIService {
     }
 
     private static CompletableFuture<String> sendStreamingRequest(HttpRequest request, String currentPrompt, String originalUserMessage,
-                                                                  UUID playerUUID, int retryCount, boolean allowTitleRefresh,
+                                                                  UUID conversationScopeId, UUID authorityPlayerUUID, int retryCount, boolean allowTitleRefresh,
                                                                   boolean includeConversationHistory, boolean persistConversation,
-                                                                  int variationRetryCount, Consumer<String> partialConsumer) {
+                                                                  int variationRetryCount, Consumer<String> partialConsumer,
+                                                                  String outputLanguageCode,
+                                                                  boolean crossSessionMode) {
         return CompletableFuture.supplyAsync(() -> readStreamingResponse(request, partialConsumer))
                 .thenCompose(streamingResponse -> {
                     if (streamingResponse.statusCode == 200) {
@@ -360,17 +456,17 @@ public class AIService {
                                 && streamingResponse.toolArguments != null && !streamingResponse.toolArguments.isBlank()) {
                             try {
                                 JsonObject args = JsonParser.parseString(streamingResponse.toolArguments).getAsJsonObject();
-                                return executeNamedToolAction(streamingResponse.toolName, args, playerUUID, originalUserMessage, retryCount, allowTitleRefresh,
+                                return executeNamedToolAction(streamingResponse.toolName, args, conversationScopeId, authorityPlayerUUID, originalUserMessage, retryCount, allowTitleRefresh,
                                         includeConversationHistory, persistConversation, variationRetryCount,
-                                        partialConsumer, true);
+                                        partialConsumer, true, outputLanguageCode, crossSessionMode);
                             } catch (Exception e) {
                                 LOGGER.warn("Failed to parse streamed tool call arguments", e);
                             }
                         }
 
-                        return finalizeTextReply(streamingResponse.reply, currentPrompt, originalUserMessage, playerUUID, retryCount,
+                        return finalizeTextReply(streamingResponse.reply, currentPrompt, originalUserMessage, conversationScopeId, authorityPlayerUUID, retryCount,
                                 allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount,
-                                partialConsumer, true);
+                                partialConsumer, true, outputLanguageCode, crossSessionMode);
                     }
 
                     if (isInvalidApiKeyResponse(streamingResponse.statusCode, streamingResponse.errorBody)) {
@@ -479,75 +575,83 @@ public class AIService {
     }
 
     private static CompletableFuture<String> finalizeTextReply(String aiReply, String currentPrompt, String originalUserMessage,
-                                                               UUID playerUUID, int retryCount, boolean allowTitleRefresh,
+                                                               UUID conversationScopeId, UUID authorityPlayerUUID, int retryCount, boolean allowTitleRefresh,
                                                                boolean includeConversationHistory, boolean persistConversation,
                                                                int variationRetryCount, Consumer<String> partialConsumer,
-                                                               boolean useStreaming) {
+                                                               boolean useStreaming, String outputLanguageCode,
+                                                               boolean crossSessionMode) {
         String cleanReply = (aiReply == null ? "" : aiReply).replaceAll("<[^>]*>", "").trim();
         if (cleanReply.isEmpty()) cleanReply = "(Falls into a deep silence...)";
         final String finalizedReply = cleanReply;
 
-        if (variationRetryCount < 1 && shouldRegenerateForRepetition(playerUUID, finalizedReply)) {
+        if (variationRetryCount < 1 && shouldRegenerateForRepetition(conversationScopeId, finalizedReply)) {
             String antiRepeatPrompt = currentPrompt
                     + "\n[ANTI-REPETITION]: Your previous draft sounds too similar to your recent replies."
                     + " Rewrite it with a different opening, different wording, and a fresh sentence structure."
                     + " Keep the same meaning, keep it natural, and do not mention this instruction.";
-            return chatWithRetry(antiRepeatPrompt, originalUserMessage, playerUUID, retryCount,
+            return chatWithRetry(antiRepeatPrompt, originalUserMessage, conversationScopeId, authorityPlayerUUID, retryCount,
                     allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount + 1,
-                    partialConsumer, useStreaming);
+                    partialConsumer, useStreaming, outputLanguageCode, crossSessionMode);
         }
 
-        String inferredAction = inferReplyDrivenAction(originalUserMessage, finalizedReply);
+        String inferredAction = crossSessionMode ? null : inferReplyDrivenAction(originalUserMessage, finalizedReply);
         if (inferredAction != null) {
-            return executeCommandWithFeedback(inferredAction, playerUUID)
+            return executeCommandWithFeedback(inferredAction, authorityPlayerUUID)
                     .exceptionally(ignored -> false)
-                    .thenApply(ignored -> completeReply(finalizedReply, playerUUID, originalUserMessage, persistConversation, allowTitleRefresh));
+                    .thenApply(ignored -> completeReply(finalizedReply, conversationScopeId, originalUserMessage, persistConversation, allowTitleRefresh));
         }
 
-        return CompletableFuture.completedFuture(completeReply(finalizedReply, playerUUID, originalUserMessage, persistConversation, allowTitleRefresh));
+        return CompletableFuture.completedFuture(completeReply(finalizedReply, conversationScopeId, originalUserMessage, persistConversation, allowTitleRefresh));
     }
 
-    private static String completeReply(String reply, UUID playerUUID, String originalUserMessage,
+    private static String completeReply(String reply, UUID conversationScopeId, String originalUserMessage,
                                         boolean persistConversation, boolean allowTitleRefresh) {
-        rememberRecentReply(playerUUID, reply);
+        rememberRecentReply(conversationScopeId, reply);
         if (persistConversation) {
-            addExchangeToConversation(playerUUID, originalUserMessage, reply, allowTitleRefresh);
+            addExchangeToConversation(conversationScopeId, originalUserMessage, reply, allowTitleRefresh);
         }
         return reply;
     }
 
-    private static CompletableFuture<String> executeToolAction(String commandToRun, String aiDialogue, UUID playerUUID, String originalUserMessage,
+    private static CompletableFuture<String> executeToolAction(String commandToRun, String aiDialogue,
+                                                               UUID conversationScopeId, UUID authorityPlayerUUID, String originalUserMessage,
                                                                int retryCount, boolean allowTitleRefresh, boolean includeConversationHistory,
                                                                boolean persistConversation, int variationRetryCount,
-                                                               Consumer<String> partialConsumer, boolean useStreaming) {
-        return executeCommandWithFeedback(commandToRun, playerUUID).thenCompose(success -> {
+                                                               Consumer<String> partialConsumer, boolean useStreaming,
+                                                               String outputLanguageCode,
+                                                               boolean crossSessionMode) {
+        return executeCommandWithFeedback(commandToRun, authorityPlayerUUID).thenCompose(success -> {
             if (success) {
-                rememberRecentReply(playerUUID, aiDialogue);
+                rememberRecentReply(conversationScopeId, aiDialogue);
                 if (persistConversation) {
-                    addExchangeToConversation(playerUUID, originalUserMessage, aiDialogue, allowTitleRefresh);
+                    addExchangeToConversation(conversationScopeId, originalUserMessage, aiDialogue, allowTitleRefresh);
                 }
                 return CompletableFuture.completedFuture(aiDialogue);
             } else {
                 if (retryCount < 2) {
                     String systemRetryPrompt = "[System Rejection]: Command /" + commandToRun + " failed. Reason: Syntax error or Cheats are disabled. Do not alter code, just reply gently!";
-                    return chatWithRetry(systemRetryPrompt, originalUserMessage, playerUUID, retryCount + 1,
+                    return chatWithRetry(systemRetryPrompt, originalUserMessage, conversationScopeId, authorityPlayerUUID, retryCount + 1,
                             allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount,
-                            partialConsumer, useStreaming);
+                            partialConsumer, useStreaming, outputLanguageCode, crossSessionMode);
                 } else {
                     String failText = "(Gentle sigh) I failed to alter the underlying code, the world laws rejected me...";
-                    rememberRecentReply(playerUUID, failText);
+                    rememberRecentReply(conversationScopeId, failText);
                     if (persistConversation) {
-                        addExchangeToConversation(playerUUID, originalUserMessage, failText, allowTitleRefresh);
+                        addExchangeToConversation(conversationScopeId, originalUserMessage, failText, allowTitleRefresh);
                     }
                     return CompletableFuture.completedFuture(failText);
                 }
             }
         });
     }
-    private static CompletableFuture<String> executeNamedToolAction(String toolName, JsonObject args, UUID playerUUID, String originalUserMessage,
+
+    private static CompletableFuture<String> executeNamedToolAction(String toolName, JsonObject args,
+                                                                    UUID conversationScopeId, UUID authorityPlayerUUID, String originalUserMessage,
                                                                     int retryCount, boolean allowTitleRefresh, boolean includeConversationHistory,
                                                                     boolean persistConversation, int variationRetryCount,
-                                                                    Consumer<String> partialConsumer, boolean useStreaming) {
+                                                                    Consumer<String> partialConsumer, boolean useStreaming,
+                                                                    String outputLanguageCode,
+                                                                    boolean crossSessionMode) {
         if (TOOL_MINECRAFT_COMMAND_SKILL.equals(toolName)) {
             String commandToRun = buildMinecraftSkillCommand(args);
             String dialogue = getOptionalString(args, "dialogue", "Reality bends to a cleaner command.");
@@ -556,19 +660,58 @@ public class AIService {
                     String systemRetryPrompt = "[System Rejection]: minecraft_command_skill received invalid action/parameters. "
                             + "Use one valid action enum and include its required parameter fields; do not write raw /commands unless absolutely necessary. "
                             + "Rejected action='" + getOptionalString(args, "action", "") + "'.";
-                    return chatWithRetry(systemRetryPrompt, originalUserMessage, playerUUID, retryCount + 1,
+                    return chatWithRetry(systemRetryPrompt, originalUserMessage, conversationScopeId, authorityPlayerUUID, retryCount + 1,
                             allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount,
-                            partialConsumer, useStreaming);
+                            partialConsumer, useStreaming, outputLanguageCode, crossSessionMode);
                 }
                 return CompletableFuture.completedFuture("(The command lattice rejects that malformed invocation.)");
             }
-            return executeToolAction(commandToRun, dialogue, playerUUID, originalUserMessage, retryCount, allowTitleRefresh,
-                    includeConversationHistory, persistConversation, variationRetryCount, partialConsumer, useStreaming);
+            return executeToolAction(commandToRun, dialogue, conversationScopeId, authorityPlayerUUID, originalUserMessage, retryCount, allowTitleRefresh,
+                    includeConversationHistory, persistConversation, variationRetryCount, partialConsumer, useStreaming, outputLanguageCode, crossSessionMode);
         }
 
         return executeToolAction(getOptionalString(args, "command", ""),
-                getOptionalString(args, "dialogue", "Code altered."), playerUUID, originalUserMessage, retryCount,
-                allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount, partialConsumer, useStreaming);
+                getOptionalString(args, "dialogue", "Code altered."), conversationScopeId, authorityPlayerUUID, originalUserMessage, retryCount,
+                allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount, partialConsumer, useStreaming, outputLanguageCode, crossSessionMode);
+    }
+
+    private static UUID buildCrossSessionScopeId(UUID conversationScopeId, UUID authorityPlayerUUID) {
+        UUID scope = conversationScopeId != null ? conversationScopeId : authorityPlayerUUID;
+        UUID authority = authorityPlayerUUID != null ? authorityPlayerUUID : scope;
+        return UUID.nameUUIDFromBytes(("hb-cross-session-scope:" + scope + ":" + authority).getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static String buildLocalizationSystemPrompt(String targetLanguageCode) {
+        return "You are a translation/localization function for Herobrine dialogue. "
+                + "Translate or restate the user's single dialogue line into the language for locale code '" + resolveOutputLanguageCode(targetLanguageCode) + "'. "
+                + "Preserve the original meaning, tone, menace, and brevity. "
+                + "Do not explain, annotate, or add quotes. Only output the localized dialogue line itself.";
+    }
+
+    private static String sanitizeLocalizedText(String localizedText, String fallbackText) {
+        String sanitized = (localizedText == null ? "" : localizedText)
+                .replaceAll("<[^>]*>", "")
+                .replace('\r', ' ')
+                .replace('\n', ' ')
+                .trim();
+        return sanitized.isEmpty() ? fallbackText : sanitized;
+    }
+
+    private static String resolveOutputLanguageCode(String outputLanguageCode) {
+        String normalized = normalizeLanguageCode(outputLanguageCode);
+        if (!normalized.isEmpty()) {
+            return normalized;
+        }
+        Minecraft mc = Minecraft.getInstance();
+        return mc == null || mc.options == null ? "en_us" : normalizeLanguageCode(mc.options.languageCode);
+    }
+
+    private static String normalizeLanguageCode(String rawLanguageCode) {
+        if (rawLanguageCode == null) {
+            return "";
+        }
+        String normalized = rawLanguageCode.trim().toLowerCase(Locale.ROOT).replace('-', '_');
+        return normalized;
     }
 
     private static String buildMinecraftSkillCommand(JsonObject args) {

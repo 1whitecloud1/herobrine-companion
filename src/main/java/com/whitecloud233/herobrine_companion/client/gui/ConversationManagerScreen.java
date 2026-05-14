@@ -2,6 +2,7 @@ package com.whitecloud233.herobrine_companion.client.gui;
 
 import com.whitecloud233.herobrine_companion.client.event.ClientHooks;
 import com.whitecloud233.herobrine_companion.client.service.ConversationStore;
+import com.whitecloud233.herobrine_companion.config.ApiKeyInputScreen;
 import com.whitecloud233.herobrine_companion.config.LLMSettingsScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -56,6 +57,14 @@ public class ConversationManagerScreen extends Screen {
         int centerY = this.height / 2;
         int startX = centerX - PANEL_WIDTH / 2;
         int startY = centerY - PANEL_HEIGHT / 2;
+
+        this.addRenderableWidget(new HeroScreen.ThemedButton(
+                startX + 10, startY + 38, 76, 20,
+                Component.translatable("gui.herobrine_companion.conversation_manager.api_setup"),
+                button -> Minecraft.getInstance().setScreen(new ApiKeyInputScreen(this)),
+                null
+        ));
+
 
         this.searchBox = new EditBox(this.font, startX + 10, startY + 38, PANEL_WIDTH - 104, 20,
                 Component.translatable("gui.herobrine_companion.conversation_manager.search"));

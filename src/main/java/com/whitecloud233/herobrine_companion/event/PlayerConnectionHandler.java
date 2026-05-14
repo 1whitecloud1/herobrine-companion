@@ -1,6 +1,7 @@
 package com.whitecloud233.herobrine_companion.event;
 
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.herobrine_companion.entity.logic.data.HeroCrossChatManager;
 import com.whitecloud233.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.herobrine_companion.network.SyncHeroVisitPacket;
 import net.minecraft.server.level.ServerPlayer;
@@ -40,5 +41,6 @@ public class PlayerConnectionHandler {
         boolean visited = player.getPersistentData().getBoolean("HasVisitedHeroDimension");
         // 哪怕是 false 也要发，确保客户端状态被重置/初始化
         PacketHandler.sendToPlayer(new SyncHeroVisitPacket(visited), player);
+        HeroCrossChatManager.INSTANCE.syncClientState(player);
     }
 }

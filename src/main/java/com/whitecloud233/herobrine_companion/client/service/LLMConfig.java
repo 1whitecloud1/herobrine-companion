@@ -31,7 +31,8 @@ public class LLMConfig {
     public enum Provider {
         DEEPSEEK_OFFICIAL("deepseek_official", "https://api.deepseek.com/chat/completions", "deepseek-chat"),
         OPENROUTER("openrouter", "https://openrouter.ai/api/v1/chat/completions", "deepseek/deepseek-v3.2-251201"),
-        QINIU_CLOUD("qiniu_cloud", "https://api.qnaigc.com/v1/chat/completions", "deepseek/deepseek-v3.2-251201");
+        QINIU_CLOUD("qiniu_cloud", "https://api.qnaigc.com/v1/chat/completions", "deepseek/deepseek-v3.2-251201"),
+        CUSTOM("custom", "", "");
 
         private final String id;
         private final String endpoint;
@@ -89,17 +90,24 @@ public class LLMConfig {
             if (normalized.contains("qnaigc.com") || normalized.contains("qiniu")) {
                 return QINIU_CLOUD;
             }
-            return QINIU_CLOUD;
+            return CUSTOM;
         }
 
         public static Provider resolve(String savedProvider, String legacyEndpoint) {
             Provider provider = fromSavedValue(savedProvider);
-            return provider != null ? provider : fromLegacyEndpoint(legacyEndpoint);
+            if (provider != null) {
+                return provider;
+            }
+            if (savedProvider != null && !savedProvider.isBlank()) {
+                return CUSTOM;
+            }
+            return fromLegacyEndpoint(legacyEndpoint);
         }
     }
 
     // 静态变量
     public static Provider aiProvider = Provider.QINIU_CLOUD;
+    private static String aiProviderId = Provider.QINIU_CLOUD.getId();
     public static String aiApiKey = DEFAULT_API_KEY_PLACEHOLDER;
     public static String aiEndpoint = Provider.QINIU_CLOUD.getEndpoint();
     public static String aiModel = Provider.QINIU_CLOUD.getDefaultModel();
@@ -113,12 +121,26 @@ public class LLMConfig {
     public static boolean isKeyMissing() {
         return aiApiKey == null || aiApiKey.isBlank() || aiApiKey.equals(DEFAULT_API_KEY_PLACEHOLDER);
     }
+    public static boolean isModelMissing() {
+        return getResolvedModel().isBlank();
+    }
+
+    public static boolean isEndpointMissing() {
+        return getResolvedEndpoint().isBlank();
+    }
+
+    public static boolean isSetupIncomplete() {
+        return isKeyMissing() || isModelMissing() || isEndpointMissing();
+    }
 
     public static boolean isKeyMissingOrInvalid() {
         return isKeyMissing() || apiKeyMarkedInvalid;
     }
 
-    public static void markApiKeyInvalid() {
+    public static boolean isSetupIncompleteOrInvalid() {
+        return isSetupIncomplete() || apiKeyMarkedInvalid;
+    }
+     public static void markApiKeyInvalid() {
         apiKeyMarkedInvalid = true;
     }
 
@@ -132,22 +154,48 @@ public class LLMConfig {
 
     public static Provider getProvider() {
         if (aiProvider == null) {
-            aiProvider = Provider.fromLegacyEndpoint(aiEndpoint);
+            aiProvider = Provider.resolve(aiProviderId, aiEndpoint);
         }
         return aiProvider;
     }
 
     public static void setProvider(Provider provider) {
         aiProvider = provider == null ? Provider.QINIU_CLOUD : provider;
-        aiEndpoint = aiProvider.getEndpoint();
+        if (aiProvider == Provider.CUSTOM) {
+            aiProviderId = normalizeCustomProviderId(aiProviderId);
+            aiEndpoint = normalizeEndpoint(aiEndpoint);
+        } else {
+            aiProviderId = aiProvider.getId();
+            aiEndpoint = aiProvider.getEndpoint();
+        }
+    }
+
+    public static String getStoredProviderId() {
+        if (getProvider() == Provider.CUSTOM) {
+            return normalizeCustomProviderId(aiProviderId);
+        }
+        return getProvider().getId();
+    }
+
+    public static void setCustomProviderId(String providerId) {
+        aiProvider = Provider.CUSTOM;
+        aiProviderId = normalizeCustomProviderId(providerId);
     }
 
     public static String getResolvedEndpoint() {
-        return getProvider().getEndpoint();
+        Provider provider = getProvider();
+        if (provider == Provider.CUSTOM) {
+            return normalizeEndpoint(aiEndpoint);
+        }
+        return provider.getEndpoint();
     }
 
     public static String getResolvedModel() {
-        return aiModel == null || aiModel.isBlank() ? getProvider().getDefaultModel() : aiModel.trim();
+        String normalizedModel = aiModel == null ? "" : aiModel.trim();
+        if (!normalizedModel.isEmpty()) {
+            return normalizedModel;
+        }
+        return getProvider() == Provider.CUSTOM ? "" : getProvider().getDefaultModel();
     }
 
     public static boolean isStreamingEnabled() {
@@ -221,13 +269,18 @@ public class LLMConfig {
     }
 
     private static void normalizeSettings() {
-        setProvider(Provider.resolve(aiProvider == null ? null : aiProvider.getId(), aiEndpoint));
+        aiProvider = Provider.resolve(aiProviderId, aiEndpoint);
+        setProvider(aiProvider);
         if (aiApiKey == null || aiApiKey.isBlank()) {
             aiApiKey = DEFAULT_API_KEY_PLACEHOLDER;
         } else {
             aiApiKey = aiApiKey.trim();
         }
         aiModel = getResolvedModel();
+        if (getProvider() == Provider.CUSTOM) {
+            aiProviderId = normalizeCustomProviderId(aiProviderId);
+            aiEndpoint = normalizeEndpoint(aiEndpoint);
+        }
         aiSystemPrompt = aiSystemPrompt == null ? "" : aiSystemPrompt.replace("\r\n", "\n").replace('\r', '\n');
         aiStreamingEnabled = aiStreamingEnabled;
         aiTemperature = getConfiguredTemperature();
@@ -240,6 +293,7 @@ public class LLMConfig {
 
     public static void load() {
         aiProvider = Provider.QINIU_CLOUD;
+        aiProviderId = aiProvider.getId();
         aiEndpoint = aiProvider.getEndpoint();
 
         // 加载公开设置
@@ -264,7 +318,9 @@ public class LLMConfig {
                 SecretData data = GSON.fromJson(reader, SecretData.class);
                 if (data != null) {
                     if (data.aiApiKey != null) aiApiKey = data.aiApiKey;
-                    setProvider(Provider.resolve(data.aiProvider, data.aiEndpoint));
+                    if (data.aiProvider != null) aiProviderId = data.aiProvider;
+                    if (data.aiEndpoint != null) aiEndpoint = data.aiEndpoint;
+                    aiProvider = Provider.resolve(data.aiProvider, data.aiEndpoint);
                 }
             } catch (Exception e) { e.printStackTrace(); }
         }
@@ -297,7 +353,7 @@ public class LLMConfig {
             SecretData sData = new SecretData();
             sData.aiApiKey = aiApiKey;
             sData.aiEndpoint = getResolvedEndpoint();
-            sData.aiProvider = getProvider().getId();
+            sData.aiProvider = getStoredProviderId();
             try (Writer writer = new OutputStreamWriter(new FileOutputStream(PRIVATE_SECRETS), StandardCharsets.UTF_8)) {
                 GSON.toJson(sData, writer);
             }
@@ -316,6 +372,16 @@ public class LLMConfig {
             return fallback;
         }
         return Math.max(min, Math.min(max, value));
+    }
+    private static String normalizeCustomProviderId(String providerId) {
+        if (providerId == null || providerId.isBlank()) {
+            return Provider.CUSTOM.getId();
+        }
+        return providerId.trim();
+    }
+
+    private static String normalizeEndpoint(String endpoint) {
+        return endpoint == null ? "" : endpoint.trim();
     }
 
     private static class ConfigData {

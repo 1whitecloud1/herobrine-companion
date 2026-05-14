@@ -2,6 +2,7 @@ package com.whitecloud233.herobrine_companion.client.gui;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.whitecloud233.herobrine_companion.client.event.ClientHooks;
+import com.whitecloud233.herobrine_companion.client.gui.crosschat.CrossSessionHubScreen;
 import com.whitecloud233.herobrine_companion.client.service.ConversationStore;
 import com.whitecloud233.herobrine_companion.compat.epicfight.HeroEpicFightCompat;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
@@ -145,7 +146,7 @@ public class HeroScreen extends Screen {
             }
             this.onClose();
             ClientHooks.enableChat();
-            Minecraft.getInstance().setScreen(new net.minecraft.client.gui.screens.ChatScreen(""));
+            Minecraft.getInstance().setScreen(new HeroChatScreen(""));
             String msgKey = ClientHooks.isApiEnabled() ? "message.herobrine_companion.system_cloud_connected" : "message.herobrine_companion.system_local_mode";
             Minecraft.getInstance().gui.getChat().addMessage(Component.translatable(msgKey));
             if (ClientHooks.isApiEnabled() && activeConversationTitle != null) {
@@ -155,7 +156,12 @@ public class HeroScreen extends Screen {
 
         this.actionList.addAction(Component.translatable("gui.herobrine_companion.chat_conversations"), button -> {
             Minecraft.getInstance().setScreen(new ConversationManagerScreen(this.entityId));
-        }, Tooltip.create(Component.translatable("gui.herobrine_companion.chat_conversations_tooltip")));
+            }, Tooltip.create(Component.translatable("gui.herobrine_companion.chat_conversations_tooltip")));
+
+        this.actionList.addAction(Component.translatable("gui.herobrine_companion.cross_chat.manage"), button -> {
+            Minecraft.getInstance().setScreen(new CrossSessionHubScreen(this.entityId));
+        }, Tooltip.create(Component.translatable("gui.herobrine_companion.cross_chat.manage_tooltip")));
+
 
         boolean protectionUnlocked = visited;
 
