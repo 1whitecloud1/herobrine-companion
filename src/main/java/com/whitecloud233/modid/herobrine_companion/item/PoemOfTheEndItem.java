@@ -490,6 +490,8 @@ public class PoemOfTheEndItem extends DiggerItem {
                         com.whitecloud233.modid.herobrine_companion.event.ModEvents.CLEAVE_BLADE.get(),
                         level, spawnX, startSurfaceY, spawnZ, dirX, dirZ, lifeTicks);
 
+        level.addFreshEntity(visualBlade);
+
         // 【探头3】实体生成检测
         level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.WARDEN_SONIC_BOOM, SoundSource.PLAYERS, 5.0F, 0.5F);
 

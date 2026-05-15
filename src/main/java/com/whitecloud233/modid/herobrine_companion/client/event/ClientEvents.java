@@ -5,6 +5,8 @@ import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.modid.herobrine_companion.client.gui.HeroContractScreen;
 import com.whitecloud233.modid.herobrine_companion.client.gui.HeroTradeScreen;
 import com.whitecloud233.modid.herobrine_companion.client.gui.HeroWardrobeScreen;
+import com.whitecloud233.modid.herobrine_companion.destructiongod.client.render.DestructionGodHerobrineRenderer;
+import com.whitecloud233.modid.herobrine_companion.destructiongod.client.render.FaultAwareBlockDisplayRenderer;
 
 import com.whitecloud233.modid.herobrine_companion.client.model.GhostSteveModel;
 import com.whitecloud233.modid.herobrine_companion.client.model.HeroDragonModel;
@@ -51,6 +53,7 @@ public class ClientEvents {
         LOGGER.info(">>> [RENDERER REGISTER] 正在注册渲染器... <<<");
 
         event.registerEntityRenderer(ModEvents.HERO.get(), HeroRenderer::new);
+        event.registerEntityRenderer(ModEvents.DESTRUCTION_GOD_HEROBRINE.get(), DestructionGodHerobrineRenderer::new);
         event.registerBlockEntityRenderer(HerobrineCompanion.END_RING_PORTAL_BE.get(), EndRingPortalRenderer::new);
 
         event.registerEntityRenderer(ModEvents.GHOST_CREEPER.get(), GhostCreeperRenderer::new);
@@ -62,6 +65,7 @@ public class ClientEvents {
         event.registerEntityRenderer(ModEvents.VOID_RIFT.get(), VoidRiftRenderer::new);
         event.registerEntityRenderer(ModEvents.GLITCH_VILLAGER.get(), GlitchVillagerRenderer::new);
         event.registerEntityRenderer(ModEvents.CLEAVE_BLADE.get(), CleaveBladeRenderer::new);
+        event.registerEntityRenderer(EntityType.BLOCK_DISPLAY, FaultAwareBlockDisplayRenderer::new);
 
         // 尝试正常注册
         event.registerEntityRenderer(EntityType.ENDER_DRAGON, DragonRendererWrapper::new);

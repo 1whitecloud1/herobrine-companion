@@ -84,6 +84,7 @@ public class HerobrineCompanion {
     public static final RegistryObject<Item> GHOST_ZOMBIE_SPAWN_EGG = ITEMS.register("ghost_zombie_spawn_egg", () -> new ForgeSpawnEggItem(ModEvents.GHOST_ZOMBIE, 0x00AFAF, 0x799C65, new Item.Properties()));
     public static final RegistryObject<Item> GHOST_SKELETON_SPAWN_EGG = ITEMS.register("ghost_skeleton_spawn_egg", () -> new ForgeSpawnEggItem(ModEvents.GHOST_SKELETON, 0xC1C1C1, 0x494949, new Item.Properties()));
     public static final RegistryObject<Item> GHOST_STEVE_SPAWN_EGG = ITEMS.register("ghost_steve_spawn_egg", () -> new ForgeSpawnEggItem(ModEvents.GHOST_STEVE, 0xB07C62, 0x3B3F8E, new Item.Properties()));
+    public static final RegistryObject<Item> DESTRUCTION_GOD_HEROBRINE_SPAWN_EGG = ITEMS.register("destruction_god_herobrine_spawn_egg", () -> new ForgeSpawnEggItem(ModEvents.DESTRUCTION_GOD_HEROBRINE, 0x5E4A43, 0xF4F4F4, new Item.Properties().rarity(Rarity.EPIC)));
 
     public static final RegistryObject<BlockEntityType<EndRingPortalBlockEntity>> END_RING_PORTAL_BE = BLOCK_ENTITY_TYPES.register("end_ring_portal", () -> BlockEntityType.Builder.of(EndRingPortalBlockEntity::new, END_RING_PORTAL.get()).build(null));
 
@@ -100,6 +101,7 @@ public class HerobrineCompanion {
         output.accept(GHOST_ZOMBIE_SPAWN_EGG.get());
         output.accept(GHOST_SKELETON_SPAWN_EGG.get());
         output.accept(GHOST_STEVE_SPAWN_EGG.get());
+        output.accept(DESTRUCTION_GOD_HEROBRINE_SPAWN_EGG.get());
         output.accept(UNSTABLE_GUNPOWDER.get());
         output.accept(CORRUPTED_CODE.get());
         output.accept(VOID_MARROW.get());
@@ -123,7 +125,7 @@ public class HerobrineCompanion {
     }).build());
 
     public HerobrineCompanion() {
-        IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
+        IEventBus modEventBus = resolveModEventBus();
 
         HeroEpicFightCompat.bootstrap(modEventBus);
 
@@ -149,7 +151,7 @@ public class HerobrineCompanion {
 
         LLMConfig.load();
 
-        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, Config.SPEC);
+        registerCommonConfig();
 
         // KubeJS Soft Dependency
         try {
@@ -173,5 +175,24 @@ public class HerobrineCompanion {
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event) {
         LOGGER.info("HELLO from server starting");
+    }
+
+    private static IEventBus resolveModEventBus() {
+        try {
+            Object context = FMLJavaModLoadingContext.class.getMethod("get").invoke(null);
+            return (IEventBus) context.getClass().getMethod("getModEventBus").invoke(context);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Failed to resolve Forge mod event bus", e);
+        }
+    }
+
+    private static void registerCommonConfig() {
+        try {
+            Object context = ModLoadingContext.class.getMethod("get").invoke(null);
+            context.getClass().getMethod("registerConfig", ModConfig.Type.class, net.minecraftforge.fml.config.IConfigSpec.class)
+                    .invoke(context, ModConfig.Type.COMMON, Config.SPEC);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Failed to register common config", e);
+        }
     }
 }

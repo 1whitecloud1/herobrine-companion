@@ -1,6 +1,13 @@
 package com.whitecloud233.modid.herobrine_companion.network;
 
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.modid.herobrine_companion.destructiongod.network.DestructionGodFaultSplitPacket;
+import com.whitecloud233.modid.herobrine_companion.destructiongod.network.DestructionGodLightningArcPacket;
+import com.whitecloud233.modid.herobrine_companion.destructiongod.network.DestructionGodLightningPacket;
+import com.whitecloud233.modid.herobrine_companion.destructiongod.network.DestructionGodOrbPacket;
+import com.whitecloud233.modid.herobrine_companion.destructiongod.network.DestructionGodThunderSkyNetPacket;
+import com.whitecloud233.modid.herobrine_companion.destructiongod.network.SPacketWorldRendCinematic;
+import com.whitecloud233.modid.herobrine_companion.network.ai.*;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
@@ -45,6 +52,11 @@ public class PacketHandler {
         INSTANCE.registerMessage(id++, PaleLightningPacket.class, PaleLightningPacket::encode, PaleLightningPacket::new, PaleLightningPacket::handle);
         // [新增] 注册苍白雷电弧包
         INSTANCE.registerMessage(id++, PaleLightningArcPacket.class, PaleLightningArcPacket::encode, PaleLightningArcPacket::new, PaleLightningArcPacket::handle);
+        INSTANCE.registerMessage(id++, DestructionGodLightningPacket.class, DestructionGodLightningPacket::encode, DestructionGodLightningPacket::new, DestructionGodLightningPacket::handle);
+        INSTANCE.registerMessage(id++, DestructionGodLightningArcPacket.class, DestructionGodLightningArcPacket::encode, DestructionGodLightningArcPacket::new, DestructionGodLightningArcPacket::handle);
+        INSTANCE.registerMessage(id++, DestructionGodOrbPacket.class, DestructionGodOrbPacket::encode, DestructionGodOrbPacket::new, DestructionGodOrbPacket::handle);
+        INSTANCE.registerMessage(id++, DestructionGodThunderSkyNetPacket.class, DestructionGodThunderSkyNetPacket::encode, DestructionGodThunderSkyNetPacket::new, DestructionGodThunderSkyNetPacket::handle);
+        INSTANCE.registerMessage(id++, DestructionGodFaultSplitPacket.class, DestructionGodFaultSplitPacket::encode, DestructionGodFaultSplitPacket::new, DestructionGodFaultSplitPacket::handle);
         // [原代码修复] 注册姿势同步数据包 (把 id 改成 id++)
         INSTANCE.registerMessage(id++, SavePosePacket.class, SavePosePacket::encode, SavePosePacket::new, SavePosePacket::handle);
 
@@ -63,6 +75,10 @@ public class PacketHandler {
                 com.whitecloud233.modid.herobrine_companion.client.fight.network.SPacketFakeCrash::toBytes,
                 com.whitecloud233.modid.herobrine_companion.client.fight.network.SPacketFakeCrash::new,
                 com.whitecloud233.modid.herobrine_companion.client.fight.network.SPacketFakeCrash::handle);
+        INSTANCE.registerMessage(id++, SPacketWorldRendCinematic.class,
+                SPacketWorldRendCinematic::toBytes,
+                SPacketWorldRendCinematic::new,
+                SPacketWorldRendCinematic::handle);
         // 【新增】：注册客户端通知服务器演出结束的包
         INSTANCE.registerMessage(id++, com.whitecloud233.modid.herobrine_companion.client.fight.network.CPacketCollapseFinished.class,
                 com.whitecloud233.modid.herobrine_companion.client.fight.network.CPacketCollapseFinished::toBytes,
@@ -75,6 +91,42 @@ public class PacketHandler {
                 TeleportToHeroPacket::toBytes, TeleportToHeroPacket::new, TeleportToHeroPacket::handle);
         INSTANCE.registerMessage(id++, HeroPunishmentPacket.class,
                 HeroPunishmentPacket::encode, HeroPunishmentPacket::new, HeroPunishmentPacket::handle);
+        INSTANCE.registerMessage(id++, OpenHeroChatPacket.class,
+                OpenHeroChatPacket::encode, OpenHeroChatPacket::new, OpenHeroChatPacket::handle);
+        INSTANCE.registerMessage(id++, UpdateClientLanguagePacket.class,
+                UpdateClientLanguagePacket::encode, UpdateClientLanguagePacket::new, UpdateClientLanguagePacket::handle);
+        INSTANCE.registerMessage(id++, AppendCrossChatHistoryPacket.class,
+                AppendCrossChatHistoryPacket::encode, AppendCrossChatHistoryPacket::new, AppendCrossChatHistoryPacket::handle);
+        INSTANCE.registerMessage(id++, PresentCrossChatAiLinePacket.class,
+                PresentCrossChatAiLinePacket::encode, PresentCrossChatAiLinePacket::new, PresentCrossChatAiLinePacket::handle);
+        INSTANCE.registerMessage(id++, SyncCrossChatStatePacket.class,
+                SyncCrossChatStatePacket::encode, SyncCrossChatStatePacket::new, SyncCrossChatStatePacket::handle);
+        INSTANCE.registerMessage(id++, OpenCrossChatInvitePacket.class,
+                OpenCrossChatInvitePacket::encode, OpenCrossChatInvitePacket::new, OpenCrossChatInvitePacket::handle);
+        INSTANCE.registerMessage(id++, OpenCrossSessionHubPacket.class,
+                OpenCrossSessionHubPacket::encode, OpenCrossSessionHubPacket::new, OpenCrossSessionHubPacket::handle);
+        INSTANCE.registerMessage(id++, RequestCrossChatSessionPacket.class,
+                RequestCrossChatSessionPacket::encode, RequestCrossChatSessionPacket::new, RequestCrossChatSessionPacket::handle);
+        INSTANCE.registerMessage(id++, RespondCrossChatInvitePacket.class,
+                RespondCrossChatInvitePacket::encode, RespondCrossChatInvitePacket::new, RespondCrossChatInvitePacket::handle);
+        INSTANCE.registerMessage(id++, SetCrossChatPermissionPacket.class,
+                SetCrossChatPermissionPacket::encode, SetCrossChatPermissionPacket::new, SetCrossChatPermissionPacket::handle);
+        INSTANCE.registerMessage(id++, SetCrossChatAutoChatPacket.class,
+                SetCrossChatAutoChatPacket::encode, SetCrossChatAutoChatPacket::new, SetCrossChatAutoChatPacket::handle);
+        INSTANCE.registerMessage(id++, SetCrossChatAutoTurnLimitPacket.class,
+                SetCrossChatAutoTurnLimitPacket::encode, SetCrossChatAutoTurnLimitPacket::new, SetCrossChatAutoTurnLimitPacket::handle);
+        INSTANCE.registerMessage(id++, SendCrossChatMessagePacket.class,
+                SendCrossChatMessagePacket::encode, SendCrossChatMessagePacket::new, SendCrossChatMessagePacket::handle);
+        INSTANCE.registerMessage(id++, SendCrossChatHbMessagePacket.class,
+                SendCrossChatHbMessagePacket::encode, SendCrossChatHbMessagePacket::new, SendCrossChatHbMessagePacket::handle);
+        INSTANCE.registerMessage(id++, CloseCrossChatSessionPacket.class,
+                CloseCrossChatSessionPacket::encode, CloseCrossChatSessionPacket::new, CloseCrossChatSessionPacket::handle);
+        INSTANCE.registerMessage(id++, com.whitecloud233.modid.herobrine_companion.network.ai.HeroCrossChatPromptPacket.class,
+                com.whitecloud233.modid.herobrine_companion.network.ai.HeroCrossChatPromptPacket::encode,
+                com.whitecloud233.modid.herobrine_companion.network.ai.HeroCrossChatPromptPacket::new,
+                com.whitecloud233.modid.herobrine_companion.network.ai.HeroCrossChatPromptPacket::handle);
+        INSTANCE.registerMessage(id++, HeroCrossChatResultPacket.class,
+                HeroCrossChatResultPacket::encode, HeroCrossChatResultPacket::new, HeroCrossChatResultPacket::handle);
     }
 
 

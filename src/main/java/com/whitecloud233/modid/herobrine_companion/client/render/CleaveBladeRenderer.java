@@ -37,28 +37,29 @@ public class CleaveBladeRenderer extends EntityRenderer<CleaveBladeEntity> {
         float yaw = Mth.lerp(partialTicks, entity.yRotO, entity.getYRot());
         poseStack.mulPose(Axis.YP.rotationDegrees(180.0F - yaw));
         poseStack.mulPose(Axis.ZP.rotationDegrees(90.0F));
+        // slashRollDegrees uses terrain-cut semantics: 0° = horizontal forward cut, ±90° = vertical cut.
+        // The textured quad's neutral pose is vertical, so convert the roll before rendering.
+        poseStack.mulPose(Axis.XP.rotationDegrees(90.0F - entity.getSlashRollDegrees()));
 
         // 强行赋予环境最高光照级别 (无视黑夜和阴影)
         int light = 15728880;
         // 使用支持自定义透明度的发光渲染通道
         VertexConsumer vertexconsumer = buffer.getBuffer(RenderType.entityTranslucentEmissive(this.getTextureLocation(entity)));
+        float pulse = 1.0F + Mth.sin((entity.tickCount + partialTicks) * 1.6F) * 0.05F;
 
-        // ==========================================
-        // 【第一层】：核心刀光（100% 实体化）
-        // ==========================================
         poseStack.pushPose();
-        poseStack.scale(150.0F, 40.0F, 1.0F);
-        drawBladeFaces(poseStack, vertexconsumer, light, 1.0F); // 1.0F 表示 100% 不透明
+        poseStack.scale(240.0F * pulse, 10.0F, 1.0F);
+        drawBladeFaces(poseStack, vertexconsumer, light, 1.0F);
         poseStack.popPose();
 
-        // ==========================================
-        // 【第二层】：雷电光晕（放大一点，变成半透明虚影）
-        // ==========================================
         poseStack.pushPose();
-        // 稍微放大一点，制造光晕外溢的感觉
-        poseStack.scale(200.0F, 48.0F, 1.0F);
-        // 0.4F 表示 40% 的不透明度，叠加在核心外面会显得边缘非常柔和发光！
-        drawBladeFaces(poseStack, vertexconsumer, light, 0.4F);
+        poseStack.scale(205.0F * pulse, 34.0F, 1.0F);
+        drawBladeFaces(poseStack, vertexconsumer, light, 0.78F);
+        poseStack.popPose();
+
+        poseStack.pushPose();
+        poseStack.scale(285.0F * pulse, 70.0F, 1.0F);
+        drawBladeFaces(poseStack, vertexconsumer, light, 0.30F);
         poseStack.popPose();
 
         poseStack.popPose();

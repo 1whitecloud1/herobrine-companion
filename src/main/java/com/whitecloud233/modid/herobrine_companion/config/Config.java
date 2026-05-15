@@ -38,6 +38,37 @@ public class Config {
             .comment("是否启用镰刀的 5 键存档毁灭术")
             .define("cleaveSkillEnabled", false);
 
+    public static final ForgeConfigSpec.BooleanValue DESTRUCTION_GOD_TERRAIN_DAMAGE_ENABLED = BUILDER
+            .comment("Whether Destruction God Herobrine terrain destruction skills can really break blocks")
+            .comment("毁灭之神 Herobrine 的地形破坏技能是否允许真实破坏方块")
+            .define("destructionGodTerrainDamageEnabled", true);
+
+    public static final ForgeConfigSpec.ConfigValue<String> DESTRUCTION_GOD_TERRAIN_DAMAGE_MODE = BUILDER
+            .comment("Terrain destruction mode for Destruction God Herobrine: visual / safe / divine")
+            .comment("毁灭之神地形破坏模式：visual（纯视觉）/ safe（安全破坏）/ divine（神性破坏）")
+            .define("destructionGodTerrainDamageMode", "divine");
+
+    public static final ForgeConfigSpec.BooleanValue DESTRUCTION_GOD_BREAK_CONTAINERS = BUILDER
+            .comment("Whether Destruction God Herobrine can break container or block-entity blocks")
+            .comment("毁灭之神是否可破坏容器和带方块实体的方块")
+            .define("destructionGodBreakContainers", true);
+
+    public static final ForgeConfigSpec.BooleanValue DESTRUCTION_GOD_ARENA_RESTORE = BUILDER
+            .comment("Whether terrain broken by Destruction God Herobrine should restore itself after a while")
+            .comment("毁灭之神造成的地形破坏是否在一段时间后自动恢复")
+            .define("destructionGodArenaRestore", false);
+
+    public static final ForgeConfigSpec.IntValue DESTRUCTION_GOD_MAX_BROKEN_BLOCKS_PER_TICK = BUILDER
+            .comment("Maximum number of blocks Destruction God Herobrine terrain skills may break per server tick")
+            .comment("毁灭之神地形技能每服务器刻最多破坏的方块数")
+
+            .defineInRange("destructionGodMaxBrokenBlocksPerTick", 4096, 64, 4096);
+
+    public static final ForgeConfigSpec.BooleanValue DESTRUCTION_GOD_FINAL_PHASE_WORLD_COLLAPSE = BUILDER
+            .comment("Whether Destruction God Herobrine may trigger final phase world collapse style terrain destruction")
+            .comment("毁灭之神最终阶段是否允许触发世界崩塌式地形破坏")
+            .define("destructionGodFinalPhaseWorldCollapse", true);
+
     public static final ForgeConfigSpec.BooleanValue SOUL_BOUND_PACT_ENABLED = BUILDER
             .comment("Whether the Soul Bound Pact item is enabled")
             .comment("是否启用魂缚之契物品")
@@ -80,6 +111,12 @@ public class Config {
     public static boolean heroBlockRestoration;
     public static boolean heroCleanItems;
     public static boolean cleaveSkillEnabled;
+    public static boolean destructionGodTerrainDamageEnabled;
+    public static String destructionGodTerrainDamageMode;
+    public static boolean destructionGodBreakContainers;
+    public static boolean destructionGodArenaRestore;
+    public static int destructionGodMaxBrokenBlocksPerTick;
+    public static boolean destructionGodFinalPhaseWorldCollapse;
 
     public static boolean soulBoundPactEnabled;
     public static boolean abyssalGazeEnabled;
@@ -99,6 +136,12 @@ public class Config {
         heroBlockRestoration = HERO_BLOCK_RESTORATION.get();
         heroCleanItems = HERO_CLEAN_ITEMS.get();
         cleaveSkillEnabled = CLEAVE_SKILL_ENABLED.get();
+        destructionGodTerrainDamageEnabled = DESTRUCTION_GOD_TERRAIN_DAMAGE_ENABLED.get();
+        destructionGodTerrainDamageMode = DESTRUCTION_GOD_TERRAIN_DAMAGE_MODE.get();
+        destructionGodBreakContainers = DESTRUCTION_GOD_BREAK_CONTAINERS.get();
+        destructionGodArenaRestore = DESTRUCTION_GOD_ARENA_RESTORE.get();
+        destructionGodMaxBrokenBlocksPerTick = DESTRUCTION_GOD_MAX_BROKEN_BLOCKS_PER_TICK.get();
+        destructionGodFinalPhaseWorldCollapse = DESTRUCTION_GOD_FINAL_PHASE_WORLD_COLLAPSE.get();
 
         soulBoundPactEnabled = SOUL_BOUND_PACT_ENABLED.get();
         abyssalGazeEnabled = ABYSSAL_GAZE_ENABLED.get();
@@ -111,7 +154,10 @@ public class Config {
         // 【新增】语言风格赋值
         aiLanguageStyle = AI_LANGUAGE_STYLE.get();
 
-        LOGGER.info("Herobrine Companion Config Loaded: Explosion={}, Aura={}, BlockRestoration={}, CleanItems={}, CleaveSkill={}, Pact={}, Gaze={}, Permit={}, AIVision={}, AIInterval={}, AIStyle={}",
-                poemOfTheEndExplosion, heroKingAuraEnabled, heroBlockRestoration, heroCleanItems, cleaveSkillEnabled, soulBoundPactEnabled, abyssalGazeEnabled, transcendencePermitEnabled, aiVisionEnabled, aiVisionInterval, aiLanguageStyle);
+        LOGGER.info("Herobrine Companion Config Loaded: Explosion={}, Aura={}, BlockRestoration={}, CleanItems={}, CleaveSkill={}, DGTerrainEnabled={}, DGTerrainMode={}, DGBreakContainers={}, DGArenaRestore={}, DGMaxBreakPerTick={}, DGWorldCollapse={}, Pact={}, Gaze={}, Permit={}, AIVision={}, AIInterval={}, AIStyle={}",
+                poemOfTheEndExplosion, heroKingAuraEnabled, heroBlockRestoration, heroCleanItems, cleaveSkillEnabled,
+                destructionGodTerrainDamageEnabled, destructionGodTerrainDamageMode, destructionGodBreakContainers,
+                destructionGodArenaRestore, destructionGodMaxBrokenBlocksPerTick, destructionGodFinalPhaseWorldCollapse,
+                soulBoundPactEnabled, abyssalGazeEnabled, transcendencePermitEnabled, aiVisionEnabled, aiVisionInterval, aiLanguageStyle);
     }
 }

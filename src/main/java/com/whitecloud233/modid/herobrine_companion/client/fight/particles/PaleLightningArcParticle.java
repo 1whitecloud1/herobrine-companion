@@ -23,7 +23,7 @@ public class PaleLightningArcParticle extends Particle {
 
     private final Vec3 absoluteEndPos;
     private final List<Vec3> mainPath;
-    private final float baseRadius = 0.02f;
+    private final float baseRadius;
 
     // 内部类平替 FDColor
     protected static class ParticleColor {
@@ -34,19 +34,24 @@ public class PaleLightningArcParticle extends Particle {
     }
 
     public PaleLightningArcParticle(ClientLevel level, double startX, double startY, double startZ, Vec3 endPos) {
+        this(level, startX, startY, startZ, endPos, 0.02F, 12);
+    }
+
+    public PaleLightningArcParticle(ClientLevel level, double startX, double startY, double startZ, Vec3 endPos, float baseRadius, int lifetimeTicks) {
         super(level, startX, startY, startZ);
         this.absoluteEndPos = endPos;
+        this.baseRadius = Math.max(0.02F, baseRadius);
 
-        this.lifetime = 12;
+        this.lifetime = Math.max(8, lifetimeTicks);
         this.hasPhysics = false;
 
-        this.setBoundingBox(new AABB(startX, startY, startZ, endPos.x, endPos.y, endPos.z).inflate(1.0));
+        this.setBoundingBox(new AABB(startX, startY, startZ, endPos.x, endPos.y, endPos.z).inflate(Math.max(1.0D, this.baseRadius * 18.0D)));
 
         Vec3 startPos = new Vec3(this.x, this.y, this.z);
         Random r = new Random();
 
         int segments = Math.max(5, (int)(startPos.distanceTo(endPos) * 4));
-        float wanderStep = 0.3f;
+        float wanderStep = 0.3f + this.baseRadius * 1.6F;
         this.mainPath = buildJaggedPath(startPos, endPos, segments, wanderStep, r);
     }
 
@@ -81,11 +86,13 @@ public class PaleLightningArcParticle extends Particle {
             alpha = 1.0f - ((float) (this.age - fadeStartTick) / 5.0f);
         }
 
+        ParticleColor outerGlowColor = new ParticleColor(0.58f, 0.78f, 1.0f, 0.26f * alpha);
+        ParticleColor glowColor = new ParticleColor(0.8f, 0.9f, 1.0f, 0.48f * alpha);
         ParticleColor coreColor = new ParticleColor(1.0f, 1.0f, 1.0f, 0.95f * alpha);
-        ParticleColor glowColor = new ParticleColor(0.8f, 0.9f, 1.0f, 0.4f * alpha);
 
-        int cylinderSegments = 5;
+        int cylinderSegments = this.baseRadius >= 0.08F ? 6 : 5;
 
+        drawVolumetricCylinder(mat, vertex, cameraPos, this.mainPath, cylinderSegments, baseRadius * 4.6f, outerGlowColor);
         drawVolumetricCylinder(mat, vertex, cameraPos, this.mainPath, cylinderSegments, baseRadius * 2.5f, glowColor);
         drawVolumetricCylinder(mat, vertex, cameraPos, this.mainPath, cylinderSegments, baseRadius, coreColor);
     }
