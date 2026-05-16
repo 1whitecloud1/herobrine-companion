@@ -1,0 +1,19 @@
+{
+  "entities": [
+    "herobrine_companion:hero"
+  ],
+  "slots": [
+    "hat",
+    "face",
+    "necklace",
+    "cape",
+    "back",
+    "hand",
+    "ring",
+    "wrist",
+    "belt",
+    "anklet",
+    "shoes",
+    "charm"
+  ]
+}

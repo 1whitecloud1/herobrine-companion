@@ -32,6 +32,7 @@ public class HeroServerTick {
             }
             data.setEquipment(ownerUUID, hero.getArmorItemsTag(), hero.getHandItemsTag());
             data.setCuriosBackItem(ownerUUID, hero.getCuriosBackItemTag());
+            data.setAccessoriesData(ownerUUID, hero.getAccessoriesDataTag());
         }
 
         // 2. 持续性唯一性检查 - 严格比对存档内记录的“唯一合法存活者”

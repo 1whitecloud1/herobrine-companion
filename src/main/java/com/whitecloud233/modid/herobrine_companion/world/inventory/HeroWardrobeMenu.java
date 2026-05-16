@@ -1,8 +1,8 @@
 package com.whitecloud233.modid.herobrine_companion.world.inventory;
 
+import com.whitecloud233.modid.herobrine_companion.compat.accessories.HeroAccessoriesCompat;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroStateManager;
-import com.whitecloud233.modid.herobrine_companion.world.inventory.ModMenus;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Inventory;
@@ -17,7 +17,19 @@ import net.minecraftforge.fml.ModList;
 
 public class HeroWardrobeMenu extends AbstractContainerMenu {
 
+    private static final int ACCESSORY_COLUMNS = 4;
+    private static final int BASE_SCREEN_WIDTH = 248;
+    private static final int BASE_SCREEN_HEIGHT = 166;
+    private static final int ACCESSORY_START_X = 154;
+    private static final int ACCESSORY_START_Y = 8;
+
     private final HeroEntity hero;
+    private final int accessorySlotCount;
+    private final int curioBackSlotIndex;
+    private final int mainHandSlotIndex;
+    private final int offHandSlotIndex;
+    private final int heroSlotCount;
+    private final int inventoryOffsetY;
 
     public HeroWardrobeMenu(int containerId, Inventory playerInv, FriendlyByteBuf extraData) {
         this(containerId, playerInv, (HeroEntity) playerInv.player.level().getEntity(extraData.readInt()));
@@ -43,26 +55,37 @@ public class HeroWardrobeMenu extends AbstractContainerMenu {
         }
 
         // 2. 右上角：依然使用 Curios 挂载翅膀 (back)
-        if (ModList.get().isLoaded("curios")) {
-            CuriosSafeInvoker.addCurioSlot(this, this.hero);
-        }
+        int curioBackSlotIndex = ModList.get().isLoaded("curios") ? CuriosSafeInvoker.addCurioSlot(this, this.hero) : -1;
+        this.curioBackSlotIndex = curioBackSlotIndex;
+        this.accessorySlotCount = HeroAccessoriesCompat.addSlots(slot -> this.addSlot(slot), this.hero, ACCESSORY_START_X, ACCESSORY_START_Y, ACCESSORY_COLUMNS);
+        int accessoryRows = Math.max(3, (int)Math.ceil(this.accessorySlotCount / (double)ACCESSORY_COLUMNS));
+        this.inventoryOffsetY = Math.max(0, accessoryRows - 3) * 18;
 
         // 3. 右下角：显式主手/副手槽，避免 EntityHandsInvWrapper 在换装时产生中间态串槽
         this.addSlot(createHandSlot(this.hero, EquipmentSlot.MAINHAND, 134, 26));
+        this.mainHandSlotIndex = this.slots.size() - 1;
         this.addSlot(createHandSlot(this.hero, EquipmentSlot.OFFHAND, 134, 44));
+        this.offHandSlotIndex = this.slots.size() - 1;
+        this.heroSlotCount = this.slots.size();
 
         // --- 下方：玩家背包与快捷栏 ---
         for (int row = 0; row < 3; ++row) {
             for (int col = 0; col < 9; ++col) {
-                this.addSlot(new Slot(playerInv, col + row * 9 + 9, 8 + col * 18, 84 + row * 18));
+                this.addSlot(new Slot(playerInv, col + row * 9 + 9, 8 + col * 18, 84 + this.inventoryOffsetY + row * 18));
             }
         }
         for (int col = 0; col < 9; ++col) {
-            this.addSlot(new Slot(playerInv, col, 8 + col * 18, 142));
+            this.addSlot(new Slot(playerInv, col, 8 + col * 18, 142 + this.inventoryOffsetY));
         }
     }
 
     public HeroEntity getHero() { return this.hero; }
+    public int getHeroSlotCount() { return this.heroSlotCount; }
+    public int getCurioBackSlotIndex() { return this.curioBackSlotIndex; }
+    public int getMainHandSlotIndex() { return this.mainHandSlotIndex; }
+    public int getOffHandSlotIndex() { return this.offHandSlotIndex; }
+    public int getScreenWidth() { return BASE_SCREEN_WIDTH; }
+    public int getScreenHeight() { return BASE_SCREEN_HEIGHT + this.inventoryOffsetY; }
     @Override public boolean stillValid(Player player) { return this.hero != null && this.hero.isAlive() && this.hero.distanceTo(player) < 8.0F; }
 
     @Override
@@ -109,8 +132,7 @@ public class HeroWardrobeMenu extends AbstractContainerMenu {
             itemstack = sourceStack.copy();
 
             // 动态获取当前创世神专属槽位的总数（装了 Curios 模组是 7 个，没装是 6 个）
-            boolean hasCurios = net.minecraftforge.fml.ModList.get().isLoaded("curios");
-            int heroSlotCount = hasCurios ? 7 : 6;
+            int heroSlotCount = this.heroSlotCount;
 
             // 玩家背包区段的起始和结束索引
             int invStart = heroSlotCount;
@@ -173,11 +195,14 @@ public class HeroWardrobeMenu extends AbstractContainerMenu {
     }
     // 【核心防御机制】安全隔离内部类
     private static class CuriosSafeInvoker {
-        static void addCurioSlot(HeroWardrobeMenu menu, HeroEntity hero) {
+        static int addCurioSlot(HeroWardrobeMenu menu, HeroEntity hero) {
             Slot backSlot = com.whitecloud233.modid.herobrine_companion.compat.curios.HeroCuriosCompat.createCurioSlot(hero, "back", 0, 134, 8);
             if (backSlot != null) {
+                int slotIndex = menu.slots.size();
                 menu.addSlot(backSlot);
+                return slotIndex;
             }
+            return -1;
         }
     }
 

@@ -5,6 +5,8 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.modid.herobrine_companion.client.model.HeroModel;
+import com.whitecloud233.modid.herobrine_companion.compat.accessories.HeroAccessoriesCompat;
+import com.whitecloud233.modid.herobrine_companion.compat.simplehats.HeroSimpleHatsCompat;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.world.structure.ModStructures;
 import net.minecraft.client.Minecraft;
@@ -61,6 +63,9 @@ public class HeroRenderer extends LivingEntityRenderer<HeroEntity, PlayerModel<H
                 new net.minecraft.client.model.HumanoidModel<>(context.bakeLayer(ModelLayers.PLAYER_OUTER_ARMOR)),
                 context.getModelManager()
         ));
+
+        HeroAccessoriesCompat.attachRenderLayer(this);
+        HeroSimpleHatsCompat.attachRenderLayer(this);
 
         // 注意：这里已经删除了之前的 HeroCustomSkinLayer，因为 AW 原生接管了。
     }

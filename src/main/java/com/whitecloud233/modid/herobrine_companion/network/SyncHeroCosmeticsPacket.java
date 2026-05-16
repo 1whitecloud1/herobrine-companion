@@ -20,6 +20,7 @@ public class SyncHeroCosmeticsPacket {
     private final String customSkinName;
     private final byte[] customSkinData;
     private final CompoundTag curiosBackItem;
+    private final CompoundTag accessoriesData;
 
     public SyncHeroCosmeticsPacket(HeroEntity hero) {
         this(
@@ -27,16 +28,18 @@ public class SyncHeroCosmeticsPacket {
                 hero.getSkinVariant(),
                 hero.getCustomSkinName(),
                 getCustomSkinData(hero),
-                hero.getCuriosBackItemTag().copy()
+                hero.getCuriosBackItemTag().copy(),
+                hero.getAccessoriesDataTag().copy()
         );
     }
 
-    public SyncHeroCosmeticsPacket(int entityId, int skinVariant, String customSkinName, byte[] customSkinData, CompoundTag curiosBackItem) {
+    public SyncHeroCosmeticsPacket(int entityId, int skinVariant, String customSkinName, byte[] customSkinData, CompoundTag curiosBackItem, CompoundTag accessoriesData) {
         this.entityId = entityId;
         this.skinVariant = skinVariant;
         this.customSkinName = customSkinName;
         this.customSkinData = customSkinData != null ? customSkinData : new byte[0];
         this.curiosBackItem = curiosBackItem != null ? curiosBackItem.copy() : new CompoundTag();
+        this.accessoriesData = accessoriesData != null ? accessoriesData.copy() : new CompoundTag();
     }
 
     public SyncHeroCosmeticsPacket(FriendlyByteBuf buf) {
@@ -44,8 +47,10 @@ public class SyncHeroCosmeticsPacket {
         this.skinVariant = buf.readInt();
         this.customSkinName = buf.readUtf(32767);
         this.customSkinData = buf.readByteArray();
-        CompoundTag tag = buf.readNbt();
-        this.curiosBackItem = tag != null ? tag : new CompoundTag();
+        CompoundTag curiosTag = buf.readNbt();
+        this.curiosBackItem = curiosTag != null ? curiosTag : new CompoundTag();
+        CompoundTag accessoriesTag = buf.readNbt();
+        this.accessoriesData = accessoriesTag != null ? accessoriesTag : new CompoundTag();
     }
 
     public void encode(FriendlyByteBuf buf) {
@@ -54,6 +59,7 @@ public class SyncHeroCosmeticsPacket {
         buf.writeUtf(this.customSkinName);
         buf.writeByteArray(this.customSkinData);
         buf.writeNbt(this.curiosBackItem);
+        buf.writeNbt(this.accessoriesData);
     }
 
     public void handle(Supplier<NetworkEvent.Context> supplier) {
@@ -76,6 +82,7 @@ public class SyncHeroCosmeticsPacket {
         hero.setSkinVariant(packet.skinVariant);
         hero.setCustomSkinName(packet.customSkinName);
         hero.setCuriosBackItemFromTag(packet.curiosBackItem);
+        hero.setAccessoriesDataFromTag(packet.accessoriesData);
 
         if (packet.skinVariant == HeroEntity.SKIN_CUSTOM && packet.customSkinData.length > 0) {
             HeroClientSkinCache.put(hero.getUUID(), packet.customSkinData);
