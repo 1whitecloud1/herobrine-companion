@@ -70,6 +70,9 @@ base {
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
+def epicFightArtifact = "curse.maven:epic-fight-mod-405076:${project.epicfight_file_id}"
+def enableEpicFightDevRuntime = project.findProperty("enable_epicfight_dev_runtime")?.toString()?.toBoolean() ?: false
+
 neoForge {
     version = project.neo_version
 
@@ -140,6 +143,18 @@ dependencies {
 
     compileOnly "curse.maven:epic-fight-mod-405076:7956628"
     runtimeOnly "curse.maven:epic-fight-mod-405076:7956628"
+
+    compileOnly "curse.maven:accessories-mod-938917:7583320"
+    runtimeOnly "curse.maven:accessories-mod-938917:7583320"
+
+    compileOnly "curse.maven:cloth-config-mod-348521:5729127"
+    runtimeOnly "curse.maven:cloth-config-mod-348521:5729127"
+
+    compileOnly "curse.maven:simplehats-mod-631990:5970513"
+    runtimeOnly "curse.maven:simplehats-mod-631990:5970513"
+
+    compileOnly "curse.maven:owo-lib-mod-532610:6785734"
+    runtimeOnly "curse.maven:owo-lib-mod-532610:6785734"
 
     compileOnly "mezz.jei:jei-${minecraft_version}-common-api:${jei_version}"
     compileOnly "mezz.jei:jei-${minecraft_version}-neoforge-api:${jei_version}"

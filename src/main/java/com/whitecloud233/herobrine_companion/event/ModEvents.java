@@ -1,6 +1,7 @@
 package com.whitecloud233.herobrine_companion.event;
 
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.herobrine_companion.destructiongod.entity.DestructionGodHerobrineEntity;
 import com.whitecloud233.herobrine_companion.entity.projectile.CleaveBladeEntity;
 import com.whitecloud233.herobrine_companion.entity.GhostCreeperEntity;
 import com.whitecloud233.herobrine_companion.entity.GhostSkeletonEntity;
@@ -104,6 +105,13 @@ public class ModEvents {
                     .updateInterval(1) // 每tick更新，确保运动平滑
                     .build("cleave_blade"));
 
+    public static final DeferredHolder<EntityType<?>, EntityType<DestructionGodHerobrineEntity>> DESTRUCTION_GOD_HEROBRINE = ENTITY_TYPES.register("destruction_god_herobrine",
+            () -> EntityType.Builder.of(DestructionGodHerobrineEntity::new, MobCategory.MONSTER)
+                    .sized(0.6F, 1.8F)
+                    .clientTrackingRange(16)
+                    .updateInterval(1)
+                    .build("destruction_god_herobrine"));
+
     public static void entityAttributeEvent(EntityAttributeCreationEvent event) {
         event.put(HERO.get(), HeroEntity.createAttributes().build());
         event.put(GHOST_CREEPER.get(), Creeper.createAttributes().build());
@@ -111,6 +119,7 @@ public class ModEvents {
         event.put(GHOST_SKELETON.get(), Skeleton.createAttributes().build());
         event.put(GHOST_STEVE.get(), GhostSteveEntity.createAttributes().build());
         event.put(GLITCH_VILLAGER.get(), Villager.createAttributes().build());
+        event.put(DESTRUCTION_GOD_HEROBRINE.get(), DestructionGodHerobrineEntity.createAttributes().build());
         // Glitch Echo and Void Rift don't need attributes as they are just Entities, not LivingEntities
     }
 

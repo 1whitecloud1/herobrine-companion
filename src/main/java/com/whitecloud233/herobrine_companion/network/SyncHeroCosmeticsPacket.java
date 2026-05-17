@@ -28,6 +28,7 @@ public class SyncHeroCosmeticsPacket implements CustomPacketPayload {
     private final String customSkinName;
     private final byte[] customSkinData;
     private final CompoundTag curiosBackItem;
+    private final CompoundTag accessoriesData;
 
     public SyncHeroCosmeticsPacket(HeroEntity hero) {
         this(
@@ -35,16 +36,18 @@ public class SyncHeroCosmeticsPacket implements CustomPacketPayload {
                 hero.getSkinVariant(),
                 hero.getCustomSkinName(),
                 getCustomSkinData(hero),
-                hero.getCuriosBackItemTag().copy()
+                hero.getCuriosBackItemTag().copy(),
+                hero.getAccessoriesDataTag().copy()
         );
     }
 
-    public SyncHeroCosmeticsPacket(int entityId, int skinVariant, String customSkinName, byte[] customSkinData, CompoundTag curiosBackItem) {
+    public SyncHeroCosmeticsPacket(int entityId, int skinVariant, String customSkinName, byte[] customSkinData, CompoundTag curiosBackItem, CompoundTag accessoriesData) {
         this.entityId = entityId;
         this.skinVariant = skinVariant;
         this.customSkinName = customSkinName;
         this.customSkinData = customSkinData != null ? customSkinData : new byte[0];
         this.curiosBackItem = curiosBackItem != null ? curiosBackItem.copy() : new CompoundTag();
+        this.accessoriesData = accessoriesData != null ? accessoriesData.copy() : new CompoundTag();
     }
 
     public SyncHeroCosmeticsPacket(FriendlyByteBuf buf) {
@@ -54,6 +57,8 @@ public class SyncHeroCosmeticsPacket implements CustomPacketPayload {
         this.customSkinData = buf.readByteArray();
         CompoundTag tag = buf.readNbt();
         this.curiosBackItem = tag != null ? tag : new CompoundTag();
+        CompoundTag accessoriesTag = buf.readNbt();
+        this.accessoriesData = accessoriesTag != null ? accessoriesTag : new CompoundTag();
     }
 
     public void encode(FriendlyByteBuf buf) {
@@ -62,6 +67,7 @@ public class SyncHeroCosmeticsPacket implements CustomPacketPayload {
         buf.writeUtf(this.customSkinName);
         buf.writeByteArray(this.customSkinData);
         buf.writeNbt(this.curiosBackItem);
+        buf.writeNbt(this.accessoriesData);
     }
 
     @Override
@@ -91,6 +97,7 @@ public class SyncHeroCosmeticsPacket implements CustomPacketPayload {
         hero.setSkinVariant(packet.skinVariant);
         hero.setCustomSkinName(packet.customSkinName);
         hero.setCuriosBackItemFromTag(packet.curiosBackItem);
+        hero.setAccessoriesDataFromTag(packet.accessoriesData);
 
         if (packet.skinVariant == HeroEntity.SKIN_CUSTOM && packet.customSkinData.length > 0) {
             HeroClientSkinCache.put(hero.getUUID(), packet.customSkinData);

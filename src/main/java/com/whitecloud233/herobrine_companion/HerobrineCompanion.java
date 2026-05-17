@@ -19,12 +19,7 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
-import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.CreativeModeTab;
-import net.minecraft.world.item.CreativeModeTabs;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Tiers;
+import net.minecraft.world.item.*;
 import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -67,7 +62,8 @@ public class HerobrineCompanion {
     public static final DeferredItem<Item> VOID_MARROW = ITEMS.register("void_marrow", () -> new Item(new Item.Properties()));
     public static final DeferredItem<Item> GLITCH_FRAGMENT = ITEMS.register("glitch_fragment", () -> new Item(new Item.Properties().rarity(net.minecraft.world.item.Rarity.RARE)));
     public static final DeferredItem<Item> SOURCE_CODE_FRAGMENT = ITEMS.register("source_code_fragment", () -> new Item(new Item.Properties().rarity(net.minecraft.world.item.Rarity.EPIC)));
-    
+    public static final DeferredItem<Item> DESTRUCTION_GOD_HEROBRINE_SPAWN_EGG = ITEMS.register("destruction_god_herobrine_spawn_egg", () -> new Item(new Item.Properties().rarity(net.minecraft.world.item.Rarity.EPIC)));
+
     // New Items
     public static final DeferredItem<MemoryShardItem> MEMORY_SHARD = ITEMS.register("memory_shard", () -> new MemoryShardItem(new Item.Properties().rarity(net.minecraft.world.item.Rarity.RARE)));
     public static final DeferredItem<RecallStoneItem> RECALL_STONE = ITEMS.register("recall_stone", () -> new RecallStoneItem(new Item.Properties().stacksTo(1).durability(3).rarity(net.minecraft.world.item.Rarity.EPIC)));
@@ -115,7 +111,8 @@ public class HerobrineCompanion {
         output.accept(POEM_OF_THE_END.get());
         output.accept(SOURCE_FLOW.get());
         output.accept(LORE_HANDBOOK.get());
-        
+        output.accept(DESTRUCTION_GOD_HEROBRINE_SPAWN_EGG.get());
+
         for (int i = 1; i <= 11; i++) {
             ItemStack stack = new ItemStack(LORE_FRAGMENT.get());
             CompoundTag tag = new CompoundTag();
@@ -126,6 +123,7 @@ public class HerobrineCompanion {
     }).build());
 
     public HerobrineCompanion(IEventBus modEventBus, ModContainer modContainer) {
+
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::registerPayloads);
         HeroEpicFightCompat.bootstrap(modEventBus);

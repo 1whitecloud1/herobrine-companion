@@ -6,6 +6,8 @@ import com.whitecloud233.herobrine_companion.client.fight.network.SPacketFakeCra
 import com.whitecloud233.herobrine_companion.client.fight.network.SPacketStartCollapse;
 import com.whitecloud233.herobrine_companion.network.ai.*;
 
+import com.whitecloud233.herobrine_companion.destructiongod.network.*;
+
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
@@ -165,7 +167,7 @@ public class PacketHandler {
                 SPacketFakeCrash.CODEC,
                 SPacketFakeCrash::handle
         );
-// 注册 SummonHeroPacket
+        // 注册 SummonHeroPacket
         registrar.playToServer(
                 SummonHeroPacket.TYPE,
                 SummonHeroPacket.STREAM_CODEC,
@@ -196,6 +198,40 @@ public class PacketHandler {
         registrar.playToServer(SetCrossChatPermissionPacket.TYPE, SetCrossChatPermissionPacket.STREAM_CODEC, SetCrossChatPermissionPacket::handle);
         registrar.playToClient(SyncCrossChatStatePacket.TYPE, SyncCrossChatStatePacket.STREAM_CODEC, SyncCrossChatStatePacket::handle);
         registrar.playToServer(UpdateClientLanguagePacket.TYPE, UpdateClientLanguagePacket.STREAM_CODEC, UpdateClientLanguagePacket::handle);
+
+        // ============================================
+        // [新增] 毁灭之神数据包注册
+        // ============================================
+        registrar.playToClient(
+                DestructionGodLightningPacket.TYPE,
+                DestructionGodLightningPacket.STREAM_CODEC,
+                DestructionGodLightningPacket::handle
+        );
+        registrar.playToClient(
+                DestructionGodLightningArcPacket.TYPE,
+                DestructionGodLightningArcPacket.STREAM_CODEC,
+                DestructionGodLightningArcPacket::handle
+        );
+        registrar.playToClient(
+                DestructionGodOrbPacket.TYPE,
+                DestructionGodOrbPacket.STREAM_CODEC,
+                DestructionGodOrbPacket::handle
+        );
+        registrar.playToClient(
+                DestructionGodThunderSkyNetPacket.TYPE,
+                DestructionGodThunderSkyNetPacket.STREAM_CODEC,
+                DestructionGodThunderSkyNetPacket::handle
+        );
+        registrar.playToClient(
+                DestructionGodFaultSplitPacket.TYPE,
+                DestructionGodFaultSplitPacket.STREAM_CODEC,
+                DestructionGodFaultSplitPacket::handle
+        );
+        registrar.playToClient(
+                SPacketWorldRendCinematic.TYPE,
+                SPacketWorldRendCinematic.STREAM_CODEC,
+                SPacketWorldRendCinematic::handle
+        );
     }
 
     public static void sendToServer(CustomPacketPayload packet) {
