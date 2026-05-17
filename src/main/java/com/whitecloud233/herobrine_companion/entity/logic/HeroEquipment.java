@@ -1,5 +1,6 @@
 package com.whitecloud233.herobrine_companion.entity.logic;
 
+import com.whitecloud233.herobrine_companion.compat.accessories.HeroAccessoriesCompat;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -87,6 +88,20 @@ public class HeroEquipment {
         return CuriosSafeInvoker.isBackSlotEmpty(hero);
     }
 
+    // 【核心防御机制】安全隔离内部类！
+    public static CompoundTag getAccessoriesDataTag(HeroEntity hero) {
+        if (!HeroAccessoriesCompat.isLoaded()) {
+            return new CompoundTag();
+        }
+        return HeroAccessoriesCompat.getAccessoriesDataTag(hero);
+    }
+
+    public static void setAccessoriesDataFromTag(HeroEntity hero, CompoundTag tag) {
+        if (!HeroAccessoriesCompat.isLoaded()) {
+            return;
+        }
+        HeroAccessoriesCompat.setAccessoriesDataFromTag(hero, tag);
+    }
     private static class CuriosSafeInvoker {
         static CompoundTag getBackItemTag(HeroEntity hero) {
             CompoundTag tag = new CompoundTag();

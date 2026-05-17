@@ -6,6 +6,8 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.logging.LogUtils;
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.client.model.HeroModel;
+import com.whitecloud233.herobrine_companion.compat.accessories.HeroAccessoriesCompat;
+import com.whitecloud233.herobrine_companion.compat.simplehats.HeroSimpleHatsCompat;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.world.structure.ModStructures;
 import com.whitecloud233.herobrine_companion.compat.ArmourerWorkshop.HeroAWCompat;
@@ -65,6 +67,9 @@ public class HeroRenderer extends LivingEntityRenderer<HeroEntity, PlayerModel<H
                 new net.minecraft.client.model.HumanoidModel<>(context.bakeLayer(ModelLayers.PLAYER_OUTER_ARMOR)),
                 context.getModelManager()
         ));
+        HeroAccessoriesCompat.attachRenderLayer(this);
+        HeroSimpleHatsCompat.attachRenderLayer(this);
+
     }
 
     // =========================================================

@@ -41,6 +41,7 @@ public class HeroWorldData {
         public ListTag armorItems = new ListTag();
         public ListTag handItems = new ListTag();
         public CompoundTag curiosBackItem = new CompoundTag();
+        public CompoundTag accessoriesData = new CompoundTag();
         public CompoundTag poseData = new CompoundTag();
 
         public UUID activeHeroUUID = null;
@@ -66,6 +67,7 @@ public class HeroWorldData {
             tag.put("ArmorItems", armorItems);
             tag.put("HandItems", handItems);
             tag.put("CuriosBackItem", curiosBackItem);
+            tag.put("AccessoriesData", accessoriesData);
             tag.put("PoseData", poseData);
 
             if (activeHeroUUID != null) tag.putUUID("ActiveHeroUUID", activeHeroUUID);
@@ -93,6 +95,7 @@ public class HeroWorldData {
             if (tag.contains("ArmorItems", 9)) profile.armorItems = tag.getList("ArmorItems", 10);
             if (tag.contains("HandItems", 9)) profile.handItems = tag.getList("HandItems", 10);
             if (tag.contains("CuriosBackItem", 10)) profile.curiosBackItem = tag.getCompound("CuriosBackItem");
+            if (tag.contains("AccessoriesData", 10)) profile.accessoriesData = tag.getCompound("AccessoriesData");
             if (tag.contains("PoseData", 10)) profile.poseData = tag.getCompound("PoseData");
 
             if (tag.hasUUID("ActiveHeroUUID")) profile.activeHeroUUID = tag.getUUID("ActiveHeroUUID");
@@ -227,6 +230,7 @@ public class HeroWorldData {
                     profile.armorItems = oldData.armorItems;
                     profile.handItems = oldData.handItems;
                     profile.curiosBackItem = oldData.curiosBackItem;
+                    profile.accessoriesData = oldData.accessoriesData;
                     profile.poseData = oldData.poseData;
                     profile.activeHeroUUID = oldData.activeHeroUUID;
                     profile.lastKnownHeroPos = oldData.lastKnownHeroPos;
@@ -323,7 +327,13 @@ public class HeroWorldData {
         profile.curiosBackItem = tag;
         profile.setDirty();
     }
-
+    public CompoundTag getAccessoriesData(UUID uuid) { return getProfile(uuid).accessoriesData; }
+    public void setAccessoriesData(UUID uuid, CompoundTag tag) {
+        if (uuid == null) return;
+        PlayerProfile profile = getProfile(uuid);
+        profile.accessoriesData = tag;
+        profile.setDirty();
+    }
     public CompoundTag getPoseData(UUID uuid) { return getProfile(uuid).poseData; }
     public void setPoseData(UUID uuid, CompoundTag tag) {
         if (uuid == null) return;

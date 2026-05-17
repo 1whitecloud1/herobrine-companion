@@ -39,6 +39,7 @@ public class HeroStateManager {
         }
         data.setEquipment(ownerUUID, hero.getArmorItemsTag(), hero.getHandItemsTag());
         data.setCuriosBackItem(ownerUUID, hero.getCuriosBackItemTag());
+        data.setAccessoriesData(ownerUUID, hero.getAccessoriesDataTag());
 
         // 同步姿势数据到全局存档
         CompoundTag poseTag = new CompoundTag();
@@ -93,6 +94,7 @@ public class HeroStateManager {
         }
 
         // 👇 [新增] 5. 恢复姿势数据，并立即同步给客户端
+        hero.setAccessoriesDataFromTag(data.getAccessoriesData(ownerUUID));
         CompoundTag poseTag = data.getPoseData(ownerUUID);
         if (poseTag != null && poseTag.contains("IsPoseEditing")) {
             hero.isPoseEditing = poseTag.getBoolean("IsPoseEditing");
@@ -144,6 +146,7 @@ public class HeroStateManager {
         heroData.put("ArmorItems", hero.getArmorItemsTag());
         heroData.put("HandItems", hero.getHandItemsTag());
         heroData.put("CuriosBackItem", hero.getCuriosBackItemTag());
+        heroData.put("AccessoriesData", hero.getAccessoriesDataTag());
 
         player.getPersistentData().put(tagKey, heroData);
 
@@ -196,6 +199,9 @@ public class HeroStateManager {
         }
 
         data.remove(tagKey); // 阅后即焚
+        if (heroData.contains("AccessoriesData", 10)) {
+            hero.setAccessoriesDataFromTag(heroData.getCompound("AccessoriesData"));
+        }
         return true;
     }
 
@@ -219,6 +225,7 @@ public class HeroStateManager {
         // 转移装备
         target.loadEquipmentFromTag(source.getArmorItemsTag(), source.getHandItemsTag());
         target.setCuriosBackItemFromTag(source.getCuriosBackItemTag());
+        target.setAccessoriesDataFromTag(source.getAccessoriesDataTag());
 
         // 👇 [新增] 转移姿势数据
         target.isPoseEditing = source.isPoseEditing;
