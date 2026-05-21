@@ -14,10 +14,10 @@ public class HeroPrankHandler {
 
     public static void tick(HeroEntity hero) {
         if (hero.level().isClientSide || !hero.isCompanionMode()) return;
+        if (hero.getHeroBrain().getState() != SimpleNeuralNetwork.MindState.PRANKSTER) return;
 
-        // Very rare chance to prank (once every few minutes on average)
-        if (hero.tickCount % 1200 != 0) return; // Check every minute
-        if (hero.getRandom().nextFloat() > 0.1) return; // 10% chance per minute
+        if (hero.tickCount % 1200 != 0) return;
+        if (hero.getRandom().nextFloat() > 0.1F) return;
 
         UUID ownerUUID = hero.getOwnerUUID();
         if (ownerUUID == null) return;
@@ -32,21 +32,21 @@ public class HeroPrankHandler {
         int type = hero.getRandom().nextInt(3);
 
         switch (type) {
-            case 0: // Fake Creeper Sound
-                player.playNotifySound(SoundEvents.CREEPER_PRIMED, SoundSource.HOSTILE, 1.0f, 1.0f);
+            case 0 -> {
+                player.playNotifySound(SoundEvents.CREEPER_PRIMED, SoundSource.HOSTILE, 1.0F, 1.0F);
                 HeroDialogueHandler.onPrank(hero, player);
-                // 恶作剧成功，增加混乱值
-                hero.getHeroBrain().inputEntropy(player.getUUID(), 0.05f);
-                break;
-            case 1: // Random Torch Break (Visual only? No, let's just break one nearby torch)
+                hero.getHeroBrain().inputEntropy(player.getUUID(), 0.05F);
+            }
+            case 1 -> {
                 BlockPos pos = player.blockPosition();
                 BlockPos torchPos = null;
-                for (int x = -5; x <= 5; x++) {
-                    for (int y = -2; y <= 2; y++) {
+                for (int x = -5; x <= 5 && torchPos == null; x++) {
+                    for (int y = -2; y <= 2 && torchPos == null; y++) {
                         for (int z = -5; z <= 5; z++) {
-                            BlockPos p = pos.offset(x, y, z);
-                            if (player.level().getBlockState(p).is(Blocks.TORCH) || player.level().getBlockState(p).is(Blocks.WALL_TORCH)) {
-                                torchPos = p;
+                            BlockPos sample = pos.offset(x, y, z);
+                            if (player.level().getBlockState(sample).is(Blocks.TORCH)
+                                    || player.level().getBlockState(sample).is(Blocks.WALL_TORCH)) {
+                                torchPos = sample;
                                 break;
                             }
                         }
@@ -54,18 +54,17 @@ public class HeroPrankHandler {
                 }
                 if (torchPos != null) {
                     player.level().destroyBlock(torchPos, true);
-                    player.playNotifySound(SoundEvents.GLASS_BREAK, SoundSource.BLOCKS, 1.0f, 1.0f);
+                    player.playNotifySound(SoundEvents.GLASS_BREAK, SoundSource.BLOCKS, 1.0F, 1.0F);
                     HeroDialogueHandler.onPrank(hero, player);
-                    // 破坏方块，增加混乱值
-                    hero.getHeroBrain().inputEntropy(player.getUUID(), 0.05f);
+                    hero.getHeroBrain().inputEntropy(player.getUUID(), 0.05F);
                 }
-                break;
-            case 2: // Jumpscare Teleport (Teleport right in front of player for a split second)
-                // This is handled by the TeleportToPlayerGoal mostly, but we can force a sound here
-                player.playNotifySound(SoundEvents.ENDERMAN_SCREAM, SoundSource.HOSTILE, 0.5f, 0.5f);
-                // 吓人，增加混乱值
-                hero.getHeroBrain().inputEntropy(player.getUUID(), 0.05f);
-                break;
+            }
+            case 2 -> {
+                player.playNotifySound(SoundEvents.ENDERMAN_SCREAM, SoundSource.HOSTILE, 0.5F, 0.5F);
+                hero.getHeroBrain().inputEntropy(player.getUUID(), 0.05F);
+            }
+            default -> {
+            }
         }
     }
 }

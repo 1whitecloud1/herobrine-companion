@@ -4,6 +4,7 @@ import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.modid.herobrine_companion.compat.epicfight.HeroEpicFightCompat;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.HeroCombatWeaponHelper;
+import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.SimpleNeuralNetwork;
 import com.whitecloud233.modid.herobrine_companion.item.PoemOfTheEndItem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.PlayerModel;
@@ -202,8 +203,11 @@ public class HeroModel extends PlayerModel<HeroEntity> {
         float partialTick = ageInTicks - entity.tickCount;
         float floatAmount = entity.getFloatingAmount(partialTick);
 
-        float headTilt = Mth.sin(ageInTicks * 0.05f) * 0.05f;
-        headTilt += (netHeadYaw * 0.01f) * 0.2f;
+        boolean observerState = entity.getMindState() == SimpleNeuralNetwork.MindState.OBSERVER;
+        float headTilt = observerState ? 0.0F : Mth.sin(ageInTicks * 0.05f) * 0.05f;
+        if (!observerState) {
+            headTilt += (netHeadYaw * 0.01f) * 0.2f;
+        }
         this.head.zRot = headTilt;
         this.hat.zRot = this.head.zRot;
 

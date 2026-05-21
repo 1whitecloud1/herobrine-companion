@@ -7,7 +7,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.ai.goal.Goal;
-import net.minecraft.world.entity.player.Player; // [修复] 添加 Player 类的 import
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
@@ -35,20 +35,10 @@ public class HeroExtinguishTorchGoal extends Goal {
 
         if (this.hero.level().isDay() && !this.hero.level().isRaining()) return false;
 
-        // [深度学习] 根据心智状态调整概率
         SimpleNeuralNetwork.MindState state = this.hero.getHeroBrain().getState();
-        int chance = 60; // 默认 1/60
+        if (state != SimpleNeuralNetwork.MindState.PRANKSTER) return false;
 
-        if (state == SimpleNeuralNetwork.MindState.PRANKSTER) {
-            chance = 10; // 恶作剧者：非常频繁 (1/10)
-        } else if (state == SimpleNeuralNetwork.MindState.OBSERVER) {
-            chance = 100; // 观察者：偶尔 (1/100)
-        } else {
-            return false; // 其他状态（如守护者、审判者）不屑于做这种小动作
-        }
-
-        if (this.hero.getRandom().nextInt(chance) != 0) return false;
-
+        if (this.hero.getRandom().nextInt(10) != 0) return false;
 
         this.targetTorch = findNearbyTorch();
         return this.targetTorch != null;
@@ -67,17 +57,31 @@ public class HeroExtinguishTorchGoal extends Goal {
     @Override
     public void tick() {
         if (this.targetTorch == null) return;
-        
+
         this.hero.getLookControl().setLookAt(Vec3.atCenterOf(this.targetTorch));
 
         if (this.hero.distanceToSqr(Vec3.atCenterOf(this.targetTorch)) < 4.0D) {
             BlockState state = this.hero.level().getBlockState(this.targetTorch);
             if (state.is(Blocks.TORCH) || state.is(Blocks.WALL_TORCH)) {
                 this.hero.level().destroyBlock(this.targetTorch, true);
-                this.hero.level().playSound(null, this.targetTorch, SoundEvents.FIRE_EXTINGUISH, SoundSource.BLOCKS, 0.5F, 2.6F + (this.hero.level().random.nextFloat() - this.hero.level().random.nextFloat()) * 0.8F);
-                this.hero.level().addParticle(ParticleTypes.LARGE_SMOKE, this.targetTorch.getX() + 0.5, this.targetTorch.getY() + 0.5, this.targetTorch.getZ() + 0.5, 0.0, 0.0, 0.0);
+                this.hero.level().playSound(
+                        null,
+                        this.targetTorch,
+                        SoundEvents.FIRE_EXTINGUISH,
+                        SoundSource.BLOCKS,
+                        0.5F,
+                        2.6F + (this.hero.level().random.nextFloat() - this.hero.level().random.nextFloat()) * 0.8F
+                );
+                this.hero.level().addParticle(
+                        ParticleTypes.LARGE_SMOKE,
+                        this.targetTorch.getX() + 0.5D,
+                        this.targetTorch.getY() + 0.5D,
+                        this.targetTorch.getZ() + 0.5D,
+                        0.0D,
+                        0.0D,
+                        0.0D
+                );
 
-                // 【修复】：只认主人，不理路人
                 if (this.hero.getOwnerUUID() != null) {
                     Player player = this.hero.level().getPlayerByUUID(this.hero.getOwnerUUID());
                     if (player instanceof ServerPlayer serverPlayer) {
@@ -103,10 +107,9 @@ public class HeroExtinguishTorchGoal extends Goal {
             int x = heroPos.getX() + this.hero.getRandom().nextInt(range * 2) - range;
             int y = heroPos.getY() + this.hero.getRandom().nextInt(range) - range / 2;
             int z = heroPos.getZ() + this.hero.getRandom().nextInt(range * 2) - range;
-            
+
             BlockPos pos = new BlockPos(x, y, z);
             BlockState state = this.hero.level().getBlockState(pos);
-            
             if (state.is(Blocks.TORCH) || state.is(Blocks.WALL_TORCH)) {
                 return pos;
             }

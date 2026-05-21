@@ -308,7 +308,9 @@ public class AIService {
                                     partialConsumer, useStreaming, outputLanguageCode, crossSessionMode);
 
                         } catch (Exception e) {
-                            return CompletableFuture.completedFuture("Data stream disrupted...");
+                            LOGGER.error("Failed to parse AI response", e);
+                            LOGGER.error("Raw response body: {}", response.body());
+                            return CompletableFuture.completedFuture("Data stream disrupted... (" + e.toString() + ")");
                         }
                     } else {
                         if (isInvalidApiKeyResponse(response.statusCode(), response.body())) {

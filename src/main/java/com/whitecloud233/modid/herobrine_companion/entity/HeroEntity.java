@@ -654,6 +654,8 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     public CompoundTag getCuriosBackItemTag() { return HeroEquipment.getCuriosBackItemTag(this); }
     public void setCuriosBackItemFromTag(CompoundTag tag) { HeroEquipment.setCuriosBackItemFromTag(this, tag); }
     public boolean isCuriosBackSlotEmpty() { return HeroEquipment.isCuriosBackSlotEmpty(this); }
+    public CompoundTag getAccessoriesDataTag() { return HeroEquipment.getAccessoriesDataTag(this); }
+    public void setAccessoriesDataFromTag(CompoundTag tag) { HeroEquipment.setAccessoriesDataFromTag(this, tag); }
 
     // Getters & Setters
     public boolean isLoadedFromDisk() { return this.isLoadedFromDisk; }

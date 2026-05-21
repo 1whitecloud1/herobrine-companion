@@ -7,6 +7,7 @@ import com.whitecloud233.modid.herobrine_companion.client.gui.crosschat.CrossSes
 import com.whitecloud233.modid.herobrine_companion.client.event.ClientHooks;
 import com.whitecloud233.modid.herobrine_companion.client.service.ConversationStore;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.SimpleNeuralNetwork;
 import com.whitecloud233.modid.herobrine_companion.event.ModEvents;
 import com.whitecloud233.modid.herobrine_companion.network.ClearAreaPacket;
 import com.whitecloud233.modid.herobrine_companion.network.DesolateAreaPacket;
@@ -419,6 +420,7 @@ public class HeroScreen extends Screen {
         int trust = 0;
         UUID uuid = null;
         boolean battleMode = false;
+        SimpleNeuralNetwork.MindState mindState = SimpleNeuralNetwork.MindState.OBSERVER;
         String epicFightDisplay = HeroEpicFightCompat.getBridgeStatus().name();
         if (this.minecraft.level != null) {
             Entity realEntity = this.minecraft.level.getEntity(this.entityId);
@@ -426,6 +428,7 @@ public class HeroScreen extends Screen {
                 trust = hero.getTrustLevel();
                 uuid = hero.getUUID();
                 battleMode = hero.isBattleModeActive();
+                mindState = hero.getMindState();
                 if (battleMode) {
                     epicFightDisplay = HeroEpicFightCompat.getBridgeStatus().name() + " " + HeroEpicFightCompat.describeCurrentSnapshot(hero);
                 }
@@ -449,7 +452,7 @@ public class HeroScreen extends Screen {
 
         drawInfoField(guiGraphics, indent + 5, varY + lineHeight, Component.translatable("gui.herobrine_companion.trust_level"), Component.literal(String.valueOf(trust)));
         drawInfoField(guiGraphics, indent + 5, varY + lineHeight * 2, Component.translatable("gui.herobrine_companion.battle_mode_status"), Component.translatable(battleMode ? "gui.herobrine_companion.battle_mode_status_on" : "gui.herobrine_companion.battle_mode_status_off"));
-        drawInfoField(guiGraphics, indent + 5, varY + lineHeight * 3, Component.translatable("gui.herobrine_companion.active_time"), Component.literal(this.dummyHero.tickCount + "").append(Component.translatable("gui.herobrine_companion.ticks")));
+        drawInfoField(guiGraphics, indent + 5, varY + lineHeight * 3, Component.translatable("gui.herobrine_companion.mind_state"), getMindStateComponent(mindState));
         drawInfoField(guiGraphics, indent + 5, varY + lineHeight * 4, Component.translatable("gui.herobrine_companion.epicfight_bridge"), Component.literal(epicFightDisplay));
         drawInfoField(guiGraphics, indent + 5, varY + lineHeight * 5, Component.translatable("gui.herobrine_companion.entity_id"), Component.literal(uuid == null ? "N/A" : "..." + uuid.toString().substring(0, 4)));
 
@@ -499,6 +502,20 @@ public class HeroScreen extends Screen {
         g.drawString(this.font, name, x, y, COL_VALUE, false);
         g.drawString(this.font, ": ", x + this.font.width(name), y, COL_TEXT_MAIN, false);
         g.drawString(this.font, value, x + this.font.width(name) + 10, y, COL_INFO, false);
+    }
+
+    private Component getMindStateComponent(SimpleNeuralNetwork.MindState state) {
+        String suffix = switch (state) {
+            case OBSERVER -> "observer";
+            case PROTECTOR -> "protector";
+            case JUDGE -> "judge";
+            case PRANKSTER -> "prankster";
+            case MAINTAINER -> "maintainer";
+            case GLITCH_LORD -> "glitch_lord";
+            case MONSTER_KING -> "monster_king";
+            case REMINISCING -> "reminiscing";
+        };
+        return Component.translatable("gui.herobrine_companion.mind_state." + suffix);
     }
 
     private void renderEntityWithMouseFollow(GuiGraphics guiGraphics, int x, int y, int scale, float mouseX, float mouseY, HeroEntity entity) {
