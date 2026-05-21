@@ -1,12 +1,9 @@
 package com.whitecloud233.modid.herobrine_companion.compat.accessories;
 
-import com.whitecloud233.modid.herobrine_companion.client.render.HeroRenderer;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroStateManager;
 import com.whitecloud233.modid.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.modid.herobrine_companion.network.SyncHeroCosmeticsPacket;
-import net.minecraft.client.model.PlayerModel;
-import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -41,13 +38,6 @@ public class HeroAccessoriesCompat {
         return ModList.get().isLoaded("accessories");
     }
 
-    public static void attachRenderLayer(HeroRenderer renderer) {
-        if (!isLoaded() || renderer == null) {
-            return;
-        }
-        AccessoriesSafeInvoker.attachRenderLayer(renderer);
-    }
-
     public static int addSlots(Consumer<Slot> slotConsumer, HeroEntity hero, int startX, int startY, int columns) {
         if (!isLoaded() || slotConsumer == null || hero == null || columns <= 0) {
             return 0;
@@ -70,10 +60,6 @@ public class HeroAccessoriesCompat {
     }
 
     private static class AccessoriesSafeInvoker {
-
-        static void attachRenderLayer(LivingEntityRenderer<HeroEntity, PlayerModel<HeroEntity>> renderer) {
-            renderer.addLayer(new io.wispforest.accessories.client.AccessoriesRenderLayer<>(renderer));
-        }
 
         static int addSlots(Consumer<Slot> slotConsumer, HeroEntity hero, int startX, int startY, int columns) {
             var capability = io.wispforest.accessories.api.AccessoriesCapability.getOptionally(hero).orElse(null);

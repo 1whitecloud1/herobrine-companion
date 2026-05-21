@@ -5,8 +5,9 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.modid.herobrine_companion.client.model.HeroModel;
-import com.whitecloud233.modid.herobrine_companion.compat.accessories.HeroAccessoriesCompat;
+import com.whitecloud233.modid.herobrine_companion.compat.accessories.HeroAccessoriesClientCompat;
 import com.whitecloud233.modid.herobrine_companion.compat.simplehats.HeroSimpleHatsCompat;
+import com.whitecloud233.modid.herobrine_companion.compat.waveycapes.HeroWaveyCapesCompat;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.world.structure.ModStructures;
 import net.minecraft.client.Minecraft;
@@ -17,6 +18,7 @@ import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.LivingEntityRenderer;
+import net.minecraft.client.renderer.entity.layers.RenderLayer;
 import net.minecraft.client.renderer.entity.layers.HumanoidArmorLayer;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.client.renderer.texture.OverlayTexture;
@@ -64,10 +66,15 @@ public class HeroRenderer extends LivingEntityRenderer<HeroEntity, PlayerModel<H
                 context.getModelManager()
         ));
 
-        HeroAccessoriesCompat.attachRenderLayer(this);
+        HeroAccessoriesClientCompat.attachRenderLayer(this);
         HeroSimpleHatsCompat.attachRenderLayer(this);
+        HeroWaveyCapesCompat.attachRenderLayer(this);
 
         // 注意：这里已经删除了之前的 HeroCustomSkinLayer，因为 AW 原生接管了。
+    }
+
+    public void addHeroRenderLayer(RenderLayer<HeroEntity, PlayerModel<HeroEntity>> layer) {
+        this.addLayer(layer);
     }
 
     @Override
