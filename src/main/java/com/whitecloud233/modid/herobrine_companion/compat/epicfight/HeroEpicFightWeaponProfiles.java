@@ -9,9 +9,6 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.ProjectileWeaponItem;
 import net.minecraft.world.item.UseAnim;
 import net.minecraftforge.registries.ForgeRegistries;
-import yesman.epicfight.api.ex_cap.core.data.BuilderEntry;
-import yesman.epicfight.api.ex_cap.core.managers.BuilderManager;
-import yesman.epicfight.gameasset.ex_cap.Builders;
 import yesman.epicfight.world.capabilities.EpicFightCapabilities;
 import yesman.epicfight.world.capabilities.entitypatch.LivingEntityPatch;
 import yesman.epicfight.world.capabilities.item.CapabilityItem;
@@ -19,6 +16,7 @@ import yesman.epicfight.world.capabilities.item.WeaponCapability;
 import yesman.epicfight.world.capabilities.item.WeaponCapabilityPresets;
 
 import java.util.Locale;
+import java.util.function.Function;
 
 public final class HeroEpicFightWeaponProfiles {
     private static volatile boolean initialized;
@@ -36,10 +34,10 @@ public final class HeroEpicFightWeaponProfiles {
         }
 
         Item poem = HerobrineCompanion.POEM_OF_THE_END.get();
-        normalProfile = buildPreset(Builders.SWORD, poem, CapabilityItem.Styles.ONE_HAND);
-        realmBreakerProfile = buildPreset(Builders.SWORD, poem, CapabilityItem.Styles.ONE_HAND);
-        thunderProfile = buildPreset(Builders.SWORD, poem, CapabilityItem.Styles.ONE_HAND);
-        voidShatterProfile = buildPreset(Builders.SWORD, poem, CapabilityItem.Styles.ONE_HAND);
+        normalProfile = buildPreset(WeaponCapabilityPresets.SWORD, poem, CapabilityItem.Styles.ONE_HAND);
+        realmBreakerProfile = buildPreset(WeaponCapabilityPresets.SWORD, poem, CapabilityItem.Styles.ONE_HAND);
+        thunderProfile = buildPreset(WeaponCapabilityPresets.SWORD, poem, CapabilityItem.Styles.ONE_HAND);
+        voidShatterProfile = buildPreset(WeaponCapabilityPresets.SWORD, poem, CapabilityItem.Styles.ONE_HAND);
         initialized = true;
     }
 
@@ -198,8 +196,8 @@ public final class HeroEpicFightWeaponProfiles {
                 || value.contains("blaster");
     }
 
-    private static WeaponCapability buildPreset(BuilderEntry builderEntry, Item item, CapabilityItem.Styles forcedStyle) {
-        WeaponCapability.Builder builder = WeaponCapabilityPresets.exCapRegistration(BuilderManager.getEntry(builderEntry.id()), item);
+    private static WeaponCapability buildPreset(Function<Item, CapabilityItem.Builder> presetFactory, Item item, CapabilityItem.Styles forcedStyle) {
+        WeaponCapability.Builder builder = (WeaponCapability.Builder) presetFactory.apply(item);
         if (forcedStyle != null) {
             builder.styleProvider(patch -> forcedStyle);
         }

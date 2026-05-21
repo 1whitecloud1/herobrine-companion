@@ -22,14 +22,38 @@ public final class HeroEpicFightCompat {
     private static final String BRIDGE_CLASS = "com.whitecloud233.modid.herobrine_companion.compat.epicfight.HeroEpicFightBridge";
     private static final String CLIENT_BRIDGE_CLASS = "com.whitecloud233.modid.herobrine_companion.compat.epicfight.HeroEpicFightClientBridge";
     private static final String WEAPON_PROFILES_CLASS = "com.whitecloud233.modid.herobrine_companion.compat.epicfight.HeroEpicFightWeaponProfiles";
+    private static final String PATCH_CLASS = "com.whitecloud233.modid.herobrine_companion.compat.epicfight.HeroEpicFightPatch";
+    private static final String NIGHTFALL_MOVESETS_CLASS = "com.whitecloud233.modid.herobrine_companion.compat.epicfight.HeroNightfallMovesets";
+    private static final String NIGHTFALL_ANIMATION_REGISTRY_CLASS = "com.whitecloud233.modid.herobrine_companion.compat.epicfight.HeroNightfallAnimationRegistry";
+    private static final String NIGHTFALL_SKILL_EFFECTS_CLASS = "com.whitecloud233.modid.herobrine_companion.compat.epicfight.HeroNightfallSkillEffects";
+    private static final String DEBUG_LOG_CLASS = "com.whitecloud233.modid.herobrine_companion.compat.epicfight.HeroEpicFightDebugLog";
+    private static final String PATCHED_HUMANOID_RENDERER_CLASS = "com.whitecloud233.modid.herobrine_companion.compat.epicfight.HeroPatchedHumanoidRenderer";
+    private static final String PATCHED_EYES_LAYER_CLASS = "com.whitecloud233.modid.herobrine_companion.compat.epicfight.HeroPatchedEyesLayer";
+    private static final String PATCHED_ITEM_IN_HAND_LAYER_CLASS = "com.whitecloud233.modid.herobrine_companion.compat.epicfight.HeroPatchedItemInHandLayer";
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final String[][] BRIDGE_PROBES = new String[][]{
             {EPIC_FIGHT_MAIN_CLASS, "yesman.epicfight.api.animation.LivingMotions", "yesman.epicfight.gameasset.Animations"},
             {"yesman.epicfight.api.forgeevent.EntityPatchRegistryEvent", "yesman.epicfight.gameasset.Armatures", "yesman.epicfight.world.capabilities.EpicFightCapabilities"},
+            {"yesman.epicfight.world.capabilities.item.WeaponCapabilityPresets", "yesman.epicfight.world.capabilities.item.WeaponCapability"},
             {"yesman.epicfight.api.ex_cap.core.managers.BuilderManager", "yesman.epicfight.gameasset.ex_cap.Builders", "yesman.epicfight.world.capabilities.item.WeaponCapability"}
     };
     private static final String[][] CLIENT_BRIDGE_PROBES = new String[][]{
             {"yesman.epicfight.api.client.forgeevent.PatchedRenderersEvent", "yesman.epicfight.client.renderer.patched.entity.PCustomHumanoidEntityRenderer", "yesman.epicfight.client.renderer.patched.layer.PatchedItemInHandLayer"}
+    };
+    private static final String[] COMMON_BRIDGE_RUNTIME_CLASSES = new String[]{
+            BRIDGE_CLASS,
+            WEAPON_PROFILES_CLASS,
+            PATCH_CLASS,
+            NIGHTFALL_MOVESETS_CLASS,
+            NIGHTFALL_ANIMATION_REGISTRY_CLASS,
+            NIGHTFALL_SKILL_EFFECTS_CLASS,
+            DEBUG_LOG_CLASS
+    };
+    private static final String[] CLIENT_BRIDGE_RUNTIME_CLASSES = new String[]{
+            CLIENT_BRIDGE_CLASS,
+            PATCHED_HUMANOID_RENDERER_CLASS,
+            PATCHED_EYES_LAYER_CLASS,
+            PATCHED_ITEM_IN_HAND_LAYER_CLASS
     };
 
     private static volatile BridgeStatus bridgeStatus = BridgeStatus.UNINITIALIZED;
@@ -68,6 +92,16 @@ public final class HeroEpicFightCompat {
             bridgeStatus = BridgeStatus.API_MISMATCH;
             bridgeInitialized = true;
             LOGGER.warn("Epic Fight is installed but its runtime API shape was not recognized. Hero will keep the fallback battle renderer without hard failure.");
+            return;
+        }
+
+        if (!preloadBridgeClasses(COMMON_BRIDGE_RUNTIME_CLASSES)) {
+            markBridgeMismatch("Epic Fight is installed, but Hero common bridge classes could not be loaded safely. Hero will keep the fallback battle renderer without hard failure.", null);
+            return;
+        }
+
+        if (FMLEnvironment.dist == Dist.CLIENT && !preloadBridgeClasses(CLIENT_BRIDGE_RUNTIME_CLASSES)) {
+            markBridgeMismatch("Epic Fight is installed, but Hero client bridge classes could not be loaded safely. Hero will keep vanilla renderer poses.", null);
             return;
         }
 
@@ -136,7 +170,7 @@ public final class HeroEpicFightCompat {
                 && hero != null
                 && hero.isBattleModeActive()
                 && isPatched(hero)
-                && HeroEpicFightWeaponProfiles.hasHeroControlledCombatAnimations(hero)
+                && hasHeroControlledCombatAnimations(hero)
                 && !hero.isInspectingScythe()
                 && !hero.isCastingThunder()
                 && !hero.isDebugAnim()
@@ -147,7 +181,7 @@ public final class HeroEpicFightCompat {
         return isRuntimeBridgeReady()
                 && hero != null
                 && hero.isBattleModeActive()
-                && HeroEpicFightWeaponProfiles.hasHeroControlledCombatAnimations(hero)
+                && hasHeroControlledCombatAnimations(hero)
                 && !hero.isInspectingScythe()
                 && !hero.isCastingThunder()
                 && !hero.isDebugAnim()
@@ -159,7 +193,7 @@ public final class HeroEpicFightCompat {
                 && hero != null
                 && hero.isBattleModeActive()
                 && isPatched(hero)
-                && HeroEpicFightWeaponProfiles.hasHeroControlledCombatAnimations(hero)
+                && hasHeroControlledCombatAnimations(hero)
                 && !hero.isInspectingScythe()
                 && !hero.isCastingThunder()
                 && !hero.isDebugAnim()
@@ -210,6 +244,28 @@ public final class HeroEpicFightCompat {
             return false;
         } catch (LinkageError error) {
             LOGGER.warn("Epic Fight class probe failed for {}", className, error);
+            return false;
+        }
+    }
+
+    private static boolean preloadBridgeClasses(String[] classNames) {
+        for (String className : classNames) {
+            if (!classLoads(className, true)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean classLoads(String className, boolean initialize) {
+        try {
+            Class.forName(className, initialize, HeroEpicFightCompat.class.getClassLoader());
+            return true;
+        } catch (ClassNotFoundException exception) {
+            LOGGER.warn("Epic Fight bridge preflight failed because {} was not found.", className, exception);
+            return false;
+        } catch (LinkageError error) {
+            LOGGER.warn("Epic Fight bridge preflight failed while loading {}", className, error);
             return false;
         }
     }
@@ -295,6 +351,16 @@ public final class HeroEpicFightCompat {
             return result instanceof Boolean patched && patched;
         } catch (ReflectiveOperationException | LinkageError exception) {
             markBridgeMismatch("Epic Fight patch lookup failed. Hero will keep fallback battle behavior.", exception);
+            return false;
+        }
+    }
+
+    private static boolean hasHeroControlledCombatAnimations(HeroEntity hero) {
+        try {
+            Object result = invokeStatic(WEAPON_PROFILES_CLASS, "hasHeroControlledCombatAnimations", new Class<?>[]{HeroEntity.class}, hero);
+            return result instanceof Boolean enabled && enabled;
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            markBridgeMismatch("Epic Fight weapon profile resolution failed. Hero will keep fallback battle behavior.", exception);
             return false;
         }
     }

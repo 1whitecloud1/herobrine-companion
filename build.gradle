@@ -31,6 +31,10 @@ archivesBaseName = "${mod_name}-${minecraft_version}-forge"
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 
+def enableAccessoriesRuntime = providers.gradleProperty("enableAccessoriesRuntime")
+        .map { it.toBoolean() }
+        .orElse(false)
+
 println "Java: ${System.getProperty 'java.version'}, JVM: ${System.getProperty 'java.vm.version'} (${System.getProperty 'java.vendor'}), Arch: ${System.getProperty 'os.arch'}"
 
 minecraft {
@@ -181,17 +185,41 @@ dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
     // compileOnly fg.deobf(files("libs/armourersworkshop-forge-1.20.1-3.2.7-beta.jar"))
-    compileOnly fg.deobf("curse.maven:epicfight-nightfall-1307848:8003764")
-   runtimeOnly fg.deobf("curse.maven:epicfight-nightfall-1307848:8003764")
+ //   compileOnly fg.deobf("curse.maven:epicfight-nightfall-1307848:8003764")
+ //  runtimeOnly fg.deobf("curse.maven:epicfight-nightfall-1307848:8003764")
 
-   compileOnly fg.deobf("com.whitecloud233.localmods:epic-fight-invincible-lib:20.14.8.2-mc1.20.1-forge")
-   runtimeOnly fg.deobf("com.whitecloud233.localmods:epic-fight-invincible-lib:20.14.8.2-mc1.20.1-forge")
+    compileOnly fg.deobf("curse.maven:accessories-938917:7164863")
+    if (enableAccessoriesRuntime.get()) {
+        runtimeOnly fg.deobf("curse.maven:accessories-938917:7164863")
+    }
 
-   compileOnly fg.deobf("curse.maven:epic-fight-avalon-1268823:7619938")
-   runtimeOnly fg.deobf("curse.maven:epic-fight-avalon-1268823:7619938")
 
-    compileOnly fg.deobf("curse.maven:epic-fight-mod-405076:7919289")
-   runtimeOnly fg.deobf("curse.maven:epic-fight-mod-405076:7919289")
+    compileOnly fg.deobf("com.whitecloud233.localmods:cloth-config-forge:11.1.136")
+    if (enableAccessoriesRuntime.get()) {
+        runtimeOnly fg.deobf("com.whitecloud233.localmods:cloth-config-forge:11.1.136")
+    }
+
+    compileOnly fg.deobf("curse.maven:simplehats-631990:7598404")
+    if (enableAccessoriesRuntime.get()) {
+        runtimeOnly fg.deobf("curse.maven:simplehats-631990:7598404")
+    }
+
+
+    compileOnly fg.deobf("com.whitecloud233.localmods:waveycapes-forge:1.9.2-mc1.20.1")
+    runtimeOnly fg.deobf("com.whitecloud233.localmods:waveycapes-forge:1.9.2-mc1.20.1")
+
+    runtimeOnly fg.deobf("com.whitecloud233.localmods:TRansition:1.0.17-1.20.1-forge-SNAPSHOT")
+    runtimeOnly fg.deobf("com.whitecloud233.localmods:TRender:1.0.12-1.20.1-forge-SNAPSHOT")
+
+
+   // compileOnly fg.deobf("com.whitecloud233.localmods:epic-fight-invincible-lib:20.14.8.2-mc1.20.1-forge")
+ //  runtimeOnly fg.deobf("com.whitecloud233.localmods:epic-fight-invincible-lib:20.14.8.2-mc1.20.1-forge")
+
+  // compileOnly fg.deobf("curse.maven:epic-fight-avalon-1268823:7619938")
+  // runtimeOnly fg.deobf("curse.maven:epic-fight-avalon-1268823:7619938")
+
+    compileOnly fg.deobf("curse.maven:epic-fight-mod-405076:8049910")
+  runtimeOnly fg.deobf("curse.maven:epic-fight-mod-405076:8049910")
 
 // 引入 Armourer's Workshop 进行测试和 API 调用 (需替换为真实的 ID)
     // 引入 Armourer's Workshop 进行测试和 API 调用 (软依赖声明)
