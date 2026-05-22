@@ -210,7 +210,7 @@ public class HeroTeleportToPlayerGoal extends Goal {
             this.hero.getNavigation().stop();
             this.hero.setDeltaMovement(0, 0, 0);
             if (this.targetPlayer != null) {
-                this.hero.getLookControl().setLookAt(this.targetPlayer, 30.0F, 30.0F);
+                this.hero.lookAtEntityIfStable(this.targetPlayer, 30.0F, 30.0F);
             }
         }
     }

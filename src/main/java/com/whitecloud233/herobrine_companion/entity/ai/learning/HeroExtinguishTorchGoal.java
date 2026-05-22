@@ -37,17 +37,9 @@ public class HeroExtinguishTorchGoal extends Goal {
 
         // [深度学习] 根据心智状态调整概率
         SimpleNeuralNetwork.MindState state = this.hero.getHeroBrain().getState();
-        int chance = 60; // 默认 1/60
+        if (state != SimpleNeuralNetwork.MindState.PRANKSTER) return false;
 
-        if (state == SimpleNeuralNetwork.MindState.PRANKSTER) {
-            chance = 10; // 恶作剧者：非常频繁 (1/10)
-        } else if (state == SimpleNeuralNetwork.MindState.OBSERVER) {
-            chance = 100; // 观察者：偶尔 (1/100)
-        } else {
-            return false; // 其他状态（如守护者、审判者）不屑于做这种小动作
-        }
-
-        if (this.hero.getRandom().nextInt(chance) != 0) return false;
+        if (this.hero.getRandom().nextInt(10) != 0) return false;
 
         this.targetTorch = findNearbyTorch();
         return this.targetTorch != null;
@@ -73,10 +65,24 @@ public class HeroExtinguishTorchGoal extends Goal {
             BlockState state = this.hero.level().getBlockState(this.targetTorch);
             if (state.is(Blocks.TORCH) || state.is(Blocks.WALL_TORCH)) {
                 this.hero.level().destroyBlock(this.targetTorch, true);
-                this.hero.level().playSound(null, this.targetTorch, SoundEvents.FIRE_EXTINGUISH, SoundSource.BLOCKS, 0.5F, 2.6F + (this.hero.level().random.nextFloat() - this.hero.level().random.nextFloat()) * 0.8F);
-                this.hero.level().addParticle(ParticleTypes.LARGE_SMOKE, this.targetTorch.getX() + 0.5, this.targetTorch.getY() + 0.5, this.targetTorch.getZ() + 0.5, 0.0, 0.0, 0.0);
+                this.hero.level().playSound(
+                        null,
+                        this.targetTorch,
+                        SoundEvents.FIRE_EXTINGUISH,
+                        SoundSource.BLOCKS,
+                        0.5F,
+                        2.6F + (this.hero.level().random.nextFloat() - this.hero.level().random.nextFloat()) * 0.8F
+                );
+                this.hero.level().addParticle(
+                        ParticleTypes.LARGE_SMOKE,
+                        this.targetTorch.getX() + 0.5D,
+                        this.targetTorch.getY() + 0.5D,
+                        this.targetTorch.getZ() + 0.5D,
+                        0.0D,
+                        0.0D,
+                        0.0D
+                );
 
-                // 【修复】：只认主人，不理路人
                 if (this.hero.getOwnerUUID() != null) {
                     Player player = this.hero.level().getPlayerByUUID(this.hero.getOwnerUUID());
                     if (player instanceof ServerPlayer serverPlayer) {

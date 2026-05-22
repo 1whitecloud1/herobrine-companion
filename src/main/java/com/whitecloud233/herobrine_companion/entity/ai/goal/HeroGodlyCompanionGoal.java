@@ -131,14 +131,14 @@ public class HeroGodlyCompanionGoal extends Goal {
         double d1 = this.owner.getZ() - this.hero.getZ();
         double distSqr = d0 * d0 + d1 * d1;
 
-        if (distSqr > 0.1D) {
+        if (distSqr > 0.1D && this.hero.getDeltaMovement().horizontalDistanceSqr() <= 0.01D) {
             float targetYRot = -((float)Mth.atan2(d0, d1)) * (180F / (float)Math.PI);
             this.hero.yBodyRot = rotlerp(this.hero.yBodyRot, targetYRot, 10.0F);
             this.hero.setYRot(this.hero.yBodyRot);
         }
 
         // 关键干扰项：由于此处强制注视主人，Hero 的 LookAngle 并不代表前进方向
-        this.hero.getLookControl().setLookAt(this.owner, 30.0F, 40.0F);
+        this.hero.lookAtEntityIfStable(this.owner, 30.0F, 40.0F);
 
         // 2. 兜底逻辑：距离过远传送
         double distToOwnerSqr = this.hero.distanceToSqr(this.owner);

@@ -63,7 +63,7 @@ public class HeroGiftPlayerGoal extends Goal {
     @Override
     public void start() {
         this.tickCounter = 0;
-        this.hero.getLookControl().setLookAt(this.owner, 30.0F, 30.0F);
+        this.hero.lookAtEntityIfStable(this.owner, 30.0F, 30.0F);
         // 播放一个提示音效
         this.hero.playSound(SoundEvents.VILLAGER_YES, 1.0F, 1.0F);
     }
@@ -71,7 +71,7 @@ public class HeroGiftPlayerGoal extends Goal {
     @Override
     public void tick() {
         if (this.owner == null) return;
-        this.hero.getLookControl().setLookAt(this.owner, 30.0F, 30.0F);
+        this.hero.lookAtEntityIfStable(this.owner, 30.0F, 30.0F);
         this.tickCounter++;
 
         if (this.tickCounter == 20) { // 1秒后扔出礼物

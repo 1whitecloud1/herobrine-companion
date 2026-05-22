@@ -39,13 +39,25 @@
   "entity.herobrine_companion.ghost_creeper": "幽灵苦力怕",
   "entity.herobrine_companion.ghost_zombie": "幽灵僵尸",
   "entity.herobrine_companion.ghost_skeleton": "幽灵骷髅",
-
+  "item.herobrine_companion.destruction_god_herobrine_spawn_egg": "不要在已经游玩的存档释放！",
+  "entity.herobrine_companion.destruction_god_herobrine": "\uff1f\uff1f\uff1f",
   "item.herobrine_companion.abyssal_gaze": "幽邃之视",
   "item.herobrine_companion.abyssal_gaze.desc": "授予永久夜视效果。",
   "item.herobrine_companion.abyssal_gaze.active": "激活",
   "item.herobrine_companion.abyssal_gaze.inactive": "未激活",
   "message.herobrine_companion.abyssal_gaze.enabled": "§b[系统] §f幽邃之视已启用。",
   "message.herobrine_companion.abyssal_gaze.disabled": "§b[系统] §f幽邃之视已禁用。",
+  "gui.herobrine_companion.mind_state": "当前状态",
+  "gui.herobrine_companion.mind_state.observer": "观察者",
+  "gui.herobrine_companion.mind_state.protector": "守护者",
+  "gui.herobrine_companion.mind_state.judge": "审判者",
+  "gui.herobrine_companion.mind_state.prankster": "恶作剧者",
+  "gui.herobrine_companion.mind_state.maintainer": "维护者",
+  "gui.herobrine_companion.mind_state.glitch_lord": "故障主",
+  "gui.herobrine_companion.mind_state.monster_king": "怪物之王",
+  "gui.herobrine_companion.mind_state.reminiscing": "追忆者",
+
+
 
   "item.herobrine_companion.source_flow": "源流涌现",
   "item.herobrine_companion.source_flow.desc": "右键使用强行迁跃至 Herobrine 身侧",

@@ -4,6 +4,8 @@ import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.ai.learning.HeroDialogueHandler;
 import com.whitecloud233.herobrine_companion.entity.ai.learning.HeroObserver;
 import com.whitecloud233.herobrine_companion.entity.ai.learning.HeroPrankHandler;
+import com.whitecloud233.herobrine_companion.entity.ai.learning.state.GlitchLordStateDefinition;
+import com.whitecloud233.herobrine_companion.entity.ai.learning.state.PranksterStateDefinition;
 import com.whitecloud233.herobrine_companion.entity.logic.HeroInteractionHandler;
 import com.whitecloud233.herobrine_companion.world.structure.ModStructures;
 import net.minecraft.core.BlockPos;
@@ -106,6 +108,8 @@ public class HeroLogic {
         HeroDialogueHandler.tick(hero);
         HeroPrankHandler.tick(hero);
         HeroObserver.tick(hero);
+        GlitchLordStateDefinition.tickPersistentState(hero);
+        PranksterStateDefinition.tickPersistentState(hero);
 
         if (hero.tickCount % 100 == 50) {
             checkPendingQuestRewards(hero);

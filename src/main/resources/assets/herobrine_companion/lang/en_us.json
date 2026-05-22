@@ -19,6 +19,19 @@
 
   "item.herobrine_companion.ghost_steve_spawn_egg": "Ghost Steve Spawn Egg",
   "entity.herobrine_companion.ghost_steve": "Ghost Steve",
+  "entity.herobrine_companion.destruction_god_herobrine": "\uff1f\uff1f\uff1f",
+  "item.herobrine_companion.destruction_god_herobrine_spawn_egg": "Do not release in a saved game that has already been played",
+
+  "gui.herobrine_companion.mind_state": "Mind State",
+  "gui.herobrine_companion.mind_state.observer": "Observer",
+  "gui.herobrine_companion.mind_state.protector": "Protector",
+  "gui.herobrine_companion.mind_state.judge": "Judge",
+  "gui.herobrine_companion.mind_state.prankster": "Prankster",
+  "gui.herobrine_companion.mind_state.maintainer": "Maintainer",
+  "gui.herobrine_companion.mind_state.glitch_lord": "Glitch Lord",
+  "gui.herobrine_companion.mind_state.monster_king": "Monster King",
+  "gui.herobrine_companion.mind_state.reminiscing": "Reminiscing",
+
 
   "item.herobrine_companion.soul_bound_pact": "Soul Bound Pact",
   "item.herobrine_companion.soul_bound_pact.desc": "A pact bound to your soul. When active, items and XP are preserved upon death.",

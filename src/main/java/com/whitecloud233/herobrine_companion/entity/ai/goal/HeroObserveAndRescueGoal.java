@@ -115,8 +115,8 @@ public class HeroObserveAndRescueGoal extends Goal {
         if (this.targetPlayer == null || !this.targetPlayer.isAlive()) return;
         boolean isCompanionOwner = isOwner(this.targetPlayer);
 
-        // 1. 始终高冷注视
-        this.hero.getLookControl().setLookAt(this.targetPlayer, 10.0F, this.hero.getMaxHeadXRot());
+        // 1. 始终高冷注视，但移动中的头部不要和 MoveControl 抢朝向
+        this.hero.lookAtEntityIfStable(this.targetPlayer, 10.0F, this.hero.getMaxHeadXRot());
 
         // 2. 【绝对实时的平滑排斥系统】
         double distanceSq = this.hero.distanceToSqr(this.targetPlayer);
