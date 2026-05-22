@@ -72,6 +72,7 @@ java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
 def epicFightArtifact = "curse.maven:epic-fight-mod-405076:${project.epicfight_file_id}"
 def enableEpicFightDevRuntime = project.findProperty("enable_epicfight_dev_runtime")?.toString()?.toBoolean() ?: false
+def waveyCapesLocalJar = file("libs/waveycapes-neoforge-1.9.2-mc1.21.1.jar")
 
 neoForge {
     version = project.neo_version
@@ -141,8 +142,11 @@ dependencies {
     compileOnly "dev.latvian.mods:rhino:2101.+"
     runtimeOnly "dev.latvian.mods:rhino:2101.+"
 
-    compileOnly "curse.maven:epic-fight-mod-405076:7956628"
-    runtimeOnly "curse.maven:epic-fight-mod-405076:7956628"
+    compileOnly epicFightArtifact
+    runtimeOnly epicFightArtifact
+
+
+    runtimeOnly files(waveyCapesLocalJar)
 
     compileOnly "curse.maven:accessories-mod-938917:7583320"
     runtimeOnly "curse.maven:accessories-mod-938917:7583320"

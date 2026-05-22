@@ -6,8 +6,10 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.logging.LogUtils;
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.client.model.HeroModel;
+import com.whitecloud233.herobrine_companion.compat.accessories.HeroAccessoriesClientCompat;
 import com.whitecloud233.herobrine_companion.compat.accessories.HeroAccessoriesCompat;
 import com.whitecloud233.herobrine_companion.compat.simplehats.HeroSimpleHatsCompat;
+import com.whitecloud233.herobrine_companion.compat.waveycapes.HeroWaveyCapesCompat;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.world.structure.ModStructures;
 import com.whitecloud233.herobrine_companion.compat.ArmourerWorkshop.HeroAWCompat;
@@ -19,6 +21,7 @@ import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.client.renderer.entity.layers.HumanoidArmorLayer;
+import net.minecraft.client.renderer.entity.layers.RenderLayer;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.network.chat.Component;
@@ -67,8 +70,9 @@ public class HeroRenderer extends LivingEntityRenderer<HeroEntity, PlayerModel<H
                 new net.minecraft.client.model.HumanoidModel<>(context.bakeLayer(ModelLayers.PLAYER_OUTER_ARMOR)),
                 context.getModelManager()
         ));
-        HeroAccessoriesCompat.attachRenderLayer(this);
+        HeroAccessoriesClientCompat.attachRenderLayer(this);
         HeroSimpleHatsCompat.attachRenderLayer(this);
+        HeroWaveyCapesCompat.attachRenderLayer(this);
 
     }
 
@@ -78,6 +82,10 @@ public class HeroRenderer extends LivingEntityRenderer<HeroEntity, PlayerModel<H
     // =========================================================
     // [光影兼容版] 混合型雷达：主动伪装 + 深度调用栈监听
     // =========================================================
+    public void addHeroRenderLayer(RenderLayer<HeroEntity, PlayerModel<HeroEntity>> layer) {
+        this.addLayer(layer);
+    }
+
     @Override
     public PlayerModel<HeroEntity> getModel() {
         // 1. 主动伪装：专门解决武器渲染（由 HeroHeldItemLayer 触发）

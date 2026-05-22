@@ -301,6 +301,39 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         if (vehicle != null) this.yBodyRot = vehicle.getYRot();
     }
 
+    public void alignHeadToBody() {
+        float bodyYaw = this.getYRot();
+        this.setYHeadRot(bodyYaw);
+        this.yHeadRot = bodyYaw;
+        this.yHeadRotO = bodyYaw;
+    }
+
+    public boolean shouldSuppressFreeLookWhileMoving() {
+        if (this.isBattleModeActive() || this.getEntityData().get(IS_CHALLENGE_ACTIVE) || this.getTarget() != null) {
+            return false;
+        }
+        return this.getDeltaMovement().horizontalDistanceSqr() > 0.01D;
+    }
+
+    public void lookAtEntityIfStable(Entity target, float yMaxRot, float xMaxRot) {
+        if (target == null) {
+            return;
+        }
+        if (this.shouldSuppressFreeLookWhileMoving()) {
+            this.alignHeadToBody();
+            return;
+        }
+        this.getLookControl().setLookAt(target, yMaxRot, xMaxRot);
+    }
+
+    public void lookAtPositionIfStable(double x, double y, double z, float yMaxRot, float xMaxRot) {
+        if (this.shouldSuppressFreeLookWhileMoving()) {
+            this.alignHeadToBody();
+            return;
+        }
+        this.getLookControl().setLookAt(x, y, z, yMaxRot, xMaxRot);
+    }
+
     @Override
     public InteractionResult mobInteract(Player player, InteractionHand hand) {
         // 【新增】：核心权限拦截逻辑

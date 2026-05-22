@@ -41,12 +41,6 @@ public class HeroAccessoriesCompat {
         return ModList.get().isLoaded("accessories");
     }
 
-    public static void attachRenderLayer(HeroRenderer renderer) {
-        if (!isLoaded() || renderer == null) {
-            return;
-        }
-        AccessoriesSafeInvoker.attachRenderLayer(renderer);
-    }
 
     public static int addSlots(Consumer<Slot> slotConsumer, HeroEntity hero, int startX, int startY, int columns) {
         if (!isLoaded() || slotConsumer == null || hero == null || columns <= 0) {
@@ -70,10 +64,6 @@ public class HeroAccessoriesCompat {
     }
 
     private static class AccessoriesSafeInvoker {
-
-        static void attachRenderLayer(LivingEntityRenderer<HeroEntity, PlayerModel<HeroEntity>> renderer) {
-            renderer.addLayer(new io.wispforest.accessories.client.AccessoriesRenderLayer<>(renderer));
-        }
 
         static int addSlots(Consumer<Slot> slotConsumer, HeroEntity hero, int startX, int startY, int columns) {
             var capability = io.wispforest.accessories.api.AccessoriesCapability.getOptionally(hero).orElse(null);
