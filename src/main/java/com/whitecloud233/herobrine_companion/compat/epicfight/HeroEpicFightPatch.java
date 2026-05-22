@@ -22,7 +22,6 @@ import yesman.epicfight.api.animation.types.AttackAnimation;
 import yesman.epicfight.api.animation.types.StaticAnimation;
 import yesman.epicfight.api.asset.AssetAccessor;
 import yesman.epicfight.api.client.animation.ClientAnimator;
-import yesman.epicfight.api.ex_cap.modules.core.data.MoveSet;
 import yesman.epicfight.gameasset.Animations;
 import yesman.epicfight.main.EpicFightSharedConstants;
 import yesman.epicfight.network.EpicFightNetworkManager;
@@ -522,8 +521,9 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
             return null;
         }
 
-        MoveSet moveSet = weaponCapability.getCurrentSet(this);
-        if (moveSet == null || moveSet.getComboAttackAnimations().isEmpty()) {
+        Object moveSet = weaponCapability.getCurrentSet(this);
+        List<AnimationManager.AnimationAccessor<? extends AttackAnimation>> moveSetAnimations = getComboAttackAnimations(moveSet);
+        if (moveSetAnimations.isEmpty()) {
             return null;
         }
 
@@ -532,7 +532,7 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
         List<AnimationManager.AnimationAccessor<? extends StaticAnimation>> dashAnimations = new ArrayList<>();
         List<AnimationManager.AnimationAccessor<? extends StaticAnimation>> airAnimations = new ArrayList<>();
 
-        for (AnimationManager.AnimationAccessor<? extends AttackAnimation> animation : moveSet.getComboAttackAnimations()) {
+        for (AnimationManager.AnimationAccessor<? extends AttackAnimation> animation : moveSetAnimations) {
             if (animation == null) {
                 continue;
             }
@@ -572,6 +572,23 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
                 dashMaxDistance,
                 airMaxDistance
         );
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<AnimationManager.AnimationAccessor<? extends AttackAnimation>> getComboAttackAnimations(Object moveSet) {
+        if (moveSet == null) {
+            return List.of();
+        }
+
+        try {
+            Object result = moveSet.getClass().getMethod("getComboAttackAnimations").invoke(moveSet);
+            if (result instanceof List<?> animations) {
+                return (List<AnimationManager.AnimationAccessor<? extends AttackAnimation>>) animations;
+            }
+        } catch (ReflectiveOperationException | LinkageError ignored) {
+        }
+
+        return List.of();
     }
 
     private boolean isDashAttackAnimation(AnimationManager.AnimationAccessor<? extends StaticAnimation> animation) {

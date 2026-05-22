@@ -5,22 +5,34 @@ import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.item.PoemOfTheEndItem;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.AxeItem;
+import net.minecraft.world.item.HoeItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.PickaxeItem;
 import net.minecraft.world.item.ProjectileWeaponItem;
+import net.minecraft.world.item.ShovelItem;
+import net.minecraft.world.item.SwordItem;
+import net.minecraft.world.item.TridentItem;
 import net.minecraft.world.item.UseAnim;
-import yesman.epicfight.api.ex_cap.modules.core.data.BuilderEntry;
-import yesman.epicfight.api.ex_cap.modules.core.managers.BuilderManager;
-import yesman.epicfight.api.ex_cap.modules.assets.Builders;
 import yesman.epicfight.world.capabilities.EpicFightCapabilities;
 import yesman.epicfight.world.capabilities.entitypatch.LivingEntityPatch;
 import yesman.epicfight.world.capabilities.item.CapabilityItem;
+import yesman.epicfight.world.capabilities.item.Style;
 import yesman.epicfight.world.capabilities.item.WeaponCapability;
-import yesman.epicfight.world.capabilities.item.WeaponCapabilityPresets;
+import yesman.epicfight.world.capabilities.item.WeaponCategory;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class HeroEpicFightWeaponProfiles {
+    private static final String LEGACY_BUILDERS_CLASS = "yesman.epicfight.api.ex_cap.modules.assets.Builders";
+    private static final String LEGACY_BUILDER_MANAGER_CLASS = "yesman.epicfight.api.ex_cap.modules.core.managers.BuilderManager";
+    private static final Map<String, WeaponCapability> FALLBACK_PROFILES = new ConcurrentHashMap<>();
     private static volatile boolean initialized;
     private static WeaponCapability normalProfile;
     private static WeaponCapability realmBreakerProfile;
@@ -36,10 +48,10 @@ public final class HeroEpicFightWeaponProfiles {
         }
 
         Item poem = HerobrineCompanion.POEM_OF_THE_END.get();
-        normalProfile = buildPreset(Builders.SWORD, poem, CapabilityItem.Styles.ONE_HAND);
-        realmBreakerProfile = buildPreset(Builders.SWORD, poem, CapabilityItem.Styles.ONE_HAND);
-        thunderProfile = buildPreset(Builders.SWORD, poem, CapabilityItem.Styles.ONE_HAND);
-        voidShatterProfile = buildPreset(Builders.SWORD, poem, CapabilityItem.Styles.ONE_HAND);
+        normalProfile = buildProfile("SWORD", poem, Items.DIAMOND_SWORD, CapabilityItem.WeaponCategories.SWORD, CapabilityItem.Styles.ONE_HAND);
+        realmBreakerProfile = buildProfile("GREATSWORD", poem, null, CapabilityItem.WeaponCategories.GREATSWORD, CapabilityItem.Styles.TWO_HAND);
+        thunderProfile = buildProfile("SPEAR", poem, null, CapabilityItem.WeaponCategories.SPEAR, CapabilityItem.Styles.TWO_HAND);
+        voidShatterProfile = buildProfile("DAGGER", poem, null, CapabilityItem.WeaponCategories.DAGGER, CapabilityItem.Styles.ONE_HAND);
         initialized = true;
     }
 
@@ -71,7 +83,12 @@ public final class HeroEpicFightWeaponProfiles {
         }
 
         CapabilityItem capability = EpicFightCapabilities.getItemStackCapability(stack);
-        return capability != null ? capability : CapabilityItem.EMPTY;
+        if (capability != null && !capability.isEmpty()) {
+            return capability;
+        }
+
+        CapabilityItem inferredCapability = inferCapability(stack);
+        return inferredCapability != null ? inferredCapability : CapabilityItem.EMPTY;
     }
 
     public static boolean isRangedLoadout(HeroEntity hero) {
@@ -191,12 +208,163 @@ public final class HeroEpicFightWeaponProfiles {
                 || value.contains("blaster");
     }
 
-    private static WeaponCapability buildPreset(BuilderEntry builderEntry, Item item, CapabilityItem.Styles forcedStyle) {
-        WeaponCapability.Builder builder = WeaponCapabilityPresets.exCapRegistration(BuilderManager.getEntry(builderEntry.id()), item);
+    private static WeaponCapability buildProfile(String legacyBuilderField,
+                                                 Item item,
+                                                 Item sampleItem,
+                                                 WeaponCategory fallbackCategory,
+                                                 Style forcedStyle) {
+        WeaponCapability profile = tryBuildLegacyPreset(legacyBuilderField, item, forcedStyle);
+        if (profile != null) {
+            return profile;
+        }
+
+        profile = tryCopySampleCapability(sampleItem);
+        if (profile != null) {
+            return profile;
+        }
+
+        WeaponCapability.Builder builder = WeaponCapability.builder();
+        builder.category(fallbackCategory);
         if (forcedStyle != null) {
             builder.styleProvider(patch -> forcedStyle);
         }
         return (WeaponCapability) builder.build();
+    }
+
+    private static WeaponCapability tryBuildLegacyPreset(String legacyBuilderField, Item item, Style forcedStyle) {
+        try {
+            ClassLoader classLoader = HeroEpicFightWeaponProfiles.class.getClassLoader();
+            Class<?> buildersClass = Class.forName(LEGACY_BUILDERS_CLASS, false, classLoader);
+            Class<?> builderManagerClass = Class.forName(LEGACY_BUILDER_MANAGER_CLASS, false, classLoader);
+
+            Field builderField = buildersClass.getField(legacyBuilderField);
+            Object builderEntry = builderField.get(null);
+            if (builderEntry == null) {
+                return null;
+            }
+
+            Method idMethod = builderEntry.getClass().getMethod("id");
+            Object builderId = idMethod.invoke(builderEntry);
+            if (!(builderId instanceof ResourceLocation id)) {
+                return null;
+            }
+
+            Method getEntryMethod = builderManagerClass.getMethod("getEntry", ResourceLocation.class);
+            Object entry = getEntryMethod.invoke(null, id);
+            if (entry == null) {
+                return null;
+            }
+
+            Method exCapRegistrationMethod = findMethod(
+                    "yesman.epicfight.world.capabilities.item.WeaponCapabilityPresets",
+                    "exCapRegistration",
+                    java.util.Map.Entry.class,
+                    Item.class
+            );
+            if (exCapRegistrationMethod == null) {
+                return null;
+            }
+
+            Object builderObject = exCapRegistrationMethod.invoke(null, entry, item);
+            if (!(builderObject instanceof WeaponCapability.Builder builder)) {
+                return null;
+            }
+
+            if (forcedStyle != null) {
+                builder.styleProvider(patch -> forcedStyle);
+            }
+            return (WeaponCapability) builder.build();
+        } catch (ReflectiveOperationException | LinkageError ignored) {
+            return null;
+        }
+    }
+
+    private static WeaponCapability tryCopySampleCapability(Item sampleItem) {
+        if (sampleItem == null) {
+            return null;
+        }
+
+        CapabilityItem capability = EpicFightCapabilities.getItemStackCapability(new ItemStack(sampleItem));
+        return capability instanceof WeaponCapability weaponCapability ? weaponCapability : null;
+    }
+
+    private static CapabilityItem inferCapability(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return null;
+        }
+
+        Item item = stack.getItem();
+        ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(item);
+        String path = itemId != null ? itemId.getPath().toLowerCase(Locale.ROOT) : "";
+
+        if (item instanceof TridentItem || containsAny(path, "trident")) {
+            return getOrCreateFallbackProfile("TRIDENT", CapabilityItem.WeaponCategories.TRIDENT, CapabilityItem.Styles.TWO_HAND);
+        }
+        if (item instanceof SwordItem) {
+            return getOrCreateFallbackProfile("SWORD", CapabilityItem.WeaponCategories.SWORD, CapabilityItem.Styles.ONE_HAND);
+        }
+        if (item instanceof AxeItem) {
+            return getOrCreateFallbackProfile("AXE", CapabilityItem.WeaponCategories.AXE, CapabilityItem.Styles.ONE_HAND);
+        }
+        if (item instanceof PickaxeItem) {
+            return getOrCreateFallbackProfile("PICKAXE", CapabilityItem.WeaponCategories.PICKAXE, CapabilityItem.Styles.ONE_HAND);
+        }
+        if (item instanceof ShovelItem) {
+            return getOrCreateFallbackProfile("SHOVEL", CapabilityItem.WeaponCategories.SHOVEL, CapabilityItem.Styles.ONE_HAND);
+        }
+        if (item instanceof HoeItem) {
+            return getOrCreateFallbackProfile("HOE", CapabilityItem.WeaponCategories.HOE, CapabilityItem.Styles.ONE_HAND);
+        }
+        if (containsAny(path, "greatsword", "claymore", "zweihander")) {
+            return getOrCreateFallbackProfile("GREATSWORD", CapabilityItem.WeaponCategories.GREATSWORD, CapabilityItem.Styles.TWO_HAND);
+        }
+        if (containsAny(path, "longsword")) {
+            return getOrCreateFallbackProfile("LONGSWORD", CapabilityItem.WeaponCategories.LONGSWORD, CapabilityItem.Styles.TWO_HAND);
+        }
+        if (containsAny(path, "spear", "pike", "halberd", "glaive", "lance")) {
+            return getOrCreateFallbackProfile("SPEAR", CapabilityItem.WeaponCategories.SPEAR, CapabilityItem.Styles.TWO_HAND);
+        }
+        if (containsAny(path, "dagger", "knife")) {
+            return getOrCreateFallbackProfile("DAGGER", CapabilityItem.WeaponCategories.DAGGER, CapabilityItem.Styles.ONE_HAND);
+        }
+        if (containsAny(path, "tachi")) {
+            return getOrCreateFallbackProfile("TACHI", CapabilityItem.WeaponCategories.TACHI, CapabilityItem.Styles.TWO_HAND);
+        }
+        if (containsAny(path, "uchigatana", "katana")) {
+            return getOrCreateFallbackProfile("UCHIGATANA", CapabilityItem.WeaponCategories.UCHIGATANA, CapabilityItem.Styles.ONE_HAND);
+        }
+        if (containsAny(path, "fist", "gauntlet", "claw")) {
+            return getOrCreateFallbackProfile("FIST", CapabilityItem.WeaponCategories.FIST, CapabilityItem.Styles.ONE_HAND);
+        }
+
+        return null;
+    }
+
+    private static WeaponCapability getOrCreateFallbackProfile(String key, WeaponCategory category, Style style) {
+        return FALLBACK_PROFILES.computeIfAbsent(key + "|" + style, ignored -> {
+            WeaponCapability.Builder builder = WeaponCapability.builder();
+            builder.category(category);
+            builder.styleProvider(patch -> style);
+            return (WeaponCapability) builder.build();
+        });
+    }
+
+    private static boolean containsAny(String value, String... tokens) {
+        for (String token : tokens) {
+            if (value.contains(token)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static Method findMethod(String className, String methodName, Class<?>... parameterTypes) {
+        try {
+            Class<?> type = Class.forName(className, false, HeroEpicFightWeaponProfiles.class.getClassLoader());
+            return type.getMethod(methodName, parameterTypes);
+        } catch (ReflectiveOperationException | LinkageError ignored) {
+            return null;
+        }
     }
 }
 

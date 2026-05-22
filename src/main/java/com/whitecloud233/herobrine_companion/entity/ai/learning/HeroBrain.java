@@ -170,6 +170,7 @@ public class HeroBrain {
     public SimpleNeuralNetwork.MindState getState() { return getCurrentNetwork().getCurrentState(); }
     public SimpleNeuralNetwork.MindState getCurrentState() { return getState(); }
     public String getDebugInfo() { return getCurrentNetwork().getDebugInfo(); }
+    public void forceState(SimpleNeuralNetwork.MindState state) { getCurrentNetwork().forceState(state, hero.level().getGameTime()); }
 
     public void save(CompoundTag tag) {
         ListTag networksTag = new ListTag();
