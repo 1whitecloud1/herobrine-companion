@@ -102,6 +102,11 @@ public class LLMConfig {
         }
     }
 
+    public enum EndpointFormat {
+        OPENAI_COMPAT,
+        ANTHROPIC
+    }
+
     // 静态变量
     public static Provider aiProvider = Provider.QINIU_CLOUD;
     private static String aiProviderId = Provider.QINIU_CLOUD.getId();
@@ -187,6 +192,10 @@ public class LLMConfig {
             return normalizeEndpoint(aiEndpoint);
         }
         return provider.getEndpoint();
+    }
+
+    public static EndpointFormat getResolvedEndpointFormat() {
+        return detectEndpointFormat(getResolvedEndpoint());
     }
 
     public static String getResolvedModel() {
@@ -385,6 +394,14 @@ public class LLMConfig {
 
     private static String normalizeEndpoint(String endpoint) {
         return endpoint == null ? "" : endpoint.trim();
+    }
+
+    public static EndpointFormat detectEndpointFormat(String endpoint) {
+        String normalized = normalizeEndpoint(endpoint).toLowerCase(Locale.ROOT);
+        if (normalized.contains("anthropic.com") || normalized.endsWith("/v1/messages") || normalized.contains("/v1/messages?")) {
+            return EndpointFormat.ANTHROPIC;
+        }
+        return EndpointFormat.OPENAI_COMPAT;
     }
 
     private static class ConfigData {

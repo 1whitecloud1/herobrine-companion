@@ -6,12 +6,14 @@ import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.event.HeroRewards;
 import com.whitecloud233.modid.herobrine_companion.event.HeroTrades;
 import com.whitecloud233.modid.herobrine_companion.event.ModEvents;
+import com.whitecloud233.modid.herobrine_companion.item.LoreFragmentItem;
 import mezz.jei.api.IModPlugin;
 import mezz.jei.api.JeiPlugin;
 import mezz.jei.api.registration.IRecipeCatalystRegistration;
 import mezz.jei.api.registration.IRecipeCategoryRegistration;
 import mezz.jei.api.registration.IRecipeRegistration;
 import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.trading.MerchantOffer;
@@ -62,6 +64,8 @@ public class HerobrineJeiPlugin implements IModPlugin {
         
         LOGGER.info("Registering {} Hero Rewards to JEI.", HeroRewards.REWARDS.size());
         registration.addRecipes(HeroRewardCategory.RECIPE_TYPE, HeroRewards.REWARDS);
+        registerGhostDropInfo(registration);
+        registerTreasureInfo(registration);
     }
 
     @Override
@@ -72,5 +76,57 @@ public class HerobrineJeiPlugin implements IModPlugin {
         // 奖励配方催化剂: TAB_ICON 和 HERO_SHELTER
         registration.addRecipeCatalyst(new ItemStack(HerobrineCompanion.TAB_ICON.get()), HeroRewardCategory.RECIPE_TYPE);
         registration.addRecipeCatalyst(new ItemStack(HerobrineCompanion.HERO_SHELTER.get()), HeroRewardCategory.RECIPE_TYPE);
+    }
+
+    private static void registerGhostDropInfo(IRecipeRegistration registration) {
+        registration.addItemStackInfo(
+                new ItemStack(HerobrineCompanion.CORRUPTED_CODE.get()),
+                Component.translatable("jei.herobrine_companion.drop.from", Component.translatable("entity.herobrine_companion.ghost_zombie")),
+                Component.translatable("jei.herobrine_companion.drop.amount.1_2_looting")
+        );
+
+        registration.addItemStackInfo(
+                new ItemStack(HerobrineCompanion.VOID_MARROW.get()),
+                Component.translatable("jei.herobrine_companion.drop.from", Component.translatable("entity.herobrine_companion.ghost_skeleton")),
+                Component.translatable("jei.herobrine_companion.drop.amount.1_2_looting")
+        );
+
+        registration.addItemStackInfo(
+                new ItemStack(HerobrineCompanion.UNSTABLE_GUNPOWDER.get()),
+                Component.translatable("jei.herobrine_companion.drop.from", Component.translatable("entity.herobrine_companion.ghost_creeper")),
+                Component.translatable("jei.herobrine_companion.drop.amount.1_2_looting")
+        );
+
+        registration.addItemStackInfo(
+                new ItemStack(HerobrineCompanion.SOURCE_CODE_FRAGMENT.get()),
+                Component.translatable("jei.herobrine_companion.drop.from", Component.translatable("entity.herobrine_companion.ghost_steve"))
+        );
+
+        registration.addItemStackInfo(
+                new ItemStack(HerobrineCompanion.GLITCH_FRAGMENT.get()),
+                Component.translatable("jei.herobrine_companion.drop.from", Component.translatable("jei.herobrine_companion.drop.ghost_trio")),
+                Component.translatable("jei.herobrine_companion.drop.chance.5")
+        );
+
+        registration.addItemStackInfo(
+                createLoreFragmentStack("fragment_5"),
+                Component.translatable("jei.herobrine_companion.drop.from", Component.translatable("jei.herobrine_companion.drop.ghost_trio")),
+                Component.translatable("jei.herobrine_companion.drop.fragment_5_only"),
+                Component.translatable("jei.herobrine_companion.drop.chance.10")
+        );
+    }
+
+    private static ItemStack createLoreFragmentStack(String fragmentId) {
+        ItemStack stack = new ItemStack(HerobrineCompanion.LORE_FRAGMENT.get());
+        stack.getOrCreateTag().putString(LoreFragmentItem.LORE_ID_KEY, fragmentId);
+        return stack;
+    }
+
+    private static void registerTreasureInfo(IRecipeRegistration registration) {
+        registration.addItemStackInfo(
+                new ItemStack(HerobrineCompanion.ETERNAL_KEY.get()),
+                Component.translatable("jei.herobrine_companion.source.from_chests"),
+                Component.translatable("jei.herobrine_companion.source.eternal_key_chests")
+        );
     }
 }

@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.client.model;
 
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.modid.herobrine_companion.compat.cooking.HeroCookingCompat;
 import com.whitecloud233.modid.herobrine_companion.compat.epicfight.HeroEpicFightCompat;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.HeroCombatWeaponHelper;
@@ -15,7 +16,9 @@ import net.minecraft.client.model.geom.builders.*;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.HumanoidArm;
+import net.minecraft.world.item.ItemStack;
 import com.mojang.blaze3d.vertex.PoseStack;
+import net.minecraftforge.registries.ForgeRegistries;
 
 public class HeroModel extends PlayerModel<HeroEntity> {
 
@@ -200,6 +203,11 @@ public class HeroModel extends PlayerModel<HeroEntity> {
             return;
         }
 
+        if (isCookingPoseActive(entity)) {
+            setupCookAnim(entity, ageInTicks);
+            return;
+        }
+
         float partialTick = ageInTicks - entity.tickCount;
         float floatAmount = entity.getFloatingAmount(partialTick);
 
@@ -264,6 +272,83 @@ public class HeroModel extends PlayerModel<HeroEntity> {
         com.whitecloud233.modid.herobrine_companion.client.fight.animation.HeroChallengeAnimations.setupChallengeAnims(this, entity, ageInTicks);
 
         copyAllModelProperties();
+    }
+
+    private boolean isCookingPoseActive(HeroEntity entity) {
+        if (entity.getInvitedAction() != HeroCookingCompat.INVITED_ACTION_COOK || entity.getInvitedPos() == null) {
+            return false;
+        }
+
+        if (!HeroCookingCompat.isCookwareStation(entity.level(), entity.getInvitedPos())) {
+            return false;
+        }
+
+        return entity.distanceToSqr(entity.getInvitedPos().getX() + 0.5D,
+                entity.getInvitedPos().getY() + 0.5D,
+                entity.getInvitedPos().getZ() + 0.5D) <= 9.0D;
+    }
+
+    private void setupCookAnim(HeroEntity entity, float ageInTicks) {
+        ItemStack mainDisplay = HeroCookingCompat.getCookMainHandDisplay(entity);
+        ItemStack offDisplay = HeroCookingCompat.getCookOffhandDisplay(entity);
+        String mainPath = getItemPath(mainDisplay);
+        boolean chopping = mainPath.contains("knife");
+        boolean stirring = mainPath.contains("shovel");
+        boolean pouring = !offDisplay.isEmpty();
+
+        float phase = ageInTicks * (chopping ? 0.95F : 0.38F);
+        float primarySwing = Mth.sin(phase);
+        float secondarySwing = Mth.sin(phase * 0.55F + 0.7F);
+        float lift = Mth.cos(phase * 0.5F) * 0.05F;
+
+        this.body.xRot = -0.12F;
+        this.body.yRot *= 0.35F;
+        this.head.xRot = Mth.lerp(0.7F, this.head.xRot, -0.42F + lift);
+        this.head.yRot *= 0.45F;
+        this.head.zRot = 0.0F;
+
+        this.rightArm.yRot = chopping ? -0.14F : -0.28F;
+        this.rightArm.zRot = chopping ? 0.10F : 0.16F + primarySwing * 0.08F;
+        this.rightArm.xRot = chopping
+                ? -1.75F + Mth.sin(phase) * 0.70F
+                : -1.05F + primarySwing * 0.24F + lift;
+        this.rightArmLower.xRot = chopping ? -0.12F : -0.18F;
+        this.rightArmLower.yRot = 0.0F;
+        this.rightArmLower.zRot = 0.0F;
+
+        if (pouring) {
+            this.leftArm.xRot = -0.90F + secondarySwing * 0.06F;
+            this.leftArm.yRot = 0.18F;
+            this.leftArm.zRot = -0.20F;
+            this.leftArmLower.xRot = -0.10F;
+        } else if (stirring) {
+            this.leftArm.xRot = -0.48F + secondarySwing * 0.10F;
+            this.leftArm.yRot = 0.20F;
+            this.leftArm.zRot = -0.16F;
+            this.leftArmLower.xRot = -0.14F;
+        } else {
+            this.leftArm.xRot = -0.34F + secondarySwing * 0.08F;
+            this.leftArm.yRot = 0.12F;
+            this.leftArm.zRot = -0.10F;
+            this.leftArmLower.xRot = -0.08F;
+        }
+        this.leftArmLower.yRot = 0.0F;
+        this.leftArmLower.zRot = 0.0F;
+
+        this.rightLeg.xRot = 0.04F;
+        this.leftLeg.xRot = -0.04F;
+        this.rightLeg.zRot = 0.02F;
+        this.leftLeg.zRot = -0.02F;
+
+        copyAllModelProperties();
+    }
+
+    private String getItemPath(ItemStack stack) {
+        if (stack.isEmpty()) {
+            return "";
+        }
+        ResourceLocation itemId = ForgeRegistries.ITEMS.getKey(stack.getItem());
+        return itemId == null ? "" : itemId.getPath();
     }
 
     private void setupBattleModeAnim(HeroEntity entity, float limbSwing, float limbSwingAmount, float ageInTicks) {
@@ -586,9 +671,11 @@ public class HeroModel extends PlayerModel<HeroEntity> {
 
     @Override
     public void translateToHand(HumanoidArm arm, PoseStack poseStack) {
+        translateToUpperArm(arm, poseStack);
+    }
+
+    public void translateToUpperArm(HumanoidArm arm, PoseStack poseStack) {
         ModelPart upperArm = arm == HumanoidArm.RIGHT ? this.rightArm : this.leftArm;
-        ModelPart lowerArm = arm == HumanoidArm.RIGHT ? this.rightArmLower : this.leftArmLower;
         upperArm.translateAndRotate(poseStack);
-        lowerArm.translateAndRotate(poseStack);
     }
 }

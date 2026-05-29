@@ -6,6 +6,8 @@ import com.whitecloud233.modid.herobrine_companion.entity.ai.HeroAI;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.HeroBrain;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.SimpleNeuralNetwork;
 import com.whitecloud233.modid.herobrine_companion.entity.logic.*;
+import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.state.ObserverStateDefinition;
+
 import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroDataHandler;
 import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroDimensionHandler;
 import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroLogic;
@@ -882,7 +884,13 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         SimpleNeuralNetwork.MindState[] states = SimpleNeuralNetwork.MindState.values();
         return (index >= 0 && index < states.length) ? states[index] : SimpleNeuralNetwork.MindState.OBSERVER;
     }
-    public void setMindState(SimpleNeuralNetwork.MindState state) { this.entityData.set(MIND_STATE, state.ordinal()); }
+    public void setMindState(SimpleNeuralNetwork.MindState state) {
+        SimpleNeuralNetwork.MindState previousState = this.getMindState();
+        if (previousState == SimpleNeuralNetwork.MindState.OBSERVER && state != SimpleNeuralNetwork.MindState.OBSERVER) {
+            ObserverStateDefinition.clearObserverInvisibility(this);
+        }
+        this.entityData.set(MIND_STATE, state.ordinal());
+    }
 
     public boolean hasClaimedReward(int id) {
         if (!this.level().isClientSide && this.level() instanceof ServerLevel serverLevel && getOwnerUUID() != null) {

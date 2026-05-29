@@ -1,6 +1,8 @@
 package com.whitecloud233.modid.herobrine_companion.network;
 
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.modid.herobrine_companion.compat.cooking.OpenCookSelectionPacket;
+import com.whitecloud233.modid.herobrine_companion.compat.cooking.SelectCookOptionPacket;
 import com.whitecloud233.modid.herobrine_companion.destructiongod.network.DestructionGodFaultSplitPacket;
 import com.whitecloud233.modid.herobrine_companion.destructiongod.network.DestructionGodLightningArcPacket;
 import com.whitecloud233.modid.herobrine_companion.destructiongod.network.DestructionGodLightningPacket;
@@ -91,6 +93,10 @@ public class PacketHandler {
                 TeleportToHeroPacket::toBytes, TeleportToHeroPacket::new, TeleportToHeroPacket::handle);
         INSTANCE.registerMessage(id++, HeroPunishmentPacket.class,
                 HeroPunishmentPacket::encode, HeroPunishmentPacket::new, HeroPunishmentPacket::handle);
+        INSTANCE.registerMessage(id++, OpenCookSelectionPacket.class,
+                OpenCookSelectionPacket::encode, OpenCookSelectionPacket::new, OpenCookSelectionPacket::handle);
+        INSTANCE.registerMessage(id++, SelectCookOptionPacket.class,
+                SelectCookOptionPacket::encode, SelectCookOptionPacket::new, SelectCookOptionPacket::handle);
         INSTANCE.registerMessage(id++, OpenHeroChatPacket.class,
                 OpenHeroChatPacket::encode, OpenHeroChatPacket::new, OpenHeroChatPacket::handle);
         INSTANCE.registerMessage(id++, UpdateClientLanguagePacket.class,

@@ -17,7 +17,7 @@ bin/
 
 # VS Code
 .vscode/
-
+*.md
 # Mac
 .DS_Store
 

@@ -4,6 +4,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.modid.herobrine_companion.compat.epicfight.HeroEpicFightCompat;
+import com.whitecloud233.modid.herobrine_companion.compat.cooking.HeroCookingCompat;
 import com.whitecloud233.modid.herobrine_companion.client.model.HeroModel;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.compat.ArmourerWorkshop.HeroAWCompat;
@@ -57,6 +58,16 @@ public class HeroHeldItemLayer extends RenderLayer<HeroEntity, PlayerModel<HeroE
         boolean isRightHanded = entity.getMainArm() == HumanoidArm.RIGHT;
         ItemStack rightHandItem = isRightHanded ? entity.getMainHandItem() : entity.getOffhandItem();
         ItemStack leftHandItem = isRightHanded ? entity.getOffhandItem() : entity.getMainHandItem();
+        ItemStack cookMainHandItem = HeroCookingCompat.getCookMainHandDisplay(entity);
+        ItemStack cookOffhandItem = HeroCookingCompat.getCookOffhandDisplay(entity);
+        if (!cookMainHandItem.isEmpty()) {
+            if (isRightHanded) rightHandItem = cookMainHandItem;
+            else leftHandItem = cookMainHandItem;
+        }
+        if (!cookOffhandItem.isEmpty()) {
+            if (isRightHanded) leftHandItem = cookOffhandItem;
+            else rightHandItem = cookOffhandItem;
+        }
 
         if (!rightHandItem.isEmpty()) {
             this.renderArmWithItem(entity, rightHandItem, ItemDisplayContext.THIRD_PERSON_RIGHT_HAND, HumanoidArm.RIGHT, poseStack, buffer, packedLight);
@@ -69,7 +80,11 @@ public class HeroHeldItemLayer extends RenderLayer<HeroEntity, PlayerModel<HeroE
     private void renderArmWithItem(HeroEntity entity, ItemStack itemStack, ItemDisplayContext displayContext, HumanoidArm arm, PoseStack poseStack, MultiBufferSource buffer, int packedLight) {
         poseStack.pushPose();
 
-        this.getParentModel().translateToHand(arm, poseStack);
+        if (shouldUseCookAnchor(entity, itemStack) && this.getParentModel() instanceof HeroModel heroModel) {
+            heroModel.translateToUpperArm(arm, poseStack);
+        } else {
+            this.getParentModel().translateToHand(arm, poseStack);
+        }
         poseStack.mulPose(com.mojang.math.Axis.XP.rotationDegrees(-90.0F));
         poseStack.mulPose(com.mojang.math.Axis.YP.rotationDegrees(180.0F));
         boolean isLeftHand = arm == HumanoidArm.LEFT;
@@ -109,5 +124,19 @@ public class HeroHeldItemLayer extends RenderLayer<HeroEntity, PlayerModel<HeroE
         );
 
         poseStack.popPose();
+    }
+
+    private boolean shouldUseCookAnchor(HeroEntity entity, ItemStack itemStack) {
+        if (entity.getInvitedAction() != HeroCookingCompat.INVITED_ACTION_COOK || itemStack.isEmpty()) {
+            return false;
+        }
+
+        ItemStack cookMainHandItem = HeroCookingCompat.getCookMainHandDisplay(entity);
+        if (!cookMainHandItem.isEmpty() && ItemStack.isSameItemSameTags(itemStack, cookMainHandItem)) {
+            return true;
+        }
+
+        ItemStack cookOffhandItem = HeroCookingCompat.getCookOffhandDisplay(entity);
+        return !cookOffhandItem.isEmpty() && ItemStack.isSameItemSameTags(itemStack, cookOffhandItem);
     }
 }

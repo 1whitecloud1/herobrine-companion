@@ -7,6 +7,7 @@ import com.whitecloud233.modid.herobrine_companion.block.entity.EndRingPortalBlo
 import com.whitecloud233.modid.herobrine_companion.client.event.ClientModSetup;
 import com.whitecloud233.modid.herobrine_companion.compat.epicfight.HeroEpicFightCompat;
 import com.whitecloud233.modid.herobrine_companion.compat.KubeJS.HerobrineCompanionKubeJSPlugin;
+import com.whitecloud233.modid.herobrine_companion.compat.kaleidoscope.KaleidoscopeCompatBuiltinPackFallback;
 import com.whitecloud233.modid.herobrine_companion.config.Config;
 import com.whitecloud233.modid.herobrine_companion.client.service.LLMConfig;
 import com.whitecloud233.modid.herobrine_companion.event.ModEvents;
@@ -130,6 +131,7 @@ public class HerobrineCompanion {
         HeroEpicFightCompat.bootstrap(modEventBus);
 
         modEventBus.addListener(this::commonSetup);
+        modEventBus.addListener(KaleidoscopeCompatBuiltinPackFallback::onAddPackFinders);
 
         if (FMLEnvironment.dist == Dist.CLIENT) {
             ClientModSetup.init(modEventBus);
