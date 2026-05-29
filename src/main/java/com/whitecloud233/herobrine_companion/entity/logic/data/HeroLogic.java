@@ -1,5 +1,7 @@
 package com.whitecloud233.herobrine_companion.entity.logic.data;
 
+import com.whitecloud233.herobrine_companion.compat.cooking.HeroCookingCompat;
+import com.whitecloud233.herobrine_companion.compat.kaleidoscope.HeroKaleidoscopeCompat;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.ai.learning.HeroDialogueHandler;
 import com.whitecloud233.herobrine_companion.entity.ai.learning.HeroObserver;
@@ -13,6 +15,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
@@ -197,6 +200,13 @@ public class HeroLogic {
     public static void handlePlayerInvitation(HeroEntity hero, Player player, BlockPos pos, int actionType) {
         BlockPos currentInvitedPos = hero.getInvitedPos();
         if (currentInvitedPos != null && currentInvitedPos.equals(pos)) {
+            if (actionType == HeroCookingCompat.INVITED_ACTION_COOK
+                    && hero.getInvitedAction() == HeroCookingCompat.INVITED_ACTION_COOK
+                    && !player.isShiftKeyDown()) {
+                player.sendSystemMessage(HeroCookingCompat.cycleCookSelection(hero, pos));
+                return;
+            }
+
             hero.setInvitedPos(null);
             hero.setInvitedAction(0);
 
@@ -207,9 +217,35 @@ public class HeroLogic {
             player.sendSystemMessage(Component.translatable("message.herobrine_companion.invite_cancel"));
             return;
         }
+        if (actionType == HeroCookingCompat.INVITED_ACTION_COOK
+                && HeroCookingCompat.getCookOptions(hero, pos).isEmpty()) {
+            player.sendSystemMessage(Component.translatable("message.herobrine_companion.invite_cook_none"));
+            return;
+        }
 
+
+        applyInvitation(hero, player, pos, actionType, false);
+    }
+
+    public static boolean handleCookSelection(HeroEntity hero, Player player, BlockPos pos, ResourceLocation recipeId, int repeatCount) {
+        int maxRepeatCount = HeroCookingCompat.getCookOptionMaxRepeat(hero, pos, recipeId);
+        if (maxRepeatCount <= 0 || !HeroCookingCompat.selectCookOption(hero, pos, recipeId)) {
+            player.sendSystemMessage(Component.translatable("message.herobrine_companion.invite_cook_none"));
+            return false;
+        }
+
+        HeroCookingCompat.setCookRepeatCount(hero, pos, Math.min(repeatCount, maxRepeatCount));
+        applyInvitation(hero, player, pos, HeroCookingCompat.INVITED_ACTION_COOK, true);
+        return true;
+    }
+
+    private static void applyInvitation(HeroEntity hero, Player player, BlockPos pos, int actionType, boolean preserveCookSelection) {
         hero.setInvitedPos(pos);
         hero.setInvitedAction(actionType);
+
+        if (actionType == HeroCookingCompat.INVITED_ACTION_COOK && !preserveCookSelection) {
+            HeroCookingCompat.resetCookSelection(hero, pos);
+        }
 
         if (actionType == 2) {
             if (hero.isFloating()) {
@@ -224,6 +260,7 @@ public class HeroLogic {
             case 1 -> "message.herobrine_companion.invite_inspect";
             case 2 -> "message.herobrine_companion.invite_rest";
             case 3 -> "message.herobrine_companion.invite_guard";
+            case HeroCookingCompat.INVITED_ACTION_COOK -> "message.herobrine_companion.invite_cook";
             default -> "message.herobrine_companion.invite_confirm";
         };
 

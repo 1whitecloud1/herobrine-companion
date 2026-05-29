@@ -4,7 +4,9 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.client.model.HeroModel;
+import com.whitecloud233.herobrine_companion.compat.cooking.HeroCookingCompat;
 import com.whitecloud233.herobrine_companion.compat.epicfight.HeroEpicFightCompat;
+import com.whitecloud233.herobrine_companion.compat.kaleidoscope.HeroKaleidoscopeCompat;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.compat.ArmourerWorkshop.HeroAWCompat;
 import net.minecraft.client.model.PlayerModel;
@@ -50,6 +52,24 @@ public class HeroHeldItemLayer extends ItemInHandLayer<HeroEntity, PlayerModel<H
         }
 
         // 主动开启伪装，骗过 AW 武器渲染器
+        ItemStack cookMainHandItem = HeroCookingCompat.getCookMainHandDisplay(entity);
+        ItemStack cookOffhandItem = HeroCookingCompat.getCookOffhandDisplay(entity);
+        if (!cookMainHandItem.isEmpty() || !cookOffhandItem.isEmpty()) {
+            HumanoidArm mainArm = entity.getMainArm();
+            if (!cookMainHandItem.isEmpty()) {
+                this.renderArmWithItem(entity, cookMainHandItem,
+                        mainArm == HumanoidArm.RIGHT ? ItemDisplayContext.THIRD_PERSON_RIGHT_HAND : ItemDisplayContext.THIRD_PERSON_LEFT_HAND,
+                        mainArm, poseStack, buffer, packedLight);
+            }
+            if (!cookOffhandItem.isEmpty()) {
+                HumanoidArm offhandArm = mainArm.getOpposite();
+                this.renderArmWithItem(entity, cookOffhandItem,
+                        offhandArm == HumanoidArm.RIGHT ? ItemDisplayContext.THIRD_PERSON_RIGHT_HAND : ItemDisplayContext.THIRD_PERSON_LEFT_HAND,
+                        offhandArm, poseStack, buffer, packedLight);
+            }
+            return;
+        }
+
         this.heroRenderer.spoofModelForAW = true;
         try {
             super.render(poseStack, buffer, packedLight, entity, limbSwing, limbSwingAmount, partialTick, ageInTicks, netHeadYaw, headPitch);
@@ -69,9 +89,12 @@ public class HeroHeldItemLayer extends ItemInHandLayer<HeroEntity, PlayerModel<H
         if (itemStack.isEmpty()) return;
 
         poseStack.pushPose();
-
+        if (entity instanceof HeroEntity hero && shouldUseCookAnchor(hero, itemStack) && this.getParentModel() instanceof HeroModel heroModel) {
+            heroModel.translateToUpperArm(arm, poseStack);
+        } else {
+            ((net.minecraft.client.model.ArmedModel) this.getParentModel()).translateToHand(arm, poseStack);
+        }
         // 1. 先执行原版的手臂平移，把渲染矩阵的中心点移动到“手掌心”
-        ((net.minecraft.client.model.ArmedModel) this.getParentModel()).translateToHand(arm, poseStack);
         poseStack.mulPose(Axis.XP.rotationDegrees(-90.0F));
         poseStack.mulPose(Axis.YP.rotationDegrees(180.0F));
         boolean isLeftHand = arm == HumanoidArm.LEFT;
@@ -98,5 +121,18 @@ public class HeroHeldItemLayer extends ItemInHandLayer<HeroEntity, PlayerModel<H
         this.customItemInHandRenderer.renderItem(entity, itemStack, displayContext, isLeftHand, poseStack, buffer, packedLight);
 
         poseStack.popPose();
+    }
+    private boolean shouldUseCookAnchor(HeroEntity entity, ItemStack itemStack) {
+        if (entity.getInvitedAction() != HeroCookingCompat.INVITED_ACTION_COOK || itemStack.isEmpty()) {
+            return false;
+        }
+
+        ItemStack cookMainHandItem = HeroCookingCompat.getCookMainHandDisplay(entity);
+        if (!cookMainHandItem.isEmpty() && ItemStack.isSameItemSameComponents(itemStack, cookMainHandItem)) {
+            return true;
+        }
+
+        ItemStack cookOffhandItem = HeroCookingCompat.getCookOffhandDisplay(entity);
+        return !cookOffhandItem.isEmpty() && ItemStack.isSameItemSameComponents(itemStack, cookOffhandItem);
     }
 }

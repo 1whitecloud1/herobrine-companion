@@ -4,6 +4,8 @@ package com.whitecloud233.herobrine_companion.network;
 import com.whitecloud233.herobrine_companion.client.fight.network.CPacketCollapseFinished;
 import com.whitecloud233.herobrine_companion.client.fight.network.SPacketFakeCrash;
 import com.whitecloud233.herobrine_companion.client.fight.network.SPacketStartCollapse;
+import com.whitecloud233.herobrine_companion.compat.cooking.OpenCookSelectionPacket;
+import com.whitecloud233.herobrine_companion.compat.cooking.SelectCookOptionPacket;
 import com.whitecloud233.herobrine_companion.network.ai.*;
 
 import com.whitecloud233.herobrine_companion.destructiongod.network.*;
@@ -46,6 +48,16 @@ public class PacketHandler {
                 RequestActionPacket.TYPE,
                 RequestActionPacket.STREAM_CODEC,
                 RequestActionPacket::handle
+        );
+        registrar.playToClient(
+                OpenCookSelectionPacket.TYPE,
+                OpenCookSelectionPacket.STREAM_CODEC,
+                OpenCookSelectionPacket::handle
+        );
+        registrar.playToServer(
+                SelectCookOptionPacket.TYPE,
+                SelectCookOptionPacket.STREAM_CODEC,
+                SelectCookOptionPacket::handle
         );
         registrar.playToClient(
                 SyncHeroVisitPacket.TYPE,

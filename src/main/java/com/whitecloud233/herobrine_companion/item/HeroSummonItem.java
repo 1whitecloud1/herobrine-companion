@@ -1,10 +1,14 @@
 package com.whitecloud233.herobrine_companion.item;
 
+import com.whitecloud233.herobrine_companion.compat.cooking.HeroCookingCompat;
+import com.whitecloud233.herobrine_companion.compat.cooking.OpenCookSelectionPacket;
+import com.whitecloud233.herobrine_companion.compat.kaleidoscope.HeroKaleidoscopeCompat;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.logic.data.HeroDataHandler;
 import com.whitecloud233.herobrine_companion.entity.logic.data.HeroLogic;
 import com.whitecloud233.herobrine_companion.event.ModEvents;
 import com.whitecloud233.herobrine_companion.entity.logic.data.HeroStateManager;
+import com.whitecloud233.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.herobrine_companion.util.EndRingContext;
 import com.whitecloud233.herobrine_companion.world.inventory.HeroContractMenu;
 import com.whitecloud233.herobrine_companion.world.structure.ModStructures;
@@ -118,6 +122,17 @@ public class HeroSummonItem extends Item {
 
                 if (actionType > 0 && existingHero != null) {
                     if (existingHero.level().dimension() == level.dimension()) {
+                        if (actionType == HeroCookingCompat.INVITED_ACTION_COOK && player instanceof ServerPlayer serverPlayer) {
+                            var cookOptions = HeroCookingCompat.getCookOptions(existingHero, clickedPos);
+                            if (!cookOptions.isEmpty()) {
+                                PacketHandler.sendToPlayer(new OpenCookSelectionPacket(existingHero.getId(), clickedPos, cookOptions), serverPlayer);
+                                setLastUseTime(stack, currentTime);
+                                return InteractionResult.SUCCESS;
+                            }
+                            player.sendSystemMessage(Component.translatable("message.herobrine_companion.invite_cook_none"));
+                            return InteractionResult.SUCCESS;
+
+                        }
                         HeroLogic.handlePlayerInvitation(existingHero, player, clickedPos, actionType);
                         setLastUseTime(stack, currentTime);
                         return InteractionResult.SUCCESS;
@@ -258,6 +273,7 @@ public class HeroSummonItem extends Item {
         BlockState state = level.getBlockState(pos);
         Block block = state.getBlock();
 
+        if (HeroCookingCompat.isCookwareStation(level, pos)) return HeroCookingCompat.INVITED_ACTION_COOK;
         if (state.is(BlockTags.BEDS) || block instanceof BedBlock) return 2;
         if (state.is(BlockTags.STAIRS) || block instanceof StairBlock) return 2;
         if (state.is(BlockTags.SLABS) || block instanceof SlabBlock) return 2;

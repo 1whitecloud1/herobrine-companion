@@ -1,0 +1,1724 @@
+package com.whitecloud233.herobrine_companion.compat.kaleidoscope;
+
+import com.whitecloud233.herobrine_companion.entity.HeroEntity;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.level.TicketType;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.world.item.crafting.SingleRecipeInput;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+import net.neoforged.fml.ModList;
+import net.neoforged.neoforge.capabilities.Capabilities;
+import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.items.ItemHandlerHelper;
+
+import javax.annotation.Nullable;
+import java.util.*;
+
+public final class HeroKaleidoscopeCompat {
+    public static final int INVITED_ACTION_COOK = 4;
+
+    private static final String MOD_ID = "kaleidoscope_cookery";
+    private static final String COOK_SELECTION_POS_KEY = "HeroCookSelectionPos";
+    private static final String COOK_SELECTION_INDEX_KEY = "HeroCookSelectionIndex";
+    private static final String COOK_SELECTION_RECIPE_KEY = "HeroCookSelectionRecipe";
+    private static final String COOK_REPEAT_POS_KEY = "HeroCookRepeatPos";
+    private static final String COOK_REPEAT_REMAINING_KEY = "HeroCookRepeatRemaining";
+    public static final int MIN_COOK_REPEAT_COUNT = 1;
+    public static final int MAX_COOK_REPEAT_COUNT = 64;
+    private static final String COOK_TICKET_LEVEL_KEY = "HeroCookTicketLevel";
+    private static final String COOK_TICKET_CHUNK_KEY = "HeroCookTicketChunk";
+    private static final int COOK_TICKET_DISTANCE = 1;
+
+    private HeroKaleidoscopeCompat() {
+    }
+
+    public static boolean isLoaded() {
+        return ModList.get().isLoaded(MOD_ID);
+    }
+
+    public static boolean isCookwareStation(Level level, BlockPos pos) {
+        if (!isLoaded() || level == null || pos == null) {
+            return false;
+        }
+        return SafeInvoker.isCookwareStation(level, pos);
+    }
+
+    public static boolean tickCookware(HeroEntity hero, BlockPos pos) {
+        if (!isLoaded() || hero == null || pos == null || hero.level().isClientSide) {
+            return false;
+        }
+        beginCookChunkTicket(hero, pos);
+        return SafeInvoker.tickCookware(hero, pos);
+    }
+
+    public static ItemStack getCookMainHandDisplay(HeroEntity hero) {
+        if (!isLoaded() || hero == null || hero.getInvitedAction() != INVITED_ACTION_COOK || hero.getInvitedPos() == null) {
+            return ItemStack.EMPTY;
+        }
+        return SafeInvoker.getCookMainHandDisplay(hero.level(), hero.getInvitedPos());
+    }
+
+    public static ItemStack getCookOffhandDisplay(HeroEntity hero) {
+        if (!isLoaded() || hero == null || hero.getInvitedAction() != INVITED_ACTION_COOK || hero.getInvitedPos() == null) {
+            return ItemStack.EMPTY;
+        }
+        return SafeInvoker.getCookOffhandDisplay(hero.level(), hero.getInvitedPos());
+    }
+
+    public static void resetCookSelection(HeroEntity hero, BlockPos pos) {
+        if (hero == null || pos == null) {
+            return;
+        }
+        hero.getPersistentData().putLong(COOK_SELECTION_POS_KEY, pos.asLong());
+        hero.getPersistentData().putInt(COOK_SELECTION_INDEX_KEY, 0);
+        hero.getPersistentData().remove(COOK_SELECTION_RECIPE_KEY);
+        hero.getPersistentData().putLong(COOK_REPEAT_POS_KEY, pos.asLong());
+        hero.getPersistentData().putInt(COOK_REPEAT_REMAINING_KEY, MIN_COOK_REPEAT_COUNT);
+    }
+
+    public static List<CookOptionView> getCookOptions(HeroEntity hero, BlockPos pos) {
+        if (!isLoaded() || hero == null || pos == null || hero.level().isClientSide) {
+            return List.of();
+        }
+        return SafeInvoker.getCookOptions(hero, pos);
+    }
+
+    public static boolean selectCookOption(HeroEntity hero, BlockPos pos, ResourceLocation recipeId) {
+        if (!isLoaded() || hero == null || pos == null || recipeId == null || hero.level().isClientSide) {
+            return false;
+        }
+        return SafeInvoker.selectCookOption(hero, pos, recipeId);
+    }
+
+    public static int getCookOptionMaxRepeat(HeroEntity hero, BlockPos pos, ResourceLocation recipeId) {
+        if (!isLoaded() || hero == null || pos == null || recipeId == null || hero.level().isClientSide) {
+            return 0;
+        }
+        return SafeInvoker.getCookOptionMaxRepeat(hero, pos, recipeId);
+    }
+
+    public static Component cycleCookSelection(HeroEntity hero, BlockPos pos) {
+        if (!isLoaded() || hero == null || pos == null || hero.level().isClientSide) {
+            return Component.translatable("message.herobrine_companion.invite_cook_none");
+        }
+        return SafeInvoker.cycleCookSelection(hero, pos);
+    }
+
+    public static void setCookRepeatCount(HeroEntity hero, BlockPos pos, int count) {
+        if (hero == null || pos == null) {
+            return;
+        }
+        hero.getPersistentData().putLong(COOK_REPEAT_POS_KEY, pos.asLong());
+        hero.getPersistentData().putInt(COOK_REPEAT_REMAINING_KEY, clampCookRepeatCount(count));
+    }
+    public static void beginCookChunkTicket(HeroEntity hero, BlockPos pos) {
+        if (hero == null || pos == null || hero.level().isClientSide || !(hero.level() instanceof ServerLevel serverLevel)) {
+            return;
+        }
+
+        ChunkPos targetChunk = new ChunkPos(pos);
+        String targetLevelId = serverLevel.dimension().location().toString();
+        String currentLevelId = hero.getPersistentData().getString(COOK_TICKET_LEVEL_KEY);
+        long currentChunkLong = hero.getPersistentData().getLong(COOK_TICKET_CHUNK_KEY);
+        if (targetLevelId.equals(currentLevelId) && currentChunkLong == targetChunk.toLong()) {
+            return;
+        }
+
+        endCookChunkTicket(hero);
+        serverLevel.getChunkSource().addRegionTicket(TicketType.UNKNOWN, targetChunk, COOK_TICKET_DISTANCE, targetChunk);
+        hero.getPersistentData().putString(COOK_TICKET_LEVEL_KEY, targetLevelId);
+        hero.getPersistentData().putLong(COOK_TICKET_CHUNK_KEY, targetChunk.toLong());
+    }
+
+    public static void endCookChunkTicket(HeroEntity hero) {
+        if (hero == null || hero.level().isClientSide) {
+            return;
+        }
+
+        String levelId = hero.getPersistentData().getString(COOK_TICKET_LEVEL_KEY);
+        if (!levelId.isBlank() && hero.getServer() != null) {
+            ResourceLocation dimensionId = ResourceLocation.tryParse(levelId);
+            if (dimensionId != null) {
+                ServerLevel ticketLevel = hero.getServer().getLevel(net.minecraft.resources.ResourceKey.create(Registries.DIMENSION, dimensionId));
+                long chunkLong = hero.getPersistentData().getLong(COOK_TICKET_CHUNK_KEY);
+                if (ticketLevel != null) {
+                    ChunkPos chunkPos = new ChunkPos(chunkLong);
+                    ticketLevel.getChunkSource().removeRegionTicket(TicketType.UNKNOWN, chunkPos, COOK_TICKET_DISTANCE, chunkPos);
+                }
+            }
+        }
+
+        hero.getPersistentData().remove(COOK_TICKET_LEVEL_KEY);
+        hero.getPersistentData().remove(COOK_TICKET_CHUNK_KEY);
+    }
+
+
+    public static int clampCookRepeatCount(int count) {
+        return Math.max(MIN_COOK_REPEAT_COUNT, Math.min(MAX_COOK_REPEAT_COUNT, count));
+    }
+
+    private static int getCookRepeatCount(HeroEntity hero, BlockPos pos) {
+        if (hero == null || pos == null) {
+            return MIN_COOK_REPEAT_COUNT;
+        }
+
+        long storedPos = hero.getPersistentData().getLong(COOK_REPEAT_POS_KEY);
+        if (storedPos != pos.asLong()) {
+            setCookRepeatCount(hero, pos, MIN_COOK_REPEAT_COUNT);
+            return MIN_COOK_REPEAT_COUNT;
+        }
+
+        int remaining = clampCookRepeatCount(hero.getPersistentData().getInt(COOK_REPEAT_REMAINING_KEY));
+        hero.getPersistentData().putInt(COOK_REPEAT_REMAINING_KEY, remaining);
+        return remaining;
+    }
+
+    private static boolean consumeCookRepeat(HeroEntity hero, BlockPos pos) {
+        if (hero == null || pos == null) {
+            return false;
+        }
+
+        int remaining = getCookRepeatCount(hero, pos);
+        if (remaining <= MIN_COOK_REPEAT_COUNT) {
+            endCookChunkTicket(hero);
+
+            hero.setInvitedPos(null);
+            hero.setInvitedAction(0);
+            setCookRepeatCount(hero, pos, MIN_COOK_REPEAT_COUNT);
+            return true;
+        }
+
+        setCookRepeatCount(hero, pos, remaining - 1);
+        return true;
+    }
+
+    @Nullable
+    private static ResourceLocation getCookSelectionRecipeId(HeroEntity hero, BlockPos pos) {
+        if (hero == null || pos == null) {
+            return null;
+        }
+
+        long storedPos = hero.getPersistentData().getLong(COOK_SELECTION_POS_KEY);
+        if (storedPos != pos.asLong()) {
+            return null;
+        }
+
+        String recipeId = hero.getPersistentData().getString(COOK_SELECTION_RECIPE_KEY);
+        return recipeId.isBlank() ? null : ResourceLocation.tryParse(recipeId);
+    }
+
+    private static int getCookSelectionIndex(HeroEntity hero, BlockPos pos, int optionCount) {
+        if (hero == null || pos == null || optionCount <= 0) {
+            return 0;
+        }
+
+        long storedPos = hero.getPersistentData().getLong(COOK_SELECTION_POS_KEY);
+        if (storedPos != pos.asLong()) {
+            resetCookSelection(hero, pos);
+            return 0;
+        }
+
+        int index = hero.getPersistentData().getInt(COOK_SELECTION_INDEX_KEY);
+        if (index < 0 || index >= optionCount) {
+            index = Math.floorMod(index, optionCount);
+            hero.getPersistentData().putInt(COOK_SELECTION_INDEX_KEY, index);
+        }
+        return index;
+    }
+
+    private static void setCookSelection(HeroEntity hero, BlockPos pos, int index, @Nullable ResourceLocation recipeId) {
+        if (hero == null || pos == null) {
+            return;
+        }
+        hero.getPersistentData().putLong(COOK_SELECTION_POS_KEY, pos.asLong());
+        hero.getPersistentData().putInt(COOK_SELECTION_INDEX_KEY, Math.max(0, index));
+        if (recipeId == null) {
+            hero.getPersistentData().remove(COOK_SELECTION_RECIPE_KEY);
+        } else {
+            hero.getPersistentData().putString(COOK_SELECTION_RECIPE_KEY, recipeId.toString());
+        }
+    }
+
+    private static <T extends RecipeCandidate> int resolveSelectedRecipeIndex(HeroEntity hero, BlockPos pos, List<T> options) {
+        if (options.isEmpty()) {
+            return -1;
+        }
+
+        ResourceLocation selectedRecipeId = getCookSelectionRecipeId(hero, pos);
+        if (selectedRecipeId != null) {
+            for (int i = 0; i < options.size(); i++) {
+                if (options.get(i).recipeId().equals(selectedRecipeId)) {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        return getCookSelectionIndex(hero, pos, options.size());
+    }
+
+    public record CookOptionView(ResourceLocation recipeId, ItemStack result, int maxRepeatCount) {
+    }
+
+    private interface RecipeCandidate {
+        ResourceLocation recipeId();
+
+        int maxRepeatCount();
+    }
+
+    private record IngredientPlan(@Nullable ItemStack nextIngredient, int matchedCount, int missingCount) {
+    }
+
+    private record PotPlan(ResourceLocation recipeId, ItemStack result, IngredientPlan ingredientPlan,
+                           int maxRepeatCount) implements RecipeCandidate {
+    }
+
+    private record StockpotPlan(ResourceLocation recipeId, ItemStack result, @Nullable ItemStack soupBaseStack,
+                                IngredientPlan ingredientPlan, int maxRepeatCount) implements RecipeCandidate {
+    }
+
+    private record TeapotPlan(ResourceLocation recipeId, ItemStack result, @Nullable ItemStack teaFluidStack,
+                              @Nullable ItemStack ingredientStack, int maxRepeatCount) implements RecipeCandidate {
+    }
+
+    private record ChoppingBoardPlan(ResourceLocation recipeId, ItemStack result, @Nullable ItemStack ingredientStack,
+                                     int maxRepeatCount) implements RecipeCandidate {
+    }
+
+    private record SteamerPlan(ResourceLocation recipeId, ItemStack result, @Nullable ItemStack ingredientStack,
+                               int maxRepeatCount) implements RecipeCandidate {
+    }
+
+    private record CookOption(ResourceLocation recipeId, ItemStack result, int maxRepeatCount) implements RecipeCandidate {
+    }
+
+    private interface StackAction {
+        boolean apply(ItemStack stack);
+    }
+
+    private interface StackMatcher {
+        boolean test(ItemStack stack);
+    }
+
+    private static final class SafeInvoker {
+        private static final String TEAPOT_BLOCK_ENTITY_CLASS_NAME =
+                "com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.TeapotBlockEntity";
+        @Nullable
+        private static final Class<?> TEAPOT_BLOCK_ENTITY_CLASS = findOptionalClass(TEAPOT_BLOCK_ENTITY_CLASS_NAME);
+
+
+        private SafeInvoker() {
+        }
+
+        static boolean isCookwareStation(Level level, BlockPos pos) {
+            BlockEntity blockEntity = level.getBlockEntity(pos);
+            return blockEntity instanceof com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.PotBlockEntity
+                    || blockEntity instanceof com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.StockpotBlockEntity
+                    || isTeapotBlockEntity(blockEntity)
+                    || blockEntity instanceof com.github.ysbbbbbb.kaleidoscopecookery.api.blockentity.IChoppingBoard
+                    || blockEntity instanceof com.github.ysbbbbbb.kaleidoscopecookery.api.blockentity.ISteamer;
+        }
+
+
+        static ItemStack getCookMainHandDisplay(Level level, BlockPos pos) {
+            BlockEntity blockEntity = level.getBlockEntity(pos);
+            if (blockEntity instanceof com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.PotBlockEntity) {
+                return com.github.ysbbbbbb.kaleidoscopecookery.init.ModItems.KITCHEN_SHOVEL.get().getDefaultInstance();
+            }
+            if (blockEntity instanceof com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.StockpotBlockEntity) {
+                return new ItemStack(Items.WOODEN_SHOVEL);
+            }
+            if (isTeapotBlockEntity(blockEntity)) {
+                return new ItemStack(Items.WOODEN_SHOVEL);
+            }
+            if (blockEntity instanceof com.github.ysbbbbbb.kaleidoscopecookery.api.blockentity.IChoppingBoard) {
+                return com.github.ysbbbbbb.kaleidoscopecookery.init.ModItems.IRON_KITCHEN_KNIFE.get().getDefaultInstance();
+            }
+            return ItemStack.EMPTY;
+        }
+
+        static ItemStack getCookOffhandDisplay(Level level, BlockPos pos) {
+            BlockEntity blockEntity = level.getBlockEntity(pos);
+            if (isTeapotBlockEntity(blockEntity)) {
+                return TeapotSupport.getCookOffhandDisplay();
+            }
+            return ItemStack.EMPTY;
+        }
+
+        static boolean tickCookware(HeroEntity hero, BlockPos pos) {
+            if (!(hero.level() instanceof ServerLevel serverLevel)) {
+                return false;
+            }
+
+            ServerPlayer owner = resolveOwner(hero);
+            if (owner == null || owner.level() != serverLevel) {
+                return false;
+            }
+
+            BlockEntity blockEntity = serverLevel.getBlockEntity(pos);
+            if (blockEntity instanceof com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.PotBlockEntity pot) {
+                return tickPot(hero, serverLevel, owner, pot);
+            }
+            if (blockEntity instanceof com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.StockpotBlockEntity stockpot) {
+                return tickStockpot(hero, serverLevel, owner, stockpot);
+            }
+            if (isTeapotBlockEntity(blockEntity)) {
+                return TeapotSupport.tickCookware(hero, serverLevel, owner, blockEntity);
+            }
+            if (blockEntity instanceof com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.ChoppingBoardBlockEntity choppingBoard) {
+                return tickChoppingBoard(hero, serverLevel, owner, choppingBoard);
+            }
+            if (blockEntity instanceof com.github.ysbbbbbb.kaleidoscopecookery.api.blockentity.ISteamer steamer) {
+                return tickSteamer(hero, serverLevel, owner, steamer);
+            }
+            return false;
+        }
+
+        static Component cycleCookSelection(HeroEntity hero, BlockPos pos) {
+            if (!(hero.level() instanceof ServerLevel serverLevel)) {
+                return Component.translatable("message.herobrine_companion.invite_cook_none");
+            }
+
+            ServerPlayer owner = resolveOwner(hero);
+            if (owner == null || owner.level() != serverLevel) {
+                return Component.translatable("message.herobrine_companion.invite_cook_none");
+            }
+
+            BlockEntity blockEntity = serverLevel.getBlockEntity(pos);
+            List<CookOption> options = getCookOptions(serverLevel, owner, blockEntity);
+            if (options.isEmpty()) {
+                resetCookSelection(hero, pos);
+                return Component.translatable("message.herobrine_companion.invite_cook_none");
+            }
+
+            if (options.size() == 1) {
+                setCookSelection(hero, pos, 0, options.get(0).recipeId());
+                return Component.translatable("message.herobrine_companion.invite_cook_single", options.get(0).result().getHoverName());
+            }
+
+            int nextIndex = (getCookSelectionIndex(hero, pos, options.size()) + 1) % options.size();
+            setCookSelection(hero, pos, nextIndex, options.get(nextIndex).recipeId());
+            return Component.translatable("message.herobrine_companion.invite_cook_selected", options.get(nextIndex).result().getHoverName());
+        }
+
+        static List<CookOptionView> getCookOptions(HeroEntity hero, BlockPos pos) {
+            if (!(hero.level() instanceof ServerLevel serverLevel)) {
+                return List.of();
+            }
+
+            ServerPlayer owner = resolveOwner(hero);
+            if (owner == null || owner.level() != serverLevel) {
+                return List.of();
+            }
+
+            BlockEntity blockEntity = serverLevel.getBlockEntity(pos);
+            List<CookOption> options = getCookOptions(serverLevel, owner, blockEntity);
+            if (options.isEmpty()) {
+                return List.of();
+            }
+
+            List<CookOptionView> result = new ArrayList<>(options.size());
+            for (CookOption option : options) {
+                result.add(new CookOptionView(option.recipeId(), option.result().copy(), option.maxRepeatCount()));
+            }
+            return result;
+        }
+
+        static boolean selectCookOption(HeroEntity hero, BlockPos pos, ResourceLocation recipeId) {
+            if (!(hero.level() instanceof ServerLevel serverLevel)) {
+                return false;
+            }
+
+            ServerPlayer owner = resolveOwner(hero);
+            if (owner == null || owner.level() != serverLevel) {
+                return false;
+            }
+
+            BlockEntity blockEntity = serverLevel.getBlockEntity(pos);
+            List<CookOption> options = getCookOptions(serverLevel, owner, blockEntity);
+            for (int i = 0; i < options.size(); i++) {
+                if (options.get(i).recipeId().equals(recipeId)) {
+                    setCookSelection(hero, pos, i, recipeId);
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        static int getCookOptionMaxRepeat(HeroEntity hero, BlockPos pos, ResourceLocation recipeId) {
+            if (!(hero.level() instanceof ServerLevel serverLevel)) {
+                return 0;
+            }
+
+            ServerPlayer owner = resolveOwner(hero);
+            if (owner == null || owner.level() != serverLevel) {
+                return 0;
+            }
+
+            BlockEntity blockEntity = serverLevel.getBlockEntity(pos);
+            List<CookOption> options = getCookOptions(serverLevel, owner, blockEntity);
+            for (CookOption option : options) {
+                if (option.recipeId().equals(recipeId)) {
+                    return option.maxRepeatCount();
+                }
+            }
+            return 0;
+        }
+
+        @Nullable
+        private static ServerPlayer resolveOwner(HeroEntity hero) {
+            if (hero.getOwnerUUID() == null) {
+                return null;
+            }
+            return hero.level() instanceof ServerLevel serverLevel
+                    ? serverLevel.getServer().getPlayerList().getPlayer(hero.getOwnerUUID())
+                    : null;
+        }
+
+        private static List<CookOption> getCookOptions(ServerLevel level, ServerPlayer owner, @Nullable BlockEntity blockEntity) {
+            if (blockEntity instanceof com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.PotBlockEntity pot) {
+                return mapPotOptions(collectPotPlans(level, owner, pot));
+            }
+            if (blockEntity instanceof com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.StockpotBlockEntity stockpot) {
+                return mapStockpotOptions(collectStockpotPlans(level, owner, stockpot));
+            }
+            if (isTeapotBlockEntity(blockEntity)) {
+                return TeapotSupport.getCookOptions(level, owner, blockEntity);
+            }
+            if (blockEntity instanceof com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.ChoppingBoardBlockEntity choppingBoard) {
+                return mapChoppingBoardOptions(collectChoppingBoardPlans(level, owner, choppingBoard));
+            }
+            if (blockEntity instanceof com.github.ysbbbbbb.kaleidoscopecookery.api.blockentity.ISteamer steamer) {
+                return mapSteamerOptions(collectSteamerPlans(level, owner, steamer));
+            }
+            return List.of();
+        }
+
+        private static List<CookOption> mapPotOptions(List<PotPlan> plans) {
+            List<CookOption> options = new ArrayList<>(plans.size());
+            for (PotPlan plan : plans) {
+                options.add(new CookOption(plan.recipeId(), plan.result().copy(), plan.maxRepeatCount()));
+            }
+            return options;
+        }
+
+        private static List<CookOption> mapStockpotOptions(List<StockpotPlan> plans) {
+            List<CookOption> options = new ArrayList<>(plans.size());
+            for (StockpotPlan plan : plans) {
+                options.add(new CookOption(plan.recipeId(), plan.result().copy(), plan.maxRepeatCount()));
+            }
+            return options;
+        }
+
+        private static List<CookOption> mapTeapotOptions(List<TeapotPlan> plans) {
+            List<CookOption> options = new ArrayList<>(plans.size());
+            for (TeapotPlan plan : plans) {
+                options.add(new CookOption(plan.recipeId(), plan.result().copy(), plan.maxRepeatCount()));
+            }
+            return options;
+        }
+
+        private static List<CookOption> mapChoppingBoardOptions(List<ChoppingBoardPlan> plans) {
+            List<CookOption> options = new ArrayList<>(plans.size());
+            for (ChoppingBoardPlan plan : plans) {
+                options.add(new CookOption(plan.recipeId(), plan.result().copy(), plan.maxRepeatCount()));
+            }
+            return options;
+        }
+
+        private static List<CookOption> mapSteamerOptions(List<SteamerPlan> plans) {
+            List<CookOption> options = new ArrayList<>(plans.size());
+            for (SteamerPlan plan : plans) {
+                options.add(new CookOption(plan.recipeId(), plan.result().copy(), plan.maxRepeatCount()));
+            }
+            return options;
+        }
+
+        private static boolean tickPot(HeroEntity hero, ServerLevel level, ServerPlayer owner,
+                                       com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.PotBlockEntity pot) {
+            int status = pot.getStatus();
+            if (status == com.github.ysbbbbbb.kaleidoscopecookery.api.blockentity.IPot.FINISHED
+                    || status == com.github.ysbbbbbb.kaleidoscopecookery.api.blockentity.IPot.BURNT) {
+                return tryTakeOutPot(hero, level, owner, pot);
+            }
+
+            if (status == com.github.ysbbbbbb.kaleidoscopecookery.api.blockentity.IPot.COOKING) {
+                if (level.getGameTime() % 20L == 0L) {
+                    pot.onShovelHit(level, owner, ItemStack.EMPTY);
+                    owner.getInventory().setChanged();
+                    return true;
+                }
+                return false;
+            }
+
+            if (status == com.github.ysbbbbbb.kaleidoscopecookery.api.blockentity.IPot.PUT_INGREDIENT) {
+                if (pot.getCurrentTick() <= 0) {
+                    if (tryAccessibleStacks(owner, stack -> pot.onPlaceOil(level, owner, stack))) {
+                        owner.getInventory().setChanged();
+                        return true;
+                    }
+                    return false;
+                }
+
+                List<PotPlan> plans = collectPotPlans(level, owner, pot);
+                if (plans.isEmpty()) {
+                    return false;
+                }
+
+                int selectedIndex = resolvePotPlanIndex(hero, pot, plans);
+                if (selectedIndex < 0) {
+                    return false;
+                }
+
+                PotPlan plan = plans.get(selectedIndex);
+                ItemStack nextIngredient = plan.ingredientPlan().nextIngredient();
+                if (nextIngredient != null && !nextIngredient.isEmpty()) {
+                    if (pot.addIngredient(level, owner, nextIngredient)) {
+                        owner.getInventory().setChanged();
+                        return true;
+                    }
+                    return false;
+                }
+
+                if (level.getGameTime() % 20L == 0L) {
+                    pot.onShovelHit(level, owner, ItemStack.EMPTY);
+                    owner.getInventory().setChanged();
+                    return true;
+                }
+                return false;
+            }
+            return false;
+        }
+
+        private static boolean tickStockpot(HeroEntity hero, ServerLevel level, ServerPlayer owner,
+                                            com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.StockpotBlockEntity stockpot) {
+            int status = stockpot.getStatus();
+            if (status == com.github.ysbbbbbb.kaleidoscopecookery.api.blockentity.IStockpot.FINISHED) {
+                if (removeStockpotLid(level, owner, stockpot)) {
+                    return true;
+                }
+                return tryTakeOutStockpot(hero, level, owner, stockpot);
+            }
+
+            List<StockpotPlan> plans = collectStockpotPlans(level, owner, stockpot);
+            if (plans.isEmpty()) {
+                return false;
+            }
+
+            int selectedIndex = resolveSelectedRecipeIndex(hero, stockpot.getBlockPos(), plans);
+            if (selectedIndex < 0) {
+                return false;
+            }
+
+            StockpotPlan plan = plans.get(selectedIndex);
+            if (status == com.github.ysbbbbbb.kaleidoscopecookery.api.blockentity.IStockpot.PUT_SOUP_BASE) {
+                ItemStack soupBaseStack = plan.soupBaseStack();
+                if (soupBaseStack != null && !soupBaseStack.isEmpty() && stockpot.addSoupBase(level, owner, soupBaseStack)) {
+                    owner.getInventory().setChanged();
+                    return true;
+                }
+                return false;
+            }
+
+            if (status == com.github.ysbbbbbb.kaleidoscopecookery.api.blockentity.IStockpot.PUT_INGREDIENT) {
+                ItemStack nextIngredient = plan.ingredientPlan().nextIngredient();
+                if (nextIngredient != null && !nextIngredient.isEmpty()) {
+                    if (stockpot.addIngredient(level, owner, nextIngredient)) {
+                        owner.getInventory().setChanged();
+                        return true;
+                    }
+                    return false;
+                }
+
+                if (!stockpot.hasLid() && tryAccessibleStacks(owner, stack -> stockpot.onLitClick(level, owner, stack))) {
+                    return true;
+                }
+            } else if (status == com.github.ysbbbbbb.kaleidoscopecookery.api.blockentity.IStockpot.COOKING) {
+                if (!stockpot.hasLid() && tryAccessibleStacks(owner, stack -> stockpot.onLitClick(level, owner, stack))) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static boolean tickChoppingBoard(HeroEntity hero, ServerLevel level, ServerPlayer owner,
+                                                 com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.ChoppingBoardBlockEntity choppingBoard) {
+            List<ChoppingBoardPlan> plans = collectChoppingBoardPlans(level, owner, choppingBoard);
+            if (plans.isEmpty()) {
+                return false;
+            }
+
+            int selectedIndex = resolveSelectedRecipeIndex(hero, choppingBoard.getBlockPos(), plans);
+            if (selectedIndex < 0) {
+                return false;
+            }
+
+            ChoppingBoardPlan plan = plans.get(selectedIndex);
+            if (choppingBoard.getCurrentCutStack().isEmpty()) {
+                ItemStack ingredientStack = plan.ingredientStack();
+                if (ingredientStack != null && !ingredientStack.isEmpty() && choppingBoard.onPutItem(level, owner, ingredientStack)) {
+                    owner.getInventory().setChanged();
+                    return true;
+                }
+                return false;
+            }
+
+            if (level.getGameTime() % 10L != 0L) {
+                return false;
+            }
+
+            boolean completesRecipe = choppingBoard.getCurrentCutCount() >= choppingBoard.getMaxCutCount();
+            Set<UUID> existingDropIds = completesRecipe
+                    ? snapshotChoppingBoardDropIds(level, choppingBoard.getBlockPos(), plan.result())
+                    : Set.of();
+            if (choppingBoard.onCutItem(level, owner, getVirtualKitchenKnife())) {
+                if (completesRecipe) {
+                    deliverChoppingBoardResult(level, owner, choppingBoard.getBlockPos(), plan.result(), existingDropIds);
+                    consumeCookRepeat(hero, choppingBoard.getBlockPos());
+                }
+                return true;
+            }
+            return false;
+        }
+
+        private static boolean tickSteamer(HeroEntity hero, ServerLevel level, ServerPlayer owner,
+                                           com.github.ysbbbbbb.kaleidoscopecookery.api.blockentity.ISteamer steamer) {
+            if (steamer instanceof com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.SteamerBlockEntity steamerBlockEntity
+                    && hasTakeableSteamerOutput(steamerBlockEntity)) {
+                if (steamer.takeFood(level, owner)) {
+                    owner.getInventory().setChanged();
+                    consumeCookRepeat(hero, steamerBlockEntity.getBlockPos());
+                    return true;
+                }
+                return false;
+            }
+
+            List<SteamerPlan> plans = collectSteamerPlans(level, owner, steamer);
+            if (plans.isEmpty()) {
+                return false;
+            }
+
+            BlockPos blockPos = steamer instanceof BlockEntity be ? be.getBlockPos() : hero.blockPosition();
+            int selectedIndex = resolveSelectedRecipeIndex(hero, blockPos, plans);
+            if (selectedIndex < 0) {
+                return false;
+            }
+
+            SteamerPlan plan = plans.get(selectedIndex);
+            ItemStack ingredientStack = plan.ingredientStack();
+            if (ingredientStack != null && !ingredientStack.isEmpty() && steamer.placeFood(level, owner, ingredientStack)) {
+                owner.getInventory().setChanged();
+                if (steamer instanceof com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.SteamerBlockEntity steamerBlockEntity) {
+                    setSteamerLid(level, steamerBlockEntity, true);
+                }
+                return true;
+            }
+            return false;
+        }
+
+        private static boolean hasTakeableSteamerOutput(com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.SteamerBlockEntity steamer) {
+            List<ItemStack> items = steamer.getItems();
+            int[] cookingTime = steamer.getCookingTime();
+            boolean hasFood = false;
+            for (int i = 0; i < items.size() && i < cookingTime.length; i++) {
+                if (items.get(i).isEmpty()) {
+                    continue;
+                }
+                hasFood = true;
+                if (cookingTime[i] != -1) {
+                    return false;
+                }
+            }
+            return hasFood;
+        }
+
+        private static boolean tryTakeOutPot(HeroEntity hero, ServerLevel level, ServerPlayer owner,
+                                             com.github.ysbbbbbb.kaleidoscopecookery.api.blockentity.IPot pot) {
+            if (pot instanceof com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.PotBlockEntity potBlockEntity) {
+                Ingredient carrier = resolvePotCarrierIngredient(hero, level, owner, potBlockEntity);
+                if (carrier != null) {
+                    boolean success = carrier.isEmpty()
+                            ? tryTakeOutPotWithHeroTool(hero, level, owner, potBlockEntity, getVirtualKitchenShovel())
+                            : tryTakeOutPotWithStack(hero, level, owner, potBlockEntity, getVirtualCarrierStack(carrier));
+                    if (success) {
+                        consumeCookRepeat(hero, potBlockEntity.getBlockPos());
+                        return true;
+                    }
+
+                    success = carrier.isEmpty()
+                            ? tryAccessibleMatchingStacks(owner,
+                            stack -> stack.is(com.github.ysbbbbbb.kaleidoscopecookery.init.tag.TagMod.KITCHEN_SHOVEL),
+                            stack -> pot.takeOutProduct(level, hero, stack))
+                            : tryAccessibleMatchingStacks(owner, carrier::test, stack -> pot.takeOutProduct(level, owner, stack));
+                    if (success) {
+                        if (carrier.isEmpty()) {
+                            transferHeroTakeoutToOwner(hero, owner, potBlockEntity.getBlockPos(), potBlockEntity.getResult());
+                        }
+                        consumeCookRepeat(hero, potBlockEntity.getBlockPos());
+                        return true;
+                    }
+                }
+            }
+
+            if (pot.takeOutProduct(level, owner, ItemStack.EMPTY)) {
+                owner.getInventory().setChanged();
+                if (pot instanceof BlockEntity blockEntity) {
+                    consumeCookRepeat(hero, blockEntity.getBlockPos());
+                }
+                return true;
+            }
+            boolean success = tryAccessibleStacks(owner, stack -> pot.takeOutProduct(level, owner, stack));
+            if (success && pot instanceof BlockEntity blockEntity) {
+                consumeCookRepeat(hero, blockEntity.getBlockPos());
+            }
+            return success;
+        }
+
+        private static boolean tryTakeOutStockpot(HeroEntity hero, ServerLevel level, ServerPlayer owner,
+                                                  com.github.ysbbbbbb.kaleidoscopecookery.api.blockentity.IStockpot stockpot) {
+            if (stockpot instanceof com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.StockpotBlockEntity stockpotBlockEntity) {
+                Ingredient carrier = resolveStockpotCarrierIngredient(hero, level, owner, stockpotBlockEntity);
+                if (carrier != null && !carrier.isEmpty()) {
+                    if (tryTakeOutStockpotWithStack(hero, level, owner, stockpotBlockEntity, getVirtualCarrierStack(carrier))) {
+                        if (shouldConsumeStockpotRepeat(stockpotBlockEntity)) {
+                            consumeCookRepeat(hero, stockpotBlockEntity.getBlockPos());
+                        }
+                        return true;
+                    }
+                    boolean success = tryAccessibleMatchingStacks(owner, carrier::test,
+                            stack -> stockpot.takeOutProduct(level, owner, stack));
+                    if (success) {
+                        if (shouldConsumeStockpotRepeat(stockpotBlockEntity)) {
+                            consumeCookRepeat(hero, stockpotBlockEntity.getBlockPos());
+                        }
+                        return true;
+                    }
+                }
+            }
+
+            if (stockpot.takeOutProduct(level, owner, ItemStack.EMPTY)) {
+                owner.getInventory().setChanged();
+                if (shouldConsumeStockpotRepeat(stockpot) && stockpot instanceof BlockEntity blockEntity) {
+                    consumeCookRepeat(hero, blockEntity.getBlockPos());
+                }
+                return true;
+            }
+            boolean success = tryAccessibleStacks(owner, stack -> stockpot.takeOutProduct(level, owner, stack));
+            if (success && shouldConsumeStockpotRepeat(stockpot) && stockpot instanceof BlockEntity blockEntity) {
+                consumeCookRepeat(hero, blockEntity.getBlockPos());
+            }
+            return success;
+        }
+        private static boolean shouldConsumeStockpotRepeat(com.github.ysbbbbbb.kaleidoscopecookery.api.blockentity.IStockpot stockpot) {
+            if (stockpot instanceof com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.StockpotBlockEntity stockpotBlockEntity) {
+                return stockpotBlockEntity.getTakeoutCount() <= 0
+                        || stockpotBlockEntity.getStatus() != com.github.ysbbbbbb.kaleidoscopecookery.api.blockentity.IStockpot.FINISHED;
+            }
+            return true;
+        }
+
+        private static ItemStack getVirtualKitchenKnife() {
+            return com.github.ysbbbbbb.kaleidoscopecookery.init.ModItems.IRON_KITCHEN_KNIFE.get().getDefaultInstance();
+        }
+
+        private static ItemStack getVirtualKitchenShovel() {
+            return com.github.ysbbbbbb.kaleidoscopecookery.init.ModItems.KITCHEN_SHOVEL.get().getDefaultInstance();
+        }
+
+        private static int resolvePotPlanIndex(HeroEntity hero,
+                                               com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.PotBlockEntity pot,
+                                               List<PotPlan> plans) {
+            int selectedIndex = resolveSelectedRecipeIndex(hero, pot.getBlockPos(), plans);
+            if (selectedIndex >= 0 && selectedIndex < plans.size()) {
+                return selectedIndex;
+            }
+            if (pot.isEmpty()) {
+                return -1;
+            }
+
+            int bestIndex = -1;
+            for (int i = 0; i < plans.size(); i++) {
+                if (bestIndex < 0 || isBetterPotPlan(plans.get(i), plans.get(bestIndex))) {
+                    bestIndex = i;
+                }
+            }
+            return bestIndex;
+        }
+
+        private static boolean isBetterPotPlan(PotPlan candidate, PotPlan currentBest) {
+            if (candidate.ingredientPlan().matchedCount() != currentBest.ingredientPlan().matchedCount()) {
+                return candidate.ingredientPlan().matchedCount() > currentBest.ingredientPlan().matchedCount();
+            }
+            if (candidate.ingredientPlan().missingCount() != currentBest.ingredientPlan().missingCount()) {
+                return candidate.ingredientPlan().missingCount() < currentBest.ingredientPlan().missingCount();
+            }
+            if (candidate.maxRepeatCount() != currentBest.maxRepeatCount()) {
+                return candidate.maxRepeatCount() > currentBest.maxRepeatCount();
+            }
+            return candidate.recipeId().toString().compareTo(currentBest.recipeId().toString()) < 0;
+        }
+
+        @Nullable
+        private static RecipeHolder<com.github.ysbbbbbb.kaleidoscopecookery.crafting.recipe.PotRecipe> findPotRecipeHolder(ServerLevel level,
+                                                                                                                             ResourceLocation recipeId) {
+            for (RecipeHolder<com.github.ysbbbbbb.kaleidoscopecookery.crafting.recipe.PotRecipe> holder
+                    : level.getRecipeManager().getAllRecipesFor(com.github.ysbbbbbb.kaleidoscopecookery.init.ModRecipes.POT_RECIPE)) {
+                if (holder.id().equals(recipeId)) {
+                    return holder;
+                }
+            }
+            return null;
+        }
+
+        @Nullable
+        private static RecipeHolder<com.github.ysbbbbbb.kaleidoscopecookery.crafting.recipe.PotRecipe> resolveSelectedPotRecipeHolder(HeroEntity hero,
+                                                                                                                                       ServerLevel level,
+                                                                                                                                       ServerPlayer owner,
+                                                                                                                                       com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.PotBlockEntity pot) {
+            ResourceLocation selectedRecipeId = getCookSelectionRecipeId(hero, pot.getBlockPos());
+            if (selectedRecipeId != null) {
+                return findPotRecipeHolder(level, selectedRecipeId);
+            }
+
+            ResourceLocation recipeId = resolvePotRecipeId(hero, level, owner, pot);
+            if (recipeId == null) {
+                return null;
+            }
+            return findPotRecipeHolder(level, recipeId);
+        }
+
+        @Nullable
+        private static Ingredient resolvePotCarrierIngredient(HeroEntity hero, ServerLevel level, ServerPlayer owner,
+                                                              com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.PotBlockEntity pot) {
+            if (!pot.hasCarrier()) {
+                return Ingredient.EMPTY;
+            }
+
+            ResourceLocation recipeId = resolvePotRecipeId(hero, level, owner, pot);
+            if (recipeId == null) {
+                return null;
+            }
+
+            for (RecipeHolder<com.github.ysbbbbbb.kaleidoscopecookery.crafting.recipe.PotRecipe> holder
+                    : level.getRecipeManager().getAllRecipesFor(com.github.ysbbbbbb.kaleidoscopecookery.init.ModRecipes.POT_RECIPE)) {
+                if (holder.id().equals(recipeId)) {
+                    return holder.value().carrier();
+                }
+            }
+            return null;
+        }
+
+        @Nullable
+        private static Ingredient resolveStockpotCarrierIngredient(HeroEntity hero, ServerLevel level, ServerPlayer owner,
+                                                                   com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.StockpotBlockEntity stockpot) {
+            ResourceLocation recipeId = resolveStockpotRecipeId(hero, level, owner, stockpot);
+            if (recipeId == null) {
+                return null;
+            }
+
+            for (RecipeHolder<com.github.ysbbbbbb.kaleidoscopecookery.crafting.recipe.StockpotRecipe> holder
+                    : level.getRecipeManager().getAllRecipesFor(com.github.ysbbbbbb.kaleidoscopecookery.init.ModRecipes.STOCKPOT_RECIPE)) {
+                if (holder.id().equals(recipeId)) {
+                    return holder.value().carrier();
+                }
+            }
+            return null;
+        }
+
+        @Nullable
+        private static ResourceLocation resolvePotRecipeId(HeroEntity hero, ServerLevel level, ServerPlayer owner,
+                                                           com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.PotBlockEntity pot) {
+            List<PotPlan> plans = collectPotPlans(level, owner, pot);
+            if (plans.isEmpty()) {
+                return null;
+            }
+
+            int selectedIndex = resolveSelectedRecipeIndex(hero, pot.getBlockPos(), plans);
+            if (selectedIndex >= 0 && selectedIndex < plans.size()) {
+                return plans.get(selectedIndex).recipeId();
+            }
+
+            ItemStack currentResult = pot.getResult();
+            if (!currentResult.isEmpty()) {
+                for (PotPlan plan : plans) {
+                    if (ItemStack.isSameItemSameComponents(plan.result(), currentResult)) {
+                        return plan.recipeId();
+                    }
+                }
+            }
+
+            return plans.size() == 1 ? plans.get(0).recipeId() : null;
+        }
+
+        @Nullable
+        private static ResourceLocation resolveStockpotRecipeId(HeroEntity hero, ServerLevel level, ServerPlayer owner,
+                                                                com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.StockpotBlockEntity stockpot) {
+            List<StockpotPlan> plans = collectStockpotPlans(level, owner, stockpot);
+            if (plans.isEmpty()) {
+                return null;
+            }
+
+            int selectedIndex = resolveSelectedRecipeIndex(hero, stockpot.getBlockPos(), plans);
+            if (selectedIndex >= 0 && selectedIndex < plans.size()) {
+                return plans.get(selectedIndex).recipeId();
+            }
+
+            ItemStack currentResult = stockpot.getResult();
+            if (!currentResult.isEmpty()) {
+                for (StockpotPlan plan : plans) {
+                    if (ItemStack.isSameItemSameComponents(plan.result(), currentResult)) {
+                        return plan.recipeId();
+                    }
+                }
+            }
+
+            return plans.size() == 1 ? plans.get(0).recipeId() : null;
+        }
+
+        private static ItemStack getVirtualCarrierStack(Ingredient carrier) {
+            if (carrier.isEmpty()) {
+                return ItemStack.EMPTY;
+            }
+
+            ItemStack[] carrierItems = carrier.getItems();
+            if (carrierItems.length <= 0) {
+                return ItemStack.EMPTY;
+            }
+            return carrierItems[0].copyWithCount(1);
+        }
+
+        private static boolean tryTakeOutPotWithHeroTool(HeroEntity hero, ServerLevel level, ServerPlayer owner,
+                                                         com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.PotBlockEntity pot,
+                                                         ItemStack toolStack) {
+            if (toolStack.isEmpty()) {
+                return false;
+            }
+
+            ItemStack originalMainHand = hero.getMainHandItem().copy();
+            ItemStack expectedResult = pot.getResult().copy();
+            if (!originalMainHand.isEmpty()) {
+                hero.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+            }
+
+            boolean success = pot.takeOutProduct(level, hero, toolStack);
+            if (success) {
+                transferHeroTakeoutToOwner(hero, owner, pot.getBlockPos(), expectedResult);
+            }
+
+            if (!originalMainHand.isEmpty() && hero.getMainHandItem().isEmpty()) {
+                hero.setItemInHand(InteractionHand.MAIN_HAND, originalMainHand);
+            }
+            return success;
+        }
+
+        private static boolean tryTakeOutPotWithStack(HeroEntity hero, ServerLevel level, ServerPlayer owner,
+                                                      com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.PotBlockEntity pot,
+                                                      ItemStack stack) {
+            if (stack.isEmpty()) {
+                return false;
+            }
+            boolean success = pot.takeOutProduct(level, owner, stack);
+            if (success) {
+                owner.getInventory().setChanged();
+            }
+            return success;
+        }
+
+        private static boolean tryTakeOutStockpotWithStack(HeroEntity hero, ServerLevel level, ServerPlayer owner,
+                                                           com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.StockpotBlockEntity stockpot,
+                                                           ItemStack stack) {
+            if (stack.isEmpty()) {
+                return false;
+            }
+            boolean success = stockpot.takeOutProduct(level, owner, stack);
+            if (success) {
+                owner.getInventory().setChanged();
+            }
+            return success;
+        }
+
+        private static void transferHeroTakeoutToOwner(HeroEntity hero, ServerPlayer owner, BlockPos pos, ItemStack expectedResult) {
+            ItemStack mainHand = hero.getMainHandItem();
+            if (!mainHand.isEmpty() && ItemStack.isSameItemSameComponents(mainHand, expectedResult)) {
+                ItemHandlerHelper.giveItemToPlayer(owner, mainHand.copy());
+                hero.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+            }
+
+            net.minecraft.world.phys.AABB searchBox = new net.minecraft.world.phys.AABB(pos).inflate(1.5D);
+            for (net.minecraft.world.entity.item.ItemEntity itemEntity : hero.level().getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, searchBox)) {
+                ItemStack stack = itemEntity.getItem();
+                if (!ItemStack.isSameItemSameComponents(stack, expectedResult)) {
+                    continue;
+                }
+                ItemHandlerHelper.giveItemToPlayer(owner, stack.copy());
+                itemEntity.discard();
+            }
+            owner.getInventory().setChanged();
+        }
+
+
+        private static Set<UUID> snapshotChoppingBoardDropIds(ServerLevel level, BlockPos pos, ItemStack expectedResult) {
+            Set<UUID> dropIds = new HashSet<>();
+            if (expectedResult.isEmpty()) {
+                return dropIds;
+            }
+
+            for (ItemEntity itemEntity : getChoppingBoardResultEntities(level, pos, expectedResult, 1.0D)) {
+                dropIds.add(itemEntity.getUUID());
+            }
+            return dropIds;
+        }
+
+        private static void deliverChoppingBoardResult(ServerLevel level, ServerPlayer owner, BlockPos pos, ItemStack expectedResult,
+                                                       Set<UUID> existingDropIds) {
+            if (expectedResult.isEmpty()) {
+                return;
+            }
+
+            int remaining = expectedResult.getCount();
+            Vec3 boardCenter = Vec3.atCenterOf(pos);
+            List<ItemEntity> newDrops = new ArrayList<>();
+            for (ItemEntity itemEntity : getChoppingBoardResultEntities(level, pos, expectedResult, 1.0D)) {
+                if (!existingDropIds.contains(itemEntity.getUUID())) {
+                    newDrops.add(itemEntity);
+                }
+            }
+            newDrops.sort(Comparator.comparingDouble(itemEntity -> itemEntity.distanceToSqr(boardCenter)));
+
+            for (ItemEntity itemEntity : newDrops) {
+                if (remaining <= 0) {
+                    break;
+                }
+
+                ItemStack stack = itemEntity.getItem();
+                int movedCount = Math.min(remaining, stack.getCount());
+                ItemHandlerHelper.giveItemToPlayer(owner, stack.copyWithCount(movedCount));
+                remaining -= movedCount;
+                if (movedCount >= stack.getCount()) {
+                    itemEntity.discard();
+                } else {
+                    stack.shrink(movedCount);
+                    itemEntity.setItem(stack);
+                }
+            }
+
+            if (remaining > 0) {
+                ItemHandlerHelper.giveItemToPlayer(owner, expectedResult.copyWithCount(remaining));
+            }
+            owner.getInventory().setChanged();
+        }
+
+        private static List<ItemEntity> getChoppingBoardResultEntities(ServerLevel level, BlockPos pos, ItemStack expectedResult, double radius) {
+            AABB searchBox = new AABB(pos).inflate(radius);
+            return level.getEntitiesOfClass(ItemEntity.class, searchBox, itemEntity ->
+                    itemEntity.tickCount <= 2 && ItemStack.isSameItemSameComponents(itemEntity.getItem(), expectedResult));
+        }
+
+
+        private static boolean removeStockpotLid(ServerLevel level, ServerPlayer owner,
+                                                 com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.StockpotBlockEntity stockpot) {
+            if (!stockpot.hasLid()) {
+                return false;
+            }
+
+            BlockPos pos = stockpot.getBlockPos();
+            BlockState state = level.getBlockState(pos);
+            if (!state.hasProperty(com.github.ysbbbbbb.kaleidoscopecookery.block.kitchen.StockpotBlock.HAS_LID)) {
+                return false;
+            }
+
+            ItemStack lidItem = stockpot.getLidItem().isEmpty()
+                    ? com.github.ysbbbbbb.kaleidoscopecookery.init.ModItems.STOCKPOT_LID.get().getDefaultInstance()
+                    : stockpot.getLidItem().copy();
+            stockpot.setLidItem(ItemStack.EMPTY);
+            stockpot.setChanged();
+            level.setBlockAndUpdate(pos, state.setValue(
+                    com.github.ysbbbbbb.kaleidoscopecookery.block.kitchen.StockpotBlock.HAS_LID, false));
+            if (!owner.getInventory().add(lidItem)) {
+                owner.drop(lidItem, false);
+            }
+            owner.getInventory().setChanged();
+            return true;
+        }
+
+        private static void setSteamerLid(ServerLevel level,
+                                          com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.SteamerBlockEntity steamer,
+                                          boolean hasLid) {
+            BlockPos pos = steamer.getBlockPos();
+            BlockState state = level.getBlockState(pos);
+            if (!state.hasProperty(com.github.ysbbbbbb.kaleidoscopecookery.block.kitchen.SteamerBlock.HAS_LID)) {
+                return;
+            }
+            if (state.getValue(com.github.ysbbbbbb.kaleidoscopecookery.block.kitchen.SteamerBlock.HAS_LID) == hasLid) {
+                return;
+            }
+            level.setBlock(pos, state.setValue(
+                    com.github.ysbbbbbb.kaleidoscopecookery.block.kitchen.SteamerBlock.HAS_LID, hasLid), 3);
+        }
+
+        private static int computeIngredientCraftCount(List<Ingredient> rawIngredients, List<ItemStack> currentInputs,
+                                                       List<ItemStack> availableStacks) {
+            List<Ingredient> ingredients = normalizeIngredients(rawIngredients);
+            if (ingredients.isEmpty()) {
+                return MAX_COOK_REPEAT_COUNT;
+            }
+
+            boolean[] usedByCurrent = new boolean[ingredients.size()];
+            if (!matchExistingInputs(currentInputs, ingredients, usedByCurrent, 0)) {
+                return 0;
+            }
+
+            List<Ingredient> firstCycleRemaining = new ArrayList<>();
+            for (int i = 0; i < ingredients.size(); i++) {
+                if (!usedByCurrent[i]) {
+                    firstCycleRemaining.add(ingredients.get(i));
+                }
+            }
+
+            int[] counts = copyStackCounts(availableStacks);
+            if (!firstCycleRemaining.isEmpty() && !consumeIngredientGroup(firstCycleRemaining, availableStacks, counts)) {
+                return 0;
+            }
+
+            int craftCount = 1;
+            while (craftCount < MAX_COOK_REPEAT_COUNT && consumeIngredientGroup(ingredients, availableStacks, counts)) {
+                craftCount++;
+            }
+            return craftCount;
+        }
+
+        private static boolean consumeIngredientGroup(List<Ingredient> ingredients, List<ItemStack> availableStacks, int[] counts) {
+            return ingredients.isEmpty() || matchRemainingIngredients(ingredients, availableStacks, counts, new ArrayList<>(), 0);
+        }
+
+        private static int[] copyStackCounts(List<ItemStack> availableStacks) {
+            int[] counts = new int[availableStacks.size()];
+            for (int i = 0; i < availableStacks.size(); i++) {
+                counts[i] = availableStacks.get(i).getCount();
+            }
+            return counts;
+        }
+
+        private static int countSoupBaseItems(ResourceLocation soupBaseId, List<ItemStack> availableStacks) {
+            com.github.ysbbbbbb.kaleidoscopecookery.api.recipe.soupbase.ISoupBase soupBase =
+                    com.github.ysbbbbbb.kaleidoscopecookery.crafting.soupbase.SoupBaseManager.getSoupBase(soupBaseId);
+            if (soupBase == null) {
+                return 0;
+            }
+
+            int total = 0;
+            for (ItemStack stack : availableStacks) {
+                if (!stack.isEmpty() && soupBase.isSoupBase(stack)) {
+                    total += stack.getCount();
+                }
+            }
+            return total;
+        }
+
+        private static int countMatchingItems(Ingredient ingredient, List<ItemStack> availableStacks) {
+            int total = 0;
+            for (ItemStack stack : availableStacks) {
+                if (!stack.isEmpty() && ingredient.test(stack)) {
+                    total += stack.getCount();
+                }
+            }
+            return total;
+        }
+
+        private static List<Ingredient> normalizeIngredients(List<Ingredient> rawIngredients) {
+            List<Ingredient> ingredients = new ArrayList<>();
+            for (Ingredient ingredient : rawIngredients) {
+                if (ingredient != null && !ingredient.isEmpty()) {
+                    ingredients.add(ingredient);
+                }
+            }
+            return ingredients;
+        }
+
+        private static List<PotPlan> collectPotPlans(ServerLevel level, ServerPlayer owner,
+                                                     com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.PotBlockEntity pot) {
+            List<ItemStack> currentInputs = collectNonEmptyStacks(pot.getInputs());
+            List<ItemStack> availableStacks = collectAccessibleStacks(owner);
+            List<PotPlan> plans = new ArrayList<>();
+
+            for (RecipeHolder<com.github.ysbbbbbb.kaleidoscopecookery.crafting.recipe.PotRecipe> holder : level.getRecipeManager().getAllRecipesFor(com.github.ysbbbbbb.kaleidoscopecookery.init.ModRecipes.POT_RECIPE)) {
+                com.github.ysbbbbbb.kaleidoscopecookery.crafting.recipe.PotRecipe recipe = holder.value();
+                IngredientPlan ingredientPlan = buildIngredientPlan(recipe.ingredients(), currentInputs, availableStacks);
+                int maxRepeatCount = computeIngredientCraftCount(recipe.ingredients(), currentInputs, availableStacks);
+                if (ingredientPlan != null && maxRepeatCount > 0) {
+                    plans.add(new PotPlan(holder.id(), recipe.getResultItem(level.registryAccess()).copy(),
+                            ingredientPlan, maxRepeatCount));
+                }
+            }
+
+            plans.sort(Comparator.comparing(plan -> plan.recipeId().toString()));
+            return plans;
+        }
+
+        private static List<StockpotPlan> collectStockpotPlans(ServerLevel level, ServerPlayer owner,
+                                                               com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.StockpotBlockEntity stockpot) {
+            List<ItemStack> currentInputs = collectNonEmptyStacks(stockpot.getInputs());
+            List<ItemStack> availableStacks = collectAccessibleStacks(owner);
+            ResourceLocation selectedSoupBase = stockpot.getStatus() == com.github.ysbbbbbb.kaleidoscopecookery.api.blockentity.IStockpot.PUT_SOUP_BASE
+                    ? null
+                    : stockpot.getSoupBaseId();
+            List<StockpotPlan> plans = new ArrayList<>();
+
+            for (RecipeHolder<com.github.ysbbbbbb.kaleidoscopecookery.crafting.recipe.StockpotRecipe> holder : level.getRecipeManager().getAllRecipesFor(com.github.ysbbbbbb.kaleidoscopecookery.init.ModRecipes.STOCKPOT_RECIPE)) {
+                com.github.ysbbbbbb.kaleidoscopecookery.crafting.recipe.StockpotRecipe recipe = holder.value();
+                if (selectedSoupBase != null && !recipe.soupBase().equals(selectedSoupBase)) {
+                    continue;
+                }
+
+                ItemStack soupBaseStack = ItemStack.EMPTY;
+                if (selectedSoupBase == null) {
+                    soupBaseStack = findSoupBaseStack(recipe.soupBase(), availableStacks);
+                    if (soupBaseStack.isEmpty()) {
+                        continue;
+                    }
+                }
+
+                IngredientPlan ingredientPlan = buildIngredientPlan(recipe.ingredients(), currentInputs, availableStacks);
+                int ingredientRepeatCount = computeIngredientCraftCount(recipe.ingredients(), currentInputs, availableStacks);
+                int soupBaseRepeatLimit = selectedSoupBase == null
+                        ? countSoupBaseItems(recipe.soupBase(), availableStacks)
+                        : countSoupBaseItems(recipe.soupBase(), availableStacks) + 1;
+                int maxRepeatCount = Math.min(ingredientRepeatCount, soupBaseRepeatLimit);
+                if (ingredientPlan != null && maxRepeatCount > 0) {
+                    plans.add(new StockpotPlan(holder.id(), recipe.getResultItem(level.registryAccess()).copy(),
+                            soupBaseStack.isEmpty() ? null : soupBaseStack, ingredientPlan, maxRepeatCount));
+                }
+            }
+
+            plans.sort(Comparator.comparing(plan -> plan.recipeId().toString()));
+            return plans;
+        }
+
+
+        private static List<ChoppingBoardPlan> collectChoppingBoardPlans(ServerLevel level, ServerPlayer owner,
+                                                                         com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.ChoppingBoardBlockEntity choppingBoard) {
+            List<ItemStack> availableStacks = collectAccessibleStacks(owner);
+            List<ChoppingBoardPlan> plans = new ArrayList<>();
+            ItemStack currentCutStack = choppingBoard.getCurrentCutStack();
+            boolean hasCurrentIngredient = !currentCutStack.isEmpty();
+            ResourceLocation currentModelId = choppingBoard.getModelId();
+            int currentMaxCutCount = choppingBoard.getMaxCutCount();
+
+            for (RecipeHolder<com.github.ysbbbbbb.kaleidoscopecookery.crafting.recipe.ChoppingBoardRecipe> holder : level.getRecipeManager().getAllRecipesFor(com.github.ysbbbbbb.kaleidoscopecookery.init.ModRecipes.CHOPPING_BOARD_RECIPE)) {
+                com.github.ysbbbbbb.kaleidoscopecookery.crafting.recipe.ChoppingBoardRecipe recipe = holder.value();
+                int maxRepeatCount;
+                ItemStack ingredientStack = ItemStack.EMPTY;
+                if (hasCurrentIngredient) {
+                    if (currentModelId == null
+                            || currentMaxCutCount != recipe.getCutCount()
+                            || !recipe.getModelId().equals(currentModelId)
+                            || !recipe.getIngredient().test(currentCutStack)) {
+                        continue;
+                    }
+                    maxRepeatCount = Math.min(MAX_COOK_REPEAT_COUNT, countMatchingItems(recipe.getIngredient(), availableStacks) + 1);
+                } else {
+                    ingredientStack = findMatchingStack(recipe.getIngredient(), 1, availableStacks);
+                    if (ingredientStack.isEmpty() || !isPlaceableChoppingBoardRecipe(level, ingredientStack, holder.id())) {
+                        continue;
+                    }
+                    maxRepeatCount = Math.min(MAX_COOK_REPEAT_COUNT, countMatchingItems(recipe.getIngredient(), availableStacks));
+                }
+
+                if (maxRepeatCount <= 0) {
+                    continue;
+                }
+
+                plans.add(new ChoppingBoardPlan(holder.id(), recipe.getResult().copy(),
+                        ingredientStack.isEmpty() ? null : ingredientStack, maxRepeatCount));
+            }
+
+            plans.sort(Comparator.comparing(plan -> plan.recipeId().toString()));
+            return plans;
+        }
+
+        private static List<SteamerPlan> collectSteamerPlans(ServerLevel level, ServerPlayer owner,
+                                                             com.github.ysbbbbbb.kaleidoscopecookery.api.blockentity.ISteamer steamer) {
+            List<ItemStack> availableStacks = collectAccessibleStacks(owner);
+            List<SteamerPlan> plans = new ArrayList<>();
+
+            for (RecipeHolder<com.github.ysbbbbbb.kaleidoscopecookery.crafting.recipe.SteamerRecipe> holder : level.getRecipeManager().getAllRecipesFor(com.github.ysbbbbbb.kaleidoscopecookery.init.ModRecipes.STEAMER_RECIPE)) {
+                com.github.ysbbbbbb.kaleidoscopecookery.crafting.recipe.SteamerRecipe recipe = holder.value();
+                ItemStack ingredientStack = findMatchingStack(recipe.getIngredient(), 1, availableStacks);
+                int maxRepeatCount = Math.min(MAX_COOK_REPEAT_COUNT, countMatchingItems(recipe.getIngredient(), availableStacks));
+                if (!ingredientStack.isEmpty() && maxRepeatCount > 0) {
+                    plans.add(new SteamerPlan(holder.id(), recipe.getResult().copy(), ingredientStack, maxRepeatCount));
+                }
+            }
+
+            plans.sort(Comparator.comparing(plan -> plan.recipeId().toString()));
+            return plans;
+        }
+
+        @Nullable
+        private static IngredientPlan buildIngredientPlan(List<Ingredient> rawIngredients, List<ItemStack> currentInputs,
+                                                          List<ItemStack> availableStacks) {
+            List<Ingredient> ingredients = normalizeIngredients(rawIngredients);
+
+            boolean[] usedByCurrent = new boolean[ingredients.size()];
+            if (!matchExistingInputs(currentInputs, ingredients, usedByCurrent, 0)) {
+                return null;
+            }
+
+            List<Ingredient> remainingIngredients = new ArrayList<>();
+            for (int i = 0; i < ingredients.size(); i++) {
+                if (!usedByCurrent[i]) {
+                    remainingIngredients.add(ingredients.get(i));
+                }
+            }
+
+            if (remainingIngredients.isEmpty()) {
+                return new IngredientPlan(null, currentInputs.size(), 0);
+            }
+
+            int[] counts = copyStackCounts(availableStacks);
+
+            List<ItemStack> chosenStacks = new ArrayList<>();
+            if (!matchRemainingIngredients(remainingIngredients, availableStacks, counts, chosenStacks, 0)) {
+                return null;
+            }
+
+            ItemStack nextIngredient = chosenStacks.isEmpty() ? null : chosenStacks.get(0);
+            return new IngredientPlan(nextIngredient, currentInputs.size(), remainingIngredients.size());
+        }
+
+        private static boolean matchExistingInputs(List<ItemStack> currentInputs, List<Ingredient> ingredients, boolean[] used, int index) {
+            if (index >= currentInputs.size()) {
+                return true;
+            }
+
+            ItemStack input = currentInputs.get(index);
+            for (int i = 0; i < ingredients.size(); i++) {
+                if (used[i]) {
+                    continue;
+                }
+                Ingredient ingredient = ingredients.get(i);
+                if (!ingredient.test(input)) {
+                    continue;
+                }
+                used[i] = true;
+                if (matchExistingInputs(currentInputs, ingredients, used, index + 1)) {
+                    return true;
+                }
+                used[i] = false;
+            }
+            return false;
+        }
+
+        private static boolean matchRemainingIngredients(List<Ingredient> remainingIngredients, List<ItemStack> availableStacks,
+                                                         int[] counts, List<ItemStack> chosenStacks, int index) {
+            if (index >= remainingIngredients.size()) {
+                return true;
+            }
+
+            Ingredient ingredient = remainingIngredients.get(index);
+            for (int i = 0; i < availableStacks.size(); i++) {
+                if (counts[i] <= 0) {
+                    continue;
+                }
+                ItemStack candidate = availableStacks.get(i);
+                if (!ingredient.test(candidate)) {
+                    continue;
+                }
+
+                counts[i]--;
+                chosenStacks.add(candidate);
+                if (matchRemainingIngredients(remainingIngredients, availableStacks, counts, chosenStacks, index + 1)) {
+                    return true;
+                }
+                chosenStacks.remove(chosenStacks.size() - 1);
+                counts[i]++;
+            }
+            return false;
+        }
+
+        private static ItemStack findSoupBaseStack(ResourceLocation soupBaseId, List<ItemStack> availableStacks) {
+            com.github.ysbbbbbb.kaleidoscopecookery.api.recipe.soupbase.ISoupBase soupBase =
+                    com.github.ysbbbbbb.kaleidoscopecookery.crafting.soupbase.SoupBaseManager.getSoupBase(soupBaseId);
+            if (soupBase == null) {
+                return ItemStack.EMPTY;
+            }
+
+            for (ItemStack stack : availableStacks) {
+                if (!stack.isEmpty() && soupBase.isSoupBase(stack)) {
+                    return stack;
+                }
+            }
+            return ItemStack.EMPTY;
+        }
+
+        private static ItemStack findTeaFluidStack(ResourceLocation teaFluidId, List<ItemStack> availableStacks) {
+            for (ItemStack stack : availableStacks) {
+                if (stack.isEmpty()) {
+                    continue;
+                }
+                if (containsFluid(stack, teaFluidId)) {
+                    return stack;
+                }
+            }
+            return ItemStack.EMPTY;
+        }
+
+        private static boolean containsFluid(ItemStack stack, ResourceLocation fluidId) {
+            var handler = stack.getCapability(Capabilities.FluidHandler.ITEM);
+            if (handler == null || handler.getTanks() <= 0) {
+                return false;
+            }
+
+            FluidStack contained = handler.getFluidInTank(0);
+            if (contained.isEmpty() || contained.getAmount() < 1000) {
+                return false;
+            }
+
+            ResourceLocation containedFluidId = BuiltInRegistries.FLUID.getKey(contained.getFluid());
+            return fluidId.equals(containedFluidId);
+        }
+
+        private static boolean isPlaceableChoppingBoardRecipe(ServerLevel level, ItemStack ingredientStack, ResourceLocation recipeId) {
+            SingleRecipeInput container = new SingleRecipeInput(ingredientStack.copyWithCount(1));
+            return level.getRecipeManager()
+                    .getRecipeFor(com.github.ysbbbbbb.kaleidoscopecookery.init.ModRecipes.CHOPPING_BOARD_RECIPE, container, level)
+                    .map(recipe -> recipe.id().equals(recipeId))
+                    .orElse(false);
+        }
+
+        private static ItemStack findMatchingStack(Ingredient ingredient, int minCount, List<ItemStack> availableStacks) {
+            for (ItemStack stack : availableStacks) {
+                if (!stack.isEmpty() && stack.getCount() >= minCount && ingredient.test(stack)) {
+                    return stack;
+                }
+            }
+            return ItemStack.EMPTY;
+        }
+
+        private static List<ItemStack> collectNonEmptyStacks(List<ItemStack> stacks) {
+            List<ItemStack> result = new ArrayList<>();
+            for (ItemStack stack : stacks) {
+                if (stack != null && !stack.isEmpty()) {
+                    result.add(stack);
+                }
+            }
+            return result;
+        }
+
+        private static List<ItemStack> collectAccessibleStacks(ServerPlayer owner) {
+            List<ItemStack> stacks = new ArrayList<>(owner.getInventory().items.size() + owner.getInventory().offhand.size());
+            for (ItemStack stack : owner.getInventory().items) {
+                if (!stack.isEmpty()) {
+                    stacks.add(stack);
+                }
+            }
+            for (ItemStack stack : owner.getInventory().offhand) {
+                if (!stack.isEmpty()) {
+                    stacks.add(stack);
+                }
+            }
+            return stacks;
+        }
+        @Nullable
+        private static Class<?> findOptionalClass(String className) {
+            try {
+                return Class.forName(className, false, HeroKaleidoscopeCompat.class.getClassLoader());
+            } catch (ClassNotFoundException | LinkageError ignored) {
+                return null;
+            }
+        }
+
+        private static boolean isTeapotBlockEntity(@Nullable BlockEntity blockEntity) {
+            return blockEntity != null && TEAPOT_BLOCK_ENTITY_CLASS != null && TEAPOT_BLOCK_ENTITY_CLASS.isInstance(blockEntity);
+        }
+
+        private static final class TeapotSupport {
+            @Nullable
+            private static final ResourceLocation EMPTY_TEA_FLUID = resolveEmptyTeaFluid();
+
+            private TeapotSupport() {
+            }
+
+            static ItemStack getCookOffhandDisplay() {
+                return com.github.ysbbbbbb.kaleidoscopecookery.init.ModItems.EMPTY_CUP.get().getDefaultInstance();
+            }
+
+            static boolean tickCookware(HeroEntity hero, ServerLevel level, ServerPlayer owner, BlockEntity blockEntity) {
+                if (blockEntity instanceof com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.TeapotBlockEntity teapot) {
+                    return tickTeapot(hero, level, owner, teapot);
+                }
+                return false;
+            }
+
+            static List<CookOption> getCookOptions(ServerLevel level, ServerPlayer owner, BlockEntity blockEntity) {
+                if (blockEntity instanceof com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.TeapotBlockEntity teapot) {
+                    return mapTeapotOptions(collectTeapotPlans(owner, teapot, level));
+                }
+                return List.of();
+            }
+
+            @Nullable
+            private static ResourceLocation resolveEmptyTeaFluid() {
+                try {
+                    Class<?> serializerClass = Class.forName(
+                            "com.github.ysbbbbbb.kaleidoscopecookery.crafting.serializer.TeapotRecipeSerializer",
+                            false,
+                            HeroKaleidoscopeCompat.class.getClassLoader());
+                    Object value = serializerClass.getField("EMPTY_TEA_FLUID").get(null);
+                    return value instanceof ResourceLocation resourceLocation ? resourceLocation : null;
+                } catch (ReflectiveOperationException | LinkageError ignored) {
+                    return null;
+                }
+            }
+
+            private static boolean needsTeaFluid(@Nullable ResourceLocation teaFluidId) {
+                if (teaFluidId == null) {
+                    return true;
+                }
+                if (EMPTY_TEA_FLUID != null && EMPTY_TEA_FLUID.equals(teaFluidId)) {
+                    return true;
+                }
+                String path = teaFluidId.getPath();
+                return path == null || path.isEmpty() || "empty".equals(path);
+            }
+
+            private static boolean tickTeapot(HeroEntity hero, ServerLevel level, ServerPlayer owner,
+                                              com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.TeapotBlockEntity teapot) {
+                int status = teapot.getStatus();
+                if (status == com.github.ysbbbbbb.kaleidoscopecookery.api.blockentity.ITeapot.FINISHED) {
+                    if (teapot.takeTeapot(level, owner)) {
+                        owner.getInventory().setChanged();
+                        consumeCookRepeat(hero, teapot.getBlockPos());
+                        return true;
+                    }
+                    return false;
+                }
+
+                if (status == com.github.ysbbbbbb.kaleidoscopecookery.api.blockentity.ITeapot.PROCESSING) {
+                    return false;
+                }
+
+                List<TeapotPlan> plans = collectTeapotPlans(owner, teapot, level);
+                if (plans.isEmpty()) {
+                    return false;
+                }
+
+                int selectedIndex = resolveSelectedRecipeIndex(hero, teapot.getBlockPos(), plans);
+                if (selectedIndex < 0) {
+                    return false;
+                }
+
+                TeapotPlan plan = plans.get(selectedIndex);
+                if (needsTeaFluid(teapot.getTeaFluidId())) {
+                    ItemStack teaFluidStack = plan.teaFluidStack();
+                    if (teaFluidStack != null && !teaFluidStack.isEmpty() && teapot.addTeaFluid(level, owner, teaFluidStack)) {
+                        owner.getInventory().setChanged();
+                        return true;
+                    }
+                    return false;
+                }
+
+                if (teapot.getInput().isEmpty()) {
+                    ItemStack ingredientStack = plan.ingredientStack();
+                    if (ingredientStack != null && !ingredientStack.isEmpty() && teapot.addIngredient(level, owner, ingredientStack)) {
+                        owner.getInventory().setChanged();
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            private static List<TeapotPlan> collectTeapotPlans(ServerPlayer owner,
+                                                               com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.TeapotBlockEntity teapot,
+                                                               ServerLevel level) {
+                List<ItemStack> availableStacks = collectAccessibleStacks(owner);
+                List<TeapotPlan> plans = new ArrayList<>();
+                ResourceLocation currentTeaFluid = teapot.getTeaFluidId();
+                boolean needsTeaFluid = needsTeaFluid(currentTeaFluid);
+                ItemStack currentInput = teapot.getInput();
+
+                for (RecipeHolder<com.github.ysbbbbbb.kaleidoscopecookery.crafting.recipe.TeapotRecipe> holder
+                        : level.getRecipeManager().getAllRecipesFor(com.github.ysbbbbbb.kaleidoscopecookery.init.ModRecipes.TEAPOT_RECIPE)) {
+                    com.github.ysbbbbbb.kaleidoscopecookery.crafting.recipe.TeapotRecipe recipe = holder.value();
+                    if (!needsTeaFluid && !recipe.teaFluid().equals(currentTeaFluid)) {
+                        continue;
+                    }
+
+                    ItemStack teaFluidStack = ItemStack.EMPTY;
+                    if (needsTeaFluid) {
+                        teaFluidStack = findTeaFluidStack(recipe.teaFluid(), availableStacks);
+                        if (teaFluidStack.isEmpty()) {
+                            continue;
+                        }
+                    }
+
+                    ItemStack ingredientStack = ItemStack.EMPTY;
+                    if (!currentInput.isEmpty()) {
+                        if (!recipe.ingredient().test(currentInput) || currentInput.getCount() < recipe.ingredientCount()) {
+                            continue;
+                        }
+                    } else {
+                        ingredientStack = findMatchingStack(recipe.ingredient(), recipe.ingredientCount(), availableStacks);
+                        if (ingredientStack.isEmpty()) {
+                            continue;
+                        }
+                    }
+
+                    plans.add(new TeapotPlan(holder.id(), recipe.result().copy(),
+                            teaFluidStack.isEmpty() ? null : teaFluidStack,
+                            ingredientStack.isEmpty() ? null : ingredientStack, 1));
+                }
+
+                plans.sort(Comparator.comparing(plan -> plan.recipeId().toString()));
+                return plans;
+            }
+        }
+
+        private static boolean tryAccessibleMatchingStacks(ServerPlayer owner, StackMatcher matcher, StackAction action) {
+            for (ItemStack stack : owner.getInventory().items) {
+                if (!stack.isEmpty() && matcher.test(stack) && action.apply(stack)) {
+                    owner.getInventory().setChanged();
+                    return true;
+                }
+            }
+            for (ItemStack stack : owner.getInventory().offhand) {
+                if (!stack.isEmpty() && matcher.test(stack) && action.apply(stack)) {
+                    owner.getInventory().setChanged();
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+    private static boolean tryAccessibleStacks(ServerPlayer owner, StackAction action) {
+        for (ItemStack stack : owner.getInventory().items) {
+            if (!stack.isEmpty() && action.apply(stack)) {
+                owner.getInventory().setChanged();
+                return true;
+            }
+        }
+        for (ItemStack stack : owner.getInventory().offhand) {
+            if (!stack.isEmpty() && action.apply(stack)) {
+                owner.getInventory().setChanged();
+                return true;
+            }
+        }
+        return false;
+    }
+}

@@ -1,5 +1,7 @@
 package com.whitecloud233.herobrine_companion.entity.ai.learning;
 
+import com.whitecloud233.herobrine_companion.compat.cooking.HeroCookingCompat;
+import com.whitecloud233.herobrine_companion.compat.kaleidoscope.HeroKaleidoscopeCompat;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -9,6 +11,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.AreaEffectCloud;
@@ -33,6 +36,11 @@ import java.util.List;
 import java.util.UUID;
 
 public class HeroInvitedActionGoal extends Goal {
+    private static final int ACTION_INSPECT = 1;
+    private static final int ACTION_REST = 2;
+    private static final int ACTION_GUARD = 3;
+    private static final int ACTION_COOK = HeroCookingCompat.INVITED_ACTION_COOK;
+
     private final HeroEntity hero;
     private BlockPos targetPos;
     private int actionType;
@@ -92,8 +100,11 @@ public class HeroInvitedActionGoal extends Goal {
         if (currentInvitedPos == null || !currentInvitedPos.equals(this.targetPos)) {
             return false;
         }
-        if (this.actionType == 2 || this.actionType == 3) {
+        if (this.actionType == ACTION_REST || this.actionType == ACTION_GUARD) {
             return true;
+        }
+        if (this.actionType == ACTION_COOK) {
+            return HeroCookingCompat.isCookwareStation(this.hero.level(), this.targetPos);
         }
         return this.timer < 400;
     }
@@ -110,8 +121,12 @@ public class HeroInvitedActionGoal extends Goal {
 
         this.hero.getNavigation().stop();
         this.hero.setNoGravity(true);
+        if (this.actionType == ACTION_COOK && this.targetPos != null) {
+            HeroCookingCompat.beginCookChunkTicket(this.hero, this.targetPos);
+        }
 
-        if (this.actionType == 3) {
+
+        if (this.actionType == ACTION_GUARD) {
             BlockState state = this.hero.level().getBlockState(this.targetPos);
             this.isGuardingDoor = state.getBlock() instanceof DoorBlock || state.getBlock() instanceof TrapDoorBlock || state.getBlock() instanceof FenceGateBlock;
             this.isGuardingContainer = state.hasBlockEntity() || state.getBlock() instanceof EnderChestBlock;
@@ -120,6 +135,10 @@ public class HeroInvitedActionGoal extends Goal {
 
     @Override
     public void stop() {
+        if (this.actionType == ACTION_COOK) {
+            HeroCookingCompat.endCookChunkTicket(this.hero);
+        }
+
         if (this.hero.isPassenger()) {
             this.hero.stopRiding();
         }
@@ -142,9 +161,15 @@ public class HeroInvitedActionGoal extends Goal {
     @Override
     public void tick() {
         if (this.targetPos == null) return;
+        if (this.actionType == HeroCookingCompat.INVITED_ACTION_COOK
+                && !HeroCookingCompat.isCookwareStation(this.hero.level(), this.targetPos)) {
+            this.hero.setInvitedPos(null);
+            this.hero.setInvitedAction(0);
+            return;
+        }
 
         Vec3 destination;
-        if (this.actionType == 3 && this.isGuardingDoor) {
+        if (this.actionType == ACTION_GUARD && this.isGuardingDoor) {
             if (this.cachedDoorStandPos == null || this.timer % 100 == 0) {
                 this.cachedDoorStandPos = getDoorStandPos();
             }
@@ -153,7 +178,7 @@ public class HeroInvitedActionGoal extends Goal {
             destination = Vec3.atCenterOf(this.targetPos);
         }
 
-        double arriveDistance = (this.actionType == 3 && this.isGuardingContainer) ? 16.0D : 4.0D;
+        double arriveDistance = (this.actionType == ACTION_GUARD && this.isGuardingContainer) ? 16.0D : 4.0D;
         double distSqr = this.hero.distanceToSqr(destination);
 
         if (!this.hasArrived) {
@@ -186,13 +211,14 @@ public class HeroInvitedActionGoal extends Goal {
         } else {
             this.timer++;
 
-            if (this.actionType == 3 && this.isGuardingContainer) {
+            if (this.actionType == ACTION_GUARD && this.isGuardingContainer) {
                 this.hero.setNoGravity(true);
             } else if (!this.hero.isNoGravity() && this.hero.isNoGravity()) {
                 this.hero.setNoGravity(false);
             }
 
-            if (this.actionType == 3) {
+            // 执行具体逻辑
+            if (this.actionType == ACTION_GUARD) {
                 if (this.isGuardingContainer) {
                     performContainerGuardLogic(Vec3.atCenterOf(this.targetPos));
                 } else if (this.isGuardingDoor) {
@@ -200,12 +226,16 @@ public class HeroInvitedActionGoal extends Goal {
                 } else {
                     performGenericGuardLogic(destination);
                 }
-            } else if (this.actionType != 2) {
+            } else if (this.actionType == ACTION_COOK) {
+                this.hero.setNoGravity(false);
+                performCookPresentation(destination);
+                HeroCookingCompat.tickCookware(this.hero, this.targetPos);
+            } else if (this.actionType != ACTION_REST) {
                 this.hero.getLookControl().setLookAt(destination);
             }
 
-            if (this.actionType == 1 && this.timer % 10 == 0) spawnInspectParticles();
-            if (this.actionType == 2 && this.timer % 20 == 0) spawnRestParticles();
+            if (this.actionType == ACTION_INSPECT && this.timer % 10 == 0) spawnInspectParticles();
+            if (this.actionType == ACTION_REST && this.timer % 20 == 0) spawnRestParticles();
         }
     }
 
@@ -488,27 +518,59 @@ public class HeroInvitedActionGoal extends Goal {
     }
 
     private void performAction() {
-        if (this.hero.getOwnerUUID() != null) {
-            this.hero.getHeroBrain().inputCreativity(this.hero.getOwnerUUID(), 0.1f);
-            this.hero.getHeroBrain().inputExploration(this.hero.getOwnerUUID(), 0.05f);
+        UUID ownerUUID = this.hero.getOwnerUUID();
+        if (ownerUUID != null) {
+            this.hero.getHeroBrain().inputCreativity(ownerUUID, 0.1f);
+            this.hero.getHeroBrain().inputExploration(ownerUUID, 0.05f);
 
-            Player owner = this.hero.level().getPlayerByUUID(this.hero.getOwnerUUID());
+            Player owner = this.hero.level().getPlayerByUUID(ownerUUID);
             if (owner instanceof ServerPlayer serverPlayer) {
-                if (this.actionType == 1) {
+                if (this.actionType == ACTION_INSPECT) {
                     HeroDialogueHandler.onInspectBlock(this.hero, serverPlayer, this.hero.level().getBlockState(this.targetPos));
-                    this.hero.getHeroBrain().inputMeta(this.hero.getOwnerUUID(), 0.05f);
-                } else if (this.actionType == 2) {
-                    this.hero.getHeroBrain().inputNostalgia(this.hero.getOwnerUUID(), 0.1f);
-                } else if (this.actionType == 3) {
-                    this.hero.getHeroBrain().inputViolence(this.hero.getOwnerUUID(), 0.05f);
-                    this.hero.getHeroBrain().inputCreativity(this.hero.getOwnerUUID(), 0.05f);
+                    this.hero.getHeroBrain().inputMeta(ownerUUID, 0.05f);
+                } else if (this.actionType == ACTION_REST) {
+                    this.hero.getHeroBrain().inputNostalgia(ownerUUID, 0.1f);
+                } else if (this.actionType == ACTION_GUARD) {
+                    this.hero.getHeroBrain().inputViolence(ownerUUID, 0.05f);
+                    this.hero.getHeroBrain().inputCreativity(ownerUUID, 0.05f);
+                } else if (this.actionType == ACTION_COOK) {
+                    this.hero.getHeroBrain().inputCreativity(ownerUUID, 0.1f);
+                    this.hero.getHeroBrain().inputMeta(ownerUUID, 0.02f);
                 }
             }
         }
-        if (this.actionType == 2) {
+        if (this.actionType == ACTION_REST) {
             createSeatAndSit();
         }
     }
+
+    private void performCookPresentation(Vec3 destination) {
+        Vec3 focus = destination.add(0.0D, 0.35D, 0.0D);
+        this.hero.getLookControl().setLookAt(focus.x, focus.y, focus.z, 50.0F, 50.0F);
+
+        Vec3 toTarget = focus.subtract(this.hero.getEyePosition());
+        if (toTarget.lengthSqr() > 1.0E-4D) {
+            double horizontal = Math.sqrt(toTarget.x * toTarget.x + toTarget.z * toTarget.z);
+            float targetYaw = (float) (Mth.atan2(toTarget.z, toTarget.x) * (180.0F / Math.PI)) - 90.0F;
+            float targetPitch = (float) (-(Mth.atan2(toTarget.y, horizontal) * (180.0F / Math.PI)));
+            this.hero.setYRot(rotlerp(this.hero.getYRot(), targetYaw, 12.0F));
+            this.hero.yBodyRot = this.hero.getYRot();
+            this.hero.setXRot(rotlerp(this.hero.getXRot(), Mth.clamp(targetPitch, -35.0F, 25.0F), 8.0F));
+        }
+
+        if (this.timer % 14 == 0) {
+            this.hero.swing(InteractionHand.MAIN_HAND);
+        }
+        if (this.timer % 40 == 20) {
+            this.hero.swing(InteractionHand.OFF_HAND);
+        }
+        if (this.timer % 48 == 0) {
+            this.hero.level().playSound(null, this.hero.blockPosition(),
+                    SoundEvents.CAMPFIRE_CRACKLE, SoundSource.NEUTRAL, 0.25F,
+                    0.85F + this.hero.getRandom().nextFloat() * 0.3F);
+        }
+    }
+
 
     private void createSeatAndSit() {
         if (this.hero.level().isClientSide) return;
