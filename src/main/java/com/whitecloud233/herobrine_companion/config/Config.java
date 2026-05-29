@@ -1,14 +1,10 @@
 package com.whitecloud233.herobrine_companion.config;
 
 import com.mojang.logging.LogUtils;
-import com.whitecloud233.herobrine_companion.HerobrineCompanion;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.event.config.ModConfigEvent;
 import net.neoforged.neoforge.common.ModConfigSpec;
 import org.slf4j.Logger;
 
-@EventBusSubscriber(modid = HerobrineCompanion.MODID, bus = EventBusSubscriber.Bus.MOD)
 public class Config {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
@@ -99,8 +95,7 @@ public class Config {
     // 【新增】更新检查器变量
     public static boolean enableUpdateChecker;
 
-    @SubscribeEvent
-    static void onLoad(final ModConfigEvent event) {
+    public static void onLoad(final ModConfigEvent event) {
         poemOfTheEndExplosion = POEM_OF_THE_END_EXPLOSION.get();
         heroKingAuraEnabled = HERO_KING_AURA_ENABLED.get();
         heroBlockRestoration = HERO_BLOCK_RESTORATION.get();

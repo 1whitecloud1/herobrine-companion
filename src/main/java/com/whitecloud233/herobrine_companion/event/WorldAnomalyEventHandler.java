@@ -7,14 +7,12 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-@EventBusSubscriber(modid = "herobrine_companion", bus = EventBusSubscriber.Bus.GAME)
 public class WorldAnomalyEventHandler {
     // 创建一个白名单，记录当前 tick 玩家正在合法破坏的方块
     public static final Set<BlockPos> PLAYER_BROKEN_BLOCKS = ConcurrentHashMap.newKeySet();

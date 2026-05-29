@@ -17,6 +17,8 @@ import net.minecraft.world.phys.Vec3;
 public final class ObserverStateDefinition implements HeroMindStateDefinition {
     private static final String OBSERVED_LOCATIONS_KEY = "ObserverObservedLocations";
     private static final String TRACE_COOLDOWN_KEY = "ObserverTraceCooldown";
+    private static final String INVISIBLE_UNTIL_KEY = "ObserverInvisibleUntil";
+
     private static final int RECORD_LOCATION_INTERVAL = 100;
     private static final int MAX_RECORDED_LOCATIONS = 6;
     private static final double LOCATION_MERGE_DIST_SQR = 36.0D;
@@ -25,6 +27,10 @@ public final class ObserverStateDefinition implements HeroMindStateDefinition {
     private static final int TRACE_MIN_OFFSET = 3;
     private static final int TRACE_MAX_OFFSET = 6;
     private static final float TRACE_CHANCE = 0.18F;
+    private static final int INVISIBILITY_CHECK_INTERVAL = 20;
+    private static final float INVISIBILITY_CHANCE = 0.08F;
+    private static final int INVISIBILITY_MIN_TICKS = 20;
+    private static final int INVISIBILITY_MAX_TICKS = 60;
 
     @Override
     public SimpleNeuralNetwork.MindState state() {
@@ -44,8 +50,7 @@ public final class ObserverStateDefinition implements HeroMindStateDefinition {
         if (snapshot.nostalgiaScore() >= 0.35f && snapshot.sorrowWeight() >= 0.30f) return SimpleNeuralNetwork.MindState.REMINISCING;
         if (snapshot.entropyScore() >= 0.35f) return SimpleNeuralNetwork.MindState.MAINTAINER;
         if (snapshot.metaScore() >= 0.30f) return SimpleNeuralNetwork.MindState.GLITCH_LORD;
-        if (snapshot.monsterEmpathyScore() >= 0.45f
-                || (snapshot.monsterEmpathyScore() >= 0.40f && snapshot.annoyanceWeight() >= 0.30f)) {
+        if (MonsterKingStateDefinition.meetsEntryRequirements(snapshot)) {
             return SimpleNeuralNetwork.MindState.MONSTER_KING;
         }
         if (snapshot.annoyanceWeight() >= 0.50f) return SimpleNeuralNetwork.MindState.JUDGE;
@@ -59,8 +64,35 @@ public final class ObserverStateDefinition implements HeroMindStateDefinition {
         return 1200;
     }
 
+    public static void clearObserverInvisibility(HeroEntity hero) {
+        if (hero == null) {
+            return;
+        }
+        hero.getPersistentData().remove(INVISIBLE_UNTIL_KEY);
+        if (hero.isInvisible()) {
+            hero.setInvisible(false);
+        }
+    }
+
     @Override
     public void tickServer(HeroEntity hero) {
+        long now = hero.level().getGameTime();
+        long invisibleUntil = hero.getPersistentData().getLong(INVISIBLE_UNTIL_KEY);
+        if (invisibleUntil > now) {
+            if (!hero.isInvisible()) {
+                hero.setInvisible(true);
+            }
+        } else {
+            if (hero.isInvisible()) {
+                hero.setInvisible(false);
+            }
+            hero.getPersistentData().remove(INVISIBLE_UNTIL_KEY);
+            if (hero.tickCount % INVISIBILITY_CHECK_INTERVAL == 0 && hero.getRandom().nextFloat() < INVISIBILITY_CHANCE) {
+                int duration = INVISIBILITY_MIN_TICKS + hero.getRandom().nextInt(INVISIBILITY_MAX_TICKS - INVISIBILITY_MIN_TICKS + 1);
+                hero.getPersistentData().putLong(INVISIBLE_UNTIL_KEY, now + duration);
+                hero.setInvisible(true);
+            }
+        }
         ServerPlayer focus = HeroStateBehaviorSupport.getFocusPlayer(hero, 24.0D);
         if (focus == null) return;
 

@@ -56,7 +56,6 @@ public class SimpleNeuralNetwork {
         switch (inputType) {
             case "VIOLENCE" -> {
                 this.violenceScore = clamp(this.violenceScore + intensity);
-                this.monsterEmpathyScore = clamp(this.monsterEmpathyScore + intensity * 0.5f);
             }
             case "DIRECT_ATTACK" -> {
                 this.violenceScore = clamp(this.violenceScore + intensity);

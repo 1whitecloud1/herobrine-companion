@@ -20,8 +20,6 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.client.event.RegisterDimensionSpecialEffectsEvent;
@@ -34,7 +32,6 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Map;
 
-@EventBusSubscriber(modid = HerobrineCompanion.MODID, value = net.neoforged.api.distmarker.Dist.CLIENT, bus = EventBusSubscriber.Bus.MOD)
 public class ClientEvents {
 
     private static final Logger LOGGER = LogUtils.getLogger();
@@ -43,7 +40,6 @@ public class ClientEvents {
         LOGGER.error(">>> [CLIENT EVENTS] 类加载确认！ <<<");
     }
 
-    @SubscribeEvent
     public static void registerRenderers(EntityRenderersEvent.RegisterRenderers event) {
         LOGGER.error(">>> [RENDERER REGISTER] 正在注册渲染器... <<<");
 
@@ -66,7 +62,6 @@ public class ClientEvents {
         event.registerEntityRenderer(EntityType.ENDER_DRAGON, DragonRendererWrapper::new);
     }
 
-    @SubscribeEvent
     public static void registerLayerDefinitions(EntityRenderersEvent.RegisterLayerDefinitions event) {
         // 👇 [修改后]：必须指向我们新写的 HeroModel.createBodyLayer
         event.registerLayerDefinition(HeroModel.LAYER_LOCATION, () -> HeroModel.createBodyLayer(false));
@@ -77,7 +72,6 @@ public class ClientEvents {
         event.registerLayerDefinition(GhostSteveModel.LAYER_LOCATION, GhostSteveModel::createBodyLayer);
     }
 
-    @SubscribeEvent
     public static void registerScreens(RegisterMenuScreensEvent event) {
         event.register(ModMenus.HERO_CONTRACT_MENU.get(), HeroContractScreen::new);
         // 由于 HeroTradeScreen 不再继承 AbstractContainerScreen，我们需要使用强制转换或者适配器
@@ -89,14 +83,12 @@ public class ClientEvents {
         event.register(ModMenus.HERO_WARDROBE_MENU.get(), HeroWardrobeScreen::new);
     }
 
-    @SubscribeEvent
     public static void registerDimensionSpecialEffects(RegisterDimensionSpecialEffectsEvent event) {
         event.register(ResourceLocation.fromNamespaceAndPath(HerobrineCompanion.MODID, "end_ring_type"), new EndRingDimensionEffects());
     }
 
     private static Method startAttackMethod;
 
-    @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
         Minecraft mc = Minecraft.getInstance();
         

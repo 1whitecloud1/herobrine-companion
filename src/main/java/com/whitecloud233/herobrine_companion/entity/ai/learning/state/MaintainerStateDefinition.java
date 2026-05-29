@@ -41,7 +41,7 @@ public final class MaintainerStateDefinition implements HeroMindStateDefinition 
     }
 
     @Override
-    public void tickServer(HeroEntity hero) {
+    public void tickServerSupport(HeroEntity hero) {
         ServerPlayer owner = HeroStateBehaviorSupport.getOwner(hero);
         if (owner == null) return;
 
@@ -71,7 +71,14 @@ public final class MaintainerStateDefinition implements HeroMindStateDefinition 
             HeroStateBehaviorSupport.spawnParticles(level, ParticleTypes.HAPPY_VILLAGER, hero.position().add(0.0D, 1.0D, 0.0D), 6, 0.3D);
         }
     }
+    @Override
+    public void tickServerMovement(HeroEntity hero) {
+        ServerPlayer owner = HeroStateBehaviorSupport.getOwner(hero);
+        if (owner == null) return;
 
+        HeroStateBehaviorSupport.ensureFloating(hero);
+        HeroStateBehaviorSupport.keepDistance(hero, owner, 4.0D, 20.0D, 1.0D, 1.1D);
+    }
     private boolean cleanupItems(HeroEntity hero, ServerPlayer owner) {
         List<ItemEntity> items = HeroStateBehaviorSupport.getNearbyItems(hero, owner, 20.0D);
         boolean cleaned = false;

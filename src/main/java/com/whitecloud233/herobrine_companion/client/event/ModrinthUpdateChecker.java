@@ -8,10 +8,7 @@ import com.whitecloud233.herobrine_companion.config.Config;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.*;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModList;
-import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 
 import java.net.URI;
@@ -23,13 +20,11 @@ import java.util.concurrent.CompletableFuture;
 
 // 1.21.1 NeoForge: 绑定到 GAME 总线 (等同于旧版的 FORGE 总线)，仅客户端生效
 @SuppressWarnings("ALL")
-@EventBusSubscriber(modid = HerobrineCompanion.MODID, bus = EventBusSubscriber.Bus.GAME, value = Dist.CLIENT)
 public class ModrinthUpdateChecker {
 
     private static boolean hasChecked = false;
     private static final String PROJECT_SLUG = "herobrine-companion"; // 请确保使用的是连字符而不是下划线
 
-    @SubscribeEvent
     public static void onPlayerJoinWorld(EntityJoinLevelEvent event) {
         if (event.getLevel().isClientSide() && event.getEntity() instanceof LocalPlayer player) {
 

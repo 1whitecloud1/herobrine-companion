@@ -71,8 +71,21 @@ base {
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
 def epicFightArtifact = "curse.maven:epic-fight-mod-405076:${project.epicfight_file_id}"
+def enableEpicFightCompile = project.findProperty("enable_epicfight_compile")?.toString()?.toBoolean() ?: false
 def enableEpicFightDevRuntime = project.findProperty("enable_epicfight_dev_runtime")?.toString()?.toBoolean() ?: false
+def epicFightCompatSources = [
+        'com/whitecloud233/herobrine_companion/compat/epicfight/HeroEpicFightBridge.java',
+        'com/whitecloud233/herobrine_companion/compat/epicfight/HeroEpicFightChasingGoal.java',
+        'com/whitecloud233/herobrine_companion/compat/epicfight/HeroEpicFightClientBridge.java',
+        'com/whitecloud233/herobrine_companion/compat/epicfight/HeroEpicFightPatch.java',
+        'com/whitecloud233/herobrine_companion/compat/epicfight/HeroEpicFightRangedAttackGoal.java',
+        'com/whitecloud233/herobrine_companion/compat/epicfight/HeroEpicFightWeaponProfiles.java',
+        'com/whitecloud233/herobrine_companion/compat/epicfight/HeroPatchedEyesLayer.java',
+        'com/whitecloud233/herobrine_companion/compat/epicfight/HeroPatchedHumanoidRenderer.java',
+        'com/whitecloud233/herobrine_companion/compat/epicfight/HeroPatchedItemInHandLayer.java'
+]
 def waveyCapesLocalJar = file("libs/waveycapes-neoforge-1.9.2-mc1.21.1.jar")
+def kaleidoscopeCompatLocalJar = file("libs/kaleidoscope_compat-2.7.2-neoforge+mc1.21.1.jar")
 
 neoForge {
     version = project.neo_version
@@ -130,6 +143,10 @@ sourceSets.main.resources {
     srcDirs = ['src/main/resources', 'src/generated/resources']
 }
 
+if (!enableEpicFightCompile) {
+    sourceSets.main.java.exclude(epicFightCompatSources)
+}
+
 dependencies {
 
 
@@ -142,8 +159,12 @@ dependencies {
     compileOnly "dev.latvian.mods:rhino:2101.+"
     runtimeOnly "dev.latvian.mods:rhino:2101.+"
 
-    compileOnly epicFightArtifact
-    runtimeOnly epicFightArtifact
+    if (enableEpicFightCompile) {
+        compileOnly epicFightArtifact
+    }
+    if (enableEpicFightCompile && enableEpicFightDevRuntime) {
+        runtimeOnly epicFightArtifact
+    }
 
 
     runtimeOnly files(waveyCapesLocalJar)
@@ -153,6 +174,15 @@ dependencies {
 
     compileOnly "curse.maven:cloth-config-mod-348521:5729127"
     runtimeOnly "curse.maven:cloth-config-mod-348521:5729127"
+
+    compileOnly "curse.maven:farmers-delight-398521:8083481"
+    runtimeOnly "curse.maven:farmers-delight-398521:8083481"
+   // https://www.curseforge.com/minecraft/mc-mods/farmers-delight/download/8083481
+    compileOnly "curse.maven:kaleidoscope-cookery-1309203:7966281"
+    runtimeOnly "curse.maven:kaleidoscope-cookery-1309203:7966281"
+
+    compileOnly files(kaleidoscopeCompatLocalJar)
+    runtimeOnly files(kaleidoscopeCompatLocalJar)
 
     compileOnly "curse.maven:simplehats-mod-631990:5970513"
     runtimeOnly "curse.maven:simplehats-mod-631990:5970513"

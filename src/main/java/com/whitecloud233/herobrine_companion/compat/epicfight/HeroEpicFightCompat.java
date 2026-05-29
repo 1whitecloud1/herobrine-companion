@@ -123,7 +123,7 @@ public final class HeroEpicFightCompat {
                 && hero != null
                 && hero.isBattleModeActive()
                 && isPatched(hero)
-                && HeroEpicFightWeaponProfiles.hasHeroControlledCombatAnimations(hero)
+                && hasHeroControlledCombatAnimations(hero)
                 && !hero.isInspectingScythe()
                 && !hero.isCastingThunder()
                 && !hero.isDebugAnim()
@@ -134,7 +134,7 @@ public final class HeroEpicFightCompat {
         return isRuntimeBridgeReady()
                 && hero != null
                 && hero.isBattleModeActive()
-                && HeroEpicFightWeaponProfiles.hasHeroControlledCombatAnimations(hero)
+                && hasHeroControlledCombatAnimations(hero)
                 && !hero.isInspectingScythe()
                 && !hero.isCastingThunder()
                 && !hero.isDebugAnim()
@@ -146,7 +146,7 @@ public final class HeroEpicFightCompat {
                 && hero != null
                 && hero.isBattleModeActive()
                 && isPatched(hero)
-                && HeroEpicFightWeaponProfiles.hasHeroControlledCombatAnimations(hero)
+                && hasHeroControlledCombatAnimations(hero)
                 && !hero.isInspectingScythe()
                 && !hero.isCastingThunder()
                 && !hero.isDebugAnim()
@@ -231,6 +231,17 @@ public final class HeroEpicFightCompat {
             return result instanceof Boolean patched && patched;
         } catch (ReflectiveOperationException | LinkageError exception) {
             markBridgeMismatch("Epic Fight patch lookup failed. Hero will keep fallback battle behavior.", exception);
+            return false;
+        }
+    }
+
+    private static boolean hasHeroControlledCombatAnimations(HeroEntity hero) {
+        try {
+            Object result = invokeStatic(WEAPON_PROFILES_CLASS, "hasHeroControlledCombatAnimations",
+                    new Class<?>[]{HeroEntity.class}, hero);
+            return result instanceof Boolean enabled && enabled;
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            markBridgeMismatch("Epic Fight weapon profile lookup failed. Hero will keep fallback battle behavior.", exception);
             return false;
         }
     }

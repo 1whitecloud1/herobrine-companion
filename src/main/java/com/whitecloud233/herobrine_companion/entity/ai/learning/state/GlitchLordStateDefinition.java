@@ -34,6 +34,7 @@ public final class GlitchLordStateDefinition implements HeroMindStateDefinition 
 
     private static final String NO_CONTACT_KEY = "MindGlitchNoContactTicks";
     private static final String ACTIVE_BLOCK_GLITCHES_KEY = "MindGlitchBlockGlitches";
+    private static final int TELEPORT_INVISIBILITY_TICKS = 4;
 
     private static final int BLOCK_GLITCH_SCAN_RANGE = 6;
     private static final int BLOCK_GLITCH_SCAN_ATTEMPTS = 48;
@@ -127,7 +128,7 @@ public final class GlitchLordStateDefinition implements HeroMindStateDefinition 
         }
 
         if (hero.tickCount % 140 == 0 && hero.getRandom().nextFloat() < 0.20F) {
-            hero.addEffect(new MobEffectInstance(MobEffects.INVISIBILITY, 8, 0, false, false));
+            hero.addEffect(new MobEffectInstance(MobEffects.INVISIBILITY, TELEPORT_INVISIBILITY_TICKS, 0, false, false));
             HeroStateBehaviorSupport.shortTeleport(hero, HeroStateBehaviorSupport.findNearbyTeleportPoint(hero, focus, 4.0D, 8.0D));
             hero.getPersistentData().putInt(NO_CONTACT_KEY, 0);
         }

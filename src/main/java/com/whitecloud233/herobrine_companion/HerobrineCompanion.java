@@ -6,9 +6,11 @@ import com.whitecloud233.herobrine_companion.block.EndRingPortalBlock;
 import com.whitecloud233.herobrine_companion.block.entity.EndRingPortalBlockEntity;
 import com.whitecloud233.herobrine_companion.client.event.ClientModSetup;
 import com.whitecloud233.herobrine_companion.compat.epicfight.HeroEpicFightCompat;
+import com.whitecloud233.herobrine_companion.compat.kaleidoscope.KaleidoscopeCompatBuiltinPackFallback;
 import com.whitecloud233.herobrine_companion.config.Config;
 import com.whitecloud233.herobrine_companion.datagen.DataGenerators;
 import com.whitecloud233.herobrine_companion.event.ModEvents;
+import com.whitecloud233.herobrine_companion.event.WorldAnomalyEventHandler;
 import com.whitecloud233.herobrine_companion.item.*;
 import com.whitecloud233.herobrine_companion.loot.AddItemModifier;
 import com.whitecloud233.herobrine_companion.network.PacketHandler;
@@ -126,7 +128,9 @@ public class HerobrineCompanion {
 
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::registerPayloads);
+        modEventBus.addListener(Config::onLoad);
         HeroEpicFightCompat.bootstrap(modEventBus);
+        modEventBus.addListener(KaleidoscopeCompatBuiltinPackFallback::onAddPackFinders);
 
         modEventBus.addListener(ModEvents::entityAttributeEvent);
         modEventBus.addListener(ModEvents::registerSpawnPlacements);
@@ -149,6 +153,7 @@ public class HerobrineCompanion {
         ModStructurePieces.STRUCTURE_PIECES.register(modEventBus);
         
         NeoForge.EVENT_BUS.register(this);
+        NeoForge.EVENT_BUS.register(WorldAnomalyEventHandler.class);
 
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
         

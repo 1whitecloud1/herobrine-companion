@@ -19,6 +19,10 @@ public class ClientModSetup {
         // 1. 注册客户端生命周期事件
         modEventBus.addListener(ClientModSetup::clientSetup);
         modEventBus.addListener(KeyBindingHandler::onKeyRegister);
+        modEventBus.addListener(ClientEvents::registerRenderers);
+        modEventBus.addListener(ClientEvents::registerLayerDefinitions);
+        modEventBus.addListener(ClientEvents::registerScreens);
+        modEventBus.addListener(ClientEvents::registerDimensionSpecialEffects);
 
         // 2. 注册配置界面 (适配 NeoForge 写法)
         ModLoadingContext.get().registerExtensionPoint(
@@ -34,6 +38,8 @@ public class ClientModSetup {
         // 2. 传入刚才实例化的对象 PATCHER_INSTANCE，而不是 IrisPatcher.class
         NeoForge.EVENT_BUS.register(PATCHER_INSTANCE);
         NeoForge.EVENT_BUS.register(KeyBindingHandler.class);
+        NeoForge.EVENT_BUS.addListener(ClientEvents::onClientTick);
+        NeoForge.EVENT_BUS.addListener(ModrinthUpdateChecker::onPlayerJoinWorld);
         
         // 4. 加载 LLM 配置
         LLMConfig.load();

@@ -5,6 +5,7 @@ import com.whitecloud233.herobrine_companion.event.HeroRewards;
 import mezz.jei.api.constants.VanillaTypes;
 import mezz.jei.api.gui.builder.IRecipeLayoutBuilder;
 import mezz.jei.api.gui.drawable.IDrawable;
+import mezz.jei.api.gui.ingredient.IRecipeSlotsView;
 import mezz.jei.api.helpers.IGuiHelper;
 import mezz.jei.api.recipe.IFocusGroup;
 import mezz.jei.api.recipe.RecipeIngredientRole;
@@ -26,7 +27,6 @@ public class HeroRewardCategory implements IRecipeCategory<HeroRewards.Reward> {
     private final IDrawable slotDrawable;
 
     public HeroRewardCategory(IGuiHelper guiHelper) {
-        // 增加高度以容纳 Input 槽位
         this.background = guiHelper.createBlankDrawable(120, 60);
         this.slotDrawable = guiHelper.getSlotDrawable();
         this.icon = guiHelper.createDrawableIngredient(VanillaTypes.ITEM_STACK, new ItemStack(Items.CHEST));
@@ -44,8 +44,13 @@ public class HeroRewardCategory implements IRecipeCategory<HeroRewards.Reward> {
     }
 
     @Override
-    public IDrawable getBackground() {
-        return background;
+    public int getWidth() {
+        return background.getWidth();
+    }
+
+    @Override
+    public int getHeight() {
+        return background.getHeight();
     }
 
     @Override
@@ -55,39 +60,31 @@ public class HeroRewardCategory implements IRecipeCategory<HeroRewards.Reward> {
 
     @Override
     public void setRecipe(IRecipeLayoutBuilder builder, HeroRewards.Reward recipe, IFocusGroup focuses) {
-        // 添加一个 Input 槽位，显示 TAB_ICON，代表“来源”
-        // 这样逻辑上就是：Herobrine (Input) -> Reward (Output)
-        // 虽然实际上不需要消耗 Herobrine，但这在 JEI 中很常见
         builder.addSlot(RecipeIngredientRole.INPUT, 5, 5)
                 .addIngredients(VanillaTypes.ITEM_STACK, java.util.List.of(new ItemStack(HerobrineCompanion.TAB_ICON.get())));
 
-        // 显示奖励物品 (Output)
         int x = 5;
         int y = 35;
-        for (int i = 0; i < recipe.items.size(); i++) {
-            if (i >= 5) break;
+        for (int i = 0; i < recipe.items.size() && i < 5; i++) {
             builder.addSlot(RecipeIngredientRole.OUTPUT, x + i * 20, y)
                     .addIngredients(VanillaTypes.ITEM_STACK, java.util.List.of(recipe.items.get(i)));
         }
     }
 
     @Override
-    public void draw(HeroRewards.Reward recipe, mezz.jei.api.gui.ingredient.IRecipeSlotsView recipeSlotsView, GuiGraphics guiGraphics, double mouseX, double mouseY) {
+    public void draw(HeroRewards.Reward recipe, IRecipeSlotsView recipeSlotsView, GuiGraphics guiGraphics, double mouseX, double mouseY) {
+        background.draw(guiGraphics, 0, 0);
+
         Font font = Minecraft.getInstance().font;
-        
-        // 绘制 Input 槽位背景
-        this.slotDrawable.draw(guiGraphics, 4, 4);
-        
-        // 绘制信任度文本 (向右移动一点)
+        slotDrawable.draw(guiGraphics, 4, 4);
+
         Component trustText = Component.translatable("gui.herobrine_companion.reward_tooltip", recipe.requiredTrust);
         guiGraphics.drawString(font, trustText, 30, 10, 0xFF404040, false);
-        
-        // 绘制 Output 槽位背景
+
         int x = 4;
         int y = 34;
-        for (int i = 0; i < recipe.items.size(); i++) {
-            if (i >= 5) break;
-            this.slotDrawable.draw(guiGraphics, x + i * 20, y);
+        for (int i = 0; i < recipe.items.size() && i < 5; i++) {
+            slotDrawable.draw(guiGraphics, x + i * 20, y);
         }
     }
 }

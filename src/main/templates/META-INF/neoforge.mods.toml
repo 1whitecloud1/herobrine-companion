@@ -82,3 +82,39 @@ type = "optional"
 versionRange = "*"
 ordering = "AFTER"
 side = "BOTH"
+
+
+[[dependencies."${mod_id}"]]
+modId="accessories"
+type = "optional"
+versionRange="[0,)"
+ordering="AFTER"
+side="BOTH"
+
+[[dependencies."${mod_id}"]]
+modId="simplehats"
+type = "optional"
+versionRange="[0,)"
+ordering="AFTER"
+side="BOTH"
+
+[[dependencies."${mod_id}"]]
+modId="waveycapes"
+type = "optional"
+versionRange="[1.9.2,)"
+ordering="AFTER"
+side="BOTH"
+
+[[dependencies."${mod_id}"]]
+modId="kaleidoscope_cookery"
+type = "optional"
+versionRange="[0,)"
+ordering="AFTER"
+side="BOTH"
+
+[[dependencies."${mod_id}"]]
+modId="jei"
+type = "optional"
+versionRange="[0,)"
+ordering="AFTER"
+side="BOTH"
