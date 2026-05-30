@@ -1,9 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.network.ai;
 
-import com.whitecloud233.modid.herobrine_companion.client.event.ClientHooks;
+import com.whitecloud233.modid.herobrine_companion.network.NetworkClientBridge;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.network.NetworkEvent;
 
 import java.util.function.Supplier;
@@ -25,9 +23,7 @@ public class OpenCrossSessionHubPacket {
 
     public void handle(Supplier<NetworkEvent.Context> contextSupplier) {
         NetworkEvent.Context context = contextSupplier.get();
-        context.enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () ->
-                ClientHooks.openCrossSessionHub(this.entityId)));
+        context.enqueueWork(() -> NetworkClientBridge.openCrossSessionHub(this.entityId));
         context.setPacketHandled(true);
     }
 }
-

@@ -1,9 +1,6 @@
 package com.whitecloud233.modid.herobrine_companion.network;
 
-import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
-import net.minecraft.client.Minecraft;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.world.entity.Entity;
 import net.minecraftforge.network.NetworkEvent;
 
 import java.util.HashSet;
@@ -38,17 +35,7 @@ public class SyncRewardsPacket {
 
     public void handle(Supplier<NetworkEvent.Context> contextSupplier) {
         NetworkEvent.Context context = contextSupplier.get();
-        context.enqueueWork(() -> {
-            // Client side handling
-            if (Minecraft.getInstance().level != null) {
-                Entity entity = Minecraft.getInstance().level.getEntity(this.entityId);
-                if (entity instanceof HeroEntity hero) {
-                    for (int id : this.claimedRewards) {
-                        hero.claimReward(id);
-                    }
-                }
-            }
-        });
+        context.enqueueWork(() -> NetworkClientBridge.applySyncRewards(this.entityId, this.claimedRewards));
         context.setPacketHandled(true);
     }
 }

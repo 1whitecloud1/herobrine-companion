@@ -52,6 +52,16 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
     }
 
     @Override
+    public boolean overrideRender() {
+        HeroEntity hero = this.getOriginal();
+        if (hero != null && hero.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE)) {
+            return false;
+        }
+
+        return super.overrideRender();
+    }
+
+    @Override
     public void onConstructed(HeroEntity hero) {
         super.onConstructed(hero);
     }

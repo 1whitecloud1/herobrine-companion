@@ -1,12 +1,10 @@
 package com.whitecloud233.modid.herobrine_companion.compat.cooking;
 
-import net.minecraft.client.Minecraft;
+import com.whitecloud233.modid.herobrine_companion.network.NetworkClientBridge;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.network.NetworkEvent;
 
 import java.util.ArrayList;
@@ -51,10 +49,7 @@ public class OpenCookSelectionPacket {
 
     public void handle(Supplier<NetworkEvent.Context> contextSupplier) {
         NetworkEvent.Context context = contextSupplier.get();
-        context.enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> {
-            Minecraft minecraft = Minecraft.getInstance();
-            minecraft.setScreen(new HeroCookSelectionScreen(this.heroId, this.cookwarePos, this.options, minecraft.screen));
-        }));
+        context.enqueueWork(() -> NetworkClientBridge.openCookSelection(this.heroId, this.cookwarePos, this.options));
         context.setPacketHandled(true);
     }
 }

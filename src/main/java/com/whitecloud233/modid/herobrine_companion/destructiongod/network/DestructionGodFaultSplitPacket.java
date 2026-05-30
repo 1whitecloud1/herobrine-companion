@@ -1,5 +1,6 @@
 package com.whitecloud233.modid.herobrine_companion.destructiongod.network;
 
+import com.whitecloud233.modid.herobrine_companion.network.NetworkClientBridge;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.network.NetworkEvent;
@@ -51,8 +52,7 @@ public class DestructionGodFaultSplitPacket {
 
     public void handle(Supplier<NetworkEvent.Context> supplier) {
         NetworkEvent.Context context = supplier.get();
-        context.enqueueWork(() -> DestructionGodClientPacketHandler.handleFaultSplit(this));
+        context.enqueueWork(() -> NetworkClientBridge.handleDestructionGodFaultSplit(this));
         context.setPacketHandled(true);
     }
 }
-

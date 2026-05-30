@@ -1,15 +1,10 @@
 package com.whitecloud233.modid.herobrine_companion.network;
 
-import com.whitecloud233.modid.herobrine_companion.client.render.HeroClientSkinCache;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroWorldData;
-import net.minecraft.client.Minecraft;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.entity.Entity;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.network.NetworkEvent;
 
 import java.util.function.Supplier;
@@ -64,31 +59,14 @@ public class SyncHeroCosmeticsPacket {
 
     public void handle(Supplier<NetworkEvent.Context> supplier) {
         NetworkEvent.Context context = supplier.get();
-        context.enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> handleOnClient(this)));
+        context.enqueueWork(() -> NetworkClientBridge.applySyncHeroCosmetics(
+                this.entityId,
+                this.skinVariant,
+                this.customSkinName,
+                this.customSkinData,
+                this.curiosBackItem,
+                this.accessoriesData));
         context.setPacketHandled(true);
-    }
-
-    private static void handleOnClient(SyncHeroCosmeticsPacket packet) {
-        Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.level == null) {
-            return;
-        }
-
-        Entity entity = minecraft.level.getEntity(packet.entityId);
-        if (!(entity instanceof HeroEntity hero)) {
-            return;
-        }
-
-        hero.setSkinVariant(packet.skinVariant);
-        hero.setCustomSkinName(packet.customSkinName);
-        hero.setCuriosBackItemFromTag(packet.curiosBackItem);
-        hero.setAccessoriesDataFromTag(packet.accessoriesData);
-
-        if (packet.skinVariant == HeroEntity.SKIN_CUSTOM && packet.customSkinData.length > 0) {
-            HeroClientSkinCache.put(hero.getUUID(), packet.customSkinData);
-        } else {
-            HeroClientSkinCache.clear(hero.getUUID());
-        }
     }
 
     private static byte[] getCustomSkinData(HeroEntity hero) {
@@ -98,4 +76,3 @@ public class SyncHeroCosmeticsPacket {
         return new byte[0];
     }
 }
-

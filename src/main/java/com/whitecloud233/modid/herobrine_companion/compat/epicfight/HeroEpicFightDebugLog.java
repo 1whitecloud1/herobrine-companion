@@ -7,9 +7,9 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.registries.ForgeRegistries;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
-import yesman.epicfight.api.animation.AnimationPlayer;
-import yesman.epicfight.api.animation.Animator;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -152,61 +152,113 @@ public final class HeroEpicFightDebugLog {
         return key + "x" + stack.getCount();
     }
 
-    public static String animatorKey(@Nullable Animator animator) {
+    public static String animatorKey(@Nullable Object animator) {
         if (animator == null) {
             return "animator=null";
         }
 
         try {
-            return animationKey(animator.getPlayerFor(null));
-        } catch (RuntimeException exception) {
+            return animationKey(invokeMethod(animator, "getPlayerFor", new Object[]{null}));
+        } catch (ReflectiveOperationException | RuntimeException exception) {
             return "animator_error=" + exception.getClass().getSimpleName();
         }
     }
 
-    public static String animatorId(@Nullable Animator animator) {
+    public static String animatorId(@Nullable Object animator) {
         if (animator == null) {
             return "animator=null";
         }
 
         try {
-            return animationId(animator.getPlayerFor(null));
-        } catch (RuntimeException exception) {
+            return animationId(invokeMethod(animator, "getPlayerFor", new Object[]{null}));
+        } catch (ReflectiveOperationException | RuntimeException exception) {
             return "animator_error=" + exception.getClass().getSimpleName();
         }
     }
 
-    public static String animationKey(@Nullable AnimationPlayer player) {
+    public static String animationKey(@Nullable Object player) {
         if (player == null) {
             return "player=null";
         }
-        if (player.isEmpty()) {
+        if (isAnimationPlayerEmpty(player)) {
             return "anim=empty";
         }
 
         try {
-            ResourceLocation animationId = player.getRealAnimation().get().getRegistryName();
+            ResourceLocation animationId = resolveAnimationId(player);
             String animationKey = animationId != null ? animationId.toString() : "unregistered";
-            return animationKey + "@" + String.format(java.util.Locale.ROOT, "%.3f/%.3f", player.getPrevElapsedTime(), player.getElapsedTime());
-        } catch (RuntimeException exception) {
+            double prevElapsed = asDouble(invokeMethod(player, "getPrevElapsedTime"));
+            double elapsed = asDouble(invokeMethod(player, "getElapsedTime"));
+            return animationKey + "@" + String.format(java.util.Locale.ROOT, "%.3f/%.3f", prevElapsed, elapsed);
+        } catch (ReflectiveOperationException | RuntimeException exception) {
             return "anim_error=" + exception.getClass().getSimpleName();
         }
     }
 
-    public static String animationId(@Nullable AnimationPlayer player) {
+    public static String animationId(@Nullable Object player) {
         if (player == null) {
             return "player=null";
         }
-        if (player.isEmpty()) {
+        if (isAnimationPlayerEmpty(player)) {
             return "anim=empty";
         }
 
         try {
-            ResourceLocation animationId = player.getRealAnimation().get().getRegistryName();
+            ResourceLocation animationId = resolveAnimationId(player);
             return animationId != null ? animationId.toString() : "unregistered";
-        } catch (RuntimeException exception) {
+        } catch (ReflectiveOperationException | RuntimeException exception) {
             return "anim_error=" + exception.getClass().getSimpleName();
         }
+    }
+
+    private static boolean isAnimationPlayerEmpty(Object player) {
+        try {
+            Object result = invokeMethod(player, "isEmpty");
+            return result instanceof Boolean empty && empty;
+        } catch (ReflectiveOperationException exception) {
+            return false;
+        }
+    }
+
+    @Nullable
+    private static ResourceLocation resolveAnimationId(Object player) throws ReflectiveOperationException {
+        Object realAnimation = invokeMethod(player, "getRealAnimation");
+        Object animation = invokeMethod(realAnimation, "get");
+        Object registryName = invokeMethod(animation, "getRegistryName");
+        return registryName instanceof ResourceLocation location ? location : null;
+    }
+
+    private static Object invokeMethod(Object target, String methodName, Object... args) throws ReflectiveOperationException {
+        Method method = resolveMethod(target.getClass(), methodName, args.length);
+        if (method == null) {
+            throw new NoSuchMethodException(target.getClass().getName() + "#" + methodName + "/" + args.length);
+        }
+        try {
+            return method.invoke(target, args);
+        } catch (InvocationTargetException exception) {
+            Throwable cause = exception.getCause();
+            if (cause instanceof ReflectiveOperationException reflectiveOperationException) {
+                throw reflectiveOperationException;
+            }
+            if (cause instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            throw exception;
+        }
+    }
+
+    @Nullable
+    private static Method resolveMethod(Class<?> type, String methodName, int parameterCount) {
+        for (Method method : type.getMethods()) {
+            if (method.getName().equals(methodName) && method.getParameterCount() == parameterCount) {
+                return method;
+            }
+        }
+        return null;
+    }
+
+    private static double asDouble(Object value) {
+        return value instanceof Number number ? number.doubleValue() : Double.NaN;
     }
 
     private static String prefix(@Nullable HeroEntity hero, String tag) {

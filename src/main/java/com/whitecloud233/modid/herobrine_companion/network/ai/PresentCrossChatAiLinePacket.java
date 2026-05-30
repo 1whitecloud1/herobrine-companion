@@ -1,18 +1,14 @@
 package com.whitecloud233.modid.herobrine_companion.network.ai;
 
-import com.whitecloud233.modid.herobrine_companion.client.service.AIService;
-import com.whitecloud233.modid.herobrine_companion.client.service.CrossChatHistoryStore;
-import net.minecraft.client.Minecraft;
+import com.whitecloud233.modid.herobrine_companion.network.NetworkClientBridge;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.network.chat.Component;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.network.NetworkEvent;
 
-import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 
 public class PresentCrossChatAiLinePacket {
+    private static final String DEFAULT_KIND_HB = "hb";
+
     public static final byte TYPE_REMOTE_HB_REPLY = 0;
     public static final byte TYPE_HB_TO_HB_OPENING = 1;
     public static final byte TYPE_HB_ECHO = 2;
@@ -40,7 +36,7 @@ public class PresentCrossChatAiLinePacket {
         this.hbMode = hbMode;
         this.speaker = speaker == null ? "" : speaker;
         this.content = content == null ? "" : content;
-        this.kind = kind == null ? CrossChatHistoryStore.KIND_HB : kind;
+        this.kind = kind == null ? DEFAULT_KIND_HB : kind;
         this.displayType = displayType;
         this.primaryName = primaryName == null ? "" : primaryName;
         this.secondaryName = secondaryName == null ? "" : secondaryName;
@@ -73,56 +69,16 @@ public class PresentCrossChatAiLinePacket {
 
     public void handle(Supplier<NetworkEvent.Context> contextSupplier) {
         NetworkEvent.Context context = contextSupplier.get();
-        context.enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> handleOnClient(this)));
+        context.enqueueWork(() -> NetworkClientBridge.presentCrossChatAiLine(
+                this.peerName,
+                this.hbMode,
+                this.speaker,
+                this.content,
+                this.kind,
+                this.displayType,
+                this.primaryName,
+                this.secondaryName,
+                this.translateForViewer));
         context.setPacketHandled(true);
     }
-
-    private static void handleOnClient(PresentCrossChatAiLinePacket packet) {
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null) {
-            return;
-        }
-
-        CompletableFuture<String> localizedFuture = packet.translateForViewer
-                ? AIService.localizeText(packet.content, mc.options.languageCode, mc.player.getUUID())
-                : CompletableFuture.completedFuture(packet.content);
-
-        localizedFuture
-                .exceptionally(ignored -> packet.content)
-                .thenAccept(localizedContent -> mc.tell(() -> applyLine(mc, packet, localizedContent)));
-    }
-
-    private static void applyLine(Minecraft mc, PresentCrossChatAiLinePacket packet, String localizedContent) {
-        String finalContent = sanitize(localizedContent);
-        if (finalContent.isEmpty()) {
-            finalContent = sanitize(packet.content);
-        }
-
-        Component message = switch (packet.displayType) {
-            case TYPE_HB_TO_HB_OPENING -> Component.translatable(
-                    "message.herobrine_companion.cross_chat.chat.hb_to_hb_opening",
-                    packet.primaryName,
-                    packet.secondaryName,
-                    finalContent
-            );
-            case TYPE_HB_ECHO -> Component.translatable(
-                    "message.herobrine_companion.cross_chat.chat.hb_echo",
-                    packet.primaryName,
-                    finalContent
-            );
-            default -> Component.translatable(
-                    "message.herobrine_companion.cross_chat.chat.remote_hb_reply",
-                    packet.primaryName,
-                    finalContent
-            );
-        };
-
-        mc.gui.getChat().addMessage(message);
-        CrossChatHistoryStore.getInstance().appendEntry(packet.peerName, packet.hbMode, packet.speaker, finalContent, packet.kind);
-    }
-
-    private static String sanitize(String content) {
-        return content == null ? "" : content.replace('\r', ' ').replace('\n', ' ').trim();
-    }
 }
-
