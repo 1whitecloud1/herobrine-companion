@@ -3,7 +3,6 @@ package com.whitecloud233.modid.herobrine_companion.entity.ai.learning.state;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.HeroDialogueHandler;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.SimpleNeuralNetwork;
-import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
@@ -39,6 +38,10 @@ public final class MonsterKingStateDefinition implements HeroMindStateDefinition
     private static final float STOP_ATTACK_CHANCE = 0.40F;
     private static final double DISTANCE_MIN = 5.0D;
     private static final double DISTANCE_MAX = 14.0D;
+    private static final float ENTER_AFFINITY_MIN = 0.45F;
+    private static final float ENTER_EMPATHY_MIN = 0.40F;
+    private static final float ENTER_ANNOYANCE_MIN = 0.30F;
+    private static final float EXIT_AFFINITY_MAX = 0.25F;
 
     @Override
     public SimpleNeuralNetwork.MindState state() {
@@ -47,13 +50,12 @@ public final class MonsterKingStateDefinition implements HeroMindStateDefinition
 
     @Override
     public boolean shouldEnter(HeroMindStateSnapshot snapshot) {
-        return snapshot.monsterEmpathyScore() >= 0.45f
-                || (snapshot.monsterEmpathyScore() >= 0.40f && snapshot.annoyanceWeight() >= 0.30f);
+        return meetsEntryRequirements(snapshot);
     }
 
     @Override
     public SimpleNeuralNetwork.MindState shouldExit(HeroMindStateSnapshot snapshot, HeroEntity hero) {
-        return snapshot.monsterEmpathyScore() < 0.25f ? SimpleNeuralNetwork.MindState.OBSERVER : null;
+        return snapshot.monsterEmpathyScore() < EXIT_AFFINITY_MAX ? SimpleNeuralNetwork.MindState.OBSERVER : null;
     }
 
     @Override
@@ -126,8 +128,12 @@ public final class MonsterKingStateDefinition implements HeroMindStateDefinition
 
     @Override
     public void tickClientAmbient(HeroEntity hero) {
-        HeroStateBehaviorSupport.spawnClientAmbient(hero, ParticleTypes.ANGRY_VILLAGER, 4, 1.2D, 0.7D, 1.2D);
-        HeroStateBehaviorSupport.spawnClientAmbient(hero, ParticleTypes.SMOKE, 6, 1.5D, 0.4D, 1.4D);
+    }
+
+    static boolean meetsEntryRequirements(HeroMindStateSnapshot snapshot) {
+        return snapshot.monsterEmpathyScore() >= ENTER_AFFINITY_MIN
+                || (snapshot.monsterEmpathyScore() >= ENTER_EMPATHY_MIN
+                && snapshot.annoyanceWeight() >= ENTER_ANNOYANCE_MIN);
     }
 
     private static boolean tryPacifyNearby(HeroEntity hero, ServerPlayer focus, ServerLevel level, List<Monster> monsters) {
@@ -148,7 +154,6 @@ public final class MonsterKingStateDefinition implements HeroMindStateDefinition
             return false;
         }
 
-        HeroStateBehaviorSupport.spawnParticles(level, ParticleTypes.ANGRY_VILLAGER, hero.position().add(0.0D, 1.2D, 0.0D), 5, 0.35D);
         HeroDialogueHandler.onPacifyMonster(hero, focus);
         return true;
     }
@@ -191,8 +196,6 @@ public final class MonsterKingStateDefinition implements HeroMindStateDefinition
     private static void doGrowl(HeroEntity hero, ServerLevel level) {
         SoundEvent sound = pickGrowlSound(hero);
         level.playSound(null, hero.blockPosition(), sound, SoundSource.HOSTILE, 0.5F, 0.6F);
-        HeroStateBehaviorSupport.spawnParticles(level, ParticleTypes.ANGRY_VILLAGER, hero.position().add(0.0D, 1.2D, 0.0D), 6, 0.45D);
-        HeroStateBehaviorSupport.spawnParticles(level, ParticleTypes.SMOKE, hero.position().add(0.0D, 1.4D, 0.0D), 6, 0.35D, 0.01D);
     }
 
     private static SoundEvent pickGrowlSound(HeroEntity hero) {

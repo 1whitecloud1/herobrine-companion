@@ -17,6 +17,13 @@ public interface HeroMindStateDefinition {
         return 0;
     }
 
+    default void tickServerSupport(HeroEntity hero) {
+    }
+
+    default void tickServerMovement(HeroEntity hero) {
+        tickServer(hero);
+    }
+
     default void tickServer(HeroEntity hero) {
     }
 

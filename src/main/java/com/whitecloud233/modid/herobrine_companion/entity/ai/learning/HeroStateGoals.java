@@ -21,6 +21,11 @@ public class HeroStateGoals extends Goal {
     }
 
     @Override
+    public boolean canContinueToUse() {
+        return hero.getTradingPlayer() == null;
+    }
+
+    @Override
     public void tick() {
         if (hero.tickCount % 10 != 0) return;
         HeroMindStateRegistry.tickServer(hero);

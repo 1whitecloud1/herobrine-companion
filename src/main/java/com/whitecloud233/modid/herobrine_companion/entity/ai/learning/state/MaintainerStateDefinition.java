@@ -40,14 +40,11 @@ public final class MaintainerStateDefinition implements HeroMindStateDefinition 
     }
 
     @Override
-    public void tickServer(HeroEntity hero) {
+    public void tickServerSupport(HeroEntity hero) {
         ServerPlayer owner = HeroStateBehaviorSupport.getOwner(hero);
         if (owner == null) return;
 
         ServerLevel level = (ServerLevel) hero.level();
-        HeroStateBehaviorSupport.ensureFloating(hero);
-        HeroStateBehaviorSupport.keepDistance(hero, owner, 4.0D, 20.0D, 1.0D, 1.1D);
-
         boolean acted = false;
         int fire = HeroStateBehaviorSupport.extinguishNearbyFire(level, owner.blockPosition(), 16, 3, 5, 32);
         if (fire > 0) {
@@ -69,6 +66,15 @@ public final class MaintainerStateDefinition implements HeroMindStateDefinition 
         if (acted) {
             HeroStateBehaviorSupport.spawnParticles(level, ParticleTypes.HAPPY_VILLAGER, hero.position().add(0.0D, 1.0D, 0.0D), 6, 0.3D);
         }
+    }
+
+    @Override
+    public void tickServerMovement(HeroEntity hero) {
+        ServerPlayer owner = HeroStateBehaviorSupport.getOwner(hero);
+        if (owner == null) return;
+
+        HeroStateBehaviorSupport.ensureFloating(hero);
+        HeroStateBehaviorSupport.keepDistance(hero, owner, 4.0D, 20.0D, 1.0D, 1.1D);
     }
 
     private boolean cleanupItems(HeroEntity hero, ServerPlayer owner) {

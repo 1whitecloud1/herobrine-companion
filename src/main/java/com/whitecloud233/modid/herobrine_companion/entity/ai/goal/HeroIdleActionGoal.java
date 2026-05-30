@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.entity.ai.goal;
 
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.SimpleNeuralNetwork;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -45,6 +46,9 @@ public class HeroIdleActionGoal extends Goal {
     @Override
     public boolean canUse() {
         if (this.hero.isBattleModeActive()) {
+            return false;
+        }
+        if (this.hero.getMindState() == SimpleNeuralNetwork.MindState.OBSERVER) {
             return false;
         }
 

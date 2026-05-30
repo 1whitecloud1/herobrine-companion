@@ -78,12 +78,17 @@ public final class HeroMindStateRegistry {
 
     public static void tickServer(HeroEntity hero) {
         reconcileContextualExit(hero);
-        if (HeroStateBehaviorSupport.isRuntimeStateBlockingMindAmbient(hero)) {
+        HeroMindStateDefinition definition = BY_STATE.get(hero.getMindState());
+        if (definition == null) {
             return;
         }
-        HeroMindStateDefinition definition = BY_STATE.get(hero.getMindState());
-        if (definition != null) {
-            definition.tickServer(hero);
+
+        if (!HeroStateBehaviorSupport.isRuntimeStateBlockingMindSupport(hero)) {
+            definition.tickServerSupport(hero);
+        }
+
+        if (!HeroStateBehaviorSupport.isRuntimeStateBlockingMindMovement(hero)) {
+            definition.tickServerMovement(hero);
         }
     }
 

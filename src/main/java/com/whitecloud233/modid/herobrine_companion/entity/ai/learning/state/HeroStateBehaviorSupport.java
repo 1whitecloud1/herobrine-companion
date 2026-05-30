@@ -58,11 +58,17 @@ final class HeroStateBehaviorSupport {
         return owner != null ? owner : getNearestPlayer(hero, range);
     }
 
-    static boolean isRuntimeStateBlockingMindAmbient(HeroEntity hero) {
+    static boolean isRuntimeStateBlockingMindSupport(HeroEntity hero) {
         return hero.getTradingPlayer() != null
                 || hero.getInvitedPos() != null
                 || hero.isBattleModeActive()
-                || hero.getVehicle() != null
+                || hero.getVehicle() != null;
+    }
+
+    static boolean isRuntimeStateBlockingMindMovement(HeroEntity hero) {
+        return isRuntimeStateBlockingMindSupport(hero)
+                // 陪伴模式只保留状态支援效果，移动由专用跟随/救援 Goal 接管。
+                || hero.isCompanionMode()
                 || hasConflictingGoalControl(hero);
     }
 

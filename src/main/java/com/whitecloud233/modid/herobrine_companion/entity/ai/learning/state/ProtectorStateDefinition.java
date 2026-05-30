@@ -37,13 +37,9 @@ public final class ProtectorStateDefinition implements HeroMindStateDefinition {
     }
 
     @Override
-    public void tickServer(HeroEntity hero) {
+    public void tickServerSupport(HeroEntity hero) {
         ServerPlayer owner = HeroStateBehaviorSupport.getOwner(hero);
         if (owner == null) return;
-
-        HeroStateBehaviorSupport.ensureFloating(hero);
-        HeroStateBehaviorSupport.stopAndLookAt(hero, owner);
-        HeroStateBehaviorSupport.keepDistance(hero, owner, 3.0D, HeroStateBehaviorSupport.isNight(hero) ? 4.0D : 6.0D, 0.9D, 1.0D);
 
         if (hero.tickCount % 180 == 0 && hero.distanceToSqr(owner) <= 32.0D * 32.0D) {
             owner.addEffect(new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, 3600, 1, false, true));
@@ -64,7 +60,6 @@ public final class ProtectorStateDefinition implements HeroMindStateDefinition {
             attacker.addEffect(new MobEffectInstance(MobEffects.WEAKNESS, 100, 0, false, true));
             if (HeroStateBehaviorSupport.isLowHealth(owner, 0.35D)) {
                 owner.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 120, 1, false, true));
-                HeroStateBehaviorSupport.moveNearPlayer(hero, owner, 2.0D, 4.0D, 1.2D);
             }
         }
 
@@ -73,6 +68,21 @@ public final class ProtectorStateDefinition implements HeroMindStateDefinition {
             if (HeroStateBehaviorSupport.hasNearbyHostiles(hero, owner, 16.0D)) {
                 HeroStateBehaviorSupport.spawnParticles(level, ParticleTypes.HAPPY_VILLAGER, owner.position().add(0.0D, 1.0D, 0.0D), 6, 0.4D);
             }
+        }
+    }
+
+    @Override
+    public void tickServerMovement(HeroEntity hero) {
+        ServerPlayer owner = HeroStateBehaviorSupport.getOwner(hero);
+        if (owner == null) return;
+
+        HeroStateBehaviorSupport.ensureFloating(hero);
+        HeroStateBehaviorSupport.stopAndLookAt(hero, owner);
+        HeroStateBehaviorSupport.keepDistance(hero, owner, 3.0D, HeroStateBehaviorSupport.isNight(hero) ? 4.0D : 6.0D, 0.9D, 1.0D);
+
+        LivingEntity attacker = HeroStateBehaviorSupport.getRecentAttacker(owner, 80);
+        if (attacker != null && HeroStateBehaviorSupport.isLowHealth(owner, 0.35D)) {
+            HeroStateBehaviorSupport.moveNearPlayer(hero, owner, 2.0D, 4.0D, 1.2D);
         }
     }
 
