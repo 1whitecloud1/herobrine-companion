@@ -32,6 +32,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class HeroNightfallMovesets {
     private static final String EFN_MOD_ID = "efn";
+    private static final String IMPACTFUL_MOD_ID = "impactful";
     private static final String EFN_ANIMATION_OWNER_PREFIX = "com.hm.efn.gameasset.animations.";
     private static final String EPICFIGHT_ANIMS = "yesman.epicfight.gameasset.Animations";
     private static final double AIR_ATTACK_JUMP_Y = 0.62D;
@@ -708,6 +709,13 @@ public final class HeroNightfallMovesets {
 
         builder.newBehaviorSeries(comboSeries);
 
+        if (isImpactfulCrimsonMoonSkillUnsafe()) {
+            for (int skillIndex = 2; skillIndex < profile.skillSeries().size(); skillIndex++) {
+                appendSkillSeries(builder, profile.skillSeries().get(skillIndex));
+            }
+            return builder;
+        }
+
         CombatBehaviors.BehaviorSeries.Builder<HumanoidMobPatch<?>> harvestSeries = CombatBehaviors.BehaviorSeries.<HumanoidMobPatch<?>>builder()
                 .weight(harvest.weight())
                 .cooldown(harvest.cooldown())
@@ -760,6 +768,10 @@ public final class HeroNightfallMovesets {
             appendSkillSeries(builder, profile.skillSeries().get(skillIndex));
         }
         return builder;
+    }
+
+    private static boolean isImpactfulCrimsonMoonSkillUnsafe() {
+        return ModList.get().isLoaded(IMPACTFUL_MOD_ID);
     }
 
     public static void tickSkillEffects(HeroEpicFightPatch patch, HeroEntity hero) {

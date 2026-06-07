@@ -42,7 +42,7 @@ public final class HeroEpicFightWeaponProfiles {
     }
 
     public static CapabilityItem resolveCapability(HeroEntity hero) {
-        if (hero == null || !hero.isAddedToWorld()) {
+        if (hero == null || hero.isRemoved()) {
             return CapabilityItem.EMPTY;
         }
 
@@ -72,7 +72,7 @@ public final class HeroEpicFightWeaponProfiles {
     }
 
     public static boolean isRangedLoadout(HeroEntity hero) {
-        if (hero == null || !hero.isAddedToWorld()) {
+        if (hero == null || hero.isRemoved()) {
             return false;
         }
 
@@ -115,7 +115,7 @@ public final class HeroEpicFightWeaponProfiles {
     }
 
     public static boolean hasHeroControlledCombatAnimations(HeroEntity hero) {
-        if (hero == null || !hero.isAddedToWorld()) {
+        if (hero == null || hero.isRemoved()) {
             return false;
         }
 

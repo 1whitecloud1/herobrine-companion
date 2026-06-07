@@ -9,6 +9,7 @@ import com.whitecloud233.modid.herobrine_companion.network.ai.OpenCrossSessionHu
 import com.whitecloud233.modid.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.modid.herobrine_companion.network.ai.PresentCrossChatAiLinePacket;
 import com.whitecloud233.modid.herobrine_companion.network.ai.SyncCrossChatStatePacket;
+import com.whitecloud233.modid.herobrine_companion.util.LegacyFormattingText;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -733,7 +734,7 @@ public final class HeroCrossChatManager {
         if (sanitized.length() > MAX_MESSAGE_LENGTH) {
             sanitized = sanitized.substring(0, MAX_MESSAGE_LENGTH).trim();
         }
-        return sanitized;
+        return LegacyFormattingText.normalize(sanitized);
     }
 
     private static String buildPlayerToHbPrompt(String speakerName, String ownerName, String message) {

@@ -79,7 +79,7 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
     @Override
     protected void initAI() {
         HeroEntity hero = this.getOriginal();
-        if (hero == null || !hero.isAddedToWorld() || !hero.isBattleModeActive()) {
+        if (hero == null || hero.isRemoved() || !hero.isBattleModeActive()) {
             this.removeHeroCombatGoals();
             this.infantryAiConfigured = false;
             return;
@@ -134,7 +134,7 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
     @Override
     public void updateHeldItem(CapabilityItem fromCap, CapabilityItem toCap, ItemStack from, ItemStack to, InteractionHand hand) {
         HeroEntity hero = this.getOriginal();
-        if (hero == null || !hero.isAddedToWorld()) {
+        if (hero == null || hero.isRemoved()) {
             return;
         }
 
@@ -1037,7 +1037,7 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
     }
 
     private boolean isEquipmentReady(HeroEntity hero) {
-        if (hero == null || !hero.isAddedToWorld()) {
+        if (hero == null || hero.isRemoved()) {
             return false;
         }
 
@@ -1051,7 +1051,7 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
 
     private void ensureInfantryAiConfigured() {
         HeroEntity hero = this.getOriginal();
-        if (hero == null || !hero.isAddedToWorld()) {
+        if (hero == null || hero.isRemoved()) {
             return;
         }
         if (!hero.isBattleModeActive()) {
