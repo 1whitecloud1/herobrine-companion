@@ -10,6 +10,7 @@ import com.whitecloud233.herobrine_companion.client.service.LocalChatService;
 import com.whitecloud233.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.herobrine_companion.network.ai.SendCrossChatHbMessagePacket;
 import com.whitecloud233.herobrine_companion.network.ai.SendCrossChatMessagePacket;
+import com.whitecloud233.herobrine_companion.util.LegacyFormattingComponents;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.network.chat.Component;
@@ -117,7 +118,7 @@ public class ClientChatHandler {
                             ).thenAccept(reply -> mc.tell(() -> {
                                 showExitHint();
                                 mc.gui.getChat().addMessage(
-                                        Component.translatable("message.herobrine_companion.chat_hero", Component.literal(reply))
+                                        Component.translatable("message.herobrine_companion.chat_hero", LegacyFormattingComponents.parse(reply))
                                 );
                             }));
                         } else {
@@ -125,7 +126,7 @@ public class ClientChatHandler {
                                 // 拿到大模型的回复后，切回主线程将其显示在聊天框
                                 mc.tell(() -> {
                                     mc.gui.getChat().addMessage(
-                                            Component.translatable("message.herobrine_companion.chat_hero", Component.literal(reply))
+                                            Component.translatable("message.herobrine_companion.chat_hero", LegacyFormattingComponents.parse(reply))
                                     );
                                 });
                             });

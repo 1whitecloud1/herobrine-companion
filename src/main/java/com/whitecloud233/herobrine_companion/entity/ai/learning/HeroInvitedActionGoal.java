@@ -3,6 +3,7 @@ package com.whitecloud233.herobrine_companion.entity.ai.learning;
 import com.whitecloud233.herobrine_companion.compat.cooking.HeroCookingCompat;
 import com.whitecloud233.herobrine_companion.compat.kaleidoscope.HeroKaleidoscopeCompat;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.herobrine_companion.entity.logic.HeroInvitationHelper;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.particles.ParticleTypes;
@@ -36,10 +37,10 @@ import java.util.List;
 import java.util.UUID;
 
 public class HeroInvitedActionGoal extends Goal {
-    private static final int ACTION_INSPECT = 1;
-    private static final int ACTION_REST = 2;
-    private static final int ACTION_GUARD = 3;
-    private static final int ACTION_COOK = HeroCookingCompat.INVITED_ACTION_COOK;
+    private static final int ACTION_INSPECT = HeroInvitationHelper.ACTION_INSPECT;
+    private static final int ACTION_REST = HeroInvitationHelper.ACTION_REST;
+    private static final int ACTION_GUARD = HeroInvitationHelper.ACTION_GUARD;
+    private static final int ACTION_COOK = HeroInvitationHelper.ACTION_COOK;
 
     private final HeroEntity hero;
     private BlockPos targetPos;
@@ -229,7 +230,11 @@ public class HeroInvitedActionGoal extends Goal {
             } else if (this.actionType == ACTION_COOK) {
                 this.hero.setNoGravity(false);
                 performCookPresentation(destination);
-                HeroCookingCompat.tickCookware(this.hero, this.targetPos);
+                if (HeroCookingCompat.isAutonomousCookingActive(this.hero, this.targetPos)) {
+                    HeroCookingCompat.tickAutonomousCooking(this.hero, this.targetPos);
+                } else {
+                    HeroCookingCompat.tickCookware(this.hero, this.targetPos);
+                }
             } else if (this.actionType != ACTION_REST) {
                 this.hero.getLookControl().setLookAt(destination);
             }

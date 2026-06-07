@@ -30,6 +30,8 @@ import java.util.UUID;
 public class HeroDialogueHandler {
 
     private static final String TAG_LAST_SPEECH = "HeroLastSpeechTime";
+    public static final String AUTONOMOUS_REST_FALLBACK_KEY = "message.herobrine_companion.autonomous_rest";
+    public static final String AUTONOMOUS_COOK_FALLBACK_KEY = "message.herobrine_companion.autonomous_cook";
 
     public static boolean canSpeak(HeroEntity hero) {
         long time = hero.level().getGameTime();
@@ -39,20 +41,36 @@ public class HeroDialogueHandler {
     }
 
     // 【核心改造】：不再服务端判断AI，而是把大模型提示词和备用台词打包发给客户端，扣对应玩家的钱！
-    public static void tryAIDialogueOrFallback(HeroEntity hero, ServerPlayer player, String aiPrompt, String fallbackKey, int fallbackVariants) {
-        if (!canSpeak(hero)) return;
-        // 记录说话时间，进入冷却
-        hero.getPersistentData().putLong(TAG_LAST_SPEECH, hero.level().getGameTime());
+    public static void tryAIDialogueOrFallback(HeroEntity hero, ServerPlayer player, String aiPrompt, String fallbackKey,
+                                               int fallbackVariants) {
+        dispatchAIDialogueOrFallback(hero, player, aiPrompt, fallbackKey, fallbackVariants, "", "", false);
+    }
 
-        // 发送数据包，将提示词和保底翻译键全部交给该玩家的客户端去处理
-        PacketHandler.sendToPlayer(new AIObservationPacket(hero.getId(), aiPrompt, fallbackKey, fallbackVariants), player);
+    public static void tryAIDialogueOrFallback(HeroEntity hero, ServerPlayer player, String aiPrompt, String fallbackKey,
+                                               int fallbackVariants, String contextTranslationKey, String contextFallbackName) {
+        dispatchAIDialogueOrFallback(hero, player, aiPrompt, fallbackKey, fallbackVariants,
+                contextTranslationKey, contextFallbackName, false);
+    }
+
+    public static void forceAIDialogueOrFallback(HeroEntity hero, ServerPlayer player, String aiPrompt, String fallbackKey,
+                                                 int fallbackVariants, String contextTranslationKey, String contextFallbackName) {
+        dispatchAIDialogueOrFallback(hero, player, aiPrompt, fallbackKey, fallbackVariants,
+                contextTranslationKey, contextFallbackName, true);
     }
 
     public static void tick(HeroEntity hero) {
-        if (hero.level().isClientSide || !hero.isCompanionMode()) return;
-        if (hero.tickCount % 100 != 0) return;
+        if (hero.level().isClientSide || !hero.isCompanionMode()) {
+            return;
+        }
+        if (hero.tickCount % 100 != 0) {
+            return;
+        }
+
         UUID ownerUUID = hero.getOwnerUUID();
-        if (ownerUUID == null) return;
+        if (ownerUUID == null) {
+            return;
+        }
+
         Player owner = hero.level().getPlayerByUUID(ownerUUID);
         if (owner instanceof ServerPlayer serverPlayer) {
             checkConditions(hero, serverPlayer);
@@ -60,19 +78,20 @@ public class HeroDialogueHandler {
     }
 
     private static void checkConditions(HeroEntity hero, ServerPlayer owner) {
-        if (!canSpeak(hero)) return;
-        RandomSource random = hero.getRandom();
+        if (!canSpeak(hero)) {
+            return;
+        }
 
-        if (owner.getHealth() < owner.getMaxHealth() * 0.3) {
+        RandomSource random = hero.getRandom();
+        if (owner.getHealth() < owner.getMaxHealth() * 0.3F) {
             tryAIDialogueOrFallback(hero, owner,
                     "The player is critically injured and has low health.",
                     "message.herobrine_companion.low_health", 3);
             return;
         }
 
-        if (random.nextFloat() < 0.02) {
-            SimpleNeuralNetwork.MindState state = hero.getHeroBrain().getState();
-            handleStateSpeech(hero, owner, state);
+        if (random.nextFloat() < 0.02F) {
+            handleStateSpeech(hero, owner, hero.getHeroBrain().getState());
         }
     }
 
@@ -178,24 +197,75 @@ public class HeroDialogueHandler {
             tryAIDialogueOrFallback(hero, owner, "You gave the player a gift.", "message.herobrine_companion.gift_comment", 3);
         }
     }
+    public static void onAutonomousRestStart(HeroEntity hero, BlockState restState) {
+        ServerPlayer owner = resolveOwnerAudience(hero);
+        if (owner == null || restState == null) {
+            return;
+        }
+
+        String blockName = restState.getBlock().getName().getString();
+        forceAIDialogueOrFallback(
+                hero,
+                owner,
+                "You are Hero. You yourself chose to rest on [" + blockName + "]. Speak to the player with one brief, natural first-person line about taking a quiet break there. Do not describe the player as the one resting.",
+                AUTONOMOUS_REST_FALLBACK_KEY,
+                4,
+                restState.getBlock().getDescriptionId(),
+                blockName
+        );
+    }
+
+    public static void onAutonomousCookingStart(HeroEntity hero, ItemStack cookedResult) {
+        ServerPlayer owner = resolveOwnerAudience(hero);
+        if (owner == null || cookedResult == null || cookedResult.isEmpty()) {
+            return;
+        }
+
+        String dishName = cookedResult.getHoverName().getString();
+        forceAIDialogueOrFallback(
+                hero,
+                owner,
+                "You are Hero. You yourself are about to cook [" + dishName + "] with nearby cookware, without using the player's ingredients. Speak to the player with one brief, natural first-person line that shows interest in the dish. Do not describe the player as the one cooking.",
+                AUTONOMOUS_COOK_FALLBACK_KEY,
+                4,
+                cookedResult.getDescriptionId(),
+                dishName
+        );
+    }
 
     public static void onObserveEntity(HeroEntity hero, ServerPlayer player, LivingEntity target) {
-        if (hero.getRandom().nextFloat() > 0.1) return;
+        if (hero.getRandom().nextFloat() > 0.1F) {
+            return;
+        }
 
         String targetName = target.getName().getString();
-
-        if (target instanceof GhostSteveEntity || target instanceof GhostCreeperEntity || target instanceof GhostZombieEntity || target instanceof GhostSkeletonEntity) {
-            tryAIDialogueOrFallback(hero, player, "The player is looking at an undead anomaly (" + targetName + ").", "message.herobrine_companion.observe_ghost", 3);
+        if (target instanceof GhostSteveEntity
+                || target instanceof GhostCreeperEntity
+                || target instanceof GhostZombieEntity
+                || target instanceof GhostSkeletonEntity) {
+            tryAIDialogueOrFallback(hero, player,
+                    "The player is looking at an undead anomaly (" + targetName + ").",
+                    "message.herobrine_companion.observe_ghost", 3);
         } else if (target instanceof Monster) {
-            tryAIDialogueOrFallback(hero, player, "The player is looking at a monster [" + targetName + "].", "message.herobrine_companion.observe_monster", 3);
+            tryAIDialogueOrFallback(hero, player,
+                    "The player is looking at a monster [" + targetName + "].",
+                    "message.herobrine_companion.observe_monster", 3);
         } else if (target instanceof Animal) {
-            tryAIDialogueOrFallback(hero, player, "The player is looking at an animal [" + targetName + "].", "message.herobrine_companion.observe_animal", 2);
+            tryAIDialogueOrFallback(hero, player,
+                    "The player is looking at an animal [" + targetName + "].",
+                    "message.herobrine_companion.observe_animal", 2);
         } else if (target instanceof Villager) {
-            tryAIDialogueOrFallback(hero, player, "The player is looking at a villager [" + targetName + "].", "message.herobrine_companion.observe_villager", 2);
+            tryAIDialogueOrFallback(hero, player,
+                    "The player is looking at a villager [" + targetName + "].",
+                    "message.herobrine_companion.observe_villager", 2);
         } else if (target instanceof Player) {
-            tryAIDialogueOrFallback(hero, player, "The player is observing another human.", "message.herobrine_companion.observe_player", 2);
+            tryAIDialogueOrFallback(hero, player,
+                    "The player is observing another human.",
+                    "message.herobrine_companion.observe_player", 2);
         } else {
-            tryAIDialogueOrFallback(hero, player, "The player is observing an entity [" + targetName + "].", "message.herobrine_companion.observe_entity_generic", 2);
+            tryAIDialogueOrFallback(hero, player,
+                    "The player is observing an entity [" + targetName + "].",
+                    "message.herobrine_companion.observe_entity_generic", 2);
         }
     }
 
@@ -203,21 +273,33 @@ public class HeroDialogueHandler {
         String blockName = state.getBlock().getName().getString();
 
         if (state.is(Blocks.DIAMOND_ORE) || state.is(Blocks.DEEPSLATE_DIAMOND_ORE)) {
-            if (hero.getRandom().nextFloat() < 0.2)
-                tryAIDialogueOrFallback(hero, player, "The player found [" + blockName + "].", "message.herobrine_companion.observe_diamond", 2);
-        } else if (state.is(Blocks.BEDROCK)) {
-            if (hero.getRandom().nextFloat() < 0.2)
-                tryAIDialogueOrFallback(hero, player, "The player is looking at [Bedrock].", "message.herobrine_companion.observe_bedrock", 1);
-        } else if (state.getBlock().getDescriptionId().contains("command_block")) {
-            if (hero.getRandom().nextFloat() < 0.2)
-                tryAIDialogueOrFallback(hero, player, "The player is looking at a [Command Block].", "message.herobrine_companion.observe_command_block", 1);
-        } else if (state.is(Blocks.REDSTONE_WIRE)) {
-            if (hero.getRandom().nextFloat() < 0.1)
-                tryAIDialogueOrFallback(hero, player, "The player is tinkering with redstone.", "message.herobrine_companion.observe_redstone", 1);
-        } else {
-            if (hero.getRandom().nextFloat() < 0.02) {
-                tryAIDialogueOrFallback(hero, player, "The player is looking at [" + blockName + "].", "message.herobrine_companion.inspect_block", 3);
+            if (hero.getRandom().nextFloat() < 0.2F) {
+                tryAIDialogueOrFallback(hero, player,
+                        "The player found [" + blockName + "].",
+                        "message.herobrine_companion.observe_diamond", 2);
             }
+        } else if (state.is(Blocks.BEDROCK)) {
+            if (hero.getRandom().nextFloat() < 0.2F) {
+                tryAIDialogueOrFallback(hero, player,
+                        "The player is looking at [Bedrock].",
+                        "message.herobrine_companion.observe_bedrock", 1);
+            }
+        } else if (state.getBlock().getDescriptionId().contains("command_block")) {
+            if (hero.getRandom().nextFloat() < 0.2F) {
+                tryAIDialogueOrFallback(hero, player,
+                        "The player is looking at a [Command Block].",
+                        "message.herobrine_companion.observe_command_block", 1);
+            }
+        } else if (state.is(Blocks.REDSTONE_WIRE)) {
+            if (hero.getRandom().nextFloat() < 0.1F) {
+                tryAIDialogueOrFallback(hero, player,
+                        "The player is tinkering with redstone.",
+                        "message.herobrine_companion.observe_redstone", 1);
+            }
+        } else if (hero.getRandom().nextFloat() < 0.02F) {
+            tryAIDialogueOrFallback(hero, player,
+                    "The player is looking at [" + blockName + "].",
+                    "message.herobrine_companion.inspect_block", 3);
         }
     }
 
@@ -226,22 +308,38 @@ public class HeroDialogueHandler {
     }
 
     public static void onObserveItem(HeroEntity hero, ServerPlayer player, ItemStack item) {
-        if (hero.getRandom().nextFloat() > 0.05) return;
+        if (hero.getRandom().nextFloat() > 0.05F) {
+            return;
+        }
 
         String itemName = item.getHoverName().getString();
-
         if (item.getItem() instanceof SwordItem) {
-            tryAIDialogueOrFallback(hero, player, "The player is holding their weapon [" + itemName + "].", "message.herobrine_companion.observe_sword", 2);
+            tryAIDialogueOrFallback(hero, player,
+                    "The player is holding their weapon [" + itemName + "].",
+                    "message.herobrine_companion.observe_sword", 2);
         } else if (item.getItem() instanceof PickaxeItem) {
-            tryAIDialogueOrFallback(hero, player, "The player is holding their [" + itemName + "] to mine.", "message.herobrine_companion.observe_pickaxe", 2);
+            tryAIDialogueOrFallback(hero, player,
+                    "The player is holding their [" + itemName + "] to mine.",
+                    "message.herobrine_companion.observe_pickaxe", 2);
         } else if (item.getItem() instanceof HoeItem) {
-            tryAIDialogueOrFallback(hero, player, "The player is holding a [" + itemName + "] to farm.", "message.herobrine_companion.observe_hoe", 2);
+            tryAIDialogueOrFallback(hero, player,
+                    "The player is holding a [" + itemName + "] to farm.",
+                    "message.herobrine_companion.observe_hoe", 2);
         } else if (item.is(Items.COMMAND_BLOCK)) {
-            tryAIDialogueOrFallback(hero, player, "The player is holding a [Command Block].", "message.herobrine_companion.observe_command_block_item", 1);
+            tryAIDialogueOrFallback(hero, player,
+                    "The player is holding a [Command Block].",
+                    "message.herobrine_companion.observe_command_block_item", 1);
         } else if (item.is(Items.COMPASS)) {
-            tryAIDialogueOrFallback(hero, player, "The player is holding a compass.", "message.herobrine_companion.observe_compass", 1);
-        } else if (item.is(Items.WHEAT_SEEDS) || item.is(Items.PUMPKIN_SEEDS) || item.is(Items.MELON_SEEDS) || item.is(Items.BEETROOT_SEEDS)) {
-            tryAIDialogueOrFallback(hero, player, "The player is holding seeds [" + itemName + "].", "message.herobrine_companion.observe_farming", 2);
+            tryAIDialogueOrFallback(hero, player,
+                    "The player is holding a compass.",
+                    "message.herobrine_companion.observe_compass", 1);
+        } else if (item.is(Items.WHEAT_SEEDS)
+                || item.is(Items.PUMPKIN_SEEDS)
+                || item.is(Items.MELON_SEEDS)
+                || item.is(Items.BEETROOT_SEEDS)) {
+            tryAIDialogueOrFallback(hero, player,
+                    "The player is holding seeds [" + itemName + "].",
+                    "message.herobrine_companion.observe_farming", 2);
         }
     }
 
@@ -272,9 +370,36 @@ public class HeroDialogueHandler {
     public static void speakRandom(HeroEntity hero, ServerPlayer player, String baseKey, int variants) {
         if (variants <= 1) {
             speak(hero, player, baseKey);
-        } else {
-            int r = hero.getRandom().nextInt(variants) + 1;
-            speak(hero, player, baseKey + "_" + r);
+            return;
         }
+
+        int variant = hero.getRandom().nextInt(variants) + 1;
+        speak(hero, player, baseKey + "_" + variant);
+    }
+
+    private static ServerPlayer resolveOwnerAudience(HeroEntity hero) {
+        if (hero == null || hero.level().isClientSide || hero.getOwnerUUID() == null) {
+            return null;
+        }
+        Player owner = hero.level().getPlayerByUUID(hero.getOwnerUUID());
+        return owner instanceof ServerPlayer serverPlayer ? serverPlayer : null;
+    }
+
+    private static void dispatchAIDialogueOrFallback(HeroEntity hero, ServerPlayer player, String aiPrompt, String fallbackKey,
+                                                     int fallbackVariants, String contextTranslationKey,
+                                                     String contextFallbackName, boolean ignoreCooldown) {
+        if (!ignoreCooldown && !canSpeak(hero)) {
+            return;
+        }
+
+        hero.getPersistentData().putLong(TAG_LAST_SPEECH, hero.level().getGameTime());
+        PacketHandler.sendToPlayer(new AIObservationPacket(
+                hero.getId(),
+                aiPrompt,
+                fallbackKey,
+                fallbackVariants,
+                contextTranslationKey,
+                contextFallbackName
+        ), player);
     }
 }

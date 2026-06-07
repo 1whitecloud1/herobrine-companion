@@ -4,6 +4,7 @@ import com.whitecloud233.herobrine_companion.compat.cooking.HeroCookingCompat;
 import com.whitecloud233.herobrine_companion.compat.cooking.OpenCookSelectionPacket;
 import com.whitecloud233.herobrine_companion.compat.kaleidoscope.HeroKaleidoscopeCompat;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.herobrine_companion.entity.logic.HeroInvitationHelper;
 import com.whitecloud233.herobrine_companion.entity.logic.data.HeroDataHandler;
 import com.whitecloud233.herobrine_companion.entity.logic.data.HeroLogic;
 import com.whitecloud233.herobrine_companion.event.ModEvents;
@@ -59,9 +60,6 @@ public class HeroSummonItem extends Item {
 
     private static final long COOLDOWN_TICKS = 100;
 
-    // 1.21.1: 更改 ResourceLocation 的实例化方式
-    private static final TagKey<Block> FORGE_CHAIRS = BlockTags.create(ResourceLocation.fromNamespaceAndPath("forge", "chairs"));
-    private static final TagKey<Block> C_CHAIRS = BlockTags.create(ResourceLocation.fromNamespaceAndPath("c", "chairs"));
 
     public HeroSummonItem(Properties properties) {
         super(properties);
@@ -118,7 +116,7 @@ public class HeroSummonItem extends Item {
                 }
 
                 HeroEntity existingHero = ownerUUID != null ? findHeroInAnyDimension(serverLevel.getServer(), ownerUUID) : null;
-                int actionType = getInteractionType(level, clickedPos);
+                int actionType = HeroInvitationHelper.getInteractionType(level, clickedPos);
 
                 if (actionType > 0 && existingHero != null) {
                     if (existingHero.level().dimension() == level.dimension()) {
@@ -269,40 +267,7 @@ public class HeroSummonItem extends Item {
         return null;
     }
 
-    private int getInteractionType(Level level, BlockPos pos) {
-        BlockState state = level.getBlockState(pos);
-        Block block = state.getBlock();
 
-        if (HeroCookingCompat.isCookwareStation(level, pos)) return HeroCookingCompat.INVITED_ACTION_COOK;
-        if (state.is(BlockTags.BEDS) || block instanceof BedBlock) return 2;
-        if (state.is(BlockTags.STAIRS) || block instanceof StairBlock) return 2;
-        if (state.is(BlockTags.SLABS) || block instanceof SlabBlock) return 2;
-
-        if (state.is(FORGE_CHAIRS) || state.is(C_CHAIRS)) return 2;
-
-        // 1.21.1: 更改 Registries 的获取方式
-        ResourceLocation key = BuiltInRegistries.BLOCK.getKey(block);
-        if (key != BuiltInRegistries.BLOCK.getDefaultKey()) {
-            String path = key.getPath().toLowerCase();
-            if (path.contains("chair") || path.contains("seat") || path.contains("sofa") || path.contains("stool") || path.contains("bench")) {
-                return 2;
-            }
-        }
-
-        if (state.is(BlockTags.DOORS) || block instanceof DoorBlock) return 3;
-        if (state.is(BlockTags.TRAPDOORS) || block instanceof TrapDoorBlock) return 3;
-        if (state.is(BlockTags.FENCE_GATES) || block instanceof FenceGateBlock) return 3;
-        if (state.is(Blocks.CHEST) || state.is(Blocks.TRAPPED_CHEST) || state.is(Blocks.ENDER_CHEST) || state.is(Blocks.BARREL) || state.is(Blocks.SHULKER_BOX)) return 3;
-
-        if (state.is(Blocks.SPAWNER)) return 1;
-        if (state.is(Blocks.ENCHANTING_TABLE)) return 1;
-        if (state.is(Blocks.BEACON)) return 1;
-        if (state.is(Blocks.COMMAND_BLOCK) || state.is(Blocks.CHAIN_COMMAND_BLOCK) || state.is(Blocks.REPEATING_COMMAND_BLOCK)) return 1;
-        if (state.is(BlockTags.DIAMOND_ORES) || state.is(BlockTags.EMERALD_ORES) || state.is(BlockTags.GOLD_ORES)) return 1;
-        if (state.is(Blocks.ANCIENT_DEBRIS)) return 1;
-
-        return 0;
-    }
 
     // --- 1.21.1 NBT / Component 更新逻辑 ---
 

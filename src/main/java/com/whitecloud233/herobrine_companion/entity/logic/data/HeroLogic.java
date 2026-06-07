@@ -9,6 +9,7 @@ import com.whitecloud233.herobrine_companion.entity.ai.learning.HeroPrankHandler
 import com.whitecloud233.herobrine_companion.entity.ai.learning.state.GlitchLordStateDefinition;
 import com.whitecloud233.herobrine_companion.entity.ai.learning.state.PranksterStateDefinition;
 import com.whitecloud233.herobrine_companion.entity.logic.HeroInteractionHandler;
+import com.whitecloud233.herobrine_companion.entity.logic.HeroInvitationHelper;
 import com.whitecloud233.herobrine_companion.world.structure.ModStructures;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -16,7 +17,6 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -109,6 +109,7 @@ public class HeroLogic {
         HeroDimensionHandler.handleVoidProtection(hero);
 
         HeroDialogueHandler.tick(hero);
+        HeroCookingCompat.tickVisuals(hero);
         HeroPrankHandler.tick(hero);
         HeroObserver.tick(hero);
         GlitchLordStateDefinition.tickPersistentState(hero);
@@ -240,6 +241,11 @@ public class HeroLogic {
     }
 
     private static void applyInvitation(HeroEntity hero, Player player, BlockPos pos, int actionType, boolean preserveCookSelection) {
+        if (hero.getInvitedAction() == HeroCookingCompat.INVITED_ACTION_COOK
+                && (actionType != HeroCookingCompat.INVITED_ACTION_COOK || !pos.equals(hero.getInvitedPos()))) {
+            HeroCookingCompat.endCookChunkTicket(hero);
+        }
+
         hero.setInvitedPos(pos);
         hero.setInvitedAction(actionType);
 
@@ -247,7 +253,11 @@ public class HeroLogic {
             HeroCookingCompat.resetCookSelection(hero, pos);
         }
 
-        if (actionType == 2) {
+        if (actionType == HeroCookingCompat.INVITED_ACTION_COOK) {
+            HeroCookingCompat.beginCookChunkTicket(hero, pos);
+        }
+
+        if (actionType == HeroInvitationHelper.ACTION_REST) {
             if (hero.isFloating()) {
                 hero.setFloating(false);
                 hero.setNoGravity(false);
@@ -257,10 +267,10 @@ public class HeroLogic {
         hero.playSound(net.minecraft.sounds.SoundEvents.EXPERIENCE_ORB_PICKUP, 1.0F, 1.0F);
 
         String baseKey = switch (actionType) {
-            case 1 -> "message.herobrine_companion.invite_inspect";
-            case 2 -> "message.herobrine_companion.invite_rest";
-            case 3 -> "message.herobrine_companion.invite_guard";
-            case HeroCookingCompat.INVITED_ACTION_COOK -> "message.herobrine_companion.invite_cook";
+            case HeroInvitationHelper.ACTION_INSPECT -> "message.herobrine_companion.invite_inspect";
+            case HeroInvitationHelper.ACTION_REST -> "message.herobrine_companion.invite_rest";
+            case HeroInvitationHelper.ACTION_GUARD -> "message.herobrine_companion.invite_guard";
+            case HeroInvitationHelper.ACTION_COOK -> "message.herobrine_companion.invite_cook";
             default -> "message.herobrine_companion.invite_confirm";
         };
 

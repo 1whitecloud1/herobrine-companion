@@ -89,7 +89,7 @@ public final class KaleidoscopeCompatBuiltinPackFallback {
     }
 
     private static void registerBuiltinPack(AddPackFindersEvent event, String packName) {
-        ResourceLocation packLocation = ResourceLocation.fromNamespaceAndPath(MOD_ID, packName);
+        ResourceLocation packLocation = ResourceLocation.fromNamespaceAndPath(MOD_ID, "packs/" + packName);
         Component title = Component.literal("Kaleidoscope Compat - " + packName.toUpperCase(Locale.ROOT));
         event.addPackFinders(packLocation, PackType.SERVER_DATA, title, PackSource.BUILT_IN, event.isTrusted(), Pack.Position.TOP);
         LOGGER.info("Registered {} builtin pack fallback for {}", MOD_ID, packLocation);

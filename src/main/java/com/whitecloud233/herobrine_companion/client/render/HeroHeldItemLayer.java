@@ -50,11 +50,30 @@ public class HeroHeldItemLayer extends ItemInHandLayer<HeroEntity, PlayerModel<H
             poseStack.popPose();
             return;
         }
+        boolean isRightHanded = entity.getMainArm() == HumanoidArm.RIGHT;
+        ItemStack rightHandItem = isRightHanded ? entity.getMainHandItem() : entity.getOffhandItem();
+        ItemStack leftHandItem = isRightHanded ? entity.getOffhandItem() : entity.getMainHandItem();
 
+        ItemStack visualMainHandItem = entity.getVisualMainHandItem();
+        ItemStack visualOffHandItem = entity.getVisualOffHandItem();
+        if (!visualMainHandItem.isEmpty()) {
+            if (isRightHanded) rightHandItem = visualMainHandItem;
+            else leftHandItem = visualMainHandItem;
+        }
+        if (!visualOffHandItem.isEmpty()) {
+            if (isRightHanded) leftHandItem = visualOffHandItem;
+            else rightHandItem = visualOffHandItem;
+        }
         // 主动开启伪装，骗过 AW 武器渲染器
         ItemStack cookMainHandItem = HeroCookingCompat.getCookMainHandDisplay(entity);
         ItemStack cookOffhandItem = HeroCookingCompat.getCookOffhandDisplay(entity);
         if (!cookMainHandItem.isEmpty() || !cookOffhandItem.isEmpty()) {
+            if (!visualMainHandItem.isEmpty()) {
+                cookMainHandItem = visualMainHandItem;
+            }
+            if (!visualOffHandItem.isEmpty()) {
+                cookOffhandItem = visualOffHandItem;
+            }
             HumanoidArm mainArm = entity.getMainArm();
             if (!cookMainHandItem.isEmpty()) {
                 this.renderArmWithItem(entity, cookMainHandItem,
@@ -72,10 +91,34 @@ public class HeroHeldItemLayer extends ItemInHandLayer<HeroEntity, PlayerModel<H
 
         this.heroRenderer.spoofModelForAW = true;
         try {
-            super.render(poseStack, buffer, packedLight, entity, limbSwing, limbSwingAmount, partialTick, ageInTicks, netHeadYaw, headPitch);
+            renderHands(poseStack, buffer, packedLight, entity, rightHandItem, leftHandItem);
         } finally {
             this.heroRenderer.spoofModelForAW = false;
         }
+    }
+
+    private void renderHands(PoseStack poseStack, MultiBufferSource buffer, int packedLight, HeroEntity entity,
+                             ItemStack rightHandItem, ItemStack leftHandItem) {
+        if (rightHandItem.isEmpty() && leftHandItem.isEmpty()) {
+            return;
+        }
+
+        poseStack.pushPose();
+        if (this.getParentModel().young) {
+            poseStack.translate(0.0F, 0.75F, 0.0F);
+            poseStack.scale(0.5F, 0.5F, 0.5F);
+        }
+        if (!rightHandItem.isEmpty()) {
+            this.renderArmWithItem(entity, rightHandItem,
+                    ItemDisplayContext.THIRD_PERSON_RIGHT_HAND,
+                    HumanoidArm.RIGHT, poseStack, buffer, packedLight);
+        }
+        if (!leftHandItem.isEmpty()) {
+            this.renderArmWithItem(entity, leftHandItem,
+                    ItemDisplayContext.THIRD_PERSON_LEFT_HAND,
+                    HumanoidArm.LEFT, poseStack, buffer, packedLight);
+        }
+        poseStack.popPose();
     }
 
     // =========================================================

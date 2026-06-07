@@ -1,6 +1,7 @@
 package com.whitecloud233.herobrine_companion.entity.logic;
 
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.herobrine_companion.entity.family.HerobrineFamilySummonManager;
 import com.whitecloud233.herobrine_companion.entity.logic.data.HeroDataHandler;
 import com.whitecloud233.herobrine_companion.entity.logic.data.HeroWorldData;
 import net.minecraft.core.GlobalPos;
@@ -38,6 +39,8 @@ public class HeroServerTick {
         }
 
         // 2. 持续性唯一性检查 - 严格比对存档内记录的“唯一合法存活者”
+        HerobrineFamilySummonManager.serverTick(hero, serverLevel);
+
         int checkInterval = hero.tickCount < 200 ? 10 : 100;
         if (hero.tickCount % checkInterval == 0) {
             UUID activeUUID = data.getActiveHeroUUID(ownerUUID);

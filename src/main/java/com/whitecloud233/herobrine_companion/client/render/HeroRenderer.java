@@ -222,6 +222,9 @@ public class HeroRenderer extends LivingEntityRenderer<HeroEntity, PlayerModel<H
             poseStack.popPose();
         }
 
+        AwakenedMobNameplateRenderer.renderForced(poseStack, buffer, entity, packedLight, partialTicks, 0xFFFF5555);
+        EntitySpeechBubbleRenderer.render(poseStack, buffer, entity, packedLight, partialTicks);
+
         if (isGlitching) {
             float age = entity.tickCount + partialTicks;
             this.getModel().setupAnim(entity, 0, 0, age, entity.getYRot(), entity.getXRot());
