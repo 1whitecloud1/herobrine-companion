@@ -1,6 +1,6 @@
 package com.whitecloud233.herobrine_companion.client.fight.network;
 
-import com.whitecloud233.herobrine_companion.client.fight.event.ClientCollapseHandler; // 【修复】去掉了错误的 .modid 包层级
+import com.whitecloud233.herobrine_companion.network.ClientOnlyExecutor;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -9,8 +9,10 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 public record SPacketStartCollapse() implements CustomPacketPayload {
 
-    public static final Type<SPacketStartCollapse> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath("herobrine_companion", "start_collapse"));
-    public static final StreamCodec<FriendlyByteBuf, SPacketStartCollapse> CODEC = StreamCodec.unit(new SPacketStartCollapse());
+    public static final Type<SPacketStartCollapse> TYPE =
+            new Type<>(ResourceLocation.fromNamespaceAndPath("herobrine_companion", "start_collapse"));
+    public static final StreamCodec<FriendlyByteBuf, SPacketStartCollapse> CODEC =
+            StreamCodec.unit(new SPacketStartCollapse());
 
     @Override
     public Type<? extends CustomPacketPayload> type() {
@@ -18,7 +20,16 @@ public record SPacketStartCollapse() implements CustomPacketPayload {
     }
 
     public void handle(IPayloadContext context) {
-        // 客户端收到包后，在主线程触发视觉演出的代码
-        context.enqueueWork(ClientCollapseHandler::startCollapse);
+        context.enqueueWork(() -> ClientOnlyExecutor.invoke(
+                SPacketStartCollapse.ClientHandler.class.getName(),
+                "handle",
+                new Class<?>[0]
+        ));
+    }
+
+    private static final class ClientHandler {
+        private static void handle() {
+            com.whitecloud233.herobrine_companion.client.fight.event.ClientCollapseHandler.startCollapse();
+        }
     }
 }

@@ -38,6 +38,7 @@ public class ClientModSetup {
         // 2. 传入刚才实例化的对象 PATCHER_INSTANCE，而不是 IrisPatcher.class
         NeoForge.EVENT_BUS.register(PATCHER_INSTANCE);
         NeoForge.EVENT_BUS.register(KeyBindingHandler.class);
+        NeoForge.EVENT_BUS.addListener(SpeechBubbleClientEvents::onRenderNameTag);
         NeoForge.EVENT_BUS.addListener(ClientEvents::onClientTick);
         NeoForge.EVENT_BUS.addListener(ModrinthUpdateChecker::onPlayerJoinWorld);
         

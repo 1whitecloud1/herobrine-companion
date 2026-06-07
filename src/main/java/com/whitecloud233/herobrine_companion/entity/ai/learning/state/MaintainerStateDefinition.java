@@ -16,6 +16,7 @@ import java.util.List;
 public final class MaintainerStateDefinition implements HeroMindStateDefinition {
 
     private static final String NO_TASK_KEY = "MindMaintainerNoTaskTicks";
+    private static final float DIRECT_ATTACK_EXIT_TO_JUDGE_MIN = 0.20f;
 
     @Override
     public SimpleNeuralNetwork.MindState state() {
@@ -29,7 +30,10 @@ public final class MaintainerStateDefinition implements HeroMindStateDefinition 
 
     @Override
     public SimpleNeuralNetwork.MindState shouldExit(HeroMindStateSnapshot snapshot, HeroEntity hero) {
-        if (snapshot.annoyanceWeight() >= 0.55f) return SimpleNeuralNetwork.MindState.JUDGE;
+        if (snapshot.directAttackScore() >= DIRECT_ATTACK_EXIT_TO_JUDGE_MIN
+                && snapshot.annoyanceWeight() >= 0.55f) {
+            return SimpleNeuralNetwork.MindState.JUDGE;
+        }
         if (snapshot.entropyScore() <= 0.20f) return SimpleNeuralNetwork.MindState.OBSERVER;
         if (hero != null && hero.getPersistentData().getInt(NO_TASK_KEY) >= 600) return SimpleNeuralNetwork.MindState.OBSERVER;
         return null;
@@ -46,9 +50,6 @@ public final class MaintainerStateDefinition implements HeroMindStateDefinition 
         if (owner == null) return;
 
         ServerLevel level = (ServerLevel) hero.level();
-        HeroStateBehaviorSupport.ensureFloating(hero);
-        HeroStateBehaviorSupport.keepDistance(hero, owner, 4.0D, 20.0D, 1.0D, 1.1D);
-
         boolean acted = false;
         int fire = HeroStateBehaviorSupport.extinguishNearbyFire(level, owner.blockPosition(), 16, 3, 5, 32);
         if (fire > 0) {

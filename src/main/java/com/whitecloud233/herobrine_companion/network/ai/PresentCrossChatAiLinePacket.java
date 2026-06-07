@@ -2,6 +2,8 @@ package com.whitecloud233.herobrine_companion.network.ai;
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.client.service.AIService;
 import com.whitecloud233.herobrine_companion.client.service.CrossChatHistoryStore;
+import com.whitecloud233.herobrine_companion.util.LegacyFormattingComponents;
+import com.whitecloud233.herobrine_companion.util.LegacyFormattingText;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
@@ -89,14 +91,14 @@ public class PresentCrossChatAiLinePacket implements CustomPacketPayload {
             finalContent = sanitize(packet.content);
         }
         Component message = switch (packet.displayType) {
-            case TYPE_HB_TO_HB_OPENING -> Component.translatable("message.herobrine_companion.cross_chat.chat.hb_to_hb_opening", packet.primaryName, packet.secondaryName, finalContent);
-            case TYPE_HB_ECHO -> Component.translatable("message.herobrine_companion.cross_chat.chat.hb_echo", packet.primaryName, finalContent);
-            default -> Component.translatable("message.herobrine_companion.cross_chat.chat.remote_hb_reply", packet.primaryName, finalContent);
+            case TYPE_HB_TO_HB_OPENING -> Component.translatable("message.herobrine_companion.cross_chat.chat.hb_to_hb_opening", packet.primaryName, packet.secondaryName, LegacyFormattingComponents.parse(finalContent));
+            case TYPE_HB_ECHO -> Component.translatable("message.herobrine_companion.cross_chat.chat.hb_echo", packet.primaryName, LegacyFormattingComponents.parse(finalContent));
+            default -> Component.translatable("message.herobrine_companion.cross_chat.chat.remote_hb_reply", packet.primaryName, LegacyFormattingComponents.parse(finalContent));
         };
         mc.gui.getChat().addMessage(message);
         CrossChatHistoryStore.getInstance().appendEntry(packet.peerName, packet.hbMode, packet.speaker, finalContent, packet.kind);
     }
     private static String sanitize(String content) {
-        return content == null ? "" : content.replace('\r', ' ').replace('\n', ' ').trim();
+        return LegacyFormattingText.normalize(content == null ? "" : content.replace('\r', ' ').replace('\n', ' ').trim());
     }
 }

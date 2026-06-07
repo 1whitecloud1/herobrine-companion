@@ -217,13 +217,17 @@ public class HeroObserver {
         if (isOnCooldown(player, "combat", 1200)) return;
 
         if (player.getLastHurtByMob() != null && player.tickCount - player.getLastHurtByMobTimestamp() < 100) {
-            triggerObserverDialogue(hero, player, "The player is being attacked by monsters and is hurt.", "message.herobrine_companion.observe_combat_hurt", 1);
+            triggerObserverDialogue(hero, player, "The player is being attacked by monsters and is hurt. You can't bear to see them suffer.", "message.herobrine_companion.observe_combat_hurt", 1);
             hero.getHeroBrain().inputFailure(player.getUUID(), 0.1f);
             setCooldown(player, "combat");
         }
         else if (player.getLastHurtMob() != null && player.tickCount - player.getLastHurtMobTimestamp() < 100) {
-            triggerObserverDialogue(hero, player, "The player is fighting against monsters.", "message.herobrine_companion.observe_combat_attack", 1);
-            hero.getHeroBrain().inputViolence(player.getUUID(), 0.05f);
+            LivingEntity recentTarget = player.getLastHurtMob();
+            if (recentTarget instanceof Monster) {
+                triggerObserverDialogue(hero, player, "The player is fighting fiercely against monsters. As the protector of monsters, you watch with complex feelings.", "message.herobrine_companion.observe_combat_attack", 1);
+            } else if (shouldCountAsCruelty(player, recentTarget)) {
+                hero.getHeroBrain().inputViolence(player.getUUID(), 0.05f);
+            }
             setCooldown(player, "combat");
         }
     }
@@ -256,7 +260,10 @@ public class HeroObserver {
             }
         }
         else if (player.getMainHandItem().getItem() instanceof net.minecraft.world.item.SwordItem && player.swinging) {
-            hero.getHeroBrain().inputViolence(player.getUUID(), 0.05f);
+            LivingEntity recentTarget = player.getLastHurtMob();
+            if (shouldCountAsCruelty(player, recentTarget)) {
+                hero.getHeroBrain().inputViolence(player.getUUID(), 0.05f);
+            }
         }
     }
 
@@ -319,6 +326,15 @@ public class HeroObserver {
                 setCooldown(player, "fire_hazard");
             }
         }
+    }
+    private static boolean shouldCountAsCruelty(ServerPlayer player, LivingEntity recentTarget) {
+        if (recentTarget == null) {
+            return false;
+        }
+        if (recentTarget instanceof Monster) {
+            return false;
+        }
+        return player.tickCount - player.getLastHurtMobTimestamp() < 20;
     }
 
     private static boolean checkLookTimer(ServerPlayer player, BlockPos pos, int threshold) {

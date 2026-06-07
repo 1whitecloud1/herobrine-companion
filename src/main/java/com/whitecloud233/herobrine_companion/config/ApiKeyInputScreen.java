@@ -245,6 +245,12 @@ public class ApiKeyInputScreen extends Screen {
     private boolean isCustomProviderSelected() {
         return this.selectedProvider == LLMConfig.Provider.CUSTOM;
     }
+
+    @Override
+    public void renderBackground(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        // 1.21.1 留空：禁用原版自带的世界模糊和黑色背景遮罩，保持和 HeroScreen 视觉一致
+    }
+
     private int drawWrappedCenteredText(GuiGraphics guiGraphics, Component text, int centerX, int startY, int maxWidth, int color) {
         int y = startY;
         for (FormattedCharSequence line : this.font.split(text, maxWidth)) {

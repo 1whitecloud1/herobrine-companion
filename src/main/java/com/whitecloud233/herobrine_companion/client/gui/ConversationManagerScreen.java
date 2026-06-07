@@ -26,6 +26,10 @@ public class ConversationManagerScreen extends Screen {
     private static final int COL_TEXT = 0xFFA9B7C6;
     private static final int COL_TITLE = 0xFFCC7832;
     private static final int COL_INFO = 0xFF6A8759;
+    private static final int TOP_CONTROL_MARGIN = 10;
+    private static final int TOP_CONTROL_GAP = 6;
+    private static final int TOP_BUTTON_WIDTH = 76;
+    private static final int TOP_CONTROL_HEIGHT = 20;
 
     private final ConversationStore conversationStore = ConversationStore.getInstance();
     private final int entityId;
@@ -57,16 +61,21 @@ public class ConversationManagerScreen extends Screen {
         int centerY = this.height / 2;
         int startX = centerX - PANEL_WIDTH / 2;
         int startY = centerY - PANEL_HEIGHT / 2;
+        int topControlsY = startY + 38;
+        int apiButtonX = startX + TOP_CONTROL_MARGIN;
+        int settingsButtonX = startX + PANEL_WIDTH - TOP_CONTROL_MARGIN - TOP_BUTTON_WIDTH;
+        int searchBoxX = apiButtonX + TOP_BUTTON_WIDTH + TOP_CONTROL_GAP;
+        int searchBoxWidth = settingsButtonX - TOP_CONTROL_GAP - searchBoxX;
 
         this.addRenderableWidget(new HeroScreen.ThemedButton(
-                startX + 10, startY + 38, 76, 20,
+                apiButtonX, topControlsY, TOP_BUTTON_WIDTH, TOP_CONTROL_HEIGHT,
                 Component.translatable("gui.herobrine_companion.conversation_manager.api_setup"),
                 button -> Minecraft.getInstance().setScreen(new ApiKeyInputScreen(this)),
                 null
         ));
 
 
-        this.searchBox = new EditBox(this.font, startX + 10, startY + 38, PANEL_WIDTH - 104, 20,
+        this.searchBox = new EditBox(this.font, searchBoxX, topControlsY, searchBoxWidth, TOP_CONTROL_HEIGHT,
                 Component.translatable("gui.herobrine_companion.conversation_manager.search"));
         this.searchBox.setMaxLength(80);
         this.searchBox.setSuggestion(Component.translatable("gui.herobrine_companion.conversation_manager.search_hint").getString());
@@ -74,7 +83,7 @@ public class ConversationManagerScreen extends Screen {
         this.addRenderableWidget(this.searchBox);
 
         this.addRenderableWidget(new HeroScreen.ThemedButton(
-                startX + PANEL_WIDTH - 86, startY + 38, 76, 20,
+                settingsButtonX, topControlsY, TOP_BUTTON_WIDTH, TOP_CONTROL_HEIGHT,
                 Component.translatable("gui.herobrine_companion.conversation_manager.llm_settings"),
                 button -> Minecraft.getInstance().setScreen(new LLMSettingsScreen(this)),
                 null

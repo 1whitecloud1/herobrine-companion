@@ -1,15 +1,13 @@
 package com.whitecloud233.herobrine_companion.compat.cooking;
 
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
-import net.minecraft.client.Minecraft;
+import com.whitecloud233.herobrine_companion.network.ClientOnlyExecutor;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 import java.util.ArrayList;
@@ -62,11 +60,18 @@ public class OpenCookSelectionPacket implements CustomPacketPayload {
     }
 
     public static void handle(OpenCookSelectionPacket packet, IPayloadContext context) {
-        context.enqueueWork(() -> {
-            if (FMLEnvironment.dist == Dist.CLIENT) {
-                Minecraft minecraft = Minecraft.getInstance();
-                minecraft.setScreen(new HeroCookSelectionScreen(packet.heroId, packet.cookwarePos, packet.options, minecraft.screen));
-            }
-        });
+        context.enqueueWork(() -> ClientOnlyExecutor.invoke(
+                OpenCookSelectionPacket.ClientHandler.class.getName(),
+                "handle",
+                new Class<?>[]{OpenCookSelectionPacket.class},
+                packet
+        ));
+    }
+
+    private static final class ClientHandler {
+        private static void handle(OpenCookSelectionPacket packet) {
+            net.minecraft.client.Minecraft minecraft = net.minecraft.client.Minecraft.getInstance();
+            minecraft.setScreen(new HeroCookSelectionScreen(packet.heroId, packet.cookwarePos, packet.options, minecraft.screen));
+        }
     }
 }

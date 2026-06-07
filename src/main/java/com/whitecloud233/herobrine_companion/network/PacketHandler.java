@@ -11,6 +11,7 @@ import com.whitecloud233.herobrine_companion.network.ai.*;
 import com.whitecloud233.herobrine_companion.destructiongod.network.*;
 
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -197,6 +198,9 @@ public class PacketHandler {
         registrar.playToServer(CloseCrossChatSessionPacket.TYPE, CloseCrossChatSessionPacket.STREAM_CODEC, CloseCrossChatSessionPacket::handle);
         registrar.playToClient(HeroCrossChatPromptPacket.TYPE, HeroCrossChatPromptPacket.STREAM_CODEC, HeroCrossChatPromptPacket::handle);
         registrar.playToServer(HeroCrossChatResultPacket.TYPE, HeroCrossChatResultPacket.STREAM_CODEC, HeroCrossChatResultPacket::handle);
+        registrar.playToClient(ActorDialoguePromptPacket.TYPE, ActorDialoguePromptPacket.STREAM_CODEC, ActorDialoguePromptPacket::handle);
+        registrar.playToServer(ActorDialogueResultPacket.TYPE, ActorDialogueResultPacket.STREAM_CODEC, ActorDialogueResultPacket::handle);
+        registrar.playToClient(SyncSpeechBubblePacket.TYPE, SyncSpeechBubblePacket.STREAM_CODEC, SyncSpeechBubblePacket::handle);
         registrar.playToClient(OpenCrossChatInvitePacket.TYPE, OpenCrossChatInvitePacket.STREAM_CODEC, OpenCrossChatInvitePacket::handle);
         registrar.playToClient(OpenCrossSessionHubPacket.TYPE, OpenCrossSessionHubPacket.STREAM_CODEC, OpenCrossSessionHubPacket::handle);
         registrar.playToClient(OpenHeroChatPacket.TYPE, OpenHeroChatPacket.STREAM_CODEC, OpenHeroChatPacket::handle);
@@ -210,6 +214,7 @@ public class PacketHandler {
         registrar.playToServer(SetCrossChatPermissionPacket.TYPE, SetCrossChatPermissionPacket.STREAM_CODEC, SetCrossChatPermissionPacket::handle);
         registrar.playToClient(SyncCrossChatStatePacket.TYPE, SyncCrossChatStatePacket.STREAM_CODEC, SyncCrossChatStatePacket::handle);
         registrar.playToServer(UpdateClientLanguagePacket.TYPE, UpdateClientLanguagePacket.STREAM_CODEC, UpdateClientLanguagePacket::handle);
+        registrar.playToServer(JeanMountInputPacket.TYPE, JeanMountInputPacket.STREAM_CODEC, JeanMountInputPacket::handle);
 
         // ============================================
         // [新增] 毁灭之神数据包注册
@@ -357,6 +362,15 @@ public class PacketHandler {
     public static void sendToTracking(CustomPacketPayload packet, Entity entity) {
         PacketDistributor.sendToPlayersTrackingEntity(entity, packet);
     }
+
+    public static void sendToNearby(CustomPacketPayload packet, Entity entity, double radius) {
+        if (entity.level() instanceof ServerLevel serverLevel) {
+            PacketDistributor.sendToPlayersNear(serverLevel, null, entity.getX(), entity.getY(), entity.getZ(), radius, packet);
+        } else {
+            PacketDistributor.sendToPlayersTrackingEntity(entity, packet);
+        }
+    }
+
     public static void sendToServer(SummonHeroPacket packet) {
         PacketDistributor.sendToServer(packet);
     }

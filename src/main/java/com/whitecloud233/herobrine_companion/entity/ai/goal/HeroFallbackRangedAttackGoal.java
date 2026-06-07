@@ -206,9 +206,8 @@ public class HeroFallbackRangedAttackGoal extends Goal {
     }
 
     private boolean isValidTarget(LivingEntity candidate) {
-        return HeroBattleStanceGoal.canHeroAttackTarget(candidate);
+        return HeroBattleStanceGoal.canHeroAttackTarget(this.hero, candidate);
     }
-
     private double getSearchRange() {
         return Math.max(SEARCH_RANGE, this.hero.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.FOLLOW_RANGE));
     }

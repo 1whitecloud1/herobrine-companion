@@ -3,14 +3,11 @@ package com.whitecloud233.herobrine_companion.entity.ai.learning.state;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.ai.learning.HeroDialogueHandler;
 import com.whitecloud233.herobrine_companion.entity.ai.learning.SimpleNeuralNetwork;
-import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
-import net.minecraft.world.effect.MobEffectInstance;
-import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.monster.Monster;
 
 import java.util.ArrayList;
@@ -198,7 +195,7 @@ public final class MonsterKingStateDefinition implements HeroMindStateDefinition
     private static void doGrowl(HeroEntity hero, ServerLevel level) {
         SoundEvent sound = pickGrowlSound(hero);
         level.playSound(null, hero.blockPosition(), sound, SoundSource.HOSTILE, 0.5F, 0.6F);
-        }
+    }
 
     private static SoundEvent pickGrowlSound(HeroEntity hero) {
         return switch (hero.getRandom().nextInt(3)) {
