@@ -6,9 +6,13 @@
   "plugin": "com.whitecloud233.modid.herobrine_companion.mixin.HerobrineCompanionMixinPlugin",
   "mixins": [
     "LivingEntityMixin",
+    "LivingEntitySpeechBubbleMixin",
     "DragonSittingScanningPhaseMixin",
     "EnderDragonSoundMixin",
+    "JeanDragonManualFlightMixin",
+    "JeanDragonPassengerMixin",
     "MobSubmissionMixin",
+    "AwakenedMobMixin",
     "LevelMixin",
     "epicfight.JsonAssetLoaderMixin"
   ],

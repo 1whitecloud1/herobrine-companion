@@ -26,6 +26,7 @@ public class ModZhCnLangProvider extends LanguageProvider {
         add(HerobrineCompanion.GHOST_CREEPER_SPAWN_EGG.get(), "幽灵苦力怕刷怪蛋");
         add(HerobrineCompanion.GHOST_ZOMBIE_SPAWN_EGG.get(), "幽灵僵尸刷怪蛋");
         add(HerobrineCompanion.GHOST_SKELETON_SPAWN_EGG.get(), "幽灵骷髅刷怪蛋");
+        add(HerobrineCompanion.DESTRUCTION_GOD_HEROBRINE_SPAWN_EGG.get(), "???");
 
 
         // Creative Tab
@@ -34,6 +35,7 @@ public class ModZhCnLangProvider extends LanguageProvider {
         // Entities
         add("entity.herobrine_companion.hero", "Hero");
         add("entity.herobrine_companion.herobrine", "Herobrine");
+        add("entity.herobrine_companion.destruction_god_herobrine", "???");
         add("entity.herobrine_companion.ghost_creeper", "幽灵苦力怕");
         add("entity.herobrine_companion.ghost_zombie", "幽灵僵尸");
         add("entity.herobrine_companion.ghost_skeleton", "幽灵骷髅");
@@ -137,6 +139,26 @@ public class ModZhCnLangProvider extends LanguageProvider {
         add("message.herobrine_companion.companion_on", "§a[Herobrine] 已切换至陪伴模式。我会守在你身边。");
         add("message.herobrine_companion.patrol_finish", "§7[Herobrine] 此处的代码已校准完毕。期待下次再见。");
         add("message.herobrine_companion.end_ring_attack", "§e[Herobrine] §f在这里，你无路可逃...我也一样。");
+        add("message.herobrine_companion.family_summon.start.simmons", "§6[Herobrine] §f灰烬已经在聆听。Simmons 正被呼唤。");
+        add("message.herobrine_companion.family_summon.start.jean", "§6[Herobrine] §f抬头。Jean 正从末地天穹回应呼唤。");
+        add("message.herobrine_companion.family_summon.success.simmons", "§a[Herobrine] §fSimmons 已回应这场仪式。");
+        add("message.herobrine_companion.family_summon.success.jean", "§a[Herobrine] §fJean 已回应这场仪式。");
+        add("message.herobrine_companion.family_summon.member.simmons", "Simmons");
+        add("message.herobrine_companion.family_summon.member.jean", "Jean");
+        add("message.herobrine_companion.family_summon.failure.low_trust", "§c[Herobrine] §f你还没有资格请求 %1$s。需求信任：%2$s，当前：%3$s。");
+        add("message.herobrine_companion.family_summon.failure.cooldown", "§c[Herobrine] §f%1$s 还不能被再次呼唤。冷却剩余：%2$s 秒。");
+        add("message.herobrine_companion.family_summon.failure.exists", "§c[Herobrine] §f%1$s 已经存在于这个世界。");
+        add("message.herobrine_companion.family_summon.failure.no_space", "§c[Herobrine] §f仪式中心上方没有足够的生成空间。");
+        add("message.herobrine_companion.family_summon.failure.busy", "§c[Herobrine] §f我现在有别的事要处理。仪式先等着。");
+        add("message.herobrine_companion.family_summon.failure.structure_broken", "§c[Herobrine] §f仪式结构已经被破坏。");
+        add("message.herobrine_companion.family_summon.failure.hero_moved", "§c[Herobrine] §f我离开了仪式范围，这次呼唤结束了。");
+        add("message.herobrine_companion.family_summon.failure.canceled", "§c[Herobrine] §f这场仪式已经被取消。");
+        add("message.herobrine_companion.family_summon.bubble.start.simmons", "灰烬，回应我。Simmons，起来。");
+        add("message.herobrine_companion.family_summon.bubble.start.jean", "末地天穹，向我张开。Jean，降临。");
+        add("message.herobrine_companion.family_summon.bubble.success.simmons", "站起来。废墟再次有了名字。");
+        add("message.herobrine_companion.family_summon.bubble.success.jean", "下来吧。天空还记得它的守望者。");
+        add("message.herobrine_companion.family_summon.bubble.answer.simmons", "很好。守住这里。");
+        add("message.herobrine_companion.family_summon.bubble.answer.jean", "很好。守住我交给你的天空。");
         add("message.herobrine_companion.trust_decrease", "§c[系统] 信任度减少 %s (当前: %s)");
         add("message.herobrine_companion.companion_attack", "§7...这就是你的选择吗？");
         add("message.herobrine_companion.companion_forced_quit", "§c[System]你已经退出陪伴模式！");

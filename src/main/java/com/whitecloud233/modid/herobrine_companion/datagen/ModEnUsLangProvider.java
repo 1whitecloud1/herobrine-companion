@@ -26,6 +26,7 @@ public class ModEnUsLangProvider extends LanguageProvider {
         add(HerobrineCompanion.GHOST_CREEPER_SPAWN_EGG.get(), "Ghost Creeper Spawn Egg");
         add(HerobrineCompanion.GHOST_ZOMBIE_SPAWN_EGG.get(), "Ghost Zombie Spawn Egg");
         add(HerobrineCompanion.GHOST_SKELETON_SPAWN_EGG.get(), "Ghost Skeleton Spawn Egg");
+        add(HerobrineCompanion.DESTRUCTION_GOD_HEROBRINE_SPAWN_EGG.get(), "Destruction God Herobrine Spawn Egg");
 
 
         // Creative Tab
@@ -34,6 +35,7 @@ public class ModEnUsLangProvider extends LanguageProvider {
         // Entities
         add("entity.herobrine_companion.hero", "Herobrine");
         add("entity.herobrine_companion.herobrine", "Herobrine");
+        add("entity.herobrine_companion.destruction_god_herobrine", "Destruction God Herobrine");
         add("entity.herobrine_companion.ghost_creeper", "Ghost Creeper");
         add("entity.herobrine_companion.ghost_zombie", "Ghost Zombie");
         add("entity.herobrine_companion.ghost_skeleton", "Ghost Skeleton");
@@ -137,6 +139,26 @@ public class ModEnUsLangProvider extends LanguageProvider {
         add("message.herobrine_companion.companion_on", "§a[Herobrine] Companion mode enabled. I will stay by your side.");
         add("message.herobrine_companion.patrol_finish", "§7[Herobrine] The code here is calibrated. Until next time.");
         add("message.herobrine_companion.end_ring_attack", "§e[Herobrine] §fHere, you have nowhere to run... and neither do I.");
+        add("message.herobrine_companion.family_summon.start.simmons", "§6[Herobrine] §fThe ash listens. Simmons is being called.");
+        add("message.herobrine_companion.family_summon.start.jean", "§6[Herobrine] §fLook up. Jean is being called from the End sky.");
+        add("message.herobrine_companion.family_summon.success.simmons", "§a[Herobrine] §fSimmons has answered the ritual.");
+        add("message.herobrine_companion.family_summon.success.jean", "§a[Herobrine] §fJean has answered the ritual.");
+        add("message.herobrine_companion.family_summon.member.simmons", "Simmons");
+        add("message.herobrine_companion.family_summon.member.jean", "Jean");
+        add("message.herobrine_companion.family_summon.failure.low_trust", "§c[Herobrine] §fYour trust is too low for %1$s. Required: %2$s, current: %3$s.");
+        add("message.herobrine_companion.family_summon.failure.cooldown", "§c[Herobrine] §f%1$s cannot be called yet. Cooldown: %2$s seconds.");
+        add("message.herobrine_companion.family_summon.failure.exists", "§c[Herobrine] §f%1$s already exists in this world.");
+        add("message.herobrine_companion.family_summon.failure.no_space", "§c[Herobrine] §fThere is not enough space above the ritual center.");
+        add("message.herobrine_companion.family_summon.failure.busy", "§c[Herobrine] §fI am occupied. This ritual can wait.");
+        add("message.herobrine_companion.family_summon.failure.structure_broken", "§c[Herobrine] §fThe ritual structure was broken.");
+        add("message.herobrine_companion.family_summon.failure.hero_moved", "§c[Herobrine] §fI left the ritual range. The call is canceled.");
+        add("message.herobrine_companion.family_summon.failure.canceled", "§c[Herobrine] §fThe ritual was canceled.");
+        add("message.herobrine_companion.family_summon.bubble.start.simmons", "Ash, answer me. Simmons, rise.");
+        add("message.herobrine_companion.family_summon.bubble.start.jean", "Sky of the End, open. Jean, descend.");
+        add("message.herobrine_companion.family_summon.bubble.success.simmons", "Stand. The ruin has a name again.");
+        add("message.herobrine_companion.family_summon.bubble.success.jean", "Come down. The sky remembers its keeper.");
+        add("message.herobrine_companion.family_summon.bubble.answer.simmons", "Good. Hold this place.");
+        add("message.herobrine_companion.family_summon.bubble.answer.jean", "Good. Guard the sky I gave you.");
         add("message.herobrine_companion.trust_decrease", "§c[System] Trust decreased by %s (Current: %s)");
         add("message.herobrine_companion.companion_attack", "§7...Is this your choice?");
         add("message.herobrine_companion.companion_forced_quit", "§c[System] You have been forced out of Companion Mode!");
