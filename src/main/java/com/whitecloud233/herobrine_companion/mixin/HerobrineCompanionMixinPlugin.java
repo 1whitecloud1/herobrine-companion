@@ -49,11 +49,12 @@ public class HerobrineCompanionMixinPlugin implements IMixinConfigPlugin {
     @Override
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
         // Check if the mixin is one of the ones controlled by the config
-        if (mixinClassName.endsWith("DragonSittingScanningPhaseMixin") ||
-            mixinClassName.endsWith("EnderDragonMixin") ||
-            mixinClassName.endsWith("MobMixin") ||
-            mixinClassName.endsWith("LookAtGoalMixin") ||
-            mixinClassName.endsWith("RandomLookAroundGoalMixin")) {
+        String simpleName = mixinClassName.substring(mixinClassName.lastIndexOf('.') + 1);
+        if (simpleName.equals("DragonSittingScanningPhaseMixin") ||
+            simpleName.equals("EnderDragonMixin") ||
+            simpleName.equals("MobMixin") ||
+            simpleName.equals("LookAtGoalMixin") ||
+            simpleName.equals("RandomLookAroundGoalMixin")) {
 
             // If the config is disabled, do not apply these mixins
             return this.isHeroKingAuraEnabled;

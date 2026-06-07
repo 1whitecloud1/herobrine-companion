@@ -2,10 +2,12 @@ package com.whitecloud233.herobrine_companion.client.event;
 
 import com.whitecloud233.herobrine_companion.item.PoemOfTheEndItem;
 import com.whitecloud233.herobrine_companion.network.CleaveSkillPacket;
+import com.whitecloud233.herobrine_companion.network.JeanMountInputPacket;
 import com.whitecloud233.herobrine_companion.network.PacketHandler;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.entity.player.Player;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
@@ -36,6 +38,8 @@ public class KeyBindingHandler {
         Player player = mc.player;
         if (player == null) return;
 
+        sendJeanMountInput(mc, player);
+
         // 判断：按下了技能键，且主手里拿着镰刀
         if (SKILL_KEY.isDown() && player.getMainHandItem().getItem() instanceof PoemOfTheEndItem) {
             chargeTicks++;
@@ -59,5 +63,35 @@ public class KeyBindingHandler {
             // 如果松开按键，或者切了别的物品，蓄力清零
             chargeTicks = 0;
         }
+    }
+
+    private static void sendJeanMountInput(Minecraft mc, Player player) {
+        if (!(player.getVehicle() instanceof EnderDragon)) {
+            return;
+        }
+
+        float forward = 0.0F;
+        float strafe = 0.0F;
+        if (mc.options.keyUp.isDown()) {
+            forward += 1.0F;
+        }
+        if (mc.options.keyDown.isDown()) {
+            forward -= 1.0F;
+        }
+        if (mc.options.keyLeft.isDown()) {
+            strafe += 1.0F;
+        }
+        if (mc.options.keyRight.isDown()) {
+            strafe -= 1.0F;
+        }
+
+        PacketHandler.sendToServer(new JeanMountInputPacket(
+                strafe,
+                forward,
+                mc.options.keyJump.isDown(),
+                mc.options.keyShift.isDown(),
+                player.getYRot(),
+                player.getXRot()
+        ));
     }
 }

@@ -84,11 +84,7 @@ public class HeroKingAuraGoal extends Goal {
             }
 
             if (shouldRemove) {
-                mob.getPersistentData().putBoolean("HeroSubmission", false);
-                mob.setSilent(false);
-                if (mob instanceof NeutralMob neutral) {
-                    neutral.stopBeingAngry();
-                }
+                clearSubmission(mob, true);
                 return true;
             }
             return false;
@@ -122,11 +118,30 @@ public class HeroKingAuraGoal extends Goal {
     private void clearAllMobs() {
         for (Mob mob : this.affectedMobs) {
             if (mob.isAlive()) {
-                mob.getPersistentData().putBoolean("HeroSubmission", false);
-                mob.setSilent(false);
+                clearSubmission(mob, true);
             }
         }
         this.affectedMobs.clear();
+    }
+
+    private void clearSubmission(Mob mob, boolean releaseDragonPhase) {
+        mob.getPersistentData().putBoolean("HeroSubmission", false);
+        mob.getPersistentData().remove("HeroSubmissionYaw");
+        if (mob.isSilent()) {
+            mob.setSilent(false);
+        }
+        if (mob instanceof NeutralMob neutral) {
+            neutral.stopBeingAngry();
+        }
+        if (releaseDragonPhase && mob instanceof EnderDragon dragon
+                && dragon.getPhaseManager().getCurrentPhase().getPhase() == EnderDragonPhase.SITTING_SCANNING) {
+            dragon.getPhaseManager().setPhase(EnderDragonPhase.HOLDING_PATTERN);
+            Vec3 currentVelocity = dragon.getDeltaMovement();
+            if (currentVelocity.y < 0.2D) {
+                dragon.setDeltaMovement(currentVelocity.x, 0.2D, currentVelocity.z);
+            }
+            dragon.hasImpulse = true;
+        }
     }
 
     private void scanForMonsters() {
@@ -242,8 +257,8 @@ public class HeroKingAuraGoal extends Goal {
             lookAtEntitySmoothly(dragon, this.hero, 5.0F);
             dragon.setXRot(25.0F);
         } else {
-            dragon.getPersistentData().putBoolean("HeroSubmission", false);
-            if (dragon.isSilent()) dragon.setSilent(false);
+            clearSubmission(dragon, false);
+
 
             if (isSitting) {
                 dragon.getPhaseManager().setPhase(EnderDragonPhase.HOLDING_PATTERN);

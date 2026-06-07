@@ -212,6 +212,21 @@ public class ConfigScreen extends Screen {
                 .build()
         );
 
+        // 12. 觉醒怪物 AI 对话 Toggle (第 5 行)
+        this.addRenderableWidget(Button.builder(
+                        Component.translatable("gui.herobrine_companion.config.awakened_mob_ai_dialogue", Config.AWAKENED_MOB_AI_DIALOGUE_ENABLED.get()),
+                        button -> {
+                            boolean newValue = !Config.AWAKENED_MOB_AI_DIALOGUE_ENABLED.get();
+                            Config.AWAKENED_MOB_AI_DIALOGUE_ENABLED.set(newValue);
+                            Config.awakenedMobAiDialogueEnabled = newValue;
+                            Config.SPEC.save();
+                            button.setMessage(Component.translatable("gui.herobrine_companion.config.awakened_mob_ai_dialogue", newValue));
+                        })
+                .bounds(col2X, startY + spacingY * 5, buttonWidth, buttonHeight)
+                .tooltip(Tooltip.create(Component.translatable("gui.herobrine_companion.config.awakened_mob_ai_dialogue.tooltip")))
+                .build()
+        );
+
         // ================= 动态自适应排版系统 =================
         // 默认将这些组件“锚定”在屏幕的最底端，基于 this.height 向上推算
         int doneButtonY = this.height - 28; // 完成按钮紧贴屏幕底端
@@ -230,7 +245,7 @@ public class ConfigScreen extends Screen {
         // 记录输入框的Y坐标供 render 绘制标题使用
         this.currentEditBoxY = editBoxY;
 
-        // 12. AI 语言风格输入框
+        // 13. AI 语言风格输入框
         EditBox languageStyleBox = new EditBox(this.font, centerX - 150, editBoxY, 300, 20, Component.translatable("gui.herobrine_companion.config.ai_language_style"));
         languageStyleBox.setMaxLength(256);
         languageStyleBox.setValue(Config.AI_LANGUAGE_STYLE.get());
@@ -241,12 +256,12 @@ public class ConfigScreen extends Screen {
         });
         this.addRenderableWidget(languageStyleBox);
 
-        // 13. 返回按钮
+        // 14. 返回按钮
         this.addRenderableWidget(Button.builder(Component.translatable("gui.done"), button -> this.onClose())
                 .bounds(centerX - 100, doneButtonY, 200, 20)
                 .build());
 
-        // 14. 重启提示标签
+        // 15. 重启提示标签
         this.addRenderableWidget(Button.builder(Component.translatable("gui.herobrine_companion.config.restart_note").withStyle(ChatFormatting.RED), button -> {})
                 .bounds(centerX - 100, noteY, 200, 10)
                 .build()

@@ -9,6 +9,10 @@
     "LivingEntityMixin",
     "DragonSittingScanningPhaseMixin",
     "EnderDragonMixin",
+    "AwakenedMobMixin",
+    "LivingEntitySpeechBubbleMixin",
+    "JeanDragonManualFlightMixin",
+    "JeanDragonPassengerMixin",
     "MobSubmissionMixin",
     "LevelMixin",
     "MixinModEntityProfiles"

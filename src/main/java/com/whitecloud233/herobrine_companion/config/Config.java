@@ -34,6 +34,10 @@ public class Config {
             .comment("Herobrine的AI语言风格与语气")
             .define("aiLanguageStyle_v1", "");
 
+    public static final ModConfigSpec.BooleanValue AWAKENED_MOB_AI_DIALOGUE_ENABLED = BUILDER
+            .comment("是否启用觉醒怪物的AI对话")
+            .define("awakenedMobAiDialogueEnabled", true);
+
     // 【新增】恢复更新检查器开关
     public static final ModConfigSpec.BooleanValue ENABLE_UPDATE_CHECKER = BUILDER
             .comment("加入世界时是否在 Modrinth 检查模组更新")
@@ -91,6 +95,7 @@ public class Config {
     public static boolean aiVisionEnabled;
     public static int aiVisionInterval;
     public static String aiLanguageStyle;
+    public static boolean awakenedMobAiDialogueEnabled;
 
     // 【新增】更新检查器变量
     public static boolean enableUpdateChecker;
@@ -108,6 +113,7 @@ public class Config {
         aiVisionEnabled = AI_VISION_ENABLED.get();
         aiVisionInterval = AI_VISION_INTERVAL.get();
         aiLanguageStyle = AI_LANGUAGE_STYLE.get();
+        awakenedMobAiDialogueEnabled = AWAKENED_MOB_AI_DIALOGUE_ENABLED.get();
 
         destructionGodTerrainDamageEnabled = DESTRUCTION_GOD_TERRAIN_DAMAGE_ENABLED.get();
         destructionGodTerrainDamageMode = DESTRUCTION_GOD_TERRAIN_DAMAGE_MODE.get();
@@ -119,10 +125,11 @@ public class Config {
         // 【新增】获取更新检查器配置
         enableUpdateChecker = ENABLE_UPDATE_CHECKER.get();
 
-        LOGGER.info("Herobrine Companion Config Loaded: Explosion={}, Aura={}, BlockRestoration={}, CleanItems={}, CleaveSkill={}, DGTerrainEnabled={}, DGTerrainMode={}, DGBreakContainers={}, DGArenaRestore={}, DGMaxBreakPerTick={}, DGWorldCollapse={}, Pact={}, Gaze={}, Permit={}, AIVision={}, AIInterval={}, AIStyle={}",
+        LOGGER.info("Herobrine Companion Config Loaded: Explosion={}, Aura={}, BlockRestoration={}, CleanItems={}, CleaveSkill={}, DGTerrainEnabled={}, DGTerrainMode={}, DGBreakContainers={}, DGArenaRestore={}, DGMaxBreakPerTick={}, DGWorldCollapse={}, Pact={}, Gaze={}, Permit={}, AIVision={}, AIInterval={}, AIStyle={}, AwakenedMobAI={}",
                 poemOfTheEndExplosion, heroKingAuraEnabled, heroBlockRestoration, heroCleanItems, cleaveSkillEnabled,
                 destructionGodTerrainDamageEnabled, destructionGodTerrainDamageMode, destructionGodBreakContainers,
                 destructionGodArenaRestore, destructionGodMaxBrokenBlocksPerTick, destructionGodFinalPhaseWorldCollapse,
-                soulBoundPactEnabled, abyssalGazeEnabled, transcendencePermitEnabled, aiVisionEnabled, aiVisionInterval, aiLanguageStyle);
+                soulBoundPactEnabled, abyssalGazeEnabled, transcendencePermitEnabled, aiVisionEnabled, aiVisionInterval,
+                aiLanguageStyle, awakenedMobAiDialogueEnabled);
     }
 }

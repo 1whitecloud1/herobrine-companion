@@ -5,6 +5,7 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.logging.LogUtils;
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.client.model.HeroDragonModel;
+import com.whitecloud233.herobrine_companion.config.Config;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.entity.EnderDragonRenderer;
@@ -12,6 +13,7 @@ import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
+import net.minecraft.world.entity.boss.enderdragon.phases.EnderDragonPhase;
 import org.slf4j.Logger;
 
 public class HeroDragonRenderer extends EnderDragonRenderer {
@@ -25,7 +27,7 @@ public class HeroDragonRenderer extends EnderDragonRenderer {
 
     public HeroDragonRenderer(EntityRendererProvider.Context context) {
         super(context);
-        LOGGER.error(">>> [HERO RENDERER] 构造函数被调用！正在初始化自定义模型... <<<");
+        LOGGER.info(">>> [HERO RENDERER] 构造函数被调用！正在初始化自定义模型... <<<");
         
         HeroDragonModel model = null;
         try {
@@ -43,6 +45,14 @@ public class HeroDragonRenderer extends EnderDragonRenderer {
     @Override
     public void render(EnderDragon entity, float entityYaw, float partialTicks, PoseStack poseStack, MultiBufferSource buffer, int packedLight) {
         if (entity == null || this.customModel == null) {
+            super.render(entity, entityYaw, partialTicks, poseStack, buffer, packedLight);
+            renderOverlays(entity, poseStack, buffer, packedLight, partialTicks);
+            return;
+        }
+
+        if (!shouldUseSubmissionRenderer(entity)) {
+            super.render(entity, entityYaw, partialTicks, poseStack, buffer, packedLight);
+            renderOverlays(entity, poseStack, buffer, packedLight, partialTicks);
             return;
         }
 
@@ -74,8 +84,26 @@ public class HeroDragonRenderer extends EnderDragonRenderer {
         this.customModel.renderToBuffer(poseStack, vertexconsumer, packedLight, OverlayTexture.NO_OVERLAY, -1);
         
         poseStack.popPose();
+        renderOverlays(entity, poseStack, buffer, packedLight, partialTicks);
     }
-    
+
+    private static void renderOverlays(EnderDragon entity, PoseStack poseStack, MultiBufferSource buffer, int packedLight, float partialTicks) {
+        if (entity == null) {
+            return;
+        }
+        if (entity.hasCustomName()) {
+            AwakenedMobNameplateRenderer.renderForced(poseStack, buffer, entity, packedLight, partialTicks, 0xFFFF0000);
+        } else {
+            AwakenedMobNameplateRenderer.render(poseStack, buffer, entity, packedLight, partialTicks);
+        }
+        EntitySpeechBubbleRenderer.render(poseStack, buffer, entity, packedLight, partialTicks);
+    }
+
+    private boolean shouldUseSubmissionRenderer(EnderDragon entity) {
+        return entity.isSilent();
+    }
+
+
     @Override
     public ResourceLocation getTextureLocation(EnderDragon entity) {
         return DRAGON_TEXTURE;
