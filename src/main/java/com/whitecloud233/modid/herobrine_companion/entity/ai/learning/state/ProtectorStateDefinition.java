@@ -10,6 +10,7 @@ import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.LivingEntity;
 
 public final class ProtectorStateDefinition implements HeroMindStateDefinition {
+    private static final float DIRECT_ATTACK_EXIT_TO_JUDGE_MIN = 0.20f;
 
     @Override
     public SimpleNeuralNetwork.MindState state() {
@@ -25,7 +26,10 @@ public final class ProtectorStateDefinition implements HeroMindStateDefinition {
 
     @Override
     public SimpleNeuralNetwork.MindState shouldExit(HeroMindStateSnapshot snapshot, HeroEntity hero) {
-        if (snapshot.annoyanceWeight() >= 0.55f) return SimpleNeuralNetwork.MindState.JUDGE;
+        if (snapshot.directAttackScore() >= DIRECT_ATTACK_EXIT_TO_JUDGE_MIN
+                && snapshot.annoyanceWeight() >= 0.55f) {
+            return SimpleNeuralNetwork.MindState.JUDGE;
+        }
         if (snapshot.entropyScore() >= 0.55f) return SimpleNeuralNetwork.MindState.MAINTAINER;
         if (snapshot.respectWeight() < 0.50f) return SimpleNeuralNetwork.MindState.OBSERVER;
         return null;

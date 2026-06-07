@@ -78,6 +78,9 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     public static final EntityDataAccessor<Optional<UUID>> OWNER_UUID = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.OPTIONAL_UUID);
     public static final EntityDataAccessor<Optional<BlockPos>> INVITED_POS = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.OPTIONAL_BLOCK_POS);
     public static final EntityDataAccessor<Integer> INVITED_ACTION = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.INT);
+    public static final EntityDataAccessor<ItemStack> VISUAL_MAIN_HAND_ITEM = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.ITEM_STACK);
+    public static final EntityDataAccessor<ItemStack> VISUAL_OFF_HAND_ITEM = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.ITEM_STACK);
+    public static final EntityDataAccessor<Boolean> VISUAL_EATING_ACTIVE = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.BOOLEAN);
     public static final EntityDataAccessor<Integer> MIND_STATE = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.INT);
     public static final EntityDataAccessor<Boolean> INSPECTING_SCYTHE = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.BOOLEAN);
     public static final EntityDataAccessor<Boolean> IS_GLITCHING = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.BOOLEAN);
@@ -329,7 +332,51 @@ public class HeroEntity extends PathfinderMob implements Merchant {
 
     @Override
     public boolean canAttack(LivingEntity target) {
-        return !(target instanceof Player) && super.canAttack(target);
+        if (target instanceof Player) {
+            return false;
+        }
+        return !this.shouldPreventFriendlyFire(target) && super.canAttack(target);
+    }
+
+    public boolean shouldPreventFriendlyFire(@Nullable Entity target) {
+        if (!(target instanceof LivingEntity living)) {
+            return false;
+        }
+        if (living == this || living instanceof HeroEntity) {
+            return true;
+        }
+        if (!this.hasCompanionFriendlyFireProtection()) {
+            return false;
+        }
+        if (living instanceof Player) {
+            return true;
+        }
+        if (this.isAlliedTo(living) || living.isAlliedTo(this)) {
+            return true;
+        }
+
+        UUID ownerUUID = this.getOwnerUUID();
+        if (ownerUUID != null && ownerUUID.equals(living.getUUID())) {
+            return true;
+        }
+
+        Player owner = this.getOwnerPlayer();
+        return owner != null && (living.is(owner) || living.isAlliedTo(owner) || owner.isAlliedTo(living));
+    }
+
+    public boolean hasCompanionFriendlyFireProtection() {
+        return this.getOwnerUUID() != null && !this.isChallengeActiveState();
+    }
+
+    public boolean isChallengeActiveState() {
+        return this.getEntityData().get(IS_CHALLENGE_ACTIVE)
+                || this.getPersistentData().getBoolean("IsChallengeActive");
+    }
+
+    @Nullable
+    public Player getOwnerPlayer() {
+        UUID ownerUUID = this.getOwnerUUID();
+        return ownerUUID == null ? null : this.level().getPlayerByUUID(ownerUUID);
     }
 
     @Override
@@ -404,8 +451,7 @@ public class HeroEntity extends PathfinderMob implements Merchant {
             return false;
         }
 
-        boolean isChallenge = this.getEntityData().get(IS_CHALLENGE_ACTIVE)
-                || this.getPersistentData().getBoolean("IsChallengeActive");
+        boolean isChallenge = this.isChallengeActiveState();
 
         this.handlingHeroHurt = true;
         try {
@@ -439,7 +485,7 @@ public class HeroEntity extends PathfinderMob implements Merchant {
 
         Entity attacker = source.getEntity();
         if (attacker instanceof LivingEntity livingAttacker
-                && com.whitecloud233.modid.herobrine_companion.entity.ai.goal.HeroBattleStanceGoal.canHeroAttackTarget(livingAttacker)) {
+                && com.whitecloud233.modid.herobrine_companion.entity.ai.goal.HeroBattleStanceGoal.canHeroAttackTarget(this, livingAttacker)) {
             this.setLastHurtByMob(livingAttacker);
             if (this.getTarget() != livingAttacker) {
                 this.setTarget(livingAttacker);
@@ -555,6 +601,9 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         this.entityData.define(OWNER_UUID, Optional.empty());
         this.entityData.define(INVITED_POS, Optional.empty());
         this.entityData.define(INVITED_ACTION, 0);
+        this.entityData.define(VISUAL_MAIN_HAND_ITEM, ItemStack.EMPTY);
+        this.entityData.define(VISUAL_OFF_HAND_ITEM, ItemStack.EMPTY);
+        this.entityData.define(VISUAL_EATING_ACTIVE, false);
         this.entityData.define(MIND_STATE, 0);
         this.entityData.define(INSPECTING_SCYTHE, false);
         this.entityData.define(IS_GLITCHING, false);
@@ -873,6 +922,21 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     public void setInvitedPos(@Nullable BlockPos pos) { this.entityData.set(INVITED_POS, Optional.ofNullable(pos)); }
     public int getInvitedAction() { return this.entityData.get(INVITED_ACTION); }
     public void setInvitedAction(int action) { this.entityData.set(INVITED_ACTION, action); }
+    public ItemStack getVisualMainHandItem() { return this.entityData.get(VISUAL_MAIN_HAND_ITEM); }
+    public void setVisualMainHandItem(ItemStack stack) {
+        this.entityData.set(VISUAL_MAIN_HAND_ITEM, sanitizeVisualItem(stack));
+    }
+    public ItemStack getVisualOffHandItem() { return this.entityData.get(VISUAL_OFF_HAND_ITEM); }
+    public void setVisualOffHandItem(ItemStack stack) {
+        this.entityData.set(VISUAL_OFF_HAND_ITEM, sanitizeVisualItem(stack));
+    }
+    public boolean isVisualEatingActive() { return this.entityData.get(VISUAL_EATING_ACTIVE); }
+    public void setVisualEatingActive(boolean active) { this.entityData.set(VISUAL_EATING_ACTIVE, active); }
+    public void clearVisualHeldItems() {
+        this.setVisualMainHandItem(ItemStack.EMPTY);
+        this.setVisualOffHandItem(ItemStack.EMPTY);
+        this.setVisualEatingActive(false);
+    }
     public void setLastSummonedTime(long time) { this.lastSummonedTime = time; }
     public long getLastSummonedTime() { return this.lastSummonedTime; }
     public GoalSelector getGoalSelector() { return this.goalSelector; }
@@ -890,6 +954,10 @@ public class HeroEntity extends PathfinderMob implements Merchant {
             ObserverStateDefinition.clearObserverInvisibility(this);
         }
         this.entityData.set(MIND_STATE, state.ordinal());
+    }
+
+    private static ItemStack sanitizeVisualItem(@Nullable ItemStack stack) {
+        return stack == null || stack.isEmpty() ? ItemStack.EMPTY : stack.copyWithCount(1);
     }
 
     public boolean hasClaimedReward(int id) {

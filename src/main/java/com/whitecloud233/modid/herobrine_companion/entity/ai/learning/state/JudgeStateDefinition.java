@@ -14,6 +14,8 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LightningBolt;
 
 public final class JudgeStateDefinition implements HeroMindStateDefinition {
+    private static final float DIRECT_ATTACK_ENTRY_MIN = 0.20f;
+    private static final float DIRECT_ATTACK_FORGIVEN_MAX = 0.05f;
 
     @Override
     public SimpleNeuralNetwork.MindState state() {
@@ -22,12 +24,14 @@ public final class JudgeStateDefinition implements HeroMindStateDefinition {
 
     @Override
     public boolean shouldEnter(HeroMindStateSnapshot snapshot) {
-        return snapshot.annoyanceWeight() >= 0.55f || snapshot.entropyScore() >= 0.65f;
+        return snapshot.directAttackScore() >= DIRECT_ATTACK_ENTRY_MIN
+                && snapshot.annoyanceWeight() >= 0.55f;
     }
 
     @Override
     public SimpleNeuralNetwork.MindState shouldExit(HeroMindStateSnapshot snapshot, HeroEntity hero) {
-        return snapshot.annoyanceWeight() <= 0.35f && snapshot.entropyScore() <= 0.40f
+        return snapshot.directAttackScore() <= DIRECT_ATTACK_FORGIVEN_MAX
+                && snapshot.annoyanceWeight() <= 0.35f
                 ? SimpleNeuralNetwork.MindState.OBSERVER
                 : null;
     }

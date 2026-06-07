@@ -203,6 +203,11 @@ public class HeroModel extends PlayerModel<HeroEntity> {
             return;
         }
 
+        if (isVisualEatingPoseActive(entity)) {
+            setupEatAnim(entity, ageInTicks);
+            return;
+        }
+
         if (isCookingPoseActive(entity)) {
             setupCookAnim(entity, ageInTicks);
             return;
@@ -288,13 +293,19 @@ public class HeroModel extends PlayerModel<HeroEntity> {
                 entity.getInvitedPos().getZ() + 0.5D) <= 9.0D;
     }
 
+    private boolean isVisualEatingPoseActive(HeroEntity entity) {
+        return entity.isVisualEatingActive() && !entity.getVisualMainHandItem().isEmpty();
+    }
+
     private void setupCookAnim(HeroEntity entity, float ageInTicks) {
         ItemStack mainDisplay = HeroCookingCompat.getCookMainHandDisplay(entity);
-        ItemStack offDisplay = HeroCookingCompat.getCookOffhandDisplay(entity);
+        ItemStack visualOffDisplay = entity.getVisualOffHandItem();
+        ItemStack offDisplay = !visualOffDisplay.isEmpty() ? visualOffDisplay : HeroCookingCompat.getCookOffhandDisplay(entity);
         String mainPath = getItemPath(mainDisplay);
         boolean chopping = mainPath.contains("knife");
         boolean stirring = mainPath.contains("shovel");
-        boolean pouring = !offDisplay.isEmpty();
+        boolean serving = !visualOffDisplay.isEmpty();
+        boolean pouring = !serving && !offDisplay.isEmpty();
 
         float phase = ageInTicks * (chopping ? 0.95F : 0.38F);
         float primarySwing = Mth.sin(phase);
@@ -316,7 +327,12 @@ public class HeroModel extends PlayerModel<HeroEntity> {
         this.rightArmLower.yRot = 0.0F;
         this.rightArmLower.zRot = 0.0F;
 
-        if (pouring) {
+        if (serving) {
+            this.leftArm.xRot = -0.74F + secondarySwing * 0.04F;
+            this.leftArm.yRot = 0.32F;
+            this.leftArm.zRot = -0.08F;
+            this.leftArmLower.xRot = -0.42F;
+        } else if (pouring) {
             this.leftArm.xRot = -0.90F + secondarySwing * 0.06F;
             this.leftArm.yRot = 0.18F;
             this.leftArm.zRot = -0.20F;
@@ -337,6 +353,44 @@ public class HeroModel extends PlayerModel<HeroEntity> {
 
         this.rightLeg.xRot = 0.04F;
         this.leftLeg.xRot = -0.04F;
+        this.rightLeg.zRot = 0.02F;
+        this.leftLeg.zRot = -0.02F;
+
+        copyAllModelProperties();
+    }
+
+    private void setupEatAnim(HeroEntity entity, float ageInTicks) {
+        HumanoidArm mainArm = entity.getMainArm();
+        ModelPart eatingArm = mainArm == HumanoidArm.RIGHT ? this.rightArm : this.leftArm;
+        ModelPart supportArm = mainArm == HumanoidArm.RIGHT ? this.leftArm : this.rightArm;
+        ModelPart eatingArmLower = mainArm == HumanoidArm.RIGHT ? this.rightArmLower : this.leftArmLower;
+        ModelPart supportArmLower = mainArm == HumanoidArm.RIGHT ? this.leftArmLower : this.rightArmLower;
+        float armSide = mainArm == HumanoidArm.RIGHT ? 1.0F : -1.0F;
+        float biteSwing = Mth.sin(ageInTicks * 1.15F) * 0.12F;
+        float bodyBob = Mth.sin(ageInTicks * 0.55F) * 0.03F;
+
+        this.body.xRot = -0.08F;
+        this.body.yRot = -0.08F * armSide;
+        this.head.xRot = Mth.lerp(0.75F, this.head.xRot, -0.18F + biteSwing * 0.35F);
+        this.head.yRot *= 0.35F;
+        this.head.zRot = 0.02F * armSide;
+
+        eatingArm.xRot = -1.68F + biteSwing;
+        eatingArm.yRot = -0.42F * armSide;
+        eatingArm.zRot = 0.20F * armSide;
+        eatingArmLower.xRot = -0.55F + biteSwing * 0.45F;
+        eatingArmLower.yRot = 0.0F;
+        eatingArmLower.zRot = 0.0F;
+
+        supportArm.xRot = -0.42F + bodyBob;
+        supportArm.yRot = 0.18F * armSide;
+        supportArm.zRot = -0.16F * armSide;
+        supportArmLower.xRot = -0.12F;
+        supportArmLower.yRot = 0.0F;
+        supportArmLower.zRot = 0.0F;
+
+        this.rightLeg.xRot = 0.06F - bodyBob;
+        this.leftLeg.xRot = -0.04F + bodyBob;
         this.rightLeg.zRot = 0.02F;
         this.leftLeg.zRot = -0.02F;
 

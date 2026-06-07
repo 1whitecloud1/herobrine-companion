@@ -299,16 +299,18 @@ public class HeroBattleStanceGoal extends Goal {
     }
 
     private boolean isValidTarget(LivingEntity candidate) {
-        return canHeroAttackTarget(candidate);
+        return canHeroAttackTarget(this.hero, candidate);
     }
 
-    public static boolean canHeroAttackTarget(LivingEntity candidate) {
+
+    public static boolean canHeroAttackTarget(HeroEntity hero, LivingEntity candidate) {
         return candidate != null
                 && candidate.isAlive()
                 && !candidate.isRemoved()
                 && !(candidate instanceof HeroEntity)
                 && !(candidate instanceof Player)
-                && (candidate instanceof Enemy || candidate instanceof Monster);
+                && (candidate instanceof Enemy || candidate instanceof Monster)
+                && (hero == null || hero.canAttack(candidate));
     }
 
     private static boolean isNonVanillaHostile(LivingEntity candidate) {

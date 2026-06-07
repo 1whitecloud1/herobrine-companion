@@ -21,6 +21,8 @@ import java.util.Comparator;
 import java.util.List;
 
 public final class PranksterStateDefinition implements HeroMindStateDefinition {
+    private static final float DIRECT_ATTACK_EXIT_TO_JUDGE_MIN = 0.20f;
+
     private static final String FAKE_CHEST_POS_KEY = "PranksterFakeTreasureChest";
     private static final String FAKE_TORCHES_KEY = "PranksterFakeTreasureTorches";
     private static final String FAKE_DIM_KEY = "PranksterFakeTreasureDim";
@@ -85,7 +87,10 @@ public final class PranksterStateDefinition implements HeroMindStateDefinition {
 
     @Override
     public SimpleNeuralNetwork.MindState shouldExit(HeroMindStateSnapshot snapshot, HeroEntity hero) {
-        if (snapshot.annoyanceWeight() >= 0.55f) return SimpleNeuralNetwork.MindState.JUDGE;
+        if (snapshot.directAttackScore() >= DIRECT_ATTACK_EXIT_TO_JUDGE_MIN
+                && snapshot.annoyanceWeight() >= 0.55f) {
+            return SimpleNeuralNetwork.MindState.JUDGE;
+        }
         if (snapshot.curiosityWeight() < 0.35f) return SimpleNeuralNetwork.MindState.OBSERVER;
         return null;
     }

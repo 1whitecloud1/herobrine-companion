@@ -15,6 +15,8 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
 
 public final class ObserverStateDefinition implements HeroMindStateDefinition {
+    private static final float DIRECT_ATTACK_EXIT_TO_JUDGE_MIN = 0.20f;
+
     private static final String OBSERVED_LOCATIONS_KEY = "ObserverObservedLocations";
     private static final String TRACE_COOLDOWN_KEY = "ObserverTraceCooldown";
     private static final String INVISIBLE_UNTIL_KEY = "ObserverInvisibleUntil";
@@ -52,7 +54,10 @@ public final class ObserverStateDefinition implements HeroMindStateDefinition {
         if (MonsterKingStateDefinition.meetsEntryRequirements(snapshot)) {
             return SimpleNeuralNetwork.MindState.MONSTER_KING;
         }
-        if (snapshot.annoyanceWeight() >= 0.50f) return SimpleNeuralNetwork.MindState.JUDGE;
+        if (snapshot.directAttackScore() >= DIRECT_ATTACK_EXIT_TO_JUDGE_MIN
+                && snapshot.annoyanceWeight() >= 0.50f) {
+            return SimpleNeuralNetwork.MindState.JUDGE;
+        }
         if (snapshot.respectWeight() >= 0.65f) return SimpleNeuralNetwork.MindState.PROTECTOR;
         if (snapshot.curiosityWeight() >= 0.55f) return SimpleNeuralNetwork.MindState.PRANKSTER;
         return null;

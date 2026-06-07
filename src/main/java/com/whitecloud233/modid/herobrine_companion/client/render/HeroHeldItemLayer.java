@@ -60,6 +60,8 @@ public class HeroHeldItemLayer extends RenderLayer<HeroEntity, PlayerModel<HeroE
         ItemStack leftHandItem = isRightHanded ? entity.getOffhandItem() : entity.getMainHandItem();
         ItemStack cookMainHandItem = HeroCookingCompat.getCookMainHandDisplay(entity);
         ItemStack cookOffhandItem = HeroCookingCompat.getCookOffhandDisplay(entity);
+        ItemStack visualMainHandItem = entity.getVisualMainHandItem();
+        ItemStack visualOffHandItem = entity.getVisualOffHandItem();
         if (!cookMainHandItem.isEmpty()) {
             if (isRightHanded) rightHandItem = cookMainHandItem;
             else leftHandItem = cookMainHandItem;
@@ -67,6 +69,14 @@ public class HeroHeldItemLayer extends RenderLayer<HeroEntity, PlayerModel<HeroE
         if (!cookOffhandItem.isEmpty()) {
             if (isRightHanded) leftHandItem = cookOffhandItem;
             else rightHandItem = cookOffhandItem;
+        }
+        if (!visualMainHandItem.isEmpty()) {
+            if (isRightHanded) rightHandItem = visualMainHandItem;
+            else leftHandItem = visualMainHandItem;
+        }
+        if (!visualOffHandItem.isEmpty()) {
+            if (isRightHanded) leftHandItem = visualOffHandItem;
+            else rightHandItem = visualOffHandItem;
         }
 
         if (!rightHandItem.isEmpty()) {

@@ -2,6 +2,7 @@ package com.whitecloud233.modid.herobrine_companion.item;
 
 import com.whitecloud233.modid.herobrine_companion.compat.cooking.HeroCookingCompat;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.modid.herobrine_companion.entity.logic.HeroInvitationHelper;
 import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroDataHandler;
 import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroLogic;
 import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroStateManager;
@@ -19,8 +20,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
-import net.minecraft.tags.BlockTags;
-import net.minecraft.tags.TagKey;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.MenuProvider;
@@ -32,12 +31,10 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.*;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.fml.loading.FMLEnvironment;
-import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.Collections;
 import java.util.Random;
@@ -55,9 +52,6 @@ public class HeroSummonItem extends Item {
     };
 
     private static final long COOLDOWN_TICKS = 100;
-
-    private static final TagKey<Block> FORGE_CHAIRS = BlockTags.create(new ResourceLocation("forge", "chairs"));
-    private static final TagKey<Block> C_CHAIRS = BlockTags.create(new ResourceLocation("c", "chairs"));
 
     public HeroSummonItem(Properties properties) {
         super(properties);
@@ -114,7 +108,7 @@ public class HeroSummonItem extends Item {
                 }
                 
                 HeroEntity existingHero = ownerUUID != null ? findHeroInAnyDimension(serverLevel.getServer(), ownerUUID) : null;
-                int actionType = getInteractionType(level, clickedPos);
+                int actionType = HeroInvitationHelper.getInteractionType(level, clickedPos);
 
                 if (actionType > 0 && existingHero != null) {
                     if (existingHero.level().dimension() == level.dimension()) {
@@ -257,41 +251,6 @@ public class HeroSummonItem extends Item {
             }
         }
         return null;
-    }
-
-    private int getInteractionType(Level level, BlockPos pos) {
-        BlockState state = level.getBlockState(pos);
-        Block block = state.getBlock();
-
-        if (HeroCookingCompat.isCookwareStation(level, pos)) return HeroCookingCompat.INVITED_ACTION_COOK;
-
-        if (state.is(BlockTags.BEDS) || block instanceof BedBlock) return 2;
-        if (state.is(BlockTags.STAIRS) || block instanceof StairBlock) return 2;
-        if (state.is(BlockTags.SLABS) || block instanceof SlabBlock) return 2;
-
-        if (state.is(FORGE_CHAIRS) || state.is(C_CHAIRS)) return 2;
-
-        ResourceLocation key = ForgeRegistries.BLOCKS.getKey(block);
-        if (key != null) {
-            String path = key.getPath().toLowerCase();
-            if (path.contains("chair") || path.contains("seat") || path.contains("sofa") || path.contains("stool") || path.contains("bench")) {
-                return 2;
-            }
-        }
-
-        if (state.is(BlockTags.DOORS) || block instanceof DoorBlock) return 3;
-        if (state.is(BlockTags.TRAPDOORS) || block instanceof TrapDoorBlock) return 3;
-        if (state.is(BlockTags.FENCE_GATES) || block instanceof FenceGateBlock) return 3;
-        if (state.is(Blocks.CHEST) || state.is(Blocks.TRAPPED_CHEST) || state.is(Blocks.ENDER_CHEST) || state.is(Blocks.BARREL) || state.is(Blocks.SHULKER_BOX)) return 3;
-
-        if (state.is(Blocks.SPAWNER)) return 1;
-        if (state.is(Blocks.ENCHANTING_TABLE)) return 1;
-        if (state.is(Blocks.BEACON)) return 1;
-        if (state.is(Blocks.COMMAND_BLOCK) || state.is(Blocks.CHAIN_COMMAND_BLOCK) || state.is(Blocks.REPEATING_COMMAND_BLOCK)) return 1;
-        if (state.is(BlockTags.DIAMOND_ORES) || state.is(BlockTags.EMERALD_ORES) || state.is(BlockTags.GOLD_ORES)) return 1;
-        if (state.is(Blocks.ANCIENT_DEBRIS)) return 1;
-
-        return 0;
     }
 
     private boolean isBound(ItemStack stack) {
