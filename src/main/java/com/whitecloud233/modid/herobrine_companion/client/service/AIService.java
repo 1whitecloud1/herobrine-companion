@@ -5,6 +5,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.whitecloud233.modid.herobrine_companion.network.HeroAIActionPacket;
+import com.whitecloud233.modid.herobrine_companion.util.LegacyFormattingText;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.commands.CommandSourceStack;
@@ -111,6 +112,27 @@ public class AIService {
                     return sanitizedSource;
                 })
                 .exceptionally(ignored -> sanitizedSource);
+    }
+
+    public static CompletableFuture<String> generateActorDialogue(String systemPrompt, String userPrompt, String seedText,
+                                                                  UUID conversationScopeId, UUID authorityPlayerUUID,
+                                                                  String outputLanguageCode) {
+        UUID effectiveScopeId = conversationScopeId != null ? conversationScopeId : authorityPlayerUUID;
+        String fallback = sanitizeActorDialogueText(seedText, "...");
+        String sanitizedSystemPrompt = systemPrompt == null ? "" : systemPrompt.trim();
+        String sanitizedUserPrompt = userPrompt == null ? "" : userPrompt.trim();
+        if (sanitizedSystemPrompt.isEmpty() || sanitizedUserPrompt.isEmpty()) {
+            return CompletableFuture.completedFuture(fallback);
+        }
+
+        return requestActorDialogueWithRetry(
+                sanitizedSystemPrompt,
+                sanitizedUserPrompt,
+                fallback,
+                effectiveScopeId,
+                outputLanguageCode,
+                0
+        );
     }
 
     public static CompletableFuture<String> observeEnvironment(String observationDesc, UUID playerUUID) {
@@ -272,6 +294,63 @@ public class AIService {
         return requestBuilder;
     }
 
+    private static CompletableFuture<String> requestActorDialogueWithRetry(String systemPrompt, String userPrompt, String fallback,
+                                                                           UUID conversationScopeId, String outputLanguageCode,
+                                                                           int variationRetryCount) {
+        if (LLMConfig.isSetupIncomplete() || LLMConfig.isKeyMissingOrInvalid()) {
+            return CompletableFuture.completedFuture(fallback);
+        }
+
+        String apiKey = LLMConfig.aiApiKey;
+        LLMConfig.Provider provider = LLMConfig.getProvider();
+        String endpoint = LLMConfig.getResolvedEndpoint();
+        LLMConfig.EndpointFormat endpointFormat = LLMConfig.getResolvedEndpointFormat();
+        String model = LLMConfig.getResolvedModel();
+        String languageCode = resolveOutputLanguageCode(outputLanguageCode);
+        double temperature = Math.min(1.1D, Math.max(0.2D, LLMConfig.getConfiguredTemperature() + 0.05D));
+
+        JsonObject requestBody = endpointFormat == LLMConfig.EndpointFormat.ANTHROPIC
+                ? buildAnthropicSimpleDialogueRequestBody(model, systemPrompt, userPrompt, languageCode, temperature)
+                : buildOpenAiSimpleDialogueRequestBody(model, systemPrompt, userPrompt, languageCode, temperature);
+
+        HttpRequest request = createRequestBuilder(endpoint, apiKey, provider, endpointFormat, false)
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody.toString(), StandardCharsets.UTF_8))
+                .build();
+
+        return CLIENT.sendAsync(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
+                .thenCompose(response -> {
+                    if (response.statusCode() == 200) {
+                        try {
+                            LLMConfig.markApiKeyValid();
+                            JsonObject json = JsonParser.parseString(response.body()).getAsJsonObject();
+                            String rawReply = endpointFormat == LLMConfig.EndpointFormat.ANTHROPIC
+                                    ? AIResponseParsingSupport.extractAnthropicText(json, fallback)
+                                    : AIResponseParsingSupport.extractOpenAiMessageText(json, fallback);
+                            String cleanReply = sanitizeActorDialogueText(rawReply, fallback);
+                            if (variationRetryCount < 1 && shouldRegenerateForRepetition(conversationScopeId, cleanReply)) {
+                                String antiRepeatPrompt = userPrompt
+                                        + "\nUse a clearly different opening and phrasing from your recent line."
+                                        + " Keep the same scene and meaning.";
+                                return requestActorDialogueWithRetry(systemPrompt, antiRepeatPrompt, fallback,
+                                        conversationScopeId, languageCode, variationRetryCount + 1);
+                            }
+                            rememberRecentReply(conversationScopeId, cleanReply);
+                            return CompletableFuture.completedFuture(cleanReply);
+                        } catch (Exception e) {
+                            LOGGER.warn("Failed to parse actor dialogue response", e);
+                            return CompletableFuture.completedFuture(fallback);
+                        }
+                    }
+
+                    if (isInvalidApiKeyResponse(response.statusCode(), response.body())) {
+                        LLMConfig.markApiKeyInvalid();
+                        reopenApiKeyInputScreen();
+                    }
+                    return CompletableFuture.completedFuture(fallback);
+                })
+                .exceptionally(ignored -> fallback);
+    }
+
     private static JsonObject buildOpenAiLocalizationRequestBody(String model, String languageCode, String sourceText) {
         JsonObject requestBody = new JsonObject();
         requestBody.addProperty("model", model);
@@ -294,6 +373,32 @@ public class AIService {
         return requestBody;
     }
 
+    private static JsonObject buildOpenAiSimpleDialogueRequestBody(String model, String systemPrompt, String userPrompt,
+                                                                   String outputLanguageCode, double temperature) {
+        JsonObject requestBody = new JsonObject();
+        requestBody.addProperty("model", model);
+        requestBody.addProperty("stream", false);
+        requestBody.addProperty("temperature", temperature);
+        requestBody.addProperty("top_p", Math.min(1.0D, Math.max(0.7D, LLMConfig.getConfiguredTopP())));
+        requestBody.addProperty("presence_penalty", 0.35D);
+        requestBody.addProperty("frequency_penalty", 0.45D);
+        requestBody.addProperty("max_tokens", Math.min(80, LLMConfig.getConfiguredMaxOutputTokens()));
+
+        JsonArray messages = new JsonArray();
+        JsonObject systemMessage = new JsonObject();
+        systemMessage.addProperty("role", "system");
+        systemMessage.addProperty("content", systemPrompt + "\nRespond for locale '" + outputLanguageCode + "'.");
+        messages.add(systemMessage);
+
+        JsonObject userMessage = new JsonObject();
+        userMessage.addProperty("role", "user");
+        userMessage.addProperty("content", userPrompt);
+        messages.add(userMessage);
+
+        requestBody.add("messages", messages);
+        return requestBody;
+    }
+
     private static JsonObject buildAnthropicLocalizationRequestBody(String model, String languageCode, String sourceText) {
         JsonObject requestBody = new JsonObject();
         requestBody.addProperty("model", model);
@@ -307,6 +412,25 @@ public class AIService {
         JsonObject userMessage = new JsonObject();
         userMessage.addProperty("role", "user");
         userMessage.addProperty("content", sourceText);
+        messages.add(userMessage);
+        requestBody.add("messages", messages);
+        return requestBody;
+    }
+
+    private static JsonObject buildAnthropicSimpleDialogueRequestBody(String model, String systemPrompt, String userPrompt,
+                                                                      String outputLanguageCode, double temperature) {
+        JsonObject requestBody = new JsonObject();
+        requestBody.addProperty("model", model);
+        requestBody.addProperty("stream", false);
+        requestBody.addProperty("temperature", temperature);
+        requestBody.addProperty("top_p", Math.min(1.0D, Math.max(0.7D, LLMConfig.getConfiguredTopP())));
+        requestBody.addProperty("max_tokens", Math.min(80, LLMConfig.getConfiguredMaxOutputTokens()));
+        requestBody.addProperty("system", systemPrompt + "\nRespond for locale '" + outputLanguageCode + "'.");
+
+        JsonArray messages = new JsonArray();
+        JsonObject userMessage = new JsonObject();
+        userMessage.addProperty("role", "user");
+        userMessage.addProperty("content", userPrompt);
         messages.add(userMessage);
         requestBody.add("messages", messages);
         return requestBody;
@@ -434,7 +558,7 @@ public class AIService {
                                                                int variationRetryCount, Consumer<String> partialConsumer,
                                                                boolean useStreaming, String outputLanguageCode,
                                                                boolean crossSessionMode) {
-        String cleanReply = (aiReply == null ? "" : aiReply).replaceAll("<[^>]*>", "").trim();
+        String cleanReply = LegacyFormattingText.normalize((aiReply == null ? "" : aiReply).replaceAll("<[^>]*>", "").trim());
         if (cleanReply.isEmpty()) cleanReply = "(Falls into a deep silence...)";
         final String finalizedReply = cleanReply;
 
@@ -460,11 +584,12 @@ public class AIService {
 
     private static String completeReply(String reply, UUID conversationScopeId, String originalUserMessage,
                                         boolean persistConversation, boolean allowTitleRefresh) {
-        rememberRecentReply(conversationScopeId, reply);
+        String normalizedReply = LegacyFormattingText.normalize(reply);
+        rememberRecentReply(conversationScopeId, normalizedReply);
         if (persistConversation) {
-            addExchangeToConversation(conversationScopeId, originalUserMessage, reply, allowTitleRefresh);
+            addExchangeToConversation(conversationScopeId, originalUserMessage, normalizedReply, allowTitleRefresh);
         }
-        return reply;
+        return normalizedReply;
     }
 
     private static CompletableFuture<String> executeToolAction(String commandToRun, String aiDialogue,
@@ -476,11 +601,7 @@ public class AIService {
                                                                boolean crossSessionMode) {
         return executeCommandWithFeedback(commandToRun, authorityPlayerUUID).thenCompose(success -> {
             if (success) {
-                rememberRecentReply(conversationScopeId, aiDialogue);
-                if (persistConversation) {
-                    addExchangeToConversation(conversationScopeId, originalUserMessage, aiDialogue, allowTitleRefresh);
-                }
-                return CompletableFuture.completedFuture(aiDialogue);
+                return CompletableFuture.completedFuture(completeReply(aiDialogue, conversationScopeId, originalUserMessage, persistConversation, allowTitleRefresh));
             } else {
                 if (retryCount < 2) {
                     String systemRetryPrompt = "[System Rejection]: Command /" + commandToRun + " failed. Reason: Syntax error or Cheats are disabled. Do not alter code, just reply gently!";
@@ -489,11 +610,7 @@ public class AIService {
                             partialConsumer, useStreaming, outputLanguageCode, crossSessionMode);
                 } else {
                     String failText = "(Gentle sigh) I failed to alter the underlying code, the world laws rejected me...";
-                    rememberRecentReply(conversationScopeId, failText);
-                    if (persistConversation) {
-                        addExchangeToConversation(conversationScopeId, originalUserMessage, failText, allowTitleRefresh);
-                    }
-                    return CompletableFuture.completedFuture(failText);
+                    return CompletableFuture.completedFuture(completeReply(failText, conversationScopeId, originalUserMessage, persistConversation, allowTitleRefresh));
                 }
             }
         });
@@ -543,12 +660,23 @@ public class AIService {
     }
 
     private static String sanitizeLocalizedText(String localizedText, String fallbackText) {
-        String sanitized = (localizedText == null ? "" : localizedText)
+        String sanitized = LegacyFormattingText.normalize((localizedText == null ? "" : localizedText)
                 .replaceAll("<[^>]*>", "")
                 .replace('\r', ' ')
                 .replace('\n', ' ')
+                .trim());
+        return sanitized.isEmpty() ? LegacyFormattingText.normalize(fallbackText) : sanitized;
+    }
+
+    private static String sanitizeActorDialogueText(String text, String fallbackText) {
+        String sanitized = sanitizeLocalizedText(text, fallbackText)
+                .replaceAll("^[\"'`]+|[\"'`]+$", "")
+                .replaceAll("\\s{2,}", " ")
                 .trim();
-        return sanitized.isEmpty() ? fallbackText : sanitized;
+        if (sanitized.isEmpty()) {
+            return fallbackText == null || fallbackText.isBlank() ? "..." : fallbackText.trim();
+        }
+        return sanitized;
     }
 
     private static String resolveOutputLanguageCode(String outputLanguageCode) {
@@ -917,7 +1045,7 @@ public class AIService {
     }
 
     private static String normalizeForRepeatCheck(String text) {
-        return text == null ? "" : text.toLowerCase(Locale.ROOT)
+        return LegacyFormattingText.stripCodes(text).toLowerCase(Locale.ROOT)
                 .replaceAll("§.", "")
                 .replaceAll("<[^>]+>", " ")
                 .replaceAll("[\\p{Punct}]+", " ")

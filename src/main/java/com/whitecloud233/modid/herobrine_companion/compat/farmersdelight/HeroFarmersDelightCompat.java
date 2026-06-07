@@ -103,6 +103,13 @@ public final class HeroFarmersDelightCompat {
         return SafeInvoker.getCookOptions(hero, pos);
     }
 
+    public static List<ItemStack> getAutonomousCookResults(Level level, BlockPos pos) {
+        if (!isLoaded() || level == null || pos == null || level.isClientSide) {
+            return List.of();
+        }
+        return SafeInvoker.getAutonomousCookResults(level, pos);
+    }
+
     public static boolean selectCookOption(HeroEntity hero, BlockPos pos, ResourceLocation recipeId) {
         if (!isLoaded() || hero == null || pos == null || recipeId == null || hero.level().isClientSide) {
             return false;
@@ -431,6 +438,31 @@ public final class HeroFarmersDelightCompat {
                 result.add(new HeroCookingCompat.CookOptionView(option.recipeId(), option.result().copy(), option.maxRepeatCount()));
             }
             return result;
+        }
+
+        static List<ItemStack> getAutonomousCookResults(Level level, BlockPos pos) {
+            if (!(level instanceof ServerLevel serverLevel)) {
+                return List.of();
+            }
+
+            BlockEntity blockEntity = level.getBlockEntity(pos);
+            if (blockEntity instanceof CookingPotBlockEntity) {
+                List<ItemStack> results = new ArrayList<>();
+                for (CookingPotRecipe recipe : serverLevel.getRecipeManager().getAllRecipesFor(ModRecipeTypes.COOKING.get())) {
+                    addUniqueResult(results, recipe.getResultItem(serverLevel.registryAccess()).copy());
+                }
+                return results;
+            }
+
+            if (blockEntity instanceof CuttingBoardBlockEntity cuttingBoard && !cuttingBoard.isItemCarvingBoard()) {
+                List<ItemStack> results = new ArrayList<>();
+                for (CuttingBoardRecipe recipe : serverLevel.getRecipeManager().getAllRecipesFor(ModRecipeTypes.CUTTING.get())) {
+                    addUniqueResult(results, getCuttingBoardPreview(recipe, serverLevel));
+                }
+                return results;
+            }
+
+            return List.of();
         }
 
         static boolean selectCookOption(HeroEntity hero, BlockPos pos, ResourceLocation recipeId) {
@@ -902,6 +934,18 @@ public final class HeroFarmersDelightCompat {
                 owner.drop(remainder, false);
             }
             owner.getInventory().setChanged();
+        }
+
+        private static void addUniqueResult(List<ItemStack> results, ItemStack candidate) {
+            if (candidate.isEmpty()) {
+                return;
+            }
+            for (ItemStack existing : results) {
+                if (ItemStack.isSameItemSameTags(existing, candidate)) {
+                    return;
+                }
+            }
+            results.add(candidate);
         }
 
         private static ItemStack consumeMatchingStack(ServerPlayer owner, ItemStack template, int amount) {

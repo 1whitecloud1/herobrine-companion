@@ -3,6 +3,7 @@ package com.whitecloud233.modid.herobrine_companion.compat.kaleidoscope;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.TicketType;
@@ -30,6 +31,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.BooleanSupplier;
+import java.lang.reflect.Field;
 
 public final class HeroKaleidoscopeCompat {
     public static final int INVITED_ACTION_COOK = 4;
@@ -98,6 +100,41 @@ public final class HeroKaleidoscopeCompat {
             return List.of();
         }
         return SafeInvoker.getCookOptions(hero, pos);
+    }
+
+    public static List<ItemStack> getAutonomousCookResults(Level level, BlockPos pos) {
+        if (!isLoaded() || level == null || pos == null || level.isClientSide) {
+            return List.of();
+        }
+        return SafeInvoker.getAutonomousCookResults(level, pos);
+    }
+
+    public static List<AutonomousCookOption> getAutonomousCookOptions(Level level, BlockPos pos) {
+        if (!isLoaded() || level == null || pos == null || level.isClientSide) {
+            return List.of();
+        }
+        return SafeInvoker.getAutonomousCookOptions(level, pos);
+    }
+
+    public static CompoundTag captureAutonomousCookwareSnapshot(Level level, BlockPos pos) {
+        if (!isLoaded() || level == null || pos == null) {
+            return new CompoundTag();
+        }
+        return SafeInvoker.captureAutonomousCookwareSnapshot(level, pos);
+    }
+
+    public static boolean applyAutonomousCookwareDisplay(Level level, BlockPos pos, ResourceLocation recipeId, ItemStack result) {
+        if (!isLoaded() || level == null || pos == null || recipeId == null || result == null || result.isEmpty() || level.isClientSide) {
+            return false;
+        }
+        return SafeInvoker.applyAutonomousCookwareDisplay(level, pos, recipeId, result);
+    }
+
+    public static void restoreAutonomousCookwareSnapshot(Level level, BlockPos pos, CompoundTag snapshot) {
+        if (!isLoaded() || level == null || pos == null || snapshot == null || snapshot.isEmpty()) {
+            return;
+        }
+        SafeInvoker.restoreAutonomousCookwareSnapshot(level, pos, snapshot);
     }
 
     public static boolean selectCookOption(HeroEntity hero, BlockPos pos, ResourceLocation recipeId) {
@@ -276,6 +313,9 @@ public final class HeroKaleidoscopeCompat {
     public record CookOptionView(ResourceLocation recipeId, ItemStack result, int maxRepeatCount) {
     }
 
+    public record AutonomousCookOption(ResourceLocation recipeId, ItemStack result) {
+    }
+
     private interface RecipeCandidate {
         ResourceLocation recipeId();
 
@@ -432,6 +472,160 @@ public final class HeroKaleidoscopeCompat {
                 result.add(new CookOptionView(option.recipeId(), option.result().copy(), option.maxRepeatCount()));
             }
             return result;
+        }
+
+        static List<ItemStack> getAutonomousCookResults(Level level, BlockPos pos) {
+            if (!(level instanceof ServerLevel serverLevel)) {
+                return List.of();
+            }
+
+            BlockEntity blockEntity = level.getBlockEntity(pos);
+            List<ItemStack> results = new ArrayList<>();
+
+            if (blockEntity instanceof com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.PotBlockEntity) {
+                for (com.github.ysbbbbbb.kaleidoscopecookery.crafting.recipe.PotRecipe recipe : serverLevel.getRecipeManager().getAllRecipesFor(com.github.ysbbbbbb.kaleidoscopecookery.init.ModRecipes.POT_RECIPE)) {
+                    addUniqueResult(results, recipe.getResultItem(serverLevel.registryAccess()).copy());
+                }
+                return results;
+            }
+            if (blockEntity instanceof com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.StockpotBlockEntity) {
+                for (com.github.ysbbbbbb.kaleidoscopecookery.crafting.recipe.StockpotRecipe recipe : serverLevel.getRecipeManager().getAllRecipesFor(com.github.ysbbbbbb.kaleidoscopecookery.init.ModRecipes.STOCKPOT_RECIPE)) {
+                    addUniqueResult(results, recipe.getResultItem(serverLevel.registryAccess()).copy());
+                }
+                return results;
+            }
+            if (blockEntity instanceof com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.ChoppingBoardBlockEntity) {
+                for (com.github.ysbbbbbb.kaleidoscopecookery.crafting.recipe.ChoppingBoardRecipe recipe : serverLevel.getRecipeManager().getAllRecipesFor(com.github.ysbbbbbb.kaleidoscopecookery.init.ModRecipes.CHOPPING_BOARD_RECIPE)) {
+                    addUniqueResult(results, recipe.getResult().copy());
+                }
+                return results;
+            }
+            if (blockEntity instanceof com.github.ysbbbbbb.kaleidoscopecookery.api.blockentity.ISteamer) {
+                for (com.github.ysbbbbbb.kaleidoscopecookery.crafting.recipe.SteamerRecipe recipe : serverLevel.getRecipeManager().getAllRecipesFor(com.github.ysbbbbbb.kaleidoscopecookery.init.ModRecipes.STEAMER_RECIPE)) {
+                    addUniqueResult(results, recipe.getResult().copy());
+                }
+                return results;
+            }
+            if (blockEntity instanceof com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.TeapotBlockEntity) {
+                for (com.github.ysbbbbbb.kaleidoscopecookery.crafting.recipe.TeapotRecipe recipe : serverLevel.getRecipeManager().getAllRecipesFor(com.github.ysbbbbbb.kaleidoscopecookery.init.ModRecipes.TEAPOT_RECIPE)) {
+                    addUniqueResult(results, recipe.result().copy());
+                }
+                return results;
+            }
+
+            return List.of();
+        }
+
+        static List<AutonomousCookOption> getAutonomousCookOptions(Level level, BlockPos pos) {
+            if (!(level instanceof ServerLevel serverLevel)) {
+                return List.of();
+            }
+
+            BlockEntity blockEntity = level.getBlockEntity(pos);
+            List<AutonomousCookOption> results = new ArrayList<>();
+
+            if (blockEntity instanceof com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.PotBlockEntity) {
+                for (com.github.ysbbbbbb.kaleidoscopecookery.crafting.recipe.PotRecipe recipe : serverLevel.getRecipeManager().getAllRecipesFor(com.github.ysbbbbbb.kaleidoscopecookery.init.ModRecipes.POT_RECIPE)) {
+                    addAutonomousOption(results, recipe.getId(), recipe.getResultItem(serverLevel.registryAccess()).copy());
+                }
+                return results;
+            }
+            if (blockEntity instanceof com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.StockpotBlockEntity) {
+                for (com.github.ysbbbbbb.kaleidoscopecookery.crafting.recipe.StockpotRecipe recipe : serverLevel.getRecipeManager().getAllRecipesFor(com.github.ysbbbbbb.kaleidoscopecookery.init.ModRecipes.STOCKPOT_RECIPE)) {
+                    addAutonomousOption(results, recipe.getId(), recipe.getResultItem(serverLevel.registryAccess()).copy());
+                }
+                return results;
+            }
+            if (blockEntity instanceof com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.ChoppingBoardBlockEntity) {
+                for (com.github.ysbbbbbb.kaleidoscopecookery.crafting.recipe.ChoppingBoardRecipe recipe : serverLevel.getRecipeManager().getAllRecipesFor(com.github.ysbbbbbb.kaleidoscopecookery.init.ModRecipes.CHOPPING_BOARD_RECIPE)) {
+                    addAutonomousOption(results, recipe.getId(), recipe.getResult().copy());
+                }
+                return results;
+            }
+            if (blockEntity instanceof com.github.ysbbbbbb.kaleidoscopecookery.api.blockentity.ISteamer) {
+                for (com.github.ysbbbbbb.kaleidoscopecookery.crafting.recipe.SteamerRecipe recipe : serverLevel.getRecipeManager().getAllRecipesFor(com.github.ysbbbbbb.kaleidoscopecookery.init.ModRecipes.STEAMER_RECIPE)) {
+                    addAutonomousOption(results, recipe.getId(), recipe.getResult().copy());
+                }
+                return results;
+            }
+            if (blockEntity instanceof com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.TeapotBlockEntity) {
+                for (com.github.ysbbbbbb.kaleidoscopecookery.crafting.recipe.TeapotRecipe recipe : serverLevel.getRecipeManager().getAllRecipesFor(com.github.ysbbbbbb.kaleidoscopecookery.init.ModRecipes.TEAPOT_RECIPE)) {
+                    addAutonomousOption(results, recipe.getId(), recipe.result().copy());
+                }
+                return results;
+            }
+
+            return List.of();
+        }
+
+        static CompoundTag captureAutonomousCookwareSnapshot(Level level, BlockPos pos) {
+            CompoundTag snapshot = new CompoundTag();
+            BlockEntity blockEntity = level.getBlockEntity(pos);
+            if (blockEntity == null) {
+                return snapshot;
+            }
+
+            snapshot.put("BlockEntityData", blockEntity.saveWithoutMetadata());
+            BlockState state = level.getBlockState(pos);
+            if (state.hasProperty(com.github.ysbbbbbb.kaleidoscopecookery.block.kitchen.StockpotBlock.HAS_LID)) {
+                snapshot.putBoolean("StockpotHasLid", state.getValue(com.github.ysbbbbbb.kaleidoscopecookery.block.kitchen.StockpotBlock.HAS_LID));
+            }
+            if (state.hasProperty(com.github.ysbbbbbb.kaleidoscopecookery.block.kitchen.SteamerBlock.HAS_LID)) {
+                snapshot.putBoolean("SteamerHasLid", state.getValue(com.github.ysbbbbbb.kaleidoscopecookery.block.kitchen.SteamerBlock.HAS_LID));
+            }
+            return snapshot;
+        }
+
+        static boolean applyAutonomousCookwareDisplay(Level level, BlockPos pos, ResourceLocation recipeId, ItemStack result) {
+            if (!(level instanceof ServerLevel serverLevel)) {
+                return false;
+            }
+
+            BlockEntity blockEntity = serverLevel.getBlockEntity(pos);
+            if (blockEntity instanceof com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.PotBlockEntity pot) {
+                return applyPotAutonomousDisplay(serverLevel, pot, result);
+            }
+            if (blockEntity instanceof com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.StockpotBlockEntity stockpot) {
+                return applyStockpotAutonomousDisplay(serverLevel, stockpot, recipeId, result);
+            }
+            if (blockEntity instanceof com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.ChoppingBoardBlockEntity choppingBoard) {
+                return applyChoppingBoardAutonomousDisplay(serverLevel, choppingBoard, recipeId);
+            }
+            if (blockEntity instanceof com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.SteamerBlockEntity steamer) {
+                return applySteamerAutonomousDisplay(serverLevel, steamer, result);
+            }
+            if (blockEntity instanceof com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.TeapotBlockEntity teapot) {
+                return TeapotSupport.applyAutonomousDisplay(serverLevel, teapot, recipeId, result);
+            }
+            return false;
+        }
+
+        static void restoreAutonomousCookwareSnapshot(Level level, BlockPos pos, CompoundTag snapshot) {
+            if (snapshot.isEmpty()) {
+                return;
+            }
+
+            BlockState state = level.getBlockState(pos);
+            if (snapshot.contains("StockpotHasLid") && state.hasProperty(com.github.ysbbbbbb.kaleidoscopecookery.block.kitchen.StockpotBlock.HAS_LID)) {
+                level.setBlock(pos, state.setValue(
+                        com.github.ysbbbbbb.kaleidoscopecookery.block.kitchen.StockpotBlock.HAS_LID,
+                        snapshot.getBoolean("StockpotHasLid")), 3);
+                state = level.getBlockState(pos);
+            }
+            if (snapshot.contains("SteamerHasLid") && state.hasProperty(com.github.ysbbbbbb.kaleidoscopecookery.block.kitchen.SteamerBlock.HAS_LID)) {
+                level.setBlock(pos, state.setValue(
+                        com.github.ysbbbbbb.kaleidoscopecookery.block.kitchen.SteamerBlock.HAS_LID,
+                        snapshot.getBoolean("SteamerHasLid")), 3);
+            }
+
+            BlockEntity blockEntity = level.getBlockEntity(pos);
+            if (blockEntity == null || !snapshot.contains("BlockEntityData")) {
+                return;
+            }
+
+            blockEntity.load(snapshot.getCompound("BlockEntityData"));
+            blockEntity.setChanged();
+            level.sendBlockUpdated(pos, level.getBlockState(pos), level.getBlockState(pos), 3);
         }
 
         static boolean selectCookOption(HeroEntity hero, BlockPos pos, ResourceLocation recipeId) {
@@ -1231,6 +1425,182 @@ public final class HeroKaleidoscopeCompat {
             return stacks;
         }
 
+        private static void addAutonomousOption(List<AutonomousCookOption> results, ResourceLocation recipeId, ItemStack candidate) {
+            if (recipeId == null || candidate.isEmpty()) {
+                return;
+            }
+            results.add(new AutonomousCookOption(recipeId, candidate.copy()));
+        }
+
+        private static boolean applyPotAutonomousDisplay(ServerLevel level,
+                                                         com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.PotBlockEntity pot,
+                                                         ItemStack result) {
+            boolean updated = setFieldValue(pot, "result", result.copy())
+                    | setFieldValue(pot, "status", com.github.ysbbbbbb.kaleidoscopecookery.api.blockentity.IPot.FINISHED)
+                    | setFieldValue(pot, "currentTick", 0);
+            return markCookwareUpdated(level, pot.getBlockPos(), pot, updated);
+        }
+
+        private static boolean applyStockpotAutonomousDisplay(ServerLevel level,
+                                                              com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.StockpotBlockEntity stockpot,
+                                                              ResourceLocation recipeId, ItemStack result) {
+            com.github.ysbbbbbb.kaleidoscopecookery.crafting.recipe.StockpotRecipe recipe = findStockpotRecipe(level, recipeId);
+            boolean updated = false;
+            updated |= setFieldValue(stockpot, "recipeId", recipeId);
+            if (recipe != null) {
+                stockpot.recipe = recipe;
+                updated |= setFieldValue(stockpot, "soupBaseId", recipe.soupBase());
+            }
+            updated |= setFieldValue(stockpot, "result", result.copy());
+            updated |= setFieldValue(stockpot, "status", com.github.ysbbbbbb.kaleidoscopecookery.api.blockentity.IStockpot.FINISHED);
+            updated |= setFieldValue(stockpot, "currentTick", 0);
+            updated |= setFieldValue(stockpot, "takeoutCount", Math.max(1, result.getCount()));
+            updated |= setFieldValue(stockpot, "lidItem", ItemStack.EMPTY);
+
+            BlockState state = level.getBlockState(stockpot.getBlockPos());
+            if (state.hasProperty(com.github.ysbbbbbb.kaleidoscopecookery.block.kitchen.StockpotBlock.HAS_LID)
+                    && state.getValue(com.github.ysbbbbbb.kaleidoscopecookery.block.kitchen.StockpotBlock.HAS_LID)) {
+                level.setBlock(stockpot.getBlockPos(), state.setValue(
+                        com.github.ysbbbbbb.kaleidoscopecookery.block.kitchen.StockpotBlock.HAS_LID, false), 3);
+                updated = true;
+            }
+            return markCookwareUpdated(level, stockpot.getBlockPos(), stockpot, updated);
+        }
+
+        private static boolean applyChoppingBoardAutonomousDisplay(ServerLevel level,
+                                                                   com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.ChoppingBoardBlockEntity choppingBoard,
+                                                                   ResourceLocation recipeId) {
+            com.github.ysbbbbbb.kaleidoscopecookery.crafting.recipe.ChoppingBoardRecipe recipe = findChoppingBoardRecipe(level, recipeId);
+            if (recipe == null) {
+                return false;
+            }
+
+            ItemStack displayStack = getFirstIngredientExample(recipe.getIngredient());
+            boolean updated = setFieldValue(choppingBoard, "modelId", recipe.getModelId())
+                    | setFieldValue(choppingBoard, "maxCutCount", recipe.getCutCount())
+                    | setFieldValue(choppingBoard, "currentCutCount", Math.max(0, recipe.getCutCount() - 1))
+                    | setFieldValue(choppingBoard, "currentCutStack", displayStack)
+                    | setFieldValue(choppingBoard, "result", recipe.getResult().copy());
+            return markCookwareUpdated(level, choppingBoard.getBlockPos(), choppingBoard, updated);
+        }
+
+        private static boolean applySteamerAutonomousDisplay(ServerLevel level,
+                                                             com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.SteamerBlockEntity steamer,
+                                                             ItemStack result) {
+            boolean updated = false;
+            List<ItemStack> items = steamer.getItems();
+            for (int i = 0; i < items.size(); i++) {
+                ItemStack next = i == 0 ? result.copyWithCount(1) : ItemStack.EMPTY;
+                if (!ItemStack.matches(items.get(i), next)) {
+                    items.set(i, next);
+                    updated = true;
+                }
+            }
+
+            int[] cookingProgress = steamer.getCookingProgress();
+            int[] cookingTime = steamer.getCookingTime();
+            if (cookingProgress.length > 0 && cookingProgress[0] != 0) {
+                cookingProgress[0] = 0;
+                updated = true;
+            }
+            if (cookingTime.length > 0 && cookingTime[0] != -1) {
+                cookingTime[0] = -1;
+                updated = true;
+            }
+            for (int i = 1; i < cookingProgress.length; i++) {
+                if (cookingProgress[i] != 0) {
+                    cookingProgress[i] = 0;
+                    updated = true;
+                }
+            }
+            for (int i = 1; i < cookingTime.length; i++) {
+                if (cookingTime[i] != 0) {
+                    cookingTime[i] = 0;
+                    updated = true;
+                }
+            }
+
+            return markCookwareUpdated(level, steamer.getBlockPos(), steamer, updated);
+        }
+
+        @Nullable
+        private static com.github.ysbbbbbb.kaleidoscopecookery.crafting.recipe.StockpotRecipe findStockpotRecipe(ServerLevel level,
+                                                                                                                  ResourceLocation recipeId) {
+            for (com.github.ysbbbbbb.kaleidoscopecookery.crafting.recipe.StockpotRecipe recipe : level.getRecipeManager().getAllRecipesFor(com.github.ysbbbbbb.kaleidoscopecookery.init.ModRecipes.STOCKPOT_RECIPE)) {
+                if (recipe.getId().equals(recipeId)) {
+                    return recipe;
+                }
+            }
+            return null;
+        }
+
+        @Nullable
+        private static com.github.ysbbbbbb.kaleidoscopecookery.crafting.recipe.ChoppingBoardRecipe findChoppingBoardRecipe(ServerLevel level,
+                                                                                                                            ResourceLocation recipeId) {
+            for (com.github.ysbbbbbb.kaleidoscopecookery.crafting.recipe.ChoppingBoardRecipe recipe : level.getRecipeManager().getAllRecipesFor(com.github.ysbbbbbb.kaleidoscopecookery.init.ModRecipes.CHOPPING_BOARD_RECIPE)) {
+                if (recipe.getId().equals(recipeId)) {
+                    return recipe;
+                }
+            }
+            return null;
+        }
+
+        private static ItemStack getFirstIngredientExample(Ingredient ingredient) {
+            ItemStack[] examples = ingredient.getItems();
+            if (examples.length <= 0) {
+                return ItemStack.EMPTY;
+            }
+            return examples[0].copyWithCount(1);
+        }
+
+        private static boolean markCookwareUpdated(Level level, BlockPos pos, BlockEntity blockEntity, boolean updated) {
+            if (!updated) {
+                return false;
+            }
+            blockEntity.setChanged();
+            level.sendBlockUpdated(pos, level.getBlockState(pos), level.getBlockState(pos), 3);
+            return true;
+        }
+
+        private static boolean setFieldValue(Object target, String fieldName, Object value) {
+            Field field = findField(target.getClass(), fieldName);
+            if (field == null) {
+                return false;
+            }
+            try {
+                field.setAccessible(true);
+                field.set(target, value);
+                return true;
+            } catch (IllegalAccessException ignored) {
+                return false;
+            }
+        }
+
+        @Nullable
+        private static Field findField(Class<?> type, String fieldName) {
+            Class<?> current = type;
+            while (current != null) {
+                try {
+                    return current.getDeclaredField(fieldName);
+                } catch (NoSuchFieldException ignored) {
+                    current = current.getSuperclass();
+                }
+            }
+            return null;
+        }
+
+        private static void addUniqueResult(List<ItemStack> results, ItemStack candidate) {
+            if (candidate.isEmpty()) {
+                return;
+            }
+            for (ItemStack existing : results) {
+                if (ItemStack.isSameItemSameTags(existing, candidate)) {
+                    return;
+                }
+            }
+            results.add(candidate);
+        }
+
         @Nullable
         private static Class<?> findOptionalClass(String className) {
             try {
@@ -1267,6 +1637,28 @@ public final class HeroKaleidoscopeCompat {
                     return mapTeapotOptions(collectTeapotPlans(owner, teapot, level));
                 }
                 return List.of();
+            }
+
+            static boolean applyAutonomousDisplay(ServerLevel level,
+                                                  com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.TeapotBlockEntity teapot,
+                                                  ResourceLocation recipeId, ItemStack result) {
+                com.github.ysbbbbbb.kaleidoscopecookery.crafting.recipe.TeapotRecipe selectedRecipe = null;
+                for (com.github.ysbbbbbb.kaleidoscopecookery.crafting.recipe.TeapotRecipe recipe : level.getRecipeManager().getAllRecipesFor(com.github.ysbbbbbb.kaleidoscopecookery.init.ModRecipes.TEAPOT_RECIPE)) {
+                    if (recipe.getId().equals(recipeId)) {
+                        selectedRecipe = recipe;
+                        break;
+                    }
+                }
+                if (selectedRecipe == null) {
+                    return false;
+                }
+
+                boolean updated = setFieldValue(teapot, "teaFluidId", selectedRecipe.teaFluid())
+                        | setFieldValue(teapot, "result", result.copy())
+                        | setFieldValue(teapot, "status", com.github.ysbbbbbb.kaleidoscopecookery.api.blockentity.ITeapot.FINISHED)
+                        | setFieldValue(teapot, "currentTick", 0)
+                        | setFieldValue(teapot, "input", ItemStack.EMPTY);
+                return markCookwareUpdated(level, teapot.getBlockPos(), teapot, updated);
             }
 
             @Nullable

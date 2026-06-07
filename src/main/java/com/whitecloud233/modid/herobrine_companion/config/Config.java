@@ -89,6 +89,11 @@ public class Config {
             .comment("是否启用全知视觉（AI计算机视觉环境感知）")
             .define("aiVisionEnabled", true);
 
+    public static final ForgeConfigSpec.BooleanValue AWAKENED_MOB_AI_DIALOGUE_ENABLED = BUILDER
+            .comment("Whether awakened monster AI dialogue is enabled")
+            .comment("鏄惁鍚敤瑙夐啋鎬墿鐨凙I瀵硅瘽")
+            .define("awakenedMobAiDialogueEnabled", true);
+
     public static final ForgeConfigSpec.IntValue AI_VISION_INTERVAL = BUILDER
             .comment("The global minimum interval (in seconds) between AI observations and speech")
             .comment("全知视觉的每次主动发话最小间隔（秒），建议在 10 ~ 300 之间")
@@ -123,6 +128,7 @@ public class Config {
     public static boolean transcendencePermitEnabled;
 
     public static boolean aiVisionEnabled;
+    public static boolean awakenedMobAiDialogueEnabled;
     public static int aiVisionInterval;
     // 【新增】更新检查器静态变量
     public static boolean enableUpdateChecker;
@@ -148,16 +154,17 @@ public class Config {
         transcendencePermitEnabled = TRANSCENDENCE_PERMIT_ENABLED.get();
 
         aiVisionEnabled = AI_VISION_ENABLED.get();
+        awakenedMobAiDialogueEnabled = AWAKENED_MOB_AI_DIALOGUE_ENABLED.get();
         aiVisionInterval = AI_VISION_INTERVAL.get();
 // 【新增】更新检查器赋值
         enableUpdateChecker = ENABLE_UPDATE_CHECKER.get();
         // 【新增】语言风格赋值
         aiLanguageStyle = AI_LANGUAGE_STYLE.get();
 
-        LOGGER.info("Herobrine Companion Config Loaded: Explosion={}, Aura={}, BlockRestoration={}, CleanItems={}, CleaveSkill={}, DGTerrainEnabled={}, DGTerrainMode={}, DGBreakContainers={}, DGArenaRestore={}, DGMaxBreakPerTick={}, DGWorldCollapse={}, Pact={}, Gaze={}, Permit={}, AIVision={}, AIInterval={}, AIStyle={}",
+        LOGGER.info("Herobrine Companion Config Loaded: Explosion={}, Aura={}, BlockRestoration={}, CleanItems={}, CleaveSkill={}, DGTerrainEnabled={}, DGTerrainMode={}, DGBreakContainers={}, DGArenaRestore={}, DGMaxBreakPerTick={}, DGWorldCollapse={}, Pact={}, Gaze={}, Permit={}, AIVision={}, AwakenedMobAIDialogue={}, AIInterval={}, AIStyle={}",
                 poemOfTheEndExplosion, heroKingAuraEnabled, heroBlockRestoration, heroCleanItems, cleaveSkillEnabled,
                 destructionGodTerrainDamageEnabled, destructionGodTerrainDamageMode, destructionGodBreakContainers,
                 destructionGodArenaRestore, destructionGodMaxBrokenBlocksPerTick, destructionGodFinalPhaseWorldCollapse,
-                soulBoundPactEnabled, abyssalGazeEnabled, transcendencePermitEnabled, aiVisionEnabled, aiVisionInterval, aiLanguageStyle);
+                soulBoundPactEnabled, abyssalGazeEnabled, transcendencePermitEnabled, aiVisionEnabled, awakenedMobAiDialogueEnabled, aiVisionInterval, aiLanguageStyle);
     }
 }

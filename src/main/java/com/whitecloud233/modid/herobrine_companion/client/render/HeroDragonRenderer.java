@@ -43,6 +43,12 @@ public class HeroDragonRenderer extends EnderDragonRenderer {
     @Override
     public void render(EnderDragon entity, float entityYaw, float partialTicks, PoseStack poseStack, MultiBufferSource buffer, int packedLight) {
         if (entity == null || this.customModel == null) {
+            super.render(entity, entityYaw, partialTicks, poseStack, buffer, packedLight);
+            return;
+        }
+
+        if (!shouldUseSubmissionRenderer(entity)) {
+            super.render(entity, entityYaw, partialTicks, poseStack, buffer, packedLight);
             return;
         }
 
@@ -74,6 +80,10 @@ public class HeroDragonRenderer extends EnderDragonRenderer {
         this.customModel.renderToBuffer(poseStack, vertexconsumer, packedLight, OverlayTexture.NO_OVERLAY, 1.0F, 1.0F, 1.0F, 1.0F);
         
         poseStack.popPose();
+    }
+
+    private boolean shouldUseSubmissionRenderer(EnderDragon entity) {
+        return entity.isSilent();
     }
     
     @Override

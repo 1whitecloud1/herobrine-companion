@@ -210,7 +210,7 @@ public class HeroFallbackRangedAttackGoal extends Goal {
     }
 
     private boolean isValidTarget(LivingEntity candidate) {
-        return HeroBattleStanceGoal.canHeroAttackTarget(candidate);
+        return HeroBattleStanceGoal.canHeroAttackTarget(this.hero, candidate);
     }
 
     private double getSearchRange() {

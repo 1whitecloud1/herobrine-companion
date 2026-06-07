@@ -10,7 +10,6 @@ import net.minecraft.client.model.geom.PartPose;
 import net.minecraft.client.model.geom.builders.*;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
-import net.minecraft.world.entity.boss.enderdragon.phases.EnderDragonPhase;
 
 public class HeroDragonModel extends EntityModel<EnderDragon> {
     public static final ModelLayerLocation LAYER_LOCATION = new ModelLayerLocation(new ResourceLocation(HerobrineCompanion.MODID, "hero_dragon"), "main");
@@ -205,6 +204,9 @@ public class HeroDragonModel extends EntityModel<EnderDragon> {
 
     @Override
     public void setupAnim(EnderDragon entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
+        this.root.getAllParts().forEach(ModelPart::resetPose);
+
+        boolean submissionPose = entity.isSilent();
         // 基础头部旋转
         this.head.yRot = netHeadYaw * ((float)Math.PI / 180F);
         this.head.xRot = headPitch * ((float)Math.PI / 180F);
@@ -235,7 +237,7 @@ public class HeroDragonModel extends EntityModel<EnderDragon> {
         this.neck2.xRot = neckPitch * 0.8F + neckBreathe * 0.8F;
         this.neck.xRot = neckPitch + neckBreathe;
 
-        if (entity.getPhaseManager().getCurrentPhase().getPhase() != EnderDragonPhase.SITTING_SCANNING) {
+        if (!submissionPose) {
              // 飞行状态
              float flapSpeed = 0.2F;
              float flapAmp = 0.5F;

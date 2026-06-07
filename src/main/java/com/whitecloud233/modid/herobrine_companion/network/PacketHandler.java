@@ -127,12 +127,18 @@ public class PacketHandler {
                 SendCrossChatHbMessagePacket::encode, SendCrossChatHbMessagePacket::new, SendCrossChatHbMessagePacket::handle);
         INSTANCE.registerMessage(id++, CloseCrossChatSessionPacket.class,
                 CloseCrossChatSessionPacket::encode, CloseCrossChatSessionPacket::new, CloseCrossChatSessionPacket::handle);
+        INSTANCE.registerMessage(id++, ActorDialoguePromptPacket.class,
+                ActorDialoguePromptPacket::encode, ActorDialoguePromptPacket::new, ActorDialoguePromptPacket::handle);
+        INSTANCE.registerMessage(id++, ActorDialogueResultPacket.class,
+                ActorDialogueResultPacket::encode, ActorDialogueResultPacket::new, ActorDialogueResultPacket::handle);
         INSTANCE.registerMessage(id++, com.whitecloud233.modid.herobrine_companion.network.ai.HeroCrossChatPromptPacket.class,
                 com.whitecloud233.modid.herobrine_companion.network.ai.HeroCrossChatPromptPacket::encode,
                 com.whitecloud233.modid.herobrine_companion.network.ai.HeroCrossChatPromptPacket::new,
                 com.whitecloud233.modid.herobrine_companion.network.ai.HeroCrossChatPromptPacket::handle);
         INSTANCE.registerMessage(id++, HeroCrossChatResultPacket.class,
                 HeroCrossChatResultPacket::encode, HeroCrossChatResultPacket::new, HeroCrossChatResultPacket::handle);
+        INSTANCE.registerMessage(id++, JeanMountInputPacket.class,
+                JeanMountInputPacket::encode, JeanMountInputPacket::new, JeanMountInputPacket::handle);
     }
 
 

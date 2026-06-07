@@ -13,24 +13,24 @@ import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
 import net.minecraft.world.entity.monster.Enemy;
 
 public class HeroAI {
-    private static boolean canSelectCombatTarget(LivingEntity candidate) {
-        return HeroBattleStanceGoal.canHeroAttackTarget(candidate);
+    private static boolean canSelectCombatTarget(HeroEntity hero, LivingEntity candidate) {
+        return HeroBattleStanceGoal.canHeroAttackTarget(hero, candidate);
     }
 
     public static void registerGoals(HeroEntity hero) {
         hero.targetSelector.addGoal(1, new HurtByTargetGoal(hero) {
             @Override
             public boolean canUse() {
-                return hero.isBattleModeActive() && super.canUse() && canSelectCombatTarget(hero.getTarget());
+                return hero.isBattleModeActive() && super.canUse() && canSelectCombatTarget(hero, hero.getTarget());
             }
 
             @Override
             public boolean canContinueToUse() {
-                return hero.isBattleModeActive() && super.canContinueToUse() && canSelectCombatTarget(hero.getTarget());
+                return hero.isBattleModeActive() && super.canContinueToUse() && canSelectCombatTarget(hero, hero.getTarget());
             }
         });
         hero.targetSelector.addGoal(2, new NearestAttackableTargetGoal<>(hero, Mob.class, 10, true, false,
-                candidate -> candidate instanceof Enemy && candidate.isAlive() && candidate != hero && canSelectCombatTarget(candidate)) {
+                candidate -> candidate instanceof Enemy && candidate.isAlive() && candidate != hero && canSelectCombatTarget(hero, candidate)) {
             @Override
             public boolean canUse() {
                 return hero.isBattleModeActive() && super.canUse();
@@ -70,6 +70,7 @@ public class HeroAI {
 
         // 2.2 [Lore] 赠送礼物 (优先级 2，与跟随并行，但执行时会短暂停留)
         hero.getGoalSelector().addGoal(2, new HeroGiftPlayerGoal(hero));
+        hero.getGoalSelector().addGoal(2, new HeroDomesticActivityGoal(hero));
 
         // 2.3 [Lore] 巡视世界 (优先级 3，空闲时触发)
         hero.getGoalSelector().addGoal(3, new HeroInspectBlockGoal(hero));

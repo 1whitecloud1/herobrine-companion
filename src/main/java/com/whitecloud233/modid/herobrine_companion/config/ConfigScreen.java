@@ -222,6 +222,21 @@ public class ConfigScreen extends Screen {
 
         // ================= 动态自适应排版系统 =================
         // 默认将这些组件“锚定”在屏幕的最底端，基于 this.height 向上推算
+        this.addRenderableWidget(Button.builder(
+                        Component.translatable("gui.herobrine_companion.config.awakened_mob_ai_dialogue", Config.AWAKENED_MOB_AI_DIALOGUE_ENABLED.get()),
+                        button -> {
+                            boolean newValue = !Config.AWAKENED_MOB_AI_DIALOGUE_ENABLED.get();
+                            Config.AWAKENED_MOB_AI_DIALOGUE_ENABLED.set(newValue);
+                            Config.awakenedMobAiDialogueEnabled = newValue;
+                            Config.SPEC.save();
+                            button.setMessage(Component.translatable("gui.herobrine_companion.config.awakened_mob_ai_dialogue", newValue));
+                        })
+                .pos(col2X, startY + spacingY * 5)
+                .size(buttonWidth, buttonHeight)
+                .tooltip(Tooltip.create(Component.translatable("gui.herobrine_companion.config.awakened_mob_ai_dialogue.tooltip")))
+                .build()
+        );
+
         int doneButtonY = this.height - 28; // 完成按钮紧贴屏幕底端
         int noteY = doneButtonY - 14;       // 提示文字在按钮上方
         int editBoxY = noteY - 26;          // 输入框在提示文字上方
