@@ -124,7 +124,7 @@ public class DestructionGodCombatGoal extends Goal {
                         int slashDepth = 20 + phase * 4;
                         double bladeSpeed = 5.2D;
                         float slashRoll = randomSlashRoll(serverLevel);
-                        CleaveBladeEntity blade = new CleaveBladeEntity(ModEvents.CLEAVE_BLADE.get(), serverLevel, rendOrigin.x, rendOrigin.y + 0.9D, rendOrigin.z, castDirection.x, castDirection.z, Math.max(14, Mth.ceil(slashLength / bladeSpeed) + 3));
+                        CleaveBladeEntity blade = new CleaveBladeEntity(ModEvents.CLEAVE_BLADE.get(), serverLevel, rendOrigin.x, rendOrigin.y + 0.9D, rendOrigin.z, castDirection.x, castDirection.z, Math.max(14, Mth.ceil(slashLength / bladeSpeed) + 3), slashRoll);
                         blade.setDeltaMovement(castDirection.x * bladeSpeed, 0.0D, castDirection.z * bladeSpeed);
                         serverLevel.addFreshEntity(blade);
                         RendTerrainSkill.startBladeLineRend(serverLevel, this.boss, rendOrigin, castDirection, slashLength, halfWidth, slashDepth, 0, slashRoll);

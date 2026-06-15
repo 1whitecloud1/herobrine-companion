@@ -140,8 +140,8 @@ public class ClientSpatialRendHandler {
         if (worldRendThunderDelay > 0) {
             worldRendThunderDelay--;
             if (worldRendThunderDelay == 0 && minecraft.level != null) {
-                minecraft.level.playSound(minecraft.player, worldRendThunderPos.x, worldRendThunderPos.y, worldRendThunderPos.z, SoundEvents.TRIDENT_THUNDER, SoundSource.WEATHER, 5.0F, 0.62F);
-                minecraft.level.playSound(minecraft.player, worldRendThunderPos.x, worldRendThunderPos.y, worldRendThunderPos.z, SoundEvents.WARDEN_SONIC_BOOM, SoundSource.HOSTILE, 3.2F, 0.42F);
+                minecraft.level.playLocalSound(worldRendThunderPos.x, worldRendThunderPos.y, worldRendThunderPos.z, SoundEvents.TRIDENT_THUNDER.value(), SoundSource.WEATHER, 5.0F, 0.62F, false);
+                minecraft.level.playLocalSound(worldRendThunderPos.x, worldRendThunderPos.y, worldRendThunderPos.z, SoundEvents.WARDEN_SONIC_BOOM, SoundSource.HOSTILE, 3.2F, 0.42F, false);
             }
         }
     }

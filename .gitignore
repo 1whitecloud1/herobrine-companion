@@ -24,3 +24,11 @@ Thumbs.db
 
 # 认证文件 (防止你的 CurseForge Token 泄露)
 gradle.properties
+/epicfight-1.21.1/
+/net/
+/scripts/
+/codex_sync_120_hero_reply.ps1
+/gradle/epicfight-compat.gradle
+/libs/kaleidoscope_compat-2.7.2-neoforge+mc1.21.1.jar
+/runserver.log
+/libs/waveycapes-neoforge-1.9.2-mc1.21.1.jar

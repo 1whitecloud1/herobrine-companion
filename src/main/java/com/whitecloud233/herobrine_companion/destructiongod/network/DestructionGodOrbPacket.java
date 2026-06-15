@@ -1,6 +1,7 @@
 package com.whitecloud233.herobrine_companion.destructiongod.network;
 
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.herobrine_companion.network.NetworkClientBridge;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -47,6 +48,6 @@ public record DestructionGodOrbPacket(Vec3 startPos, Vec3 impactPos, int fallTic
     }
 
     public void handle(IPayloadContext context) {
-        context.enqueueWork(() -> DestructionGodClientPacketHandler.handleOrb(this));
+        context.enqueueWork(() -> NetworkClientBridge.handleDestructionGodOrb(this));
     }
 }

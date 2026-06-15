@@ -1,6 +1,7 @@
 package com.whitecloud233.herobrine_companion.destructiongod.network;
 
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.herobrine_companion.network.NetworkClientBridge;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -43,6 +44,6 @@ public record DestructionGodThunderSkyNetPacket(Vec3 center, double cloudY, floa
     }
 
     public void handle(IPayloadContext context) {
-        context.enqueueWork(() -> DestructionGodClientPacketHandler.handleThunderSkyNet(this));
+        context.enqueueWork(() -> NetworkClientBridge.handleDestructionGodThunderSkyNet(this));
     }
 }
