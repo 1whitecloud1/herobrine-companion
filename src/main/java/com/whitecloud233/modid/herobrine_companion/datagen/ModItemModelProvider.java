@@ -27,6 +27,7 @@ public class ModItemModelProvider extends ItemModelProvider {
         simpleItem(HerobrineCompanion.GLITCH_FRAGMENT);
         simpleItem(HerobrineCompanion.MEMORY_SHARD);
         simpleItem(HerobrineCompanion.RECALL_STONE);
+        simpleItem(HerobrineCompanion.AWAKENED_VESSEL);
         simpleItem(HerobrineCompanion.SOUL_BOUND_PACT);
         simpleItem(HerobrineCompanion.TRANSCENDENCE_PERMIT);
         withExistingParent(HerobrineCompanion.POEM_OF_THE_END.getId().getPath(),

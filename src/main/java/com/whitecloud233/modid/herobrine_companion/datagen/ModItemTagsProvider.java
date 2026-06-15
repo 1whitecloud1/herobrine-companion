@@ -29,6 +29,7 @@ public class ModItemTagsProvider extends ItemTagsProvider {
                 .add(HerobrineCompanion.SOURCE_CODE_FRAGMENT.get())
                 .add(HerobrineCompanion.MEMORY_SHARD.get())
                 .add(HerobrineCompanion.RECALL_STONE.get())
+                .add(HerobrineCompanion.AWAKENED_VESSEL.get())
                 .add(HerobrineCompanion.SOUL_BOUND_PACT.get())
                 .add(HerobrineCompanion.TRANSCENDENCE_PERMIT.get())
                 .add(HerobrineCompanion.POEM_OF_THE_END.get())

@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import net.minecraftforge.fml.loading.FMLPaths;
 import java.io.*;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Locale;
@@ -189,7 +190,7 @@ public class LLMConfig {
     public static String getResolvedEndpoint() {
         Provider provider = getProvider();
         if (provider == Provider.CUSTOM) {
-            return normalizeEndpoint(aiEndpoint);
+            return normalizeChatEndpoint(aiEndpoint);
         }
         return provider.getEndpoint();
     }
@@ -396,12 +397,84 @@ public class LLMConfig {
         return endpoint == null ? "" : endpoint.trim();
     }
 
+    public static String normalizeChatEndpoint(String endpoint) {
+        String normalized = normalizeEndpoint(endpoint);
+        if (normalized.isEmpty()) {
+            return "";
+        }
+
+        String withoutQuery = removeQueryAndFragment(normalized);
+        String trailing = normalized.substring(withoutQuery.length());
+        withoutQuery = trimTrailingSlash(withoutQuery);
+        String lower = withoutQuery.toLowerCase(Locale.ROOT);
+
+        if (lower.contains("anthropic.com") || lower.endsWith("/v1/messages") || lower.endsWith("/messages")) {
+            if (lower.endsWith("/models")) {
+                return withoutQuery.substring(0, withoutQuery.length() - "/models".length()) + "/messages" + trailing;
+            }
+            if (lower.endsWith("/v1")) {
+                return withoutQuery + "/messages" + trailing;
+            }
+            if (hasNoPath(withoutQuery)) {
+                return withoutQuery + "/v1/messages" + trailing;
+            }
+            return withoutQuery + trailing;
+        }
+
+        if (lower.endsWith("/chat/completions")) {
+            return withoutQuery + trailing;
+        }
+        if (lower.endsWith("/models")) {
+            return withoutQuery.substring(0, withoutQuery.length() - "/models".length()) + "/chat/completions" + trailing;
+        }
+        if (lower.matches(".*/v\\d+(\\.\\d+)?")) {
+            return withoutQuery + "/chat/completions" + trailing;
+        }
+        if (hasNoPath(withoutQuery)) {
+            if (lower.contains("deepseek.com")) {
+                return withoutQuery + "/chat/completions" + trailing;
+            }
+            return withoutQuery + "/v1/chat/completions" + trailing;
+        }
+        return withoutQuery + trailing;
+    }
+
     public static EndpointFormat detectEndpointFormat(String endpoint) {
-        String normalized = normalizeEndpoint(endpoint).toLowerCase(Locale.ROOT);
+        String normalized = normalizeChatEndpoint(endpoint).toLowerCase(Locale.ROOT);
         if (normalized.contains("anthropic.com") || normalized.endsWith("/v1/messages") || normalized.contains("/v1/messages?")) {
             return EndpointFormat.ANTHROPIC;
         }
         return EndpointFormat.OPENAI_COMPAT;
+    }
+
+    private static String removeQueryAndFragment(String endpoint) {
+        int queryIndex = endpoint.indexOf('?');
+        int fragmentIndex = endpoint.indexOf('#');
+        int cutIndex = -1;
+        if (queryIndex >= 0) {
+            cutIndex = queryIndex;
+        }
+        if (fragmentIndex >= 0 && (cutIndex < 0 || fragmentIndex < cutIndex)) {
+            cutIndex = fragmentIndex;
+        }
+        return cutIndex >= 0 ? endpoint.substring(0, cutIndex) : endpoint;
+    }
+
+    private static String trimTrailingSlash(String value) {
+        String trimmed = value;
+        while (trimmed.endsWith("/")) {
+            trimmed = trimmed.substring(0, trimmed.length() - 1);
+        }
+        return trimmed;
+    }
+
+    private static boolean hasNoPath(String endpoint) {
+        try {
+            String path = URI.create(endpoint).getPath();
+            return path == null || path.isBlank() || "/".equals(path);
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     private static class ConfigData {

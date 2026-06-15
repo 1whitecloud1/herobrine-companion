@@ -20,6 +20,7 @@ public class ModEnUsLangProvider extends LanguageProvider {
         add(HerobrineCompanion.GLITCH_FRAGMENT.get(), "Glitch Fragment");
         add(HerobrineCompanion.MEMORY_SHARD.get(), "Memory Shard");
         add(HerobrineCompanion.RECALL_STONE.get(), "Recall Stone");
+        add(HerobrineCompanion.AWAKENED_VESSEL.get(), "Awakened Vessel");
         add(HerobrineCompanion.SOUL_BOUND_PACT.get(), "Soul Bound Pact");
         add(HerobrineCompanion.TRANSCENDENCE_PERMIT.get(), "Transcendence Permit");
         add(HerobrineCompanion.END_RING_PORTAL_ITEM.get(), "End Ring Portal");
@@ -185,6 +186,18 @@ public class ModEnUsLangProvider extends LanguageProvider {
         add("item.herobrine_companion.transcendence_permit.desc", "A permit to transcend the mundane. When enabled, you gain the ability to fly.");
         add("message.herobrine_companion.transcendence_permit.enabled", "§b[System] §fTranscendence Permit enabled. Gravity no longer binds you.");
         add("message.herobrine_companion.transcendence_permit.disabled", "§b[System] §fTranscendence Permit disabled. You return to the earth.");
+        add("item.herobrine_companion.awakened_vessel.desc", "Right-click an awakened mob to contain it, then right-click again to release it.");
+        add("item.herobrine_companion.awakened_vessel.empty", "Empty");
+        add("item.herobrine_companion.awakened_vessel.contains", "Contains: %s");
+        add("message.herobrine_companion.awakened_vessel.capture.not_awakened", "§7This vessel only answers awakened mobs.");
+        add("message.herobrine_companion.awakened_vessel.capture.already_full", "§cThe Awakened Vessel already contains a target.");
+        add("message.herobrine_companion.awakened_vessel.capture.unsupported", "§cThis target cannot be contained by the Awakened Vessel.");
+        add("message.herobrine_companion.awakened_vessel.capture.success", "§dContained %s.");
+        add("message.herobrine_companion.awakened_vessel.release.empty", "§7The Awakened Vessel is empty.");
+        add("message.herobrine_companion.awakened_vessel.release.no_space", "§cThere is not enough space nearby to release the target.");
+        add("message.herobrine_companion.awakened_vessel.release.invalid_data", "§cThe entity data in the Awakened Vessel cannot be restored.");
+        add("message.herobrine_companion.awakened_vessel.release.success", "§dReleased %s.");
+        add("message.herobrine_companion.awakened_vessel.release.jean_submission", "§5Jean descends in submission: %s.");
 
         // Book
         add("book.herobrine_companion.book.lore.title", "The Borderland Journal");

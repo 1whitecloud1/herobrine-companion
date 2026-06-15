@@ -20,6 +20,7 @@ public class ModZhCnLangProvider extends LanguageProvider {
         add(HerobrineCompanion.GLITCH_FRAGMENT.get(), "故障碎片");
         add(HerobrineCompanion.MEMORY_SHARD.get(), "记忆碎片");
         add(HerobrineCompanion.RECALL_STONE.get(), "回溯之石");
+        add(HerobrineCompanion.AWAKENED_VESSEL.get(), "醒魂容器");
         add(HerobrineCompanion.SOUL_BOUND_PACT.get(), "魂缚之契");
         add(HerobrineCompanion.TRANSCENDENCE_PERMIT.get(), "凌越之允");
         add(HerobrineCompanion.END_RING_PORTAL_ITEM.get(), "末地环传送门");
@@ -185,6 +186,18 @@ public class ModZhCnLangProvider extends LanguageProvider {
         add("item.herobrine_companion.transcendence_permit.desc", "凌越凡俗的许可。启用后，你将获得飞行的能力。");
         add("message.herobrine_companion.transcendence_permit.enabled", "§b[系统] §f凌越之允已启用。重力不再束缚你。");
         add("message.herobrine_companion.transcendence_permit.disabled", "§b[系统] §f凌越之允已禁用。你回归大地。");
+        add("item.herobrine_companion.awakened_vessel.desc", "右键收容觉醒怪物，再次右键释放。");
+        add("item.herobrine_companion.awakened_vessel.empty", "空");
+        add("item.herobrine_companion.awakened_vessel.contains", "已收容：%s");
+        add("message.herobrine_companion.awakened_vessel.capture.not_awakened", "§7这个容器只回应已经觉醒的怪物。");
+        add("message.herobrine_companion.awakened_vessel.capture.already_full", "§c醒魂容器已经收容了一个目标。");
+        add("message.herobrine_companion.awakened_vessel.capture.unsupported", "§c这个目标不能被醒魂容器收容。");
+        add("message.herobrine_companion.awakened_vessel.capture.success", "§d已收容 %s。");
+        add("message.herobrine_companion.awakened_vessel.release.empty", "§7醒魂容器是空的。");
+        add("message.herobrine_companion.awakened_vessel.release.no_space", "§c附近没有足够空间释放目标。");
+        add("message.herobrine_companion.awakened_vessel.release.invalid_data", "§c醒魂容器中的实体数据无法恢复。");
+        add("message.herobrine_companion.awakened_vessel.release.success", "§d已释放 %s。");
+        add("message.herobrine_companion.awakened_vessel.release.jean_submission", "§5Jean 已在臣服姿势中降临：%s。");
 
         // Book
         add("book.herobrine_companion.book.lore.title", "边界手记");
