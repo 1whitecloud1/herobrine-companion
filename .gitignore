@@ -47,3 +47,9 @@ hs_err_pid*
 
 # Mod specific
 # Add any other mod-specific generated files or directories here
+/src/main/java/com/whitecloud233/modid/herobrine_companion/statepython参考/
+/epicfight-1.20.1/
+/docs/
+/local-maven/
+/.codex-tmp/
+/.claude/
