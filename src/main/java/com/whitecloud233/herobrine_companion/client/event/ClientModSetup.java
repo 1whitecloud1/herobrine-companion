@@ -39,6 +39,7 @@ public class ClientModSetup {
         NeoForge.EVENT_BUS.register(PATCHER_INSTANCE);
         NeoForge.EVENT_BUS.register(KeyBindingHandler.class);
         NeoForge.EVENT_BUS.addListener(SpeechBubbleClientEvents::onRenderNameTag);
+        NeoForge.EVENT_BUS.addListener(SpeechBubbleClientEvents::onRenderLevelStage);
         NeoForge.EVENT_BUS.addListener(ClientEvents::onClientTick);
         NeoForge.EVENT_BUS.addListener(ModrinthUpdateChecker::onPlayerJoinWorld);
         

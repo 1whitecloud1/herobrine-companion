@@ -2,6 +2,7 @@ package com.whitecloud233.herobrine_companion.entity.ai.goal;
 
 import com.whitecloud233.herobrine_companion.config.Config;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.herobrine_companion.entity.family.JeanCombatResponseService;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.util.Mth;
@@ -222,6 +223,11 @@ public class HeroKingAuraGoal extends Goal {
     }
 
     private void handleDragonSubmission(EnderDragon dragon) {
+        if (JeanCombatResponseService.hasActivePlayerDamageResponse(dragon)) {
+            clearSubmission(dragon, true);
+            return;
+        }
+
         Vec3 look = this.hero.getLookAngle();
         double targetX = this.hero.getX() + look.x * 12.0;
         double targetZ = this.hero.getZ() + look.z * 12.0;

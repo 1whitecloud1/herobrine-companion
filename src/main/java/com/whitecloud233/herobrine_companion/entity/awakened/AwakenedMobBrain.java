@@ -14,6 +14,7 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.boss.EnderDragonPart;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 
@@ -92,6 +93,10 @@ public final class AwakenedMobBrain {
             return;
         }
 
+        if (AwakenedMobPeerInteractionService.trySpeakWithPeer(mob, profile, now)) {
+            return;
+        }
+
         if (now < access.herobrineCompanion$getNextAmbientSpeechGameTime() || !hasNearbyPlayerAudience(mob)) {
             return;
         }
@@ -101,7 +106,8 @@ public final class AwakenedMobBrain {
     }
 
     public static boolean handlePlayerInteraction(Player player, Entity target, ItemStack heldItem) {
-        if (!(target instanceof Mob mob) || mob.level().isClientSide) {
+        Mob mob = resolveMob(target);
+        if (mob == null || mob.level().isClientSide) {
             return false;
         }
 
@@ -165,7 +171,8 @@ public final class AwakenedMobBrain {
     }
 
     public static void handlePlayerAttack(Player player, Entity target) {
-        if (!(target instanceof Mob mob) || mob.level().isClientSide) {
+        Mob mob = resolveMob(target);
+        if (mob == null || mob.level().isClientSide) {
             return;
         }
 
@@ -189,6 +196,16 @@ public final class AwakenedMobBrain {
             speak(mob, Component.translatable(randomEntry(profile.hostileKeys(), mob.getRandom()), player.getDisplayName()));
             access.herobrineCompanion$setNextPlayerInteractionGameTime(now + randomBetween(mob.getRandom(), 80, 140));
         }
+    }
+
+    private static Mob resolveMob(Entity target) {
+        if (target instanceof Mob mob) {
+            return mob;
+        }
+        if (target instanceof EnderDragonPart part) {
+            return part.parentMob;
+        }
+        return null;
     }
 
     public static boolean shouldSuppressAggro(Mob mob, Player player) {
@@ -528,13 +545,15 @@ public final class AwakenedMobBrain {
         }
 
         UUID scopeId = ActorDialogueManager.createScopeId("awakened-hero:" + mob.getUUID() + ":" + hero.getUUID());
+        String fallbackSeed = buildFallbackSeed(mobFallbackKey, List.of());
+        speak(mob, Component.literal(fallbackSeed));
         ActorDialogueManager.INSTANCE.requestDialogue(new ActorDialogueSpec(
                 mob,
                 scopeId,
                 ActorDialoguePrompts.awakenedMobPersona(mob, profile,
                         preferredAudience == null ? null : ((AwakenedMobAccessor) mob).herobrineCompanion$getOrCreatePlayerMemory(preferredAudience.getUUID())),
                 ActorDialoguePrompts.buildAwakenedHeroScene(mob, hero),
-                buildFallbackSeed(mobFallbackKey, List.of()),
+                fallbackSeed,
                 mobFallbackKey,
                 List.of(),
                 preferredAudience,

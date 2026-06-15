@@ -1,7 +1,7 @@
 package com.whitecloud233.herobrine_companion.destructiongod.network;
 
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
-import com.whitecloud233.herobrine_companion.destructiongod.client.cinematic.ClientSpatialRendHandler;
+import com.whitecloud233.herobrine_companion.network.NetworkClientBridge;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
@@ -26,6 +26,6 @@ public record SPacketWorldRendCinematic(double x, double y, double z) implements
     }
 
     public void handle(IPayloadContext context) {
-        context.enqueueWork(() -> ClientSpatialRendHandler.startWorldRendCinematic(this.x(), this.y(), this.z()));
+        context.enqueueWork(() -> NetworkClientBridge.handleWorldRendCinematic(this.x(), this.y(), this.z()));
     }
 }

@@ -295,7 +295,7 @@ final class ScytheFaultSplitTask extends TerrainTask {
         for (FaultPlateSnapshot group : snapshots) {
             FaultPaletteSnapshot snapshot = group.fullSnapshot();
             for (FaultPaletteEntry entry : snapshot.entries()) {
-                BlockPos target = entry.pos();
+                BlockPos target = entry.pos().offset(group.blockOffset());
                 if (placedKeys.add(target.asLong())) {
                     placements.add(new FaultPlacement(target, snapshot.palette().get(entry.paletteIndex())));
                 }
@@ -529,7 +529,7 @@ final class ScytheFaultSplitTask extends TerrainTask {
 
         Set<Long> visited = new HashSet<>();
         List<FaultPlateGroup> groups = new ArrayList<>();
-        BlockPos blockOffset = BlockPos.ZERO;
+        BlockPos blockOffset = this.sideBlockOffset(positiveSide);
         Vec3 translation = this.sideDisplayTranslation(positiveSide);
 
         for (FaultColumnSample column : columns) {
@@ -580,7 +580,31 @@ final class ScytheFaultSplitTask extends TerrainTask {
     }
 
     private Vec3 sideDisplayTranslation(boolean positiveSide) {
-        return this.perpendicular.scale(positiveSide ? -this.displayShift : this.displayShift);
+        return this.perpendicular.scale(positiveSide ? this.displayShift : -this.displayShift);
+    }
+
+    private BlockPos sideBlockOffset(boolean positiveSide) {
+        int sideSign = positiveSide ? 1 : -1;
+        int x = quantizeBlockOffset(this.perpendicular.x * sideSign * this.shiftDistance);
+        int z = quantizeBlockOffset(this.perpendicular.z * sideSign * this.shiftDistance);
+        if (x == 0 && z == 0) {
+            if (Math.abs(this.perpendicular.x) >= Math.abs(this.perpendicular.z)) {
+                x = this.perpendicular.x * sideSign >= 0.0D ? 1 : -1;
+            } else {
+                z = this.perpendicular.z * sideSign >= 0.0D ? 1 : -1;
+            }
+        }
+        return new BlockPos(x, 0, z);
+    }
+
+    private static int quantizeBlockOffset(double value) {
+        if (value > 0.0D) {
+            return Mth.floor(value + 0.5D);
+        }
+        if (value < 0.0D) {
+            return -Mth.floor(-value + 0.5D);
+        }
+        return 0;
     }
 
     private boolean componentTouchesCorridor(List<FaultColumnSample> component, Set<Long> corridorColumnKeys) {

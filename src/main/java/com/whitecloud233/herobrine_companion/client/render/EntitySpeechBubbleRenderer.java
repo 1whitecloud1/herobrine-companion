@@ -1,6 +1,7 @@
 package com.whitecloud233.herobrine_companion.client.render;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.awakened.AwakenedMobAccessor;
 import com.whitecloud233.herobrine_companion.entity.dialogue.SpeechBubbleAccessor;
 import net.minecraft.client.Minecraft;
@@ -21,6 +22,10 @@ public final class EntitySpeechBubbleRenderer {
     private static final int NAME_COLOR = 0xFFE0C88E;
     private static final int TEXT_COLOR = 0xFFF4F4F4;
     private static final int LINE_HEIGHT = 10;
+    private static final double DEFAULT_MAX_DISTANCE_SQR = 1024.0D;
+    private static final double LARGE_BUBBLE_MAX_DISTANCE_SQR = 4096.0D;
+    private static final float DEFAULT_TEXT_SCALE = 0.025F;
+    private static final float LARGE_BUBBLE_TEXT_SCALE = 0.0625F;
 
     private EntitySpeechBubbleRenderer() {
     }
@@ -34,8 +39,11 @@ public final class EntitySpeechBubbleRenderer {
             return;
         }
 
+        boolean largeSpeechBubble = usesLargeSpeechBubble(livingEntity);
+        double maxDistanceSqr = largeSpeechBubble ? LARGE_BUBBLE_MAX_DISTANCE_SQR : DEFAULT_MAX_DISTANCE_SQR;
+
         Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.player == null || minecraft.options.hideGui || minecraft.player.distanceToSqr(livingEntity) > 1024.0D) {
+        if (minecraft.player == null || minecraft.options.hideGui || minecraft.player.distanceToSqr(livingEntity) > maxDistanceSqr) {
             return;
         }
 
@@ -54,7 +62,8 @@ public final class EntitySpeechBubbleRenderer {
         poseStack.pushPose();
         poseStack.translate(nameTagAnchor.x, nameTagAnchor.y + 0.85F, nameTagAnchor.z);
         poseStack.mulPose(minecraft.getEntityRenderDispatcher().cameraOrientation());
-        poseStack.scale(0.025F, -0.025F, 0.025F);
+        float textScale = largeSpeechBubble ? LARGE_BUBBLE_TEXT_SCALE : DEFAULT_TEXT_SCALE;
+        poseStack.scale(textScale, -textScale, textScale);
 
         Matrix4f matrix = poseStack.last().pose();
         int background = ((int) (minecraft.options.getBackgroundOpacity(0.35F) * 255.0F) << 24);
@@ -86,6 +95,10 @@ public final class EntitySpeechBubbleRenderer {
 
     private static boolean isAwakenedMob(LivingEntity entity) {
         return entity instanceof AwakenedMobAccessor accessor && accessor.herobrineCompanion$isAwakenedMob();
+    }
+
+    private static boolean usesLargeSpeechBubble(LivingEntity entity) {
+        return entity instanceof HeroEntity || isAwakenedMob(entity);
     }
 
     private static Vec3 getNameTagAnchor(LivingEntity entity, float partialTick) {

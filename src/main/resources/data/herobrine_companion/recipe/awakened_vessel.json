@@ -1,0 +1,30 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    "GEG",
+    "MCM",
+    "GSG"
+  ],
+  "key": {
+    "G": {
+      "item": "herobrine_companion:glitch_fragment"
+    },
+    "E": {
+      "item": "minecraft:ender_eye"
+    },
+    "M": {
+      "item": "herobrine_companion:memory_shard"
+    },
+    "C": {
+      "item": "minecraft:crying_obsidian"
+    },
+    "S": {
+      "item": "herobrine_companion:source_code_fragment"
+    }
+  },
+  "result": {
+    "id": "herobrine_companion:awakened_vessel",
+    "count": 1
+  }
+}

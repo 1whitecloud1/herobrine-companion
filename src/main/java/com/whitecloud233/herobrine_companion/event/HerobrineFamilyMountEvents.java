@@ -8,6 +8,7 @@ import com.whitecloud233.herobrine_companion.entity.awakened.AwakenedPlayerMemor
 import com.whitecloud233.herobrine_companion.entity.family.HerobrineFamilyMemberType;
 import com.whitecloud233.herobrine_companion.entity.family.HerobrineFamilyMembers;
 import com.whitecloud233.herobrine_companion.entity.family.HerobrineFamilyWorldData;
+import com.whitecloud233.herobrine_companion.entity.family.JeanCombatResponseService;
 import com.whitecloud233.herobrine_companion.entity.logic.data.HeroWorldData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -128,6 +129,11 @@ public final class HerobrineFamilyMountEvents {
     @SubscribeEvent
     public static void onLivingTick(EntityTickEvent.Pre event) {
         if (event.getEntity().level().isClientSide || !(event.getEntity() instanceof EnderDragon dragon) || !isJean(dragon)) {
+            return;
+        }
+
+        if (JeanCombatResponseService.hasActivePlayerDamageResponse(dragon)) {
+            clearMountedJean(dragon);
             return;
         }
 

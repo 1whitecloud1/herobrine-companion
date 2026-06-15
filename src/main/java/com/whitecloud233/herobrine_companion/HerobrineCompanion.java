@@ -64,12 +64,13 @@ public class HerobrineCompanion {
     public static final DeferredItem<Item> VOID_MARROW = ITEMS.register("void_marrow", () -> new Item(new Item.Properties()));
     public static final DeferredItem<Item> GLITCH_FRAGMENT = ITEMS.register("glitch_fragment", () -> new Item(new Item.Properties().rarity(net.minecraft.world.item.Rarity.RARE)));
     public static final DeferredItem<Item> SOURCE_CODE_FRAGMENT = ITEMS.register("source_code_fragment", () -> new Item(new Item.Properties().rarity(net.minecraft.world.item.Rarity.EPIC)));
-    public static final DeferredItem<Item> DESTRUCTION_GOD_HEROBRINE_SPAWN_EGG = ITEMS.register("destruction_god_herobrine_spawn_egg", () -> new Item(new Item.Properties().rarity(net.minecraft.world.item.Rarity.EPIC)));
+    public static final DeferredItem<Item> DESTRUCTION_GOD_HEROBRINE_SPAWN_EGG = ITEMS.register("destruction_god_herobrine_spawn_egg", () -> new DeferredSpawnEggItem(ModEvents.DESTRUCTION_GOD_HEROBRINE, 0x5E4A43, 0xF4F4F4, new Item.Properties().rarity(net.minecraft.world.item.Rarity.EPIC)));
 
     // New Items
     public static final DeferredItem<MemoryShardItem> MEMORY_SHARD = ITEMS.register("memory_shard", () -> new MemoryShardItem(new Item.Properties().rarity(net.minecraft.world.item.Rarity.RARE)));
     public static final DeferredItem<RecallStoneItem> RECALL_STONE = ITEMS.register("recall_stone", () -> new RecallStoneItem(new Item.Properties().stacksTo(1).durability(3).rarity(net.minecraft.world.item.Rarity.EPIC)));
     public static final DeferredItem<AbyssalGazeItem> ABYSSAL_GAZE = ITEMS.register("abyssal_gaze", () -> new AbyssalGazeItem(new Item.Properties().stacksTo(1).rarity(net.minecraft.world.item.Rarity.EPIC)));
+    public static final DeferredItem<AwakenedVesselItem> AWAKENED_VESSEL = ITEMS.register("awakened_vessel", () -> new AwakenedVesselItem(new Item.Properties().stacksTo(1).rarity(net.minecraft.world.item.Rarity.EPIC)));
     public static final DeferredItem<SoulBoundPactItem> SOUL_BOUND_PACT = ITEMS.register("soul_bound_pact", () -> new SoulBoundPactItem(new Item.Properties().stacksTo(1).rarity(net.minecraft.world.item.Rarity.EPIC)));
     public static final DeferredItem<TranscendencePermitItem> TRANSCENDENCE_PERMIT = ITEMS.register("transcendence_permit", () -> new TranscendencePermitItem(new Item.Properties().stacksTo(1).rarity(net.minecraft.world.item.Rarity.EPIC)));
     public static final DeferredItem<PoemOfTheEndItem> POEM_OF_THE_END = ITEMS.register("poem_of_the_end", () -> new PoemOfTheEndItem(Tiers.NETHERITE, 5.0F, -3.0F, new Item.Properties().durability(2031).rarity(net.minecraft.world.item.Rarity.EPIC)));
@@ -108,6 +109,7 @@ public class HerobrineCompanion {
         output.accept(MEMORY_SHARD.get());
         output.accept(RECALL_STONE.get());
         output.accept(ABYSSAL_GAZE.get());
+        output.accept(AWAKENED_VESSEL.get());
         output.accept(SOUL_BOUND_PACT.get());
         output.accept(TRANSCENDENCE_PERMIT.get());
         output.accept(POEM_OF_THE_END.get());

@@ -214,6 +214,7 @@ public final class AwakenedMobProfiles {
                                               Item preferredItem, int preferredItemCount,
                                               Item rewardItem, int rewardItemCount) {
         return new AwakenedMobProfile(
+                root,
                 awakeningChance,
                 List.copyOf(names),
                 keys(root, "ambient"),
@@ -225,6 +226,14 @@ public final class AwakenedMobProfiles {
                 keys(root, "reminder"),
                 keys(root, "hostile"),
                 keys(root, "hero"),
+                peerKeys(root, "same"),
+                peerKeys(root, "casual"),
+                peerKeys(root, "collab"),
+                peerKeys(root, "gossip"),
+                peerKeys(root, "conflict"),
+                peerKeys(root, "scuffle"),
+                peerKeys(root, "authority"),
+                peerKeys(root, "reply"),
                 preferredItem,
                 preferredItemCount,
                 rewardItem,
@@ -235,5 +244,10 @@ public final class AwakenedMobProfiles {
     private static List<String> keys(String root, String scene) {
         String base = "message.herobrine_companion.awakened_mob." + root + "." + scene;
         return List.of(base + ".0", base + ".1", base + ".2", base + ".3");
+    }
+
+    private static List<String> peerKeys(String root, String scene) {
+        String base = "message.herobrine_companion.awakened_mob." + root + ".peer." + scene;
+        return List.of(base + ".0");
     }
 }

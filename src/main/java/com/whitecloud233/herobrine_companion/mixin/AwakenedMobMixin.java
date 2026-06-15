@@ -3,6 +3,7 @@ package com.whitecloud233.herobrine_companion.mixin;
 import com.whitecloud233.herobrine_companion.entity.awakened.AwakenedMobAccessor;
 import com.whitecloud233.herobrine_companion.entity.awakened.AwakenedMobBrain;
 import com.whitecloud233.herobrine_companion.entity.awakened.AwakenedPlayerMemory;
+import com.whitecloud233.herobrine_companion.entity.family.HerobrineFamilyMembers;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -48,6 +49,8 @@ public abstract class AwakenedMobMixin implements AwakenedMobAccessor {
     @Unique
     private long herobrineCompanion$nextHeroInteractionGameTime;
     @Unique
+    private long herobrineCompanion$nextPeerInteractionGameTime;
+    @Unique
     private final Map<UUID, AwakenedPlayerMemory> herobrineCompanion$playerMemories = new HashMap<>();
 
     @Inject(method = "defineSynchedData", at = @At("TAIL"))
@@ -82,8 +85,16 @@ public abstract class AwakenedMobMixin implements AwakenedMobAccessor {
         herobrineCompanion$awakenedMob = tag.getBoolean(HEROBRINE_COMPANION_AWAKENED_TAG);
         herobrineCompanion$awakeningInitialized = tag.getBoolean(HEROBRINE_COMPANION_AWAKENING_INITIALIZED_TAG);
         herobrineCompanion$awakenedMobName = tag.getString(HEROBRINE_COMPANION_AWAKENED_NAME_TAG);
-        self.getEntityData().set(HEROBRINE_COMPANION_AWAKENED_VISUAL, herobrineCompanion$awakenedMob);
         herobrineCompanion$playerMemories.clear();
+
+        String forcedFamilyName = HerobrineFamilyMembers.getForcedName(self);
+        if (forcedFamilyName != null) {
+            herobrineCompanion$awakeningInitialized = true;
+            herobrineCompanion$awakenedMob = true;
+            herobrineCompanion$awakenedMobName = forcedFamilyName;
+        }
+
+        self.getEntityData().set(HEROBRINE_COMPANION_AWAKENED_VISUAL, herobrineCompanion$awakenedMob);
 
         ListTag memoryList = tag.getList(HEROBRINE_COMPANION_PLAYER_MEMORIES_TAG, Tag.TAG_COMPOUND);
         for (int i = 0; i < memoryList.size(); i++) {
@@ -159,6 +170,16 @@ public abstract class AwakenedMobMixin implements AwakenedMobAccessor {
     @Override
     public void herobrineCompanion$setNextHeroInteractionGameTime(long gameTime) {
         this.herobrineCompanion$nextHeroInteractionGameTime = gameTime;
+    }
+
+    @Override
+    public long herobrineCompanion$getNextPeerInteractionGameTime() {
+        return herobrineCompanion$nextPeerInteractionGameTime;
+    }
+
+    @Override
+    public void herobrineCompanion$setNextPeerInteractionGameTime(long gameTime) {
+        this.herobrineCompanion$nextPeerInteractionGameTime = gameTime;
     }
 
     @Override

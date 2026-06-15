@@ -2,6 +2,8 @@ package com.whitecloud233.herobrine_companion.event;
 
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.entity.awakened.AwakenedMobBrain;
+import com.whitecloud233.herobrine_companion.entity.awakened.AwakenedMobPeerScuffleService;
+import com.whitecloud233.herobrine_companion.entity.family.JeanCombatResponseService;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.player.Player;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -21,6 +23,10 @@ public final class AwakenedMobCombatEvents {
             return;
         }
 
+        if (JeanCombatResponseService.isActiveTarget(mob, player)) {
+            return;
+        }
+
         if (AwakenedMobBrain.shouldSuppressAggro(mob, player)) {
             event.setCanceled(true);
         }
@@ -28,6 +34,12 @@ public final class AwakenedMobCombatEvents {
 
     @SubscribeEvent
     public static void onLivingIncomingDamage(LivingIncomingDamageEvent event) {
+        if (event.getSource().getEntity() instanceof Mob attacker
+                && AwakenedMobPeerScuffleService.handleMobAttack(attacker, event.getEntity(), event.getAmount(), event.getEntity().level().getGameTime())) {
+            event.setCanceled(true);
+            return;
+        }
+
         if (event.getSource().getEntity() instanceof Player player) {
             AwakenedMobBrain.handlePlayerAttack(player, event.getEntity());
         }
@@ -39,7 +51,11 @@ public final class AwakenedMobCombatEvents {
             return;
         }
 
-        if (mob.getTarget() instanceof Player player && AwakenedMobBrain.shouldSuppressAggro(mob, player)) {
+        AwakenedMobPeerScuffleService.tick(mob);
+
+        if (mob.getTarget() instanceof Player player
+                && !JeanCombatResponseService.isActiveTarget(mob, player)
+                && AwakenedMobBrain.shouldSuppressAggro(mob, player)) {
             mob.setTarget(null);
         }
     }
