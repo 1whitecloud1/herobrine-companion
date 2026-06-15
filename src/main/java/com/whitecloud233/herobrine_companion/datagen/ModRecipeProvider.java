@@ -51,5 +51,17 @@ public class ModRecipeProvider extends RecipeProvider {
                 .define('G', Items.GHAST_TEAR) // 恶魂之泪：替换下界之星，提供纯白的驱动能量
                 .unlockedBy("has_source_code_fragment", has(HerobrineCompanion.SOURCE_CODE_FRAGMENT.get()))
                 .save(output);
+
+        ShapedRecipeBuilder.shaped(RecipeCategory.TOOLS, HerobrineCompanion.AWAKENED_VESSEL.get())
+                .pattern("GEG")
+                .pattern("MCM")
+                .pattern("GSG")
+                .define('G', HerobrineCompanion.GLITCH_FRAGMENT.get())
+                .define('E', Items.ENDER_EYE)
+                .define('M', HerobrineCompanion.MEMORY_SHARD.get())
+                .define('C', Items.CRYING_OBSIDIAN)
+                .define('S', HerobrineCompanion.SOURCE_CODE_FRAGMENT.get())
+                .unlockedBy("has_memory_shard", has(HerobrineCompanion.MEMORY_SHARD.get()))
+                .save(output);
     }
 }

@@ -33,6 +33,7 @@ public class ModItemTagsProvider extends ItemTagsProvider {
                 .add(HerobrineCompanion.GHOST_SKELETON_SPAWN_EGG.get())
                 .add(HerobrineCompanion.SOURCE_CODE_FRAGMENT.get())
                 .add(HerobrineCompanion.ABYSSAL_GAZE.get())
+                .add(HerobrineCompanion.AWAKENED_VESSEL.get())
                 .add(HerobrineCompanion.SOUL_BOUND_PACT.get())
                 .add(HerobrineCompanion.TRANSCENDENCE_PERMIT.get())
                 .add(HerobrineCompanion.POEM_OF_THE_END.get())

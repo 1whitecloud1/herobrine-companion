@@ -21,6 +21,7 @@ public class ModZhCnLangProvider extends LanguageProvider {
         add(HerobrineCompanion.SOURCE_CODE_FRAGMENT.get(), "源代码碎片");
         add(HerobrineCompanion.MEMORY_SHARD.get(), "记忆碎片");
         add(HerobrineCompanion.RECALL_STONE.get(), "回溯之石");
+        add(HerobrineCompanion.AWAKENED_VESSEL.get(), "醒魂容器");
         add(HerobrineCompanion.END_RING_PORTAL_ITEM.get(), "末地环传送门");
         add(HerobrineCompanion.GHOST_CREEPER_SPAWN_EGG.get(), "幽灵苦力怕刷怪蛋");
         add(HerobrineCompanion.GHOST_ZOMBIE_SPAWN_EGG.get(), "幽灵僵尸刷怪蛋");
@@ -226,6 +227,18 @@ public class ModZhCnLangProvider extends LanguageProvider {
         // Tooltips
         add("item.herobrine_companion.memory_shard.desc", "一段无法被世界读取的记忆……也许唱片机能强行解析它？");
         add("item.herobrine_companion.recall_stone.desc", "将你传送回上一次死亡的地点。");
+        add("item.herobrine_companion.awakened_vessel.desc", "右键收容觉醒怪物，再次右键释放。");
+        add("item.herobrine_companion.awakened_vessel.empty", "空");
+        add("item.herobrine_companion.awakened_vessel.contains", "已收容：%s");
+        add("message.herobrine_companion.awakened_vessel.capture.not_awakened", "§7这个容器只回应已经觉醒的怪物。");
+        add("message.herobrine_companion.awakened_vessel.capture.already_full", "§c醒魂容器已经收容了一个目标。");
+        add("message.herobrine_companion.awakened_vessel.capture.unsupported", "§c这个目标不能被醒魂容器收容。");
+        add("message.herobrine_companion.awakened_vessel.capture.success", "§d已收容 %s。");
+        add("message.herobrine_companion.awakened_vessel.release.empty", "§7醒魂容器是空的。");
+        add("message.herobrine_companion.awakened_vessel.release.no_space", "§c附近没有足够空间释放目标。");
+        add("message.herobrine_companion.awakened_vessel.release.invalid_data", "§c醒魂容器中的实体数据无法恢复。");
+        add("message.herobrine_companion.awakened_vessel.release.success", "§d已释放 %s。");
+        add("message.herobrine_companion.awakened_vessel.release.jean_submission", "§5Jean 已在臣服姿势中降临：%s。");
         add("item.herobrine_companion.bound_shelter_name", "§d§k||| §r§6%s 的庇护 §d§k|||");
         add("item.herobrine_companion.eternal_key.desc_1", "§7或许在末地会发挥意想不到的效果...");
         add("item.herobrine_companion.eternal_key.desc_2", "§7右键点击一个基岩，以绑定到这把钥匙。");

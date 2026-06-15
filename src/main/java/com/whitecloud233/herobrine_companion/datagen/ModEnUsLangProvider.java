@@ -20,6 +20,7 @@ public class ModEnUsLangProvider extends LanguageProvider {
         add(HerobrineCompanion.GLITCH_FRAGMENT.get(), "Glitch Fragment");
         add(HerobrineCompanion.MEMORY_SHARD.get(), "Memory Shard");
         add(HerobrineCompanion.RECALL_STONE.get(), "Recall Stone");
+        add(HerobrineCompanion.AWAKENED_VESSEL.get(), "Awakened Vessel");
         add(HerobrineCompanion.END_RING_PORTAL_ITEM.get(), "End Ring Portal");
         add(HerobrineCompanion.GHOST_CREEPER_SPAWN_EGG.get(), "Ghost Creeper Spawn Egg");
         add(HerobrineCompanion.GHOST_ZOMBIE_SPAWN_EGG.get(), "Ghost Zombie Spawn Egg");
@@ -164,6 +165,18 @@ public class ModEnUsLangProvider extends LanguageProvider {
         // Tooltips
         add("item.herobrine_companion.memory_shard.desc", "A memory unreadable by the world... Perhaps a Jukebox can force parse it?");
         add("item.herobrine_companion.recall_stone.desc", "Teleports you back to your last death location.");
+        add("item.herobrine_companion.awakened_vessel.desc", "Right-click an awakened mob to contain it, then right-click again to release it.");
+        add("item.herobrine_companion.awakened_vessel.empty", "Empty");
+        add("item.herobrine_companion.awakened_vessel.contains", "Contains: %s");
+        add("message.herobrine_companion.awakened_vessel.capture.not_awakened", "§7This vessel only answers awakened mobs.");
+        add("message.herobrine_companion.awakened_vessel.capture.already_full", "§cThe Awakened Vessel already contains a target.");
+        add("message.herobrine_companion.awakened_vessel.capture.unsupported", "§cThis target cannot be contained by the Awakened Vessel.");
+        add("message.herobrine_companion.awakened_vessel.capture.success", "§dContained %s.");
+        add("message.herobrine_companion.awakened_vessel.release.empty", "§7The Awakened Vessel is empty.");
+        add("message.herobrine_companion.awakened_vessel.release.no_space", "§cThere is not enough space nearby to release the target.");
+        add("message.herobrine_companion.awakened_vessel.release.invalid_data", "§cThe entity data in the Awakened Vessel cannot be restored.");
+        add("message.herobrine_companion.awakened_vessel.release.success", "§dReleased %s.");
+        add("message.herobrine_companion.awakened_vessel.release.jean_submission", "§5Jean descends in submission: %s.");
         add("item.herobrine_companion.bound_shelter_name", "§d§k||| §r§6%s's Shelter §d§k|||");
         add("item.herobrine_companion.eternal_key.desc_1", "§7Might have unexpected effects in the End...");
         add("item.herobrine_companion.eternal_key.desc_2", "§7Right-click on Bedrock to bind this key.");

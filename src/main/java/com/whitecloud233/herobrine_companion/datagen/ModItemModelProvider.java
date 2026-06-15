@@ -23,6 +23,8 @@ public class ModItemModelProvider extends ItemModelProvider {
         basicItem(HerobrineCompanion.MEMORY_SHARD.get());
         basicItem(HerobrineCompanion.RECALL_STONE.get());
         basicItem(HerobrineCompanion.ABYSSAL_GAZE.get());
+        withExistingParent(HerobrineCompanion.AWAKENED_VESSEL.getId().getPath(), mcLoc("item/generated"))
+                .texture("layer0", modLoc("item/soul_bound_pact"));
         basicItem(HerobrineCompanion.SOUL_BOUND_PACT.get());
         basicItem(HerobrineCompanion.TRANSCENDENCE_PERMIT.get());
         basicItem(HerobrineCompanion.SOURCE_FLOW.get());
@@ -38,6 +40,7 @@ public class ModItemModelProvider extends ItemModelProvider {
         withExistingParent(HerobrineCompanion.GHOST_ZOMBIE_SPAWN_EGG.getId().getPath(), mcLoc("item/template_spawn_egg"));
         withExistingParent(HerobrineCompanion.GHOST_SKELETON_SPAWN_EGG.getId().getPath(), mcLoc("item/template_spawn_egg"));
         withExistingParent(HerobrineCompanion.GHOST_STEVE_SPAWN_EGG.getId().getPath(), mcLoc("item/template_spawn_egg"));
+        withExistingParent(HerobrineCompanion.DESTRUCTION_GOD_HEROBRINE_SPAWN_EGG.getId().getPath(), mcLoc("item/template_spawn_egg"));
 
         // Block Items
         // The portal block item should use the block texture, or a specific item texture if it exists.
