@@ -91,6 +91,10 @@ public final class AwakenedMobBrain {
             return;
         }
 
+        if (AwakenedMobPeerInteractionService.trySpeakWithPeer(mob, profile, now)) {
+            return;
+        }
+
         if (now < access.herobrineCompanion$getNextAmbientSpeechGameTime() || !hasNearbyPlayerAudience(mob)) {
             return;
         }

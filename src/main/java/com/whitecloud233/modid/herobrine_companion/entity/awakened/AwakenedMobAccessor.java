@@ -28,6 +28,10 @@ public interface AwakenedMobAccessor {
 
     void herobrineCompanion$setNextHeroInteractionGameTime(long gameTime);
 
+    long herobrineCompanion$getNextPeerInteractionGameTime();
+
+    void herobrineCompanion$setNextPeerInteractionGameTime(long gameTime);
+
     AwakenedPlayerMemory herobrineCompanion$getOrCreatePlayerMemory(UUID playerId);
 
     Collection<AwakenedPlayerMemory> herobrineCompanion$getPlayerMemories();

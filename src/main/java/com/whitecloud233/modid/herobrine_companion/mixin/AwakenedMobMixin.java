@@ -48,6 +48,8 @@ public abstract class AwakenedMobMixin implements AwakenedMobAccessor {
     @Unique
     private long herobrineCompanion$nextHeroInteractionGameTime;
     @Unique
+    private long herobrineCompanion$nextPeerInteractionGameTime;
+    @Unique
     private final Map<UUID, AwakenedPlayerMemory> herobrineCompanion$playerMemories = new HashMap<>();
 
     @Inject(method = "defineSynchedData", at = @At("TAIL"))
@@ -160,6 +162,16 @@ public abstract class AwakenedMobMixin implements AwakenedMobAccessor {
     @Override
     public void herobrineCompanion$setNextHeroInteractionGameTime(long gameTime) {
         this.herobrineCompanion$nextHeroInteractionGameTime = gameTime;
+    }
+
+    @Override
+    public long herobrineCompanion$getNextPeerInteractionGameTime() {
+        return herobrineCompanion$nextPeerInteractionGameTime;
+    }
+
+    @Override
+    public void herobrineCompanion$setNextPeerInteractionGameTime(long gameTime) {
+        this.herobrineCompanion$nextPeerInteractionGameTime = gameTime;
     }
 
     @Override

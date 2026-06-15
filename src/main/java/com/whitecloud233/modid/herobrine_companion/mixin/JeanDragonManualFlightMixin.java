@@ -28,18 +28,17 @@ public abstract class JeanDragonManualFlightMixin extends Mob {
             return;
         }
 
-        if (dragon.getPersistentData().hasUUID(HEROBRINE_COMPANION_JEAN_FRONT_HERO_TAG)) {
-            dragon.setDeltaMovement(0.0D, 0.0D, 0.0D);
-            ci.cancel();
-            return;
-        }
-
         for (Entity passenger : dragon.getPassengers()) {
             if (passenger instanceof Player) {
                 dragon.setDeltaMovement(0.0D, 0.0D, 0.0D);
                 ci.cancel();
                 return;
             }
+        }
+
+        if (dragon.getPersistentData().hasUUID(HEROBRINE_COMPANION_JEAN_FRONT_HERO_TAG)) {
+            // Keep dragon parts ticking during the boarding pose so right-click and attack targets stay live.
+            dragon.setDeltaMovement(0.0D, 0.0D, 0.0D);
         }
     }
 }

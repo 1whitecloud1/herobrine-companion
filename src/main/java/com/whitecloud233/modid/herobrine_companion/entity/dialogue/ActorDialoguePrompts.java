@@ -3,6 +3,8 @@ package com.whitecloud233.modid.herobrine_companion.entity.dialogue;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.awakened.AwakenedMobAccessor;
 import com.whitecloud233.modid.herobrine_companion.entity.awakened.AwakenedMobProfile;
+import com.whitecloud233.modid.herobrine_companion.entity.awakened.AwakenedMobPeerScene;
+import com.whitecloud233.modid.herobrine_companion.entity.awakened.AwakenedMobPeerRelationRules;
 import com.whitecloud233.modid.herobrine_companion.entity.awakened.AwakenedMobProfiles;
 import com.whitecloud233.modid.herobrine_companion.entity.awakened.AwakenedPlayerMemory;
 import com.whitecloud233.modid.herobrine_companion.entity.family.HerobrineFamilyMemberType;
@@ -96,6 +98,37 @@ public final class ActorDialoguePrompts {
                 + "Say one short line of report, devotion, restraint, or dark humor.";
     }
 
+    public static String buildAwakenedPeerScene(Mob speaker, Mob target, AwakenedMobProfile speakerProfile,
+                                                AwakenedMobProfile targetProfile, AwakenedMobPeerScene scene,
+                                                Player audience) {
+        String speakerName = resolveAwakenedName(speaker);
+        String targetName = resolveAwakenedName(target);
+        String audienceContext = audience == null
+                ? "A nearby player may overhear you, but you are not talking to that player. "
+                : "A nearby player named " + sanitize(audience.getDisplayName().getString())
+                + " may overhear you, but you are not talking to that player. ";
+        String familyContext = AwakenedMobProfiles.sharesFamily(speaker, target)
+                ? "You and the listener belong to the same monster family. "
+                : "You and the listener belong to different monster families. ";
+        String rootContext = "Your family root is " + speakerProfile.root()
+                + "; the listener's family root is " + targetProfile.root() + ". ";
+        String relationshipHint = AwakenedMobPeerRelationRules.describeRelationship(speakerProfile, targetProfile);
+        String relationshipContext = relationshipHint.isBlank() ? "" : "Relationship texture: " + relationshipHint + ". ";
+        return "You are " + speakerName + ", an awakened " + describeMobType(speaker) + ". "
+                + "You are speaking to " + targetName + ", an awakened " + describeMobType(target) + ". "
+                + familyContext
+                + rootContext
+                + relationshipContext
+                + audienceContext
+                + describePeerSceneIntent(scene)
+                + "This is monster-to-monster speech, not a report to Herobrine and not a warning to the player. "
+                + "Make it feel like ordinary night-life: casual talk, help, gossip, complaint, teasing, or a quarrel. "
+                + "Use varied spoken wording; fragments, questions, interruptions, and dry remarks are fine. "
+                + "Do not sound like a guard report, meeting note, command broadcast, or modern assistant. "
+                + "If replying in Chinese, do not use stock phrases such as \u6536\u4f4f, \u5c01\u4f4f\u4e86, \u6536\u7d27\u4e86, \u538b\u4e0b\u6765\u4e86, or \u8bb0\u4e0b\u4e86. "
+                + "Say one short line directly to " + targetName + ".";
+    }
+
     public static String buildHerobrineReplyToAwakened(HeroEntity hero, Mob mob, String awakenedLine, Player audience) {
         String targetName = resolveAwakenedName(mob);
         String listenerName = audience == null ? "the nearby player" : sanitize(audience.getDisplayName().getString());
@@ -118,6 +151,18 @@ public final class ActorDialoguePrompts {
             return forcedName;
         }
         return sanitize(mob.getName().getString());
+    }
+
+    private static String describePeerSceneIntent(AwakenedMobPeerScene scene) {
+        return switch (scene) {
+            case SAME -> "Scene: same-family casual talk about habits, old mistakes, space, weather, or who annoyed whom. ";
+            case CASUAL -> "Scene: cross-family small talk, wary familiarity, passing comments, or a quick jab. ";
+            case COLLAB -> "Scene: temporary cooperation. Sound practical and casual, not like a formal order. ";
+            case GOSSIP -> "Scene: gossip about a nearby player, Herobrine, another monster, the place, sounds, smells, or something odd that just happened. ";
+            case CONFLICT -> "Scene: a small argument over space, noise, smell, blocked paths, stolen credit, or being bumped. ";
+            case SCUFFLE -> "Scene: a brief scuffle. The line can be sharper, but keep it short and spoken. ";
+            case AUTHORITY -> "Scene: a higher family member putting pressure on a common awakened monster. Sound personal, not like a loudspeaker. ";
+        };
     }
 
     private static String describePreferredGift(AwakenedMobProfile profile) {

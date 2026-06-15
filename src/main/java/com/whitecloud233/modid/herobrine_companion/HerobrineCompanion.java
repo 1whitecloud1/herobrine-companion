@@ -60,6 +60,7 @@ public class HerobrineCompanion {
     public static final RegistryObject<EternalKeyItem> ETERNAL_KEY = ITEMS.register("eternal_key", () -> new EternalKeyItem(new Item.Properties().stacksTo(1).rarity(net.minecraft.world.item.Rarity.EPIC)));
     public static final RegistryObject<AbyssalGazeItem> ABYSSAL_GAZE = ITEMS.register("abyssal_gaze", () -> new AbyssalGazeItem(new Item.Properties().stacksTo(1).rarity(net.minecraft.world.item.Rarity.EPIC)));
     public static final RegistryObject<SourceFlowItem> SOURCE_FLOW = ITEMS.register("source_flow", () -> new SourceFlowItem(new Item.Properties().stacksTo(1).rarity(net.minecraft.world.item.Rarity.EPIC)));
+    public static final RegistryObject<AwakenedVesselItem> AWAKENED_VESSEL = ITEMS.register("awakened_vessel", () -> new AwakenedVesselItem(new Item.Properties().stacksTo(1).rarity(net.minecraft.world.item.Rarity.EPIC)));
 
     public static final RegistryObject<Item> UNSTABLE_GUNPOWDER = ITEMS.register("unstable_gunpowder", () -> new Item(new Item.Properties()));
     public static final RegistryObject<Item> CORRUPTED_CODE = ITEMS.register("corrupted_code", () -> new Item(new Item.Properties()));
@@ -97,6 +98,7 @@ public class HerobrineCompanion {
         output.accept(ETERNAL_KEY.get());
         output.accept(ABYSSAL_GAZE.get());
         output.accept(SOURCE_FLOW.get());
+        output.accept(AWAKENED_VESSEL.get());
         //output.accept(END_RING_PORTAL_ITEM.get());
         output.accept(GHOST_CREEPER_SPAWN_EGG.get());
         output.accept(GHOST_ZOMBIE_SPAWN_EGG.get());

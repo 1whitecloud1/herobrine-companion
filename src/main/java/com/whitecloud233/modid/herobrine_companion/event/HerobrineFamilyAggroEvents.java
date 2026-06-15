@@ -3,7 +3,9 @@ package com.whitecloud233.modid.herobrine_companion.event;
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.family.HerobrineFamilyMembers;
+import com.whitecloud233.modid.herobrine_companion.entity.family.JeanCombatResponseService;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.AreaEffectCloud;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
@@ -14,6 +16,7 @@ import net.minecraft.world.entity.projectile.WitherSkull;
 import net.minecraftforge.event.entity.EntityJoinLevelEvent;
 import net.minecraftforge.event.entity.living.LivingAttackEvent;
 import net.minecraftforge.event.entity.living.LivingChangeTargetEvent;
+import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.living.LivingEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -72,6 +75,9 @@ public final class HerobrineFamilyAggroEvents {
                 && attacker != null
                 && shouldAllowRetaliationAgainst(attacker)) {
             markRetaliationTarget(familyMember, attacker);
+            if (attacker instanceof Player player) {
+                JeanCombatResponseService.markPlayerDamage(familyMember, player);
+            }
             familyMember.setTarget(attacker);
             return;
         }
@@ -100,6 +106,14 @@ public final class HerobrineFamilyAggroEvents {
         if (mob instanceof WitherBoss wither) {
             clearInvalidWitherHeadTargets(wither);
         }
+        JeanCombatResponseService.tick(mob);
+    }
+
+    @SubscribeEvent
+    public static void onLivingDeath(LivingDeathEvent event) {
+        if (!event.getEntity().level().isClientSide && event.getEntity() instanceof Player player) {
+            JeanCombatResponseService.recordPlayerDeath(player);
+        }
     }
 
     private static boolean isAllowedFamilyTarget(Mob familyMember, LivingEntity target) {
@@ -114,6 +128,9 @@ public final class HerobrineFamilyAggroEvents {
         }
         if (target instanceof Player player && (player.isCreative() || player.isSpectator())) {
             return false;
+        }
+        if (target instanceof Player player && JeanCombatResponseService.isActiveTarget(familyMember, player)) {
+            return true;
         }
         return isRetaliationTargetActive(familyMember, target);
     }
@@ -242,10 +259,22 @@ public final class HerobrineFamilyAggroEvents {
         if (attacker instanceof LivingEntity livingAttacker) {
             return livingAttacker;
         }
+        if (attacker instanceof AreaEffectCloud cloud) {
+            LivingEntity owner = cloud.getOwner();
+            if (owner != null) {
+                return owner;
+            }
+        }
 
         Entity direct = source.getDirectEntity();
         if (direct instanceof LivingEntity livingDirect) {
             return livingDirect;
+        }
+        if (direct instanceof AreaEffectCloud cloud) {
+            LivingEntity owner = cloud.getOwner();
+            if (owner != null) {
+                return owner;
+            }
         }
         if (direct instanceof Projectile projectile && projectile.getOwner() instanceof LivingEntity owner) {
             return owner;
