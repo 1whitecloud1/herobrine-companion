@@ -38,9 +38,15 @@ public final class LLMModelDiscovery {
             return CompletableFuture.completedFuture(ModelDiscoveryResult.failed("API key is empty."));
         }
 
+        return fetchModelsFromEndpoint(normalizedEndpoint, normalizedApiKey, provider, endpointFormat);
+    }
+
+    private static CompletableFuture<ModelDiscoveryResult> fetchModelsFromEndpoint(String endpoint, String apiKey,
+                                                                                   LLMConfig.Provider provider,
+                                                                                   LLMConfig.EndpointFormat endpointFormat) {
         String modelsEndpoint;
         try {
-            modelsEndpoint = deriveModelsEndpoint(normalizedEndpoint);
+            modelsEndpoint = deriveModelsEndpoint(endpoint);
             URI.create(modelsEndpoint);
         } catch (Exception e) {
             return CompletableFuture.completedFuture(ModelDiscoveryResult.failed("Invalid model endpoint."));
@@ -52,11 +58,12 @@ public final class LLMModelDiscovery {
                 .GET()
                 .header("Accept", "application/json");
 
+
         if (endpointFormat == LLMConfig.EndpointFormat.ANTHROPIC) {
-            requestBuilder.header("x-api-key", normalizedApiKey)
+            requestBuilder.header("x-api-key", apiKey)
                     .header("anthropic-version", ANTHROPIC_VERSION);
         } else {
-            requestBuilder.header("Authorization", "Bearer " + normalizedApiKey);
+            requestBuilder.header("Authorization", "Bearer " + apiKey);
         }
 
         if (provider == LLMConfig.Provider.OPENROUTER) {
@@ -98,8 +105,9 @@ public final class LLMModelDiscovery {
             return normalized + "/models";
         }
         if (hasNoPath(normalized)) {
+            // DeepSeek 官方 API 需要 /v1 前缀
             if (lower.contains("deepseek.com")) {
-                return normalized + "/models";
+                return normalized + "/v1/models";
             }
             return normalized + "/v1/models";
         }

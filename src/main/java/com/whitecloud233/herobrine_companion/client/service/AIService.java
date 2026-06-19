@@ -158,6 +158,7 @@ public class AIService {
                                                            Consumer<String> partialConsumer, boolean useStreaming,
                                                            String outputLanguageCode,
                                                            boolean crossSessionMode) {
+        LLMConfig.ensureLoaded();
         UUID effectiveScopeId = conversationScopeId != null ? conversationScopeId : authorityPlayerUUID;
         UUID effectiveAuthorityPlayerId = authorityPlayerUUID != null ? authorityPlayerUUID : effectiveScopeId;
         String apiKey = LLMConfig.aiApiKey;
