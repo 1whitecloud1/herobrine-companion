@@ -1,7 +1,8 @@
 package com.whitecloud233.herobrine_companion.entity.projectile;
 
+import com.whitecloud233.herobrine_companion.init.*;
+
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
-import com.whitecloud233.herobrine_companion.event.ModEvents;
 import com.whitecloud233.herobrine_companion.item.PoemOfTheEndItem;
 import com.whitecloud233.herobrine_companion.entity.logic.data.HeroWorldData;
 import net.minecraft.core.particles.ParticleTypes;
@@ -36,7 +37,7 @@ public class VoidRiftEntity extends Entity {
     }
 
     public VoidRiftEntity(Level level, double x, double y, double z, UUID ownerUUID) {
-        this(ModEvents.VOID_RIFT.get(), level);
+        this(ModEntities.VOID_RIFT.get(), level);
         this.setPos(x, y, z);
         this.ownerUUID = ownerUUID;
         // 设置随机旋转 (0-360)

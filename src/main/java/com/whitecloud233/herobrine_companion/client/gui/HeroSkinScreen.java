@@ -1,8 +1,9 @@
 package com.whitecloud233.herobrine_companion.client.gui;
 
+import com.whitecloud233.herobrine_companion.init.*;
+
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
-import com.whitecloud233.herobrine_companion.event.ModEvents;
 import com.whitecloud233.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.herobrine_companion.network.ToggleSkinPacket;
 import net.minecraft.client.Minecraft;
@@ -71,7 +72,7 @@ public class HeroSkinScreen extends Screen {
 
         for (SkinOption option : skinOptions) {
             if (option.dummyEntity == null) {
-                option.dummyEntity = ModEvents.HERO.get().create(this.minecraft.level);
+                option.dummyEntity = ModEntities.HERO.get().create(this.minecraft.level);
                 if (option.dummyEntity != null) {
                     option.dummyEntity.setSkinVariant(option.variantId);
                     if (option.variantId == HeroEntity.SKIN_CUSTOM) {

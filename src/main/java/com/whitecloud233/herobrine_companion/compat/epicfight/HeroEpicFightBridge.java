@@ -1,7 +1,8 @@
 package com.whitecloud233.herobrine_companion.compat.epicfight;
 
+import com.whitecloud233.herobrine_companion.init.*;
+
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
-import com.whitecloud233.herobrine_companion.event.ModEvents;
 import net.neoforged.bus.api.IEventBus;
 import yesman.epicfight.api.event.EpicFightEventHooks;
 import yesman.epicfight.api.event.types.registry.EntityPatchRegistryEvent;
@@ -27,7 +28,7 @@ public final class HeroEpicFightBridge {
             return;
         }
         armatureRegistered = true;
-        Armatures.registerEntityTypeArmature(ModEvents.HERO.get(), Armatures.BIPED);
+        Armatures.registerEntityTypeArmature(ModEntities.HERO.get(), Armatures.BIPED);
     }
 
     public static boolean isPatched(HeroEntity hero) {
@@ -35,7 +36,7 @@ public final class HeroEpicFightBridge {
     }
 
     private static void onEntityPatchRegistry(EntityPatchRegistryEvent event) {
-        event.registerEntityPatch(ModEvents.HERO.get(), HeroEpicFightPatch::new);
+        event.registerEntityPatch(ModEntities.HERO.get(), HeroEpicFightPatch::new);
     }
 }
 

@@ -1,11 +1,12 @@
 package com.whitecloud233.herobrine_companion.client.gui;
 
+import com.whitecloud233.herobrine_companion.init.*;
+
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import com.mojang.logging.LogUtils;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity; // 【修复】去掉了错误的 .modid
-import com.whitecloud233.herobrine_companion.event.ModEvents;
 import com.whitecloud233.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.herobrine_companion.network.SavePosePacket;
 import net.minecraft.client.Minecraft;
@@ -103,7 +104,7 @@ public class HeroPoseScreen extends Screen {
         super.init();
         if (this.minecraft == null || this.minecraft.level == null) return;
 
-        this.dummyHero = ModEvents.HERO.get().create(this.minecraft.level);
+        this.dummyHero = ModEntities.HERO.get().create(this.minecraft.level);
         if (this.dummyHero == null) {
             LOGGER.warn("Unable to create preview Hero entity for pose editor");
             return;

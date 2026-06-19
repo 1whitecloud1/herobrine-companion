@@ -1,7 +1,8 @@
 package com.whitecloud233.herobrine_companion.event;
 
+import com.whitecloud233.herobrine_companion.init.*;
+
 import com.mojang.logging.LogUtils;
-import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.compat.kubejs.SafeKubeJSCaller;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import net.minecraft.world.item.ItemStack;
@@ -24,7 +25,7 @@ public class HeroTrades {
 
         // Level 0:
         offers.add(new MerchantOffer(
-            new ItemCost(HerobrineCompanion.CORRUPTED_CODE.get(), 4),
+            new ItemCost(ModItems.CORRUPTED_CODE.get(), 4),
             new ItemStack(Items.ENDER_CHEST, 1),
             Integer.MAX_VALUE, 2, 0.05f
         ));
@@ -34,7 +35,7 @@ public class HeroTrades {
                 Integer.MAX_VALUE, 2, 0.05f
         ));
         offers.add(new MerchantOffer(
-            new ItemCost(HerobrineCompanion.VOID_MARROW.get(), 2),
+            new ItemCost(ModItems.VOID_MARROW.get(), 2),
             new ItemStack(Items.BEDROCK, 1),
             Integer.MAX_VALUE, 2, 0.05f
         ));
@@ -42,12 +43,12 @@ public class HeroTrades {
         // Level 1 (Trust >= 2):
         if (trust >= 2) {
             offers.add(new MerchantOffer(
-                new ItemCost(HerobrineCompanion.VOID_MARROW.get(), 4),
+                new ItemCost(ModItems.VOID_MARROW.get(), 4),
                 new ItemStack(Items.DIAMOND, 1),
                 Integer.MAX_VALUE, 5, 0.05f
             ));
             offers.add(new MerchantOffer(
-                new ItemCost(HerobrineCompanion.UNSTABLE_GUNPOWDER.get(), 1),
+                new ItemCost(ModItems.UNSTABLE_GUNPOWDER.get(), 1),
                 new ItemStack(Items.ENDER_PEARL, 4),
                 Integer.MAX_VALUE, 5, 0.05f
             ));
@@ -56,12 +57,12 @@ public class HeroTrades {
         // Level 2 (Trust >= 20):
         if (trust >= 20) {
             offers.add(new MerchantOffer(
-                new ItemCost(HerobrineCompanion.UNSTABLE_GUNPOWDER.get(), 2),
-                new ItemStack(HerobrineCompanion.GLITCH_FRAGMENT.get(), 1),
+                new ItemCost(ModItems.UNSTABLE_GUNPOWDER.get(), 2),
+                new ItemStack(ModItems.GLITCH_FRAGMENT.get(), 1),
                 Integer.MAX_VALUE, 10, 0.05f
             ));
             offers.add(new MerchantOffer(
-                    new ItemCost(HerobrineCompanion.SOURCE_CODE_FRAGMENT.get(), 2),
+                    new ItemCost(ModItems.SOURCE_CODE_FRAGMENT.get(), 2),
                     new ItemStack(Items.TOTEM_OF_UNDYING, 1),
                     Integer.MAX_VALUE, 2, 0.05f
             ));
@@ -70,24 +71,24 @@ public class HeroTrades {
         // Level 3 (Trust >= 40): Glitch Fragment -> Diamond Block
         if (trust >= 40) {
             offers.add(new MerchantOffer(
-                new ItemCost(HerobrineCompanion.GLITCH_FRAGMENT.get(), 2),
+                new ItemCost(ModItems.GLITCH_FRAGMENT.get(), 2),
                 new ItemStack(Items.DIAMOND_BLOCK, 1),
                 Integer.MAX_VALUE, 15, 0.05f
             ));
             offers.add(new MerchantOffer(
-                new ItemCost(HerobrineCompanion.GLITCH_FRAGMENT.get(), 4),
+                new ItemCost(ModItems.GLITCH_FRAGMENT.get(), 4),
                 new ItemStack(Items.NETHERITE_INGOT, 1),
                 Integer.MAX_VALUE, 15, 0.05f
             ));
             offers.add(new MerchantOffer(
-                    new ItemCost(HerobrineCompanion.CORRUPTED_CODE.get(), 1),
-                    Optional.of(new ItemCost(HerobrineCompanion.VOID_MARROW.get(), 1)),
-                    new ItemStack(HerobrineCompanion.MEMORY_SHARD.get(), 1),
+                    new ItemCost(ModItems.CORRUPTED_CODE.get(), 1),
+                    Optional.of(new ItemCost(ModItems.VOID_MARROW.get(), 1)),
+                    new ItemStack(ModItems.MEMORY_SHARD.get(), 1),
                     Integer.MAX_VALUE, 15, 0.10f
             ));
             offers.add(new MerchantOffer(
-                    new ItemCost(HerobrineCompanion.SOURCE_CODE_FRAGMENT.get(), 1),
-                    new ItemStack(HerobrineCompanion.RECALL_STONE.get(), 1),
+                    new ItemCost(ModItems.SOURCE_CODE_FRAGMENT.get(), 1),
+                    new ItemStack(ModItems.RECALL_STONE.get(), 1),
                     Integer.MAX_VALUE, 30, 0.10f
             ));
         }
@@ -95,13 +96,13 @@ public class HeroTrades {
         // Level 4 (Trust >= 70): Memory Shard (new rare item)
         if (trust >= 70) {
             offers.add(new MerchantOffer(
-                new ItemCost(HerobrineCompanion.UNSTABLE_GUNPOWDER.get(), 4),
-                Optional.of(new ItemCost(HerobrineCompanion.VOID_MARROW.get(), 4)),
+                new ItemCost(ModItems.UNSTABLE_GUNPOWDER.get(), 4),
+                Optional.of(new ItemCost(ModItems.VOID_MARROW.get(), 4)),
                 new ItemStack(Items.NETHER_STAR, 1),
                 Integer.MAX_VALUE, 40, 0.10f
             ));
             offers.add(new MerchantOffer(
-                new ItemCost(HerobrineCompanion.SOURCE_CODE_FRAGMENT.get(), 2),
+                new ItemCost(ModItems.SOURCE_CODE_FRAGMENT.get(), 2),
                 new ItemStack(Items.DRAGON_BREATH, 1),
                 Integer.MAX_VALUE, 30, 0.10f
             ));

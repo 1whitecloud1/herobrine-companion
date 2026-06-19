@@ -1,10 +1,11 @@
 package com.whitecloud233.herobrine_companion.destructiongod.entity.ai.goal;
 
+import com.whitecloud233.herobrine_companion.init.*;
+
 import com.whitecloud233.herobrine_companion.destructiongod.entity.DestructionGodHerobrineEntity;
 import com.whitecloud233.herobrine_companion.destructiongod.network.*;
 import com.whitecloud233.herobrine_companion.destructiongod.world.*;
 import com.whitecloud233.herobrine_companion.entity.projectile.CleaveBladeEntity;
-import com.whitecloud233.herobrine_companion.event.ModEvents;
 import com.whitecloud233.herobrine_companion.network.PacketHandler;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
@@ -124,7 +125,7 @@ public class DestructionGodCombatGoal extends Goal {
                         int slashDepth = 20 + phase * 4;
                         double bladeSpeed = 5.2D;
                         float slashRoll = randomSlashRoll(serverLevel);
-                        CleaveBladeEntity blade = new CleaveBladeEntity(ModEvents.CLEAVE_BLADE.get(), serverLevel, rendOrigin.x, rendOrigin.y + 0.9D, rendOrigin.z, castDirection.x, castDirection.z, Math.max(14, Mth.ceil(slashLength / bladeSpeed) + 3), slashRoll);
+                        CleaveBladeEntity blade = new CleaveBladeEntity(ModEntities.CLEAVE_BLADE.get(), serverLevel, rendOrigin.x, rendOrigin.y + 0.9D, rendOrigin.z, castDirection.x, castDirection.z, Math.max(14, Mth.ceil(slashLength / bladeSpeed) + 3), slashRoll);
                         blade.setDeltaMovement(castDirection.x * bladeSpeed, 0.0D, castDirection.z * bladeSpeed);
                         serverLevel.addFreshEntity(blade);
                         RendTerrainSkill.startBladeLineRend(serverLevel, this.boss, rendOrigin, castDirection, slashLength, halfWidth, slashDepth, 0, slashRoll);

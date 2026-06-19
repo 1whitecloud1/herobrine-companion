@@ -1,5 +1,7 @@
 package com.whitecloud233.herobrine_companion.datagen;
 
+import com.whitecloud233.herobrine_companion.init.*;
+
 import net.minecraft.advancements.AdvancementHolder;
 import net.minecraft.core.HolderLookup;
 import net.neoforged.neoforge.common.data.AdvancementProvider;
@@ -15,7 +17,7 @@ public class ModAdvancementGenerator implements AdvancementProvider.AdvancementG
         /*
         AdvancementHolder root = Advancement.Builder.advancement()
                 .display(
-                        HerobrineCompanion.HERO_SHELTER.get(),
+                        ModItems.HERO_SHELTER.get(),
                         Component.translatable("advancement.herobrine_companion.root.title"),
                         Component.translatable("advancement.herobrine_companion.root.desc"),
                         ResourceLocation.withDefaultNamespace("textures/gui/advancements/backgrounds/stone.png"),
@@ -33,7 +35,7 @@ public class ModAdvancementGenerator implements AdvancementProvider.AdvancementG
         AdvancementHolder loreHandbook = Advancement.Builder.advancement()
                 .parent(root)
                 .display(
-                        HerobrineCompanion.LORE_HANDBOOK.get(),
+                        ModItems.LORE_HANDBOOK.get(),
                         Component.translatable("advancement.herobrine_companion.lore_handbook.title"),
                         Component.translatable("advancement.herobrine_companion.lore_handbook.desc"),
                         null,
@@ -42,7 +44,7 @@ public class ModAdvancementGenerator implements AdvancementProvider.AdvancementG
                         true,
                         false
                 )
-                .addCriterion("has_lore_handbook", InventoryChangeTrigger.TriggerInstance.hasItems(HerobrineCompanion.LORE_HANDBOOK.get()))
+                .addCriterion("has_lore_handbook", InventoryChangeTrigger.TriggerInstance.hasItems(ModItems.LORE_HANDBOOK.get()))
                 .save(saver, HerobrineCompanion.MODID + ":lore_handbook");
 
         // Sub-branches for Lore Fragments (1-11)
@@ -52,7 +54,7 @@ public class ModAdvancementGenerator implements AdvancementProvider.AdvancementG
             AdvancementHolder fragmentAdvancement = Advancement.Builder.advancement()
                     .parent(loreHandbook)
                     .display(
-                            HerobrineCompanion.LORE_FRAGMENT.get(),
+                            ModItems.LORE_FRAGMENT.get(),
                             Component.translatable("advancement.herobrine_companion.fragment_" + i + ".title"),
                             Component.translatable("advancement.herobrine_companion.fragment_" + i + ".desc"),
                             null,
@@ -71,7 +73,7 @@ public class ModAdvancementGenerator implements AdvancementProvider.AdvancementG
         AdvancementHolder eternalKey = Advancement.Builder.advancement()
                 .parent(ResourceLocation.fromNamespaceAndPath(HerobrineCompanion.MODID, "root"))
                 .display(
-                        HerobrineCompanion.ETERNAL_KEY.get(),
+                        ModItems.ETERNAL_KEY.get(),
                         Component.translatable("advancement.herobrine_companion.eternal_key.title"),
                         Component.translatable("advancement.herobrine_companion.eternal_key.desc"),
                         null,
@@ -80,13 +82,13 @@ public class ModAdvancementGenerator implements AdvancementProvider.AdvancementG
                         true,
                         false
                 )
-                .addCriterion("has_eternal_key", InventoryChangeTrigger.TriggerInstance.hasItems(HerobrineCompanion.ETERNAL_KEY.get()))
+                .addCriterion("has_eternal_key", InventoryChangeTrigger.TriggerInstance.hasItems(ModItems.ETERNAL_KEY.get()))
                 .save(saver, HerobrineCompanion.MODID + ":eternal_key");
 
         Advancement.Builder.advancement()
                 .parent(eternalKey)
                 .display(
-                        HerobrineCompanion.END_RING_PORTAL_ITEM.get(),
+                        ModItems.END_RING_PORTAL_ITEM.get(),
                         Component.translatable("advancement.herobrine_companion.enter_end_ring.title"),
                         Component.translatable("advancement.herobrine_companion.enter_end_ring.desc"),
                         null,
@@ -104,7 +106,7 @@ public class ModAdvancementGenerator implements AdvancementProvider.AdvancementG
         AdvancementHolder soulBoundPact = Advancement.Builder.advancement()
                 .parent(root)
                 .display(
-                        HerobrineCompanion.SOUL_BOUND_PACT.get(),
+                        ModItems.SOUL_BOUND_PACT.get(),
                         Component.translatable("advancement.herobrine_companion.soul_bound_pact.title"),
                         Component.translatable("advancement.herobrine_companion.soul_bound_pact.desc"),
                         null,
@@ -113,7 +115,7 @@ public class ModAdvancementGenerator implements AdvancementProvider.AdvancementG
                         true,
                         false
                 )
-                .addCriterion("has_soul_bound_pact", InventoryChangeTrigger.TriggerInstance.hasItems(HerobrineCompanion.SOUL_BOUND_PACT.get()))
+                .addCriterion("has_soul_bound_pact", InventoryChangeTrigger.TriggerInstance.hasItems(ModItems.SOUL_BOUND_PACT.get()))
                 .save(saver, HerobrineCompanion.MODID + ":soul_bound_pact");
         */
     }

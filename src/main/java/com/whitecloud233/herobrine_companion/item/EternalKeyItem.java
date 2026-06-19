@@ -1,6 +1,7 @@
 package com.whitecloud233.herobrine_companion.item;
 
-import com.whitecloud233.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.herobrine_companion.init.*;
+
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -70,7 +71,7 @@ public class EternalKeyItem extends Item {
         if (!level.isClientSide) {
             ServerLevel serverLevel = (ServerLevel) level;
             // 替换方块为传送门
-            level.setBlock(pos, HerobrineCompanion.END_RING_PORTAL.get().defaultBlockState(), 3);
+            level.setBlock(pos, ModBlocks.END_RING_PORTAL.get().defaultBlockState(), 3);
             
             LightningBolt lightning = EntityType.LIGHTNING_BOLT.create(serverLevel);
             if (lightning != null) {

@@ -1,5 +1,7 @@
 package com.whitecloud233.herobrine_companion.compat.jei;
 
+import com.whitecloud233.herobrine_companion.init.*;
+
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import mezz.jei.api.constants.VanillaTypes;
 import mezz.jei.api.gui.builder.IRecipeLayoutBuilder;
@@ -28,7 +30,7 @@ public class HeroTradeCategory implements IRecipeCategory<MerchantOffer> {
     public HeroTradeCategory(IGuiHelper guiHelper) {
         this.background = guiHelper.createBlankDrawable(82, 34);
         this.slotBackground = guiHelper.getSlotDrawable();
-        this.icon = guiHelper.createDrawableIngredient(VanillaTypes.ITEM_STACK, new ItemStack(HerobrineCompanion.TAB_ICON.get()));
+        this.icon = guiHelper.createDrawableIngredient(VanillaTypes.ITEM_STACK, new ItemStack(ModItems.TAB_ICON.get()));
         this.localizedName = Component.translatable("gui.herobrine_companion.jei.hero_trade");
     }
 

@@ -1,5 +1,7 @@
 package com.whitecloud233.herobrine_companion.datagen;
 
+import com.whitecloud233.herobrine_companion.init.*;
+
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.util.ModTags;
 import net.minecraft.core.HolderLookup;
@@ -19,27 +21,27 @@ public class ModItemTagsProvider extends ItemTagsProvider {
     @Override
     protected void addTags(HolderLookup.Provider pProvider) {
         tag(ModTags.Items.HERO_ITEMS)
-                .add(HerobrineCompanion.HERO_SHELTER.get())
-                .add(HerobrineCompanion.ETERNAL_KEY.get())
-                .add(HerobrineCompanion.UNSTABLE_GUNPOWDER.get())
-                .add(HerobrineCompanion.CORRUPTED_CODE.get())
-                .add(HerobrineCompanion.VOID_MARROW.get())
-                .add(HerobrineCompanion.GLITCH_FRAGMENT.get())
-                .add(HerobrineCompanion.MEMORY_SHARD.get())
-                .add(HerobrineCompanion.RECALL_STONE.get())
-                .add(HerobrineCompanion.END_RING_PORTAL_ITEM.get())
-                .add(HerobrineCompanion.GHOST_CREEPER_SPAWN_EGG.get())
-                .add(HerobrineCompanion.GHOST_ZOMBIE_SPAWN_EGG.get())
-                .add(HerobrineCompanion.GHOST_SKELETON_SPAWN_EGG.get())
-                .add(HerobrineCompanion.SOURCE_CODE_FRAGMENT.get())
-                .add(HerobrineCompanion.ABYSSAL_GAZE.get())
-                .add(HerobrineCompanion.AWAKENED_VESSEL.get())
-                .add(HerobrineCompanion.SOUL_BOUND_PACT.get())
-                .add(HerobrineCompanion.TRANSCENDENCE_PERMIT.get())
-                .add(HerobrineCompanion.POEM_OF_THE_END.get())
-                .add(HerobrineCompanion.SOURCE_FLOW.get())
-                .add(HerobrineCompanion.LORE_HANDBOOK.get())
-                .add(HerobrineCompanion.LORE_FRAGMENT.get())
-                .add(HerobrineCompanion.GHOST_STEVE_SPAWN_EGG.get());
+                .add(ModItems.HERO_SHELTER.get())
+                .add(ModItems.ETERNAL_KEY.get())
+                .add(ModItems.UNSTABLE_GUNPOWDER.get())
+                .add(ModItems.CORRUPTED_CODE.get())
+                .add(ModItems.VOID_MARROW.get())
+                .add(ModItems.GLITCH_FRAGMENT.get())
+                .add(ModItems.MEMORY_SHARD.get())
+                .add(ModItems.RECALL_STONE.get())
+                .add(ModItems.END_RING_PORTAL_ITEM.get())
+                .add(ModItems.GHOST_CREEPER_SPAWN_EGG.get())
+                .add(ModItems.GHOST_ZOMBIE_SPAWN_EGG.get())
+                .add(ModItems.GHOST_SKELETON_SPAWN_EGG.get())
+                .add(ModItems.SOURCE_CODE_FRAGMENT.get())
+                .add(ModItems.ABYSSAL_GAZE.get())
+                .add(ModItems.AWAKENED_VESSEL.get())
+                .add(ModItems.SOUL_BOUND_PACT.get())
+                .add(ModItems.TRANSCENDENCE_PERMIT.get())
+                .add(ModItems.POEM_OF_THE_END.get())
+                .add(ModItems.SOURCE_FLOW.get())
+                .add(ModItems.LORE_HANDBOOK.get())
+                .add(ModItems.LORE_FRAGMENT.get())
+                .add(ModItems.GHOST_STEVE_SPAWN_EGG.get());
     }
 }

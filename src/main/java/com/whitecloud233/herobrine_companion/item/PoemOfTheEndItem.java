@@ -1,5 +1,7 @@
 package com.whitecloud233.herobrine_companion.item;
 
+import com.whitecloud233.herobrine_companion.init.*;
+
 import com.whitecloud233.herobrine_companion.compat.epicfight.HeroEpicFightStateMapper;
 import com.whitecloud233.herobrine_companion.entity.projectile.CleaveBladeEntity;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
@@ -461,7 +463,7 @@ public class PoemOfTheEndItem extends DiggerItem {
 
         CleaveBladeEntity visualBlade =
                 new CleaveBladeEntity(
-                        com.whitecloud233.herobrine_companion.event.ModEvents.CLEAVE_BLADE.get(),
+                        com.whitecloud233.herobrine_companion.init.ModEntities.CLEAVE_BLADE.get(),
                         level, spawnX, startSurfaceY, spawnZ, dirX, dirZ, lifeTicks);
 
         // 【探头3】实体生成检测

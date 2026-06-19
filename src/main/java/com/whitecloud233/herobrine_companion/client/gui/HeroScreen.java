@@ -1,5 +1,7 @@
 package com.whitecloud233.herobrine_companion.client.gui;
 
+import com.whitecloud233.herobrine_companion.init.*;
+
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.whitecloud233.herobrine_companion.client.event.ClientHooks;
 import com.whitecloud233.herobrine_companion.client.gui.crosschat.CrossSessionHubScreen;
@@ -7,7 +9,6 @@ import com.whitecloud233.herobrine_companion.client.service.ConversationStore;
 import com.whitecloud233.herobrine_companion.compat.epicfight.HeroEpicFightCompat;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.ai.learning.SimpleNeuralNetwork;
-import com.whitecloud233.herobrine_companion.event.ModEvents;
 import com.whitecloud233.herobrine_companion.network.*;
 
 import net.minecraft.ChatFormatting;
@@ -64,7 +65,7 @@ public class HeroScreen extends Screen {
         if (this.minecraft == null) return;
         super.init();
         if (this.minecraft.level != null) {
-            this.dummyHero = ModEvents.HERO.get().create(this.minecraft.level);
+            this.dummyHero = ModEntities.HERO.get().create(this.minecraft.level);
             // 同步皮肤状态到 dummyHero 以便预览
             Entity realEntity = this.minecraft.level.getEntity(this.entityId);
             if (realEntity instanceof HeroEntity realHero) {

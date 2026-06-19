@@ -1,7 +1,8 @@
 package com.whitecloud233.herobrine_companion.datagen;
 
+import com.whitecloud233.herobrine_companion.init.*;
+
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
-import com.whitecloud233.herobrine_companion.event.ModEvents;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.data.worldgen.BootstrapContext;
 import net.minecraft.resources.ResourceKey;
@@ -22,7 +23,7 @@ public class ModBiomeModifiers {
 
         context.register(SPAWN_GHOST_STEVE, new BiomeModifiers.AddSpawnsBiomeModifier(
                 biomes.getOrThrow(BiomeTags.IS_OVERWORLD),
-                List.of(new MobSpawnSettings.SpawnerData(ModEvents.GHOST_STEVE.get(), 1, 1, 1))
+                List.of(new MobSpawnSettings.SpawnerData(ModEntities.GHOST_STEVE.get(), 1, 1, 1))
         ));
     }
 }

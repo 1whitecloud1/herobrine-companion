@@ -1,9 +1,10 @@
 package com.whitecloud233.herobrine_companion.entity.logic.event;
 
+import com.whitecloud233.herobrine_companion.init.*;
+
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.ai.learning.HeroDialogueHandler;
-import com.whitecloud233.herobrine_companion.event.ModEvents;
 import com.whitecloud233.herobrine_companion.item.LoreFragmentItem;
 import com.whitecloud233.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.herobrine_companion.network.TriggerEternalOathPacket;
@@ -60,7 +61,7 @@ public class StoryAndLoreHandler {
             CompoundTag data = player.getPersistentData();
             if (!data.getBoolean("HasReceivedFragment9")) {
                 if (player.getRandom().nextFloat() < 0.2f) {
-                    ItemStack fragment = new ItemStack(HerobrineCompanion.LORE_FRAGMENT.get());
+                    ItemStack fragment = new ItemStack(ModItems.LORE_FRAGMENT.get());
                     CompoundTag tag = new CompoundTag();
                     tag.putString(LoreFragmentItem.LORE_ID_KEY, "fragment_9");
                     // 1.21.1 更改：使用 Data Component
@@ -114,7 +115,7 @@ public class StoryAndLoreHandler {
             data.putInt("StillTicks", stillTicks);
 
             if (stillTicks >= 400) {
-                ItemStack fragment = new ItemStack(HerobrineCompanion.LORE_FRAGMENT.get());
+                ItemStack fragment = new ItemStack(ModItems.LORE_FRAGMENT.get());
                 CompoundTag tag = new CompoundTag();
                 tag.putString(LoreFragmentItem.LORE_ID_KEY, "fragment_6");
                 // 1.21.1 更改：使用 Data Component
@@ -162,7 +163,7 @@ public class StoryAndLoreHandler {
             existingHero.getNavigation().stop();
             existingHero.setTarget(null);
         } else {
-            HeroEntity hero = ModEvents.HERO.get().create(level);
+            HeroEntity hero = ModEntities.HERO.get().create(level);
             if (hero != null) {
                 hero.moveTo(targetPos);
                 // 1.21.1 更改：移除了最后废弃的 NBT tag 参数

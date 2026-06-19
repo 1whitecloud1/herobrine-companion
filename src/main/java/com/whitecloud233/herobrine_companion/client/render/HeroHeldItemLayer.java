@@ -1,8 +1,9 @@
 package com.whitecloud233.herobrine_companion.client.render;
 
+import com.whitecloud233.herobrine_companion.init.*;
+
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
-import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.client.model.HeroModel;
 import com.whitecloud233.herobrine_companion.compat.cooking.HeroCookingCompat;
 import com.whitecloud233.herobrine_companion.compat.epicfight.HeroEpicFightCompat;
@@ -36,7 +37,7 @@ public class HeroHeldItemLayer extends ItemInHandLayer<HeroEntity, PlayerModel<H
             return;
         }
         if (entity.isInspectingScythe()) {
-            ItemStack scytheStack = new ItemStack(HerobrineCompanion.POEM_OF_THE_END.get());
+            ItemStack scytheStack = new ItemStack(ModItems.POEM_OF_THE_END.get());
             if (scytheStack.isEmpty()) return;
 
             poseStack.pushPose();

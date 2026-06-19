@@ -1,6 +1,7 @@
 package com.whitecloud233.herobrine_companion.entity;
 
-import com.whitecloud233.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.herobrine_companion.init.*;
+
 import com.whitecloud233.herobrine_companion.item.LoreFragmentItem;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
@@ -38,7 +39,7 @@ public class GlitchVillagerEntity extends Villager {
             // 如果 SoundEvents.MUSIC_DISC_11 是 Holder，则使用 .value()
             this.playSound(SoundEvents.MUSIC_DISC_11.value(), 1.0F, 0.5F);
             
-            ItemStack fragment = new ItemStack(HerobrineCompanion.LORE_FRAGMENT.get());
+            ItemStack fragment = new ItemStack(ModItems.LORE_FRAGMENT.get());
             CompoundTag tag = new CompoundTag();
             tag.putString(LoreFragmentItem.LORE_ID_KEY, "fragment_11");
             fragment.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));

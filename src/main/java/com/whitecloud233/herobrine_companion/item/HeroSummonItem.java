@@ -1,5 +1,7 @@
 package com.whitecloud233.herobrine_companion.item;
 
+import com.whitecloud233.herobrine_companion.init.*;
+
 import com.whitecloud233.herobrine_companion.compat.cooking.HeroCookingCompat;
 import com.whitecloud233.herobrine_companion.compat.cooking.OpenCookSelectionPacket;
 import com.whitecloud233.herobrine_companion.compat.kaleidoscope.HeroKaleidoscopeCompat;
@@ -7,7 +9,6 @@ import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.logic.HeroInvitationHelper;
 import com.whitecloud233.herobrine_companion.entity.logic.data.HeroDataHandler;
 import com.whitecloud233.herobrine_companion.entity.logic.data.HeroLogic;
-import com.whitecloud233.herobrine_companion.event.ModEvents;
 import com.whitecloud233.herobrine_companion.entity.logic.data.HeroStateManager;
 import com.whitecloud233.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.herobrine_companion.util.EndRingContext;
@@ -185,7 +186,7 @@ public class HeroSummonItem extends Item {
                 existingHero.saveWithoutId(heroData);
                 existingHero.discard();
 
-                HeroEntity newHero = ModEvents.HERO.get().create(serverLevel);
+                HeroEntity newHero = ModEntities.HERO.get().create(serverLevel);
                 if (newHero != null) {
                     if (heroData.contains("UUID")) heroData.remove("UUID");
                     if (heroData.contains("UUIDMost")) heroData.remove("UUIDMost");
@@ -223,7 +224,7 @@ public class HeroSummonItem extends Item {
             serverLevel.playSound(null, BlockPos.containing(targetPos), SoundEvents.ENDERMAN_TELEPORT, SoundSource.PLAYERS, 1.0f, 1.0f);
             return true;
         } else {
-            HeroEntity hero = ModEvents.HERO.get().create(serverLevel);
+            HeroEntity hero = ModEntities.HERO.get().create(serverLevel);
             if (hero != null) {
                 hero.moveTo(targetPos);
                 hero.finalizeSpawn(serverLevel, serverLevel.getCurrentDifficultyAt(hero.blockPosition()), MobSpawnType.TRIGGERED, null);
@@ -259,7 +260,7 @@ public class HeroSummonItem extends Item {
     public static HeroEntity findHeroInAnyDimension(net.minecraft.server.MinecraftServer server, UUID ownerUUID) {
         if (ownerUUID == null) return null;
         for (ServerLevel level : server.getAllLevels()) {
-            var entities = level.getEntities(ModEvents.HERO.get(), entity -> ownerUUID.equals(entity.getOwnerUUID()));
+            var entities = level.getEntities(ModEntities.HERO.get(), entity -> ownerUUID.equals(entity.getOwnerUUID()));
             if (!entities.isEmpty()) {
                 return entities.get(0);
             }

@@ -1,5 +1,7 @@
 package com.whitecloud233.herobrine_companion.entity;
 
+import com.whitecloud233.herobrine_companion.init.*;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.HolderSet;
@@ -29,8 +31,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-
-import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 
 public class GlitchEchoEntity extends Entity {
 
@@ -363,7 +363,7 @@ public class GlitchEchoEntity extends Entity {
     // 假设你的目标物品是这个，请替换为你模组里的实际物品引用
     // 例如: ModItems.ETERNAL_KEY.get()
     private boolean isTargetItem(ItemStack stack) {
-        return stack.getItem() == HerobrineCompanion.ETERNAL_KEY.get();
+        return stack.getItem() == ModItems.ETERNAL_KEY.get();
     }
 
     private BlockPos findNearbyChest(int radius) {

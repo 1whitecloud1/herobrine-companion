@@ -1,5 +1,7 @@
 package com.whitecloud233.herobrine_companion.compat.jei;
 
+import com.whitecloud233.herobrine_companion.init.*;
+
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.event.HeroRewards;
 import mezz.jei.api.constants.VanillaTypes;
@@ -61,7 +63,7 @@ public class HeroRewardCategory implements IRecipeCategory<HeroRewards.Reward> {
     @Override
     public void setRecipe(IRecipeLayoutBuilder builder, HeroRewards.Reward recipe, IFocusGroup focuses) {
         builder.addSlot(RecipeIngredientRole.INPUT, 5, 5)
-                .addIngredients(VanillaTypes.ITEM_STACK, java.util.List.of(new ItemStack(HerobrineCompanion.TAB_ICON.get())));
+                .addIngredients(VanillaTypes.ITEM_STACK, java.util.List.of(new ItemStack(ModItems.TAB_ICON.get())));
 
         int x = 5;
         int y = 35;

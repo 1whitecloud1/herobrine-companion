@@ -12,6 +12,7 @@ import com.whitecloud233.herobrine_companion.entity.GlitchVillagerEntity;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.projectile.VoidRiftEntity;
 import com.whitecloud233.herobrine_companion.entity.projectile.RealmBreakerLightningEntity;
+import com.whitecloud233.herobrine_companion.init.ModEntities;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -36,105 +37,35 @@ import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 import net.neoforged.neoforge.event.level.ExplosionEvent;
 import net.neoforged.neoforge.event.tick.EntityTickEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
-import net.neoforged.neoforge.registries.DeferredRegister;
-import net.neoforged.neoforge.registries.DeferredHolder;
-import net.minecraft.core.registries.Registries;
 
 import java.util.List;
 
 @EventBusSubscriber(modid = HerobrineCompanion.MODID)
 public class ModEvents {
 
-    public static final DeferredRegister<EntityType<?>> ENTITY_TYPES = DeferredRegister.create(Registries.ENTITY_TYPE, HerobrineCompanion.MODID);
-
-    public static final DeferredHolder<EntityType<?>, EntityType<HeroEntity>> HERO = ENTITY_TYPES.register("hero",
-            () -> EntityType.Builder.of(HeroEntity::new, MobCategory.CREATURE)
-                    .sized(0.6F, 1.8F) // Normal player size
-                    .build("hero"));
-
-    public static final DeferredHolder<EntityType<?>, EntityType<GhostCreeperEntity>> GHOST_CREEPER = ENTITY_TYPES.register("ghost_creeper",
-            () -> EntityType.Builder.of(GhostCreeperEntity::new, MobCategory.MONSTER)
-                    .sized(0.6F, 1.7F)
-                    .build("ghost_creeper"));
-
-    public static final DeferredHolder<EntityType<?>, EntityType<GhostZombieEntity>> GHOST_ZOMBIE = ENTITY_TYPES.register("ghost_zombie",
-            () -> EntityType.Builder.of(GhostZombieEntity::new, MobCategory.MONSTER)
-                    .sized(0.6F, 1.95F)
-                    .build("ghost_zombie"));
-
-    public static final DeferredHolder<EntityType<?>, EntityType<GhostSkeletonEntity>> GHOST_SKELETON = ENTITY_TYPES.register("ghost_skeleton",
-            () -> EntityType.Builder.of(GhostSkeletonEntity::new, MobCategory.MONSTER)
-                    .sized(0.6F, 1.99F)
-                    .build("ghost_skeleton"));
-
-    public static final DeferredHolder<EntityType<?>, EntityType<GhostSteveEntity>> GHOST_STEVE = ENTITY_TYPES.register("ghost_steve",
-            () -> EntityType.Builder.of(GhostSteveEntity::new, MobCategory.MONSTER)
-                    .sized(0.6F, 1.8F)
-                    .build("ghost_steve"));
-
-    public static final DeferredHolder<EntityType<?>, EntityType<GlitchEchoEntity>> GLITCH_ECHO = ENTITY_TYPES.register("glitch_echo",
-            () -> EntityType.Builder.of(GlitchEchoEntity::new, MobCategory.MISC)
-                    .sized(0.4F, 0.4F) // [关键修改] 缩小碰撞箱，使其更容易通过狭窄通道
-                    .fireImmune()
-                    .noSummon()
-                    .build("glitch_echo"));
-
-    public static final DeferredHolder<EntityType<?>, EntityType<RealmBreakerLightningEntity>> REALM_BREAKER_LIGHTNING = ENTITY_TYPES.register("realm_breaker_lightning",
-            () -> EntityType.Builder.<RealmBreakerLightningEntity>of(RealmBreakerLightningEntity::new, MobCategory.MISC)
-                    .sized(0.5F, 0.5F)
-                    .clientTrackingRange(4)
-                    .updateInterval(20)
-                    .build("realm_breaker_lightning"));
-
-    public static final DeferredHolder<EntityType<?>, EntityType<VoidRiftEntity>> VOID_RIFT = ENTITY_TYPES.register("void_rift",
-            () -> EntityType.Builder.<VoidRiftEntity>of(VoidRiftEntity::new, MobCategory.MISC)
-                    .sized(3.0F, 3.0F) // [修改] 增大碰撞箱以匹配视觉
-                    .clientTrackingRange(4)
-                    .updateInterval(20)
-                    .build("void_rift"));
-
-    public static final DeferredHolder<EntityType<?>, EntityType<GlitchVillagerEntity>> GLITCH_VILLAGER = ENTITY_TYPES.register("glitch_villager",
-            () -> EntityType.Builder.of(GlitchVillagerEntity::new, MobCategory.MISC)
-                    .sized(0.6F, 1.95F)
-                    .build("glitch_villager"));
-
-    public static final DeferredHolder<EntityType<?>, EntityType<CleaveBladeEntity>> CLEAVE_BLADE = ENTITY_TYPES.register("cleave_blade",
-            () -> EntityType.Builder.<CleaveBladeEntity>of(CleaveBladeEntity::new, MobCategory.MISC)
-                    .sized(1.0F, 1.0F)
-                    .clientTrackingRange(80) // 80格追踪范围，确保飞远了客户端也能看见
-                    .updateInterval(1) // 每tick更新，确保运动平滑
-                    .build("cleave_blade"));
-
-    public static final DeferredHolder<EntityType<?>, EntityType<DestructionGodHerobrineEntity>> DESTRUCTION_GOD_HEROBRINE = ENTITY_TYPES.register("destruction_god_herobrine",
-            () -> EntityType.Builder.of(DestructionGodHerobrineEntity::new, MobCategory.MONSTER)
-                    .sized(0.6F, 1.8F)
-                    .clientTrackingRange(16)
-                    .updateInterval(1)
-                    .build("destruction_god_herobrine"));
-
     public static void entityAttributeEvent(EntityAttributeCreationEvent event) {
-        event.put(HERO.get(), HeroEntity.createAttributes().build());
-        event.put(GHOST_CREEPER.get(), Creeper.createAttributes().build());
-        event.put(GHOST_ZOMBIE.get(), Zombie.createAttributes().build());
-        event.put(GHOST_SKELETON.get(), Skeleton.createAttributes().build());
-        event.put(GHOST_STEVE.get(), GhostSteveEntity.createAttributes().build());
-        event.put(GLITCH_VILLAGER.get(), Villager.createAttributes().build());
-        event.put(DESTRUCTION_GOD_HEROBRINE.get(), DestructionGodHerobrineEntity.createAttributes().build());
+        event.put(ModEntities.HERO.get(), HeroEntity.createAttributes().build());
+        event.put(ModEntities.GHOST_CREEPER.get(), Creeper.createAttributes().build());
+        event.put(ModEntities.GHOST_ZOMBIE.get(), Zombie.createAttributes().build());
+        event.put(ModEntities.GHOST_SKELETON.get(), Skeleton.createAttributes().build());
+        event.put(ModEntities.GHOST_STEVE.get(), GhostSteveEntity.createAttributes().build());
+        event.put(ModEntities.GLITCH_VILLAGER.get(), Villager.createAttributes().build());
+        event.put(ModEntities.DESTRUCTION_GOD_HEROBRINE.get(), DestructionGodHerobrineEntity.createAttributes().build());
         // Glitch Echo and Void Rift don't need attributes as they are just Entities, not LivingEntities
     }
 
     public static void registerSpawnPlacements(RegisterSpawnPlacementsEvent event) {
-        event.register(GHOST_CREEPER.get(), SpawnPlacementTypes.ON_GROUND, Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+        event.register(ModEntities.GHOST_CREEPER.get(), SpawnPlacementTypes.ON_GROUND, Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
                 Monster::checkMonsterSpawnRules, RegisterSpawnPlacementsEvent.Operation.REPLACE);
         
-        event.register(GHOST_ZOMBIE.get(), SpawnPlacementTypes.ON_GROUND, Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
-                Monster::checkMonsterSpawnRules, RegisterSpawnPlacementsEvent.Operation.REPLACE);
+        event.register(ModEntities.GHOST_ZOMBIE.get(), SpawnPlacementTypes.ON_GROUND, Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                Zombie::checkMonsterSpawnRules, RegisterSpawnPlacementsEvent.Operation.REPLACE);
         
-        event.register(GHOST_SKELETON.get(), SpawnPlacementTypes.ON_GROUND, Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
-                Monster::checkMonsterSpawnRules, RegisterSpawnPlacementsEvent.Operation.REPLACE);
+        event.register(ModEntities.GHOST_SKELETON.get(), SpawnPlacementTypes.ON_GROUND, Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                Skeleton::checkMonsterSpawnRules, RegisterSpawnPlacementsEvent.Operation.REPLACE);
 
         // [修改] 使用 WORLD_SURFACE 而不是 MOTION_BLOCKING_NO_LEAVES，以确保在地面生成
-        event.register(GHOST_STEVE.get(), SpawnPlacementTypes.ON_GROUND, Heightmap.Types.WORLD_SURFACE,
+        event.register(ModEntities.GHOST_STEVE.get(), SpawnPlacementTypes.ON_GROUND, Heightmap.Types.WORLD_SURFACE,
                 GhostSteveEntity::checkGhostSteveSpawnRules, RegisterSpawnPlacementsEvent.Operation.REPLACE);
     }
 
@@ -142,6 +73,4 @@ public class ModEvents {
     public static void onEntityTick(EntityTickEvent.Pre event) {
         // Logic removed
     }
-
-
 }

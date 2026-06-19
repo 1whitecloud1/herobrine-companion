@@ -1,6 +1,7 @@
 package com.whitecloud233.herobrine_companion.entity.ai.learning;
 
-import com.whitecloud233.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.herobrine_companion.init.*;
+
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
@@ -118,7 +119,7 @@ public class HeroGiftPlayerGoal extends Goal {
 
         // 2. 守护者：送好东西
         if (state == SimpleNeuralNetwork.MindState.PROTECTOR) {
-            if (roll < 0.2) return new ItemStack(HerobrineCompanion.VOID_MARROW.get(), 1);
+            if (roll < 0.2) return new ItemStack(ModItems.VOID_MARROW.get(), 1);
             if (roll < 0.5) return new ItemStack(Items.DIAMOND, 2);
             return new ItemStack(Items.GOLDEN_APPLE, 1);
         }
@@ -132,7 +133,7 @@ public class HeroGiftPlayerGoal extends Goal {
 
         // 4. 默认逻辑 (基于信任度)
         if (trust > 70 && roll < 0.1) {
-            return new ItemStack(HerobrineCompanion.VOID_MARROW.get(), 1);
+            return new ItemStack(ModItems.VOID_MARROW.get(), 1);
         } else if (trust > 50 && roll < 0.2) {
             return new ItemStack(Items.DIAMOND);
         } else if (trust > 20 && roll < 0.4) {

@@ -1,5 +1,7 @@
 package com.whitecloud233.herobrine_companion.datagen;
 
+import com.whitecloud233.herobrine_companion.init.*;
+
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import net.minecraft.data.PackOutput;
 import net.neoforged.neoforge.common.data.LanguageProvider;
@@ -12,19 +14,19 @@ public class ModEnUsLangProvider extends LanguageProvider {
     @Override
     protected void addTranslations() {
         // Items
-        add(HerobrineCompanion.HERO_SHELTER.get(), "Hero Shelter");
-        add(HerobrineCompanion.ETERNAL_KEY.get(), "Eternal Key");
-        add(HerobrineCompanion.UNSTABLE_GUNPOWDER.get(), "Unstable Gunpowder");
-        add(HerobrineCompanion.CORRUPTED_CODE.get(), "Corrupted Code");
-        add(HerobrineCompanion.VOID_MARROW.get(), "Void Marrow");
-        add(HerobrineCompanion.GLITCH_FRAGMENT.get(), "Glitch Fragment");
-        add(HerobrineCompanion.MEMORY_SHARD.get(), "Memory Shard");
-        add(HerobrineCompanion.RECALL_STONE.get(), "Recall Stone");
-        add(HerobrineCompanion.AWAKENED_VESSEL.get(), "Awakened Vessel");
-        add(HerobrineCompanion.END_RING_PORTAL_ITEM.get(), "End Ring Portal");
-        add(HerobrineCompanion.GHOST_CREEPER_SPAWN_EGG.get(), "Ghost Creeper Spawn Egg");
-        add(HerobrineCompanion.GHOST_ZOMBIE_SPAWN_EGG.get(), "Ghost Zombie Spawn Egg");
-        add(HerobrineCompanion.GHOST_SKELETON_SPAWN_EGG.get(), "Ghost Skeleton Spawn Egg");
+        add(ModItems.HERO_SHELTER.get(), "Hero Shelter");
+        add(ModItems.ETERNAL_KEY.get(), "Eternal Key");
+        add(ModItems.UNSTABLE_GUNPOWDER.get(), "Unstable Gunpowder");
+        add(ModItems.CORRUPTED_CODE.get(), "Corrupted Code");
+        add(ModItems.VOID_MARROW.get(), "Void Marrow");
+        add(ModItems.GLITCH_FRAGMENT.get(), "Glitch Fragment");
+        add(ModItems.MEMORY_SHARD.get(), "Memory Shard");
+        add(ModItems.RECALL_STONE.get(), "Recall Stone");
+        add(ModItems.AWAKENED_VESSEL.get(), "Awakened Vessel");
+        add(ModItems.END_RING_PORTAL_ITEM.get(), "End Ring Portal");
+        add(ModItems.GHOST_CREEPER_SPAWN_EGG.get(), "Ghost Creeper Spawn Egg");
+        add(ModItems.GHOST_ZOMBIE_SPAWN_EGG.get(), "Ghost Zombie Spawn Egg");
+        add(ModItems.GHOST_SKELETON_SPAWN_EGG.get(), "Ghost Skeleton Spawn Egg");
 
 
         // Creative Tab

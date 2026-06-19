@@ -1,6 +1,7 @@
 package com.whitecloud233.herobrine_companion.event;
 
-import com.whitecloud233.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.herobrine_companion.init.*;
+
 import com.whitecloud233.herobrine_companion.entity.*;
 import com.whitecloud233.herobrine_companion.entity.ai.learning.HeroBrain;
 import com.whitecloud233.herobrine_companion.entity.logic.data.HeroDataHandler;
@@ -191,7 +192,7 @@ public class HeroQuestHandler {
         
         if (questId == QUEST_CLEAR_UNSTABLE_ZONE) {
             player.sendSystemMessage(Component.translatable("message.herobrine_companion.quest_complete_1"));
-            player.getInventory().add(new ItemStack(HerobrineCompanion.VOID_MARROW.get(), 3));
+            player.getInventory().add(new ItemStack(ModItems.VOID_MARROW.get(), 3));
             increaseTrust(player, 15);
         } else if (questId == QUEST_PACIFY_ENDERMAN) {
             player.sendSystemMessage(Component.translatable("message.herobrine_companion.quest_complete_2"));

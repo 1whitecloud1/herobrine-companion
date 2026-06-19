@@ -1,5 +1,7 @@
 package com.whitecloud233.herobrine_companion.event;
 
+import com.whitecloud233.herobrine_companion.init.*;
+
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.logic.data.HeroWorldData;
@@ -35,7 +37,7 @@ public class ChatEvents {
                 event.getPlayer().sendSystemMessage(Component.literal("§e[Debug] 是否已通过指令召唤过: " + worldData.hasSpawnedFromChat(playerUUID)));
 
                 if (existingHero == null && !worldData.hasSpawnedFromChat(playerUUID)) {
-                    HeroEntity hero = ModEvents.HERO.get().create(serverLevel);
+                    HeroEntity hero = ModEntities.HERO.get().create(serverLevel);
                     if (hero != null) {
                         // 【最终修复】在加入世界前，手动设置一个全新的、绝对不会冲突的UUID
                         UUID newHeroUUID = UUID.randomUUID();
@@ -61,7 +63,7 @@ public class ChatEvents {
                             event.getPlayer().sendSystemMessage(Component.literal("§c[Debug] 实体加入世界失败 (addFreshEntity = false)。请检查服务端日志是否存在UUID冲突。新UUID: " + newHeroUUID));
                         }
                     } else {
-                        event.getPlayer().sendSystemMessage(Component.literal("§c[Debug] 创建实体失败 (ModEvents.HERO.get().create = null)"));
+                        event.getPlayer().sendSystemMessage(Component.literal("§c[Debug] 创建实体失败 (ModEntities.HERO.get().create = null)"));
                     }
                 } else {
                     event.getPlayer().sendSystemMessage(Component.literal("§c[System] 你已经召唤过 Hero 了，请使用源流（SourceFlowItem）或者庇护所寻找。"));

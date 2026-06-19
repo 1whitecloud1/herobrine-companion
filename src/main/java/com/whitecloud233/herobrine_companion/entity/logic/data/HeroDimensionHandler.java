@@ -1,8 +1,9 @@
 package com.whitecloud233.herobrine_companion.entity.logic.data;
 
+import com.whitecloud233.herobrine_companion.init.*;
+
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
-import com.whitecloud233.herobrine_companion.event.ModEvents;
 import com.whitecloud233.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.herobrine_companion.network.SyncHeroVisitPacket;
 import com.whitecloud233.herobrine_companion.util.EndRingContext;
@@ -75,7 +76,7 @@ public class HeroDimensionHandler {
         }
 
             if (heroToUpdate == null) {
-                heroToUpdate = new HeroEntity(ModEvents.HERO.get(), endLevel);
+                heroToUpdate = new HeroEntity(ModEntities.HERO.get(), endLevel);
                 heroToUpdate.setUUID(UUID.randomUUID());
                 isNewEntity = true;
             }
@@ -149,7 +150,7 @@ public class HeroDimensionHandler {
             }
 
             if (carriedHeroData != null) {
-                HeroEntity newHero = new HeroEntity(ModEvents.HERO.get(), toLevel);
+                HeroEntity newHero = new HeroEntity(ModEntities.HERO.get(), toLevel);
 
                 if (carriedHeroData.contains("UUID")) carriedHeroData.remove("UUID");
                 if (carriedHeroData.contains("UUIDMost")) carriedHeroData.remove("UUIDMost");
@@ -252,7 +253,7 @@ public class HeroDimensionHandler {
                 }
             }
 
-            HeroEntity hero = ModEvents.HERO.get().create(level);
+            HeroEntity hero = ModEntities.HERO.get().create(level);
             if (hero != null) {
                 // 【核心修复1】先进行所有 NBT 数据的恢复（这步会把被删掉 Pos 的实体强行设到 0,0,0）
                 boolean hasCombatData = com.whitecloud233.herobrine_companion.entity.logic.data.HeroStateManager.restoreFromPlayerNBT(hero, player, "HeroCombatRespawnData");

@@ -1,6 +1,7 @@
 package com.whitecloud233.herobrine_companion.event;
 
-import com.whitecloud233.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.herobrine_companion.init.*;
+
 import com.whitecloud233.herobrine_companion.item.LoreFragmentItem;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
@@ -55,8 +56,8 @@ public class HeroRewards {
         REWARDS.clear();
         
         // --- 信任度 2 奖励 ---
-        ItemStack handbook = new ItemStack(HerobrineCompanion.LORE_HANDBOOK.get());
-        ItemStack fragment1 = new ItemStack(HerobrineCompanion.LORE_FRAGMENT.get());
+        ItemStack handbook = new ItemStack(ModItems.LORE_HANDBOOK.get());
+        ItemStack fragment1 = new ItemStack(ModItems.LORE_FRAGMENT.get());
         CompoundTag tag = new CompoundTag();
         tag.putString(LoreFragmentItem.LORE_ID_KEY, "fragment_1");
         fragment1.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
@@ -64,11 +65,11 @@ public class HeroRewards {
 
         // --- 其他奖励 ---
         REWARDS.add(new Reward(0, 10, new ItemStack(Items.TOTEM_OF_UNDYING, 2)));
-        REWARDS.add(new Reward(1, 20, new ItemStack(HerobrineCompanion.ABYSSAL_GAZE.get(), 1)));
+        REWARDS.add(new Reward(1, 20, new ItemStack(ModItems.ABYSSAL_GAZE.get(), 1)));
         REWARDS.add(new Reward(2, 30, new ItemStack(Items.DIAMOND, 32)));
-        REWARDS.add(new Reward(3, 50, new ItemStack(HerobrineCompanion.SOUL_BOUND_PACT.get(), 1)));
-        REWARDS.add(new Reward(4, 75, new ItemStack(HerobrineCompanion.TRANSCENDENCE_PERMIT.get(), 1)));
-        REWARDS.add(new Reward(5, 100, new ItemStack(HerobrineCompanion.POEM_OF_THE_END.get(), 1)));
+        REWARDS.add(new Reward(3, 50, new ItemStack(ModItems.SOUL_BOUND_PACT.get(), 1)));
+        REWARDS.add(new Reward(4, 75, new ItemStack(ModItems.TRANSCENDENCE_PERMIT.get(), 1)));
+        REWARDS.add(new Reward(5, 100, new ItemStack(ModItems.POEM_OF_THE_END.get(), 1)));
         
         LOGGER.info("HeroRewards reset to defaults. Count: {}", REWARDS.size());
     }

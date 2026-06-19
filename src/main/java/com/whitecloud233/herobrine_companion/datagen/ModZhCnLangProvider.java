@@ -1,5 +1,7 @@
 package com.whitecloud233.herobrine_companion.datagen;
 
+import com.whitecloud233.herobrine_companion.init.*;
+
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import net.minecraft.data.PackOutput;
 import net.neoforged.neoforge.common.data.LanguageProvider;
@@ -12,28 +14,28 @@ public class ModZhCnLangProvider extends LanguageProvider {
     @Override
     protected void addTranslations() {
         // Items
-        add(HerobrineCompanion.HERO_SHELTER.get(), "创世神的庇护");
-        add(HerobrineCompanion.ETERNAL_KEY.get(), "永恒门钥");
-        add(HerobrineCompanion.UNSTABLE_GUNPOWDER.get(), "不稳定的火药");
-        add(HerobrineCompanion.CORRUPTED_CODE.get(), "损坏片段");
-        add(HerobrineCompanion.VOID_MARROW.get(), "虚空骨髓");
-        add(HerobrineCompanion.GLITCH_FRAGMENT.get(), "故障碎片");
-        add(HerobrineCompanion.SOURCE_CODE_FRAGMENT.get(), "源代码碎片");
-        add(HerobrineCompanion.MEMORY_SHARD.get(), "记忆碎片");
-        add(HerobrineCompanion.RECALL_STONE.get(), "回溯之石");
-        add(HerobrineCompanion.AWAKENED_VESSEL.get(), "醒魂容器");
-        add(HerobrineCompanion.END_RING_PORTAL_ITEM.get(), "末地环传送门");
-        add(HerobrineCompanion.GHOST_CREEPER_SPAWN_EGG.get(), "幽灵苦力怕刷怪蛋");
-        add(HerobrineCompanion.GHOST_ZOMBIE_SPAWN_EGG.get(), "幽灵僵尸刷怪蛋");
-        add(HerobrineCompanion.GHOST_SKELETON_SPAWN_EGG.get(), "幽灵骷髅刷怪蛋");
-        add(HerobrineCompanion.ABYSSAL_GAZE.get(), "深渊凝视");
-        add(HerobrineCompanion.SOUL_BOUND_PACT.get(), "灵魂契约");
-        add(HerobrineCompanion.TRANSCENDENCE_PERMIT.get(), "超脱许可");
-        add(HerobrineCompanion.POEM_OF_THE_END.get(), "终末之诗");
+        add(ModItems.HERO_SHELTER.get(), "创世神的庇护");
+        add(ModItems.ETERNAL_KEY.get(), "永恒门钥");
+        add(ModItems.UNSTABLE_GUNPOWDER.get(), "不稳定的火药");
+        add(ModItems.CORRUPTED_CODE.get(), "损坏片段");
+        add(ModItems.VOID_MARROW.get(), "虚空骨髓");
+        add(ModItems.GLITCH_FRAGMENT.get(), "故障碎片");
+        add(ModItems.SOURCE_CODE_FRAGMENT.get(), "源代码碎片");
+        add(ModItems.MEMORY_SHARD.get(), "记忆碎片");
+        add(ModItems.RECALL_STONE.get(), "回溯之石");
+        add(ModItems.AWAKENED_VESSEL.get(), "醒魂容器");
+        add(ModItems.END_RING_PORTAL_ITEM.get(), "末地环传送门");
+        add(ModItems.GHOST_CREEPER_SPAWN_EGG.get(), "幽灵苦力怕刷怪蛋");
+        add(ModItems.GHOST_ZOMBIE_SPAWN_EGG.get(), "幽灵僵尸刷怪蛋");
+        add(ModItems.GHOST_SKELETON_SPAWN_EGG.get(), "幽灵骷髅刷怪蛋");
+        add(ModItems.ABYSSAL_GAZE.get(), "深渊凝视");
+        add(ModItems.SOUL_BOUND_PACT.get(), "灵魂契约");
+        add(ModItems.TRANSCENDENCE_PERMIT.get(), "超脱许可");
+        add(ModItems.POEM_OF_THE_END.get(), "终末之诗");
         
         // Lore System Items
-        add(HerobrineCompanion.LORE_HANDBOOK.get(), "传说手册");
-        add(HerobrineCompanion.LORE_FRAGMENT.get(), "传说残页");
+        add(ModItems.LORE_HANDBOOK.get(), "传说手册");
+        add(ModItems.LORE_FRAGMENT.get(), "传说残页");
         add("item.herobrine_companion.lore_fragment.tooltip", "右键点击以收集至传说手册");
         add("item.herobrine_companion.lore_fragment.corrupted", "这张残页上的文字模糊不清，无法辨认...");
         add("item.herobrine_companion.lore_fragment.collected", "已收集: %s");

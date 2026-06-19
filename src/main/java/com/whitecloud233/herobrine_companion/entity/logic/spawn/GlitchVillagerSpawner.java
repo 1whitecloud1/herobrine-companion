@@ -1,7 +1,8 @@
 package com.whitecloud233.herobrine_companion.entity.logic.spawn;
 
+import com.whitecloud233.herobrine_companion.init.*;
+
 import com.whitecloud233.herobrine_companion.entity.GlitchVillagerEntity;
-import com.whitecloud233.herobrine_companion.event.ModEvents;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -62,7 +63,7 @@ public class GlitchVillagerSpawner {
                 
                 BlockPos pos = new BlockPos(x, y, z);
                 if (level.isEmptyBlock(pos) && level.isEmptyBlock(pos.above()) && level.getBlockState(pos.below()).canOcclude()) {
-                    GlitchVillagerEntity entity = ModEvents.GLITCH_VILLAGER.get().create(level);
+                    GlitchVillagerEntity entity = ModEntities.GLITCH_VILLAGER.get().create(level);
                     if (entity != null) {
                         entity.moveTo(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5, random.nextFloat() * 360F, 0);
                         level.addFreshEntity(entity);
