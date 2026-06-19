@@ -248,6 +248,8 @@ public final class AwakenedMobProfiles {
 
     private static List<String> peerKeys(String root, String scene) {
         String base = "message.herobrine_companion.awakened_mob." + root + ".peer." + scene;
-        return List.of(base + ".0");
+        return java.util.stream.IntStream.range(0, 4)
+                .mapToObj(index -> base + "." + index)
+                .toList();
     }
 }

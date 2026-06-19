@@ -40,6 +40,33 @@ public final class AwakenedMobPeerInteractionService {
 
     private static final Map<PairKey, Long> PAIR_COOLDOWNS = new HashMap<>();
     private static final Map<UUID, PendingReply> PENDING_REPLIES = new HashMap<>();
+    private static final List<String> PEER_ROOTS = List.of(
+            "zombie",
+            "skeleton",
+            "creeper",
+            "spider",
+            "enderman",
+            "witch",
+            "raider",
+            "slime",
+            "blaze",
+            "guardian",
+            "phantom",
+            "piglin",
+            "beast",
+            "ancient",
+            "simmons",
+            "jean"
+    );
+    private static final List<AwakenedMobPeerScene> DIRECTED_SPECIAL_SCENES = List.of(
+            AwakenedMobPeerScene.CASUAL,
+            AwakenedMobPeerScene.COLLAB,
+            AwakenedMobPeerScene.GOSSIP,
+            AwakenedMobPeerScene.CONFLICT,
+            AwakenedMobPeerScene.SCUFFLE,
+            AwakenedMobPeerScene.AUTHORITY
+    );
+    private static final int SPECIAL_LINES_PER_DIRECTED_SCENE = 2;
     private static final Map<SpecialLineKey, List<String>> SPECIAL_LINE_KEYS = createSpecialLineKeys();
 
     private AwakenedMobPeerInteractionService() {
@@ -308,13 +335,13 @@ public final class AwakenedMobPeerInteractionService {
             return false;
         }
         float chance = switch (scene) {
-            case SAME -> 0.18F;
-            case GOSSIP -> 0.28F;
-            case CONFLICT -> 0.30F;
+            case SAME, CASUAL -> 0.22F;
+            case COLLAB -> 0.30F;
+            case GOSSIP, CONFLICT -> 0.32F;
+            case SCUFFLE -> 0.35F;
             case AUTHORITY -> 0.45F;
-            default -> 0.0F;
         };
-        return chance > 0.0F && speaker.getRandom().nextFloat() < chance;
+        return speaker.getRandom().nextFloat() < chance;
     }
 
     private static String selectLineKey(AwakenedMobProfile speakerProfile, AwakenedMobProfile listenerProfile,
@@ -334,75 +361,16 @@ public final class AwakenedMobPeerInteractionService {
 
     private static Map<SpecialLineKey, List<String>> createSpecialLineKeys() {
         Map<SpecialLineKey, List<String>> keys = new HashMap<>();
-        putSpecial(keys, "zombie", "skeleton", AwakenedMobPeerScene.COLLAB, 2);
-        putSpecial(keys, "skeleton", "zombie", AwakenedMobPeerScene.CASUAL, 2);
-        putSpecial(keys, "creeper", "zombie", AwakenedMobPeerScene.CONFLICT, 2);
-        putSpecial(keys, "zombie", "creeper", AwakenedMobPeerScene.CONFLICT, 2);
-        putSpecial(keys, "spider", "skeleton", AwakenedMobPeerScene.COLLAB, 2);
-        putSpecial(keys, "skeleton", "spider", AwakenedMobPeerScene.CONFLICT, 2);
-        putSpecial(keys, "witch", "raider", AwakenedMobPeerScene.CONFLICT, 2);
-        putSpecial(keys, "raider", "witch", AwakenedMobPeerScene.COLLAB, 2);
-        putSpecial(keys, "piglin", "beast", AwakenedMobPeerScene.CONFLICT, 2);
-        putSpecial(keys, "beast", "piglin", AwakenedMobPeerScene.CASUAL, 2);
-        putSpecial(keys, "blaze", "slime", AwakenedMobPeerScene.CONFLICT, 2);
-        putSpecial(keys, "slime", "blaze", AwakenedMobPeerScene.CONFLICT, 2);
-        putSpecial(keys, "guardian", "enderman", AwakenedMobPeerScene.CONFLICT, 2);
-        putSpecial(keys, "enderman", "guardian", AwakenedMobPeerScene.CONFLICT, 2);
-        putSpecial(keys, "simmons", "common", AwakenedMobPeerScene.AUTHORITY, 2);
-        putSpecial(keys, "jean", "common", AwakenedMobPeerScene.AUTHORITY, 2);
-
-        putSpecial(keys, "zombie", "witch", AwakenedMobPeerScene.COLLAB, 1);
-        putSpecial(keys, "witch", "zombie", AwakenedMobPeerScene.CONFLICT, 1);
-        putSpecial(keys, "zombie", "raider", AwakenedMobPeerScene.CONFLICT, 1);
-        putSpecial(keys, "raider", "zombie", AwakenedMobPeerScene.GOSSIP, 1);
-        putSpecial(keys, "zombie", "slime", AwakenedMobPeerScene.CONFLICT, 1);
-        putSpecial(keys, "slime", "zombie", AwakenedMobPeerScene.CASUAL, 1);
-        putSpecial(keys, "skeleton", "creeper", AwakenedMobPeerScene.COLLAB, 1);
-        putSpecial(keys, "creeper", "skeleton", AwakenedMobPeerScene.CONFLICT, 1);
-        putSpecial(keys, "skeleton", "phantom", AwakenedMobPeerScene.GOSSIP, 1);
-        putSpecial(keys, "phantom", "skeleton", AwakenedMobPeerScene.CASUAL, 1);
-        putSpecial(keys, "skeleton", "raider", AwakenedMobPeerScene.CONFLICT, 1);
-        putSpecial(keys, "raider", "skeleton", AwakenedMobPeerScene.GOSSIP, 1);
-        putSpecial(keys, "creeper", "spider", AwakenedMobPeerScene.CASUAL, 1);
-        putSpecial(keys, "spider", "creeper", AwakenedMobPeerScene.CONFLICT, 1);
-        putSpecial(keys, "creeper", "enderman", AwakenedMobPeerScene.CONFLICT, 1);
-        putSpecial(keys, "enderman", "creeper", AwakenedMobPeerScene.CASUAL, 1);
-        putSpecial(keys, "creeper", "raider", AwakenedMobPeerScene.CONFLICT, 1);
-        putSpecial(keys, "raider", "creeper", AwakenedMobPeerScene.COLLAB, 1);
-        putSpecial(keys, "spider", "enderman", AwakenedMobPeerScene.CONFLICT, 1);
-        putSpecial(keys, "enderman", "spider", AwakenedMobPeerScene.CASUAL, 1);
-        putSpecial(keys, "spider", "witch", AwakenedMobPeerScene.COLLAB, 1);
-        putSpecial(keys, "witch", "spider", AwakenedMobPeerScene.GOSSIP, 1);
-        putSpecial(keys, "spider", "phantom", AwakenedMobPeerScene.CONFLICT, 1);
-        putSpecial(keys, "phantom", "spider", AwakenedMobPeerScene.GOSSIP, 1);
-        putSpecial(keys, "enderman", "phantom", AwakenedMobPeerScene.CASUAL, 1);
-        putSpecial(keys, "phantom", "enderman", AwakenedMobPeerScene.GOSSIP, 1);
-        putSpecial(keys, "witch", "slime", AwakenedMobPeerScene.CONFLICT, 1);
-        putSpecial(keys, "slime", "witch", AwakenedMobPeerScene.CASUAL, 1);
-        putSpecial(keys, "witch", "blaze", AwakenedMobPeerScene.COLLAB, 1);
-        putSpecial(keys, "blaze", "witch", AwakenedMobPeerScene.CONFLICT, 1);
-        putSpecial(keys, "raider", "piglin", AwakenedMobPeerScene.CONFLICT, 1);
-        putSpecial(keys, "piglin", "raider", AwakenedMobPeerScene.CASUAL, 1);
-        putSpecial(keys, "raider", "beast", AwakenedMobPeerScene.COLLAB, 1);
-        putSpecial(keys, "beast", "raider", AwakenedMobPeerScene.CONFLICT, 1);
-        putSpecial(keys, "slime", "guardian", AwakenedMobPeerScene.CONFLICT, 1);
-        putSpecial(keys, "guardian", "slime", AwakenedMobPeerScene.CASUAL, 1);
-        putSpecial(keys, "slime", "piglin", AwakenedMobPeerScene.CONFLICT, 1);
-        putSpecial(keys, "piglin", "slime", AwakenedMobPeerScene.GOSSIP, 1);
-        putSpecial(keys, "blaze", "piglin", AwakenedMobPeerScene.COLLAB, 1);
-        putSpecial(keys, "piglin", "blaze", AwakenedMobPeerScene.CONFLICT, 1);
-        putSpecial(keys, "blaze", "beast", AwakenedMobPeerScene.CONFLICT, 1);
-        putSpecial(keys, "beast", "blaze", AwakenedMobPeerScene.CASUAL, 1);
-        putSpecial(keys, "piglin", "skeleton", AwakenedMobPeerScene.CONFLICT, 1);
-        putSpecial(keys, "skeleton", "piglin", AwakenedMobPeerScene.CONFLICT, 1);
-        putSpecial(keys, "ancient", "guardian", AwakenedMobPeerScene.AUTHORITY, 1);
-        putSpecial(keys, "guardian", "ancient", AwakenedMobPeerScene.GOSSIP, 1);
-        putSpecial(keys, "jean", "phantom", AwakenedMobPeerScene.AUTHORITY, 1);
-        putSpecial(keys, "phantom", "jean", AwakenedMobPeerScene.GOSSIP, 1);
-        putSpecial(keys, "jean", "enderman", AwakenedMobPeerScene.AUTHORITY, 1);
-        putSpecial(keys, "enderman", "jean", AwakenedMobPeerScene.GOSSIP, 1);
-        putSpecial(keys, "simmons", "jean", AwakenedMobPeerScene.CONFLICT, 1);
-        putSpecial(keys, "jean", "simmons", AwakenedMobPeerScene.CASUAL, 1);
+        for (String speakerRoot : PEER_ROOTS) {
+            for (String listenerRoot : PEER_ROOTS) {
+                if (speakerRoot.equals(listenerRoot)) {
+                    continue;
+                }
+                for (AwakenedMobPeerScene scene : DIRECTED_SPECIAL_SCENES) {
+                    putSpecial(keys, speakerRoot, listenerRoot, scene, SPECIAL_LINES_PER_DIRECTED_SCENE);
+                }
+            }
+        }
         return Map.copyOf(keys);
     }
 
