@@ -159,6 +159,7 @@ public class AIService {
                                                            Consumer<String> partialConsumer, boolean useStreaming,
                                                            String outputLanguageCode,
                                                            boolean crossSessionMode) {
+        LLMConfig.ensureLoaded();
         UUID effectiveScopeId = conversationScopeId != null ? conversationScopeId : authorityPlayerUUID;
         UUID effectiveAuthorityPlayerId = authorityPlayerUUID != null ? authorityPlayerUUID : effectiveScopeId;
         String apiKey = LLMConfig.aiApiKey;
@@ -166,7 +167,7 @@ public class AIService {
         String endpoint = LLMConfig.getResolvedEndpoint();
         LLMConfig.EndpointFormat endpointFormat = LLMConfig.getResolvedEndpointFormat();
         String model = LLMConfig.getResolvedModel();
-        String systemPrompt = LLMConfig.aiSystemPrompt;
+        String systemPrompt = LLMConfig.getSystemPrompt();
         String langCode = resolveOutputLanguageCode(outputLanguageCode);
 
         if (LLMConfig.isSetupIncomplete()) {

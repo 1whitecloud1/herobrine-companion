@@ -36,6 +36,7 @@ public class LLMSettingsScreen extends Screen {
     @Override
     protected void init() {
         super.init();
+        LLMConfig.ensureLoaded();
         int centerX = this.width / 2;
         int centerY = this.height / 2;
         int startX = centerX - PANEL_WIDTH / 2;
@@ -47,7 +48,7 @@ public class LLMSettingsScreen extends Screen {
                 startX + 16, startY + 50, PANEL_WIDTH - 32, 128,
                 Component.translatable("gui.herobrine_companion.llm_settings.system_prompt")));
         this.systemPromptBox.setMaxLength(12000);
-        this.systemPromptBox.setValue(LLMConfig.aiSystemPrompt == null ? "" : LLMConfig.aiSystemPrompt);
+        this.systemPromptBox.setValue(LLMConfig.getSystemPrompt());
         this.systemPromptBox.setResponder(value -> this.updateSaveState());
 
         this.addRenderableWidget(new HeroScreen.ThemedButton(

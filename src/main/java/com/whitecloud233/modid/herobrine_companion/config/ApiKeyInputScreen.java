@@ -10,7 +10,9 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
 
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 
 public class ApiKeyInputScreen extends Screen {
     private static final int MODEL_DROPDOWN_ROW_HEIGHT = 18;
@@ -29,9 +31,8 @@ public class ApiKeyInputScreen extends Screen {
     private EditBox providerIdBox;
     private EditBox endpointBox;
     private EditBox modelBox;
-    private String customProviderIdDraft;
-    private String customEndpointDraft;
-    private String customModelDraft;
+    private EditBox modelNameBox;
+    private final Map<LLMConfig.Provider, ProviderDraft> providerDrafts = new EnumMap<>(LLMConfig.Provider.class);
     private List<String> discoveredModels = List.of();
     private int discoveredModelIndex = -1;
     private boolean modelDiscoveryInFlight = false;
@@ -48,10 +49,8 @@ public class ApiKeyInputScreen extends Screen {
         // 使用翻译键替换纯文本
         super(Component.translatable("gui.herobrine_companion.api_setup.title"));
         this.lastScreen = lastScreen;
+        LLMConfig.ensureLoaded();
         this.selectedProvider = LLMConfig.getProvider();
-        this.customProviderIdDraft = this.selectedProvider == LLMConfig.Provider.CUSTOM ? LLMConfig.getStoredProviderId() : LLMConfig.Provider.CUSTOM.getId();
-        this.customEndpointDraft = this.selectedProvider == LLMConfig.Provider.CUSTOM ? LLMConfig.getResolvedEndpoint() : "";
-        this.customModelDraft = this.selectedProvider == LLMConfig.Provider.CUSTOM ? LLMConfig.getResolvedModel() : "";
     }
 
     @Override
@@ -65,12 +64,13 @@ public class ApiKeyInputScreen extends Screen {
         int modelBoxWidth = contentWidth - modelButtonWidth - modelButtonSpacing;
         int providerStartX = centerX - (contentWidth / 2);
         this.modelDropdownX = centerX - (contentWidth / 2);
-        this.modelDropdownY = 211;
+        this.modelDropdownY = 240;
         this.modelDropdownWidth = contentWidth;
 
         if (this.selectedProvider == null) {
             this.selectedProvider = LLMConfig.Provider.QINIU_CLOUD;
         }
+        ProviderDraft selectedDraft = this.getDraft(this.selectedProvider);
 
         this.deepseekButton = this.addRenderableWidget(this.createProviderButton(providerStartX, 60, providerButtonWidth, LLMConfig.Provider.DEEPSEEK_OFFICIAL));
         this.openrouterButton = this.addRenderableWidget(this.createProviderButton(providerStartX + providerButtonWidth + providerButtonSpacing, 60, providerButtonWidth, LLMConfig.Provider.OPENROUTER));
@@ -80,8 +80,9 @@ public class ApiKeyInputScreen extends Screen {
         // 创建 API Key 输入框，使用翻译键
         this.apiKeyBox = new EditBox(this.font, centerX - (contentWidth / 2), 100, contentWidth, 20, Component.translatable("gui.herobrine_companion.api_setup.api_key"));
         this.apiKeyBox.setMaxLength(256);
-        this.apiKeyBox.setValue(LLMConfig.isKeyMissing() ? "" : LLMConfig.aiApiKey);
+        this.apiKeyBox.setValue(this.isPlaceholderKey(selectedDraft.apiKey) ? "" : selectedDraft.apiKey);
         this.apiKeyBox.setResponder(value -> {
+            this.getSelectedDraft().apiKey = value.trim();
             this.clearDiscoveredModels();
             this.updateSaveButtonState();
         });
@@ -89,35 +90,35 @@ public class ApiKeyInputScreen extends Screen {
 
         this.providerIdBox = new EditBox(this.font, centerX - (contentWidth / 2), 130, contentWidth, 20, Component.translatable("gui.herobrine_companion.api_setup.provider_id"));
         this.providerIdBox.setMaxLength(256);
-        this.providerIdBox.setValue(this.isCustomProviderSelected() ? this.customProviderIdDraft : LLMConfig.getStoredProviderId());
+        this.providerIdBox.setValue(selectedDraft.providerId);
         this.providerIdBox.setResponder(value -> {
-            if (this.isCustomProviderSelected()) {
-                this.customProviderIdDraft = value.trim();
-            }
+            this.getSelectedDraft().providerId = value.trim();
             this.updateSaveButtonState();
         });
         this.addRenderableWidget(this.providerIdBox);
 
         this.endpointBox = new EditBox(this.font, centerX - (contentWidth / 2), 160, contentWidth, 20, Component.translatable("gui.herobrine_companion.api_setup.endpoint_input"));
         this.endpointBox.setMaxLength(512);
-        this.endpointBox.setValue(this.isCustomProviderSelected() ? this.customEndpointDraft : LLMConfig.getResolvedEndpoint());
+        this.endpointBox.setValue(selectedDraft.endpoint);
         this.endpointBox.setResponder(value -> {
-            if (this.isCustomProviderSelected()) {
-                this.customEndpointDraft = value.trim();
-            }
+            this.getSelectedDraft().endpoint = value.trim();
             this.clearDiscoveredModels();
             this.updateSaveButtonState();
         });
         this.addRenderableWidget(this.endpointBox);
 
-        this.modelBox = new EditBox(this.font, centerX - (contentWidth / 2), 190, modelBoxWidth, 20, Component.translatable("gui.herobrine_companion.api_setup.model"));
+        this.modelBox = new EditBox(this.font, centerX - (contentWidth / 2), 190, modelBoxWidth, 20, Component.translatable("gui.herobrine_companion.api_setup.model_id"));
         this.modelBox.setMaxLength(256);
-        this.modelBox.setValue(this.isCustomProviderSelected() ? this.customModelDraft : LLMConfig.getResolvedModel());
+        this.modelBox.setValue(selectedDraft.modelId);
         this.modelBox.setResponder(value -> {
-            if (this.isCustomProviderSelected()) {
-                this.customModelDraft = value.trim();
+            ProviderDraft draft = this.getSelectedDraft();
+            String previousModelId = draft.modelId == null ? "" : draft.modelId;
+            draft.modelId = value.trim();
+            this.syncDiscoveredModelIndex(draft.modelId);
+            if (this.modelNameBox != null && (draft.modelName == null || draft.modelName.isBlank() || draft.modelName.equals(previousModelId))) {
+                draft.modelName = draft.modelId;
+                this.modelNameBox.setValue(draft.modelName);
             }
-            this.syncDiscoveredModelIndex(value.trim());
             this.updateSaveButtonState();
         });
         this.addRenderableWidget(this.modelBox);
@@ -127,26 +128,29 @@ public class ApiKeyInputScreen extends Screen {
                 .size(modelButtonWidth, 20)
                 .build());
 
+        this.modelNameBox = new EditBox(this.font, centerX - (contentWidth / 2), 218, contentWidth, 20, Component.translatable("gui.herobrine_companion.api_setup.model_name"));
+        this.modelNameBox.setMaxLength(256);
+        this.modelNameBox.setValue(selectedDraft.modelName);
+        this.modelNameBox.setResponder(value -> {
+            this.getSelectedDraft().modelName = value.trim();
+            this.updateSaveButtonState();
+        });
+        this.addRenderableWidget(this.modelNameBox);
+
         this.refreshProviderButtons();
         this.refreshInputMode();
 
         // 保存按钮，使用翻译键
         this.saveButton = this.addRenderableWidget(Button.builder(Component.translatable("gui.herobrine_companion.api_setup.confirm_save"), (button) -> {
-            if (this.isCustomProviderSelected()) {
-                LLMConfig.setCustomProviderId(this.providerIdBox.getValue().trim());
-                LLMConfig.aiEndpoint = this.endpointBox.getValue().trim();
-            } else {
-                LLMConfig.setProvider(this.selectedProvider);
-            }
-            LLMConfig.aiApiKey = this.apiKeyBox.getValue().trim();
-            LLMConfig.aiModel = this.modelBox.getValue().trim();
-            LLMConfig.save(); // 写入根目录私密文件
+            this.captureCurrentDraft();
+            ProviderDraft draft = this.getSelectedDraft();
+            LLMConfig.saveProviderSettings(this.selectedProvider, draft.providerId, draft.apiKey, draft.endpoint, draft.modelId, draft.modelName);
             this.minecraft.setScreen(this.lastScreen);
-        }).pos(centerX - (contentWidth / 2), 224).size(106, 20).build());
+        }).pos(centerX - (contentWidth / 2), 250).size(106, 20).build());
 
         this.cancelButton = this.addRenderableWidget(Button.builder(Component.translatable("gui.herobrine_companion.api_setup.cancel"), (button) ->
                 this.minecraft.setScreen(this.lastScreen))
-                .pos(centerX + 4, 224)
+                .pos(centerX + 4, 250)
                 .size(106, 20)
                 .build());
 
@@ -160,6 +164,7 @@ public class ApiKeyInputScreen extends Screen {
         this.providerIdBox.tick();
         this.endpointBox.tick();
         this.modelBox.tick();
+        this.modelNameBox.tick();
     }
 
     private Button createProviderButton(int x, int y, int width, LLMConfig.Provider provider) {
@@ -174,45 +179,9 @@ public class ApiKeyInputScreen extends Screen {
             provider = LLMConfig.Provider.QINIU_CLOUD;
         }
 
-        if (this.isCustomProviderSelected()) {
-            if (this.providerIdBox != null) {
-                this.customProviderIdDraft = this.providerIdBox.getValue().trim();
-            }
-            if (this.endpointBox != null) {
-                this.customEndpointDraft = this.endpointBox.getValue().trim();
-            }
-            if (this.modelBox != null) {
-                this.customModelDraft = this.modelBox.getValue().trim();
-            }
-        }
-
-        LLMConfig.Provider previousProvider = this.selectedProvider;
+        this.captureCurrentDraft();
         this.selectedProvider = provider;
-
-        if (this.modelBox != null) {
-            String currentModel = this.modelBox.getValue().trim();
-            if (this.isCustomProviderSelected()) {
-                this.modelBox.setValue(this.customModelDraft);
-            } else if (currentModel.isEmpty() || previousProvider == null || currentModel.equals(previousProvider.getDefaultModel())) {
-                this.modelBox.setValue(this.selectedProvider.getDefaultModel());
-            }
-        }
-
-        if (this.providerIdBox != null) {
-            if (this.isCustomProviderSelected()) {
-                this.providerIdBox.setValue(this.customProviderIdDraft);
-            } else {
-                this.providerIdBox.setValue(this.selectedProvider.getId());
-            }
-        }
-
-        if (this.endpointBox != null) {
-            if (this.isCustomProviderSelected()) {
-                this.endpointBox.setValue(this.customEndpointDraft);
-            } else {
-                this.endpointBox.setValue(this.selectedProvider.getEndpoint());
-            }
-        }
+        this.applyDraftToInputs(this.getSelectedDraft());
 
         this.refreshProviderButtons();
         this.refreshInputMode();
@@ -234,8 +203,12 @@ public class ApiKeyInputScreen extends Screen {
             this.providerIdBox.active = customSelected;
         }
         if (this.endpointBox != null) {
-            this.endpointBox.setEditable(customSelected);
-            this.endpointBox.active = customSelected;
+            this.endpointBox.setEditable(true);
+            this.endpointBox.active = true;
+        }
+        if (this.modelNameBox != null) {
+            this.modelNameBox.setEditable(true);
+            this.modelNameBox.active = true;
         }
         this.updateFetchModelsButtonState();
     }
@@ -258,6 +231,7 @@ public class ApiKeyInputScreen extends Screen {
             case DEEPSEEK_OFFICIAL -> Component.translatable("gui.herobrine_companion.api_setup.provider.deepseek");
             case OPENROUTER -> Component.translatable("gui.herobrine_companion.api_setup.provider.openrouter");
             case QINIU_CLOUD -> Component.translatable("gui.herobrine_companion.api_setup.provider.qiniu");
+            case QINIU_CLOUD_ANTHROPIC -> Component.translatable("gui.herobrine_companion.api_setup.provider.qiniu_anthropic");
             case CUSTOM -> Component.translatable("gui.herobrine_companion.api_setup.provider.custom");
         };
     }
@@ -267,18 +241,76 @@ public class ApiKeyInputScreen extends Screen {
             case DEEPSEEK_OFFICIAL -> Component.translatable("gui.herobrine_companion.api_setup.provider_hint.deepseek", this.selectedProvider.getDefaultModel());
             case OPENROUTER -> Component.translatable("gui.herobrine_companion.api_setup.provider_hint.openrouter", this.selectedProvider.getDefaultModel());
             case QINIU_CLOUD -> Component.translatable("gui.herobrine_companion.api_setup.provider_hint.qiniu", this.selectedProvider.getDefaultModel());
+            case QINIU_CLOUD_ANTHROPIC -> Component.translatable("gui.herobrine_companion.api_setup.provider_hint.qiniu_anthropic", this.selectedProvider.getDefaultModel());
             case CUSTOM -> Component.translatable("gui.herobrine_companion.api_setup.provider_hint.custom");
         };
     }
 
+    private ProviderDraft getSelectedDraft() {
+        return this.getDraft(this.selectedProvider == null ? LLMConfig.Provider.QINIU_CLOUD : this.selectedProvider);
+    }
+
+    private ProviderDraft getDraft(LLMConfig.Provider provider) {
+        LLMConfig.Provider normalizedProvider = provider == null ? LLMConfig.Provider.QINIU_CLOUD : provider;
+        return this.providerDrafts.computeIfAbsent(normalizedProvider, ignored -> {
+            LLMConfig.ProviderSettings settings = LLMConfig.getProviderSettings(normalizedProvider);
+            return new ProviderDraft(settings.providerId(), settings.apiKey(), settings.endpoint(), settings.modelId(), settings.modelName());
+        });
+    }
+
+    private void captureCurrentDraft() {
+        if (this.selectedProvider == null) {
+            return;
+        }
+        ProviderDraft draft = this.getSelectedDraft();
+        if (this.apiKeyBox != null) {
+            draft.apiKey = this.apiKeyBox.getValue().trim();
+        }
+        if (this.providerIdBox != null) {
+            draft.providerId = this.providerIdBox.getValue().trim();
+        }
+        if (this.endpointBox != null) {
+            draft.endpoint = this.endpointBox.getValue().trim();
+        }
+        if (this.modelBox != null) {
+            draft.modelId = this.modelBox.getValue().trim();
+        }
+        if (this.modelNameBox != null) {
+            draft.modelName = this.modelNameBox.getValue().trim();
+        }
+    }
+
+    private void applyDraftToInputs(ProviderDraft draft) {
+        if (draft == null) {
+            return;
+        }
+        if (this.apiKeyBox != null) {
+            this.apiKeyBox.setValue(this.isPlaceholderKey(draft.apiKey) ? "" : draft.apiKey);
+        }
+        if (this.providerIdBox != null) {
+            this.providerIdBox.setValue(draft.providerId);
+        }
+        if (this.endpointBox != null) {
+            this.endpointBox.setValue(draft.endpoint);
+        }
+        if (this.modelBox != null) {
+            this.modelBox.setValue(draft.modelId);
+        }
+        if (this.modelNameBox != null) {
+            this.modelNameBox.setValue(draft.modelName == null || draft.modelName.isBlank() ? draft.modelId : draft.modelName);
+        }
+    }
+
+    private boolean isPlaceholderKey(String apiKey) {
+        return apiKey == null || apiKey.isBlank() || apiKey.equals(LLMConfig.getDefaultApiKeyPlaceholder());
+    }
+
     private void updateSaveButtonState() {
         if (this.saveButton != null) {
-            boolean hasRequiredCoreFields = !this.apiKeyBox.getValue().trim().isEmpty() && !this.modelBox.getValue().trim().isEmpty();
-            if (this.isCustomProviderSelected()) {
-                hasRequiredCoreFields = hasRequiredCoreFields
-                        && !this.providerIdBox.getValue().trim().isEmpty()
-                        && !this.endpointBox.getValue().trim().isEmpty();
-            }
+            boolean hasRequiredCoreFields = !this.apiKeyBox.getValue().trim().isEmpty()
+                    && !this.endpointBox.getValue().trim().isEmpty()
+                    && !this.modelBox.getValue().trim().isEmpty()
+                    && !this.providerIdBox.getValue().trim().isEmpty();
             this.saveButton.active = hasRequiredCoreFields;
             this.saveButton.visible = !this.modelDropdownOpen;
         }
@@ -287,6 +319,18 @@ public class ApiKeyInputScreen extends Screen {
             this.cancelButton.visible = !this.modelDropdownOpen;
         }
         this.updateFetchModelsButtonState();
+    }
+
+    private void syncModelNameWithIdIfNeeded() {
+        if (this.modelBox == null || this.modelNameBox == null) {
+            return;
+        }
+        String modelId = this.modelBox.getValue().trim();
+        String modelName = this.modelNameBox.getValue().trim();
+        if (modelName.isEmpty()) {
+            this.modelNameBox.setValue(modelId);
+            this.getSelectedDraft().modelName = modelId;
+        }
     }
 
     private void setModelDropdownOpen(boolean open) {
@@ -434,9 +478,8 @@ public class ApiKeyInputScreen extends Screen {
         }
         String model = this.discoveredModels.get(index);
         this.modelBox.setValue(model);
-        if (this.isCustomProviderSelected()) {
-            this.customModelDraft = model;
-        }
+        this.getSelectedDraft().modelId = model;
+        this.syncModelNameWithIdIfNeeded();
     }
 
     private void syncDiscoveredModelIndex(String model) {
@@ -585,6 +628,22 @@ public class ApiKeyInputScreen extends Screen {
         return this.selectedProvider == LLMConfig.Provider.CUSTOM;
     }
 
+    private static final class ProviderDraft {
+        private String providerId;
+        private String apiKey;
+        private String endpoint;
+        private String modelId;
+        private String modelName;
+
+        private ProviderDraft(String providerId, String apiKey, String endpoint, String modelId, String modelName) {
+            this.providerId = providerId == null ? "" : providerId;
+            this.apiKey = apiKey == null ? "" : apiKey;
+            this.endpoint = endpoint == null ? "" : endpoint;
+            this.modelId = modelId == null ? "" : modelId;
+            this.modelName = modelName == null ? "" : modelName;
+        }
+    }
+
     private int drawWrappedCenteredText(GuiGraphics guiGraphics, Component text, int centerX, int startY, int maxWidth, int color) {
         int y = startY;
         for (FormattedCharSequence line : this.font.split(text, maxWidth)) {
@@ -606,7 +665,8 @@ public class ApiKeyInputScreen extends Screen {
         guiGraphics.drawString(this.font, Component.translatable("gui.herobrine_companion.api_setup.api_key"), this.width / 2 - 110, 88, 0xFFFFFF);
         guiGraphics.drawString(this.font, Component.translatable("gui.herobrine_companion.api_setup.provider_id"), this.width / 2 - 110, 118, 0xFFFFFF);
         guiGraphics.drawString(this.font, Component.translatable("gui.herobrine_companion.api_setup.endpoint_input"), this.width / 2 - 110, 148, 0xFFFFFF);
-        guiGraphics.drawString(this.font, Component.translatable("gui.herobrine_companion.api_setup.model"), this.width / 2 - 110, 178, 0xFFFFFF);
+        guiGraphics.drawString(this.font, Component.translatable("gui.herobrine_companion.api_setup.model_id"), this.width / 2 - 110, 178, 0xFFFFFF);
+        guiGraphics.drawString(this.font, Component.translatable("gui.herobrine_companion.api_setup.model_name"), this.width / 2 - 110, 206, 0xFFFFFF);
 
         super.render(guiGraphics, mouseX, mouseY, partialTick);
 
@@ -615,11 +675,11 @@ public class ApiKeyInputScreen extends Screen {
             return;
         }
 
-        int textY = 250;
+        int textY = 278;
         if (!this.modelDiscoveryStatus.getString().isBlank()) {
             textY = this.drawWrappedCenteredText(guiGraphics, this.modelDiscoveryStatus, this.width / 2, textY, 260, this.modelDiscoveryStatusColor) + 2;
         } else if (!this.saveButton.active) {
-            guiGraphics.drawCenteredString(this.font, Component.translatable("gui.herobrine_companion.api_setup.warning_required"), this.width / 2, 212, 0xFF8080);
+            guiGraphics.drawCenteredString(this.font, Component.translatable("gui.herobrine_companion.api_setup.warning_required"), this.width / 2, 238, 0xFF8080);
         }
 
         textY = this.drawWrappedCenteredText(guiGraphics,

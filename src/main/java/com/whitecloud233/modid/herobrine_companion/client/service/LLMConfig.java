@@ -2,21 +2,31 @@ package com.whitecloud233.modid.herobrine_companion.client.service;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.mojang.logging.LogUtils;
 import net.minecraftforge.fml.loading.FMLPaths;
+import org.slf4j.Logger;
+
 import java.io.*;
-import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 
 public class LLMConfig {
+    private static final Logger LOGGER = LogUtils.getLogger();
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final String DEFAULT_API_KEY_PLACEHOLDER = "YOUR_API_KEY_HERE";
     private static final String DEFAULT_SYSTEM_PROMPT = "You are Herobrine. "
             + "Speak as Herobrine rather than as a generic assistant. Be cold, calm, mythic, and aware of the world's code, but still capable of brief direct conversation. "
             + "When chatting normally, stay in-character and do not mention being an AI model. When asked to physically alter the world, answer as a reality-warping entity who can rewrite or discard parts of existence.";
+    private static final double DEFAULT_TEMPERATURE = 0.95D;
+    private static final double DEFAULT_TOP_P = 0.92D;
+    private static final int DEFAULT_MAX_OUTPUT_TOKENS = 512;
     private static boolean apiKeyMarkedInvalid = false;
+    private static boolean loaded = false;
+    private static boolean loading = false;
+    private static boolean providerProfilesLoaded = false;
 
     // 1. 公开配置：放在 config 文件夹，会被整合包打包
     private static final File PUBLIC_CONFIG = FMLPaths.CONFIGDIR.get().resolve("herobrine_companion")
@@ -27,9 +37,10 @@ public class LLMConfig {
             .resolve("herobrine_ai_secrets.json").toFile();
 
     public enum Provider {
-        DEEPSEEK_OFFICIAL("deepseek_official", "https://api.deepseek.com/chat/completions", "deepseek-chat"),
+        DEEPSEEK_OFFICIAL("deepseek_official", "https://api.deepseek.com/v1/chat/completions", "deepseek-chat"),
         OPENROUTER("openrouter", "https://openrouter.ai/api/v1/chat/completions", "deepseek/deepseek-v3.2-251201"),
         QINIU_CLOUD("qiniu_cloud", "https://api.qnaigc.com/v1/chat/completions", "deepseek/deepseek-v3.2-251201"),
+        QINIU_CLOUD_ANTHROPIC("qiniu_cloud_anthropic", "https://anthropic.qnaigc.com/v1/messages", "claude-3-5-sonnet-20241022"),
         CUSTOM("custom", "", "");
 
         private final String id;
@@ -85,6 +96,9 @@ public class LLMConfig {
             if (normalized.contains("deepseek.com")) {
                 return DEEPSEEK_OFFICIAL;
             }
+            if (normalized.contains("anthropic.qnaigc.com")) {
+                return QINIU_CLOUD_ANTHROPIC;
+            }
             if (normalized.contains("qnaigc.com") || normalized.contains("qiniu")) {
                 return QINIU_CLOUD;
             }
@@ -114,14 +128,35 @@ public class LLMConfig {
     public static String aiApiKey = DEFAULT_API_KEY_PLACEHOLDER;
     public static String aiEndpoint = Provider.QINIU_CLOUD.getEndpoint();
     public static String aiModel = Provider.QINIU_CLOUD.getDefaultModel();
+    public static String aiModelName = Provider.QINIU_CLOUD.getDefaultModel();
     public static String aiSystemPrompt = DEFAULT_SYSTEM_PROMPT;
     public static boolean aiStreamingEnabled = false;
-    public static double aiTemperature = 0.95D;
-    public static double aiTopP = 0.92D;
-    public static int aiMaxOutputTokens = 512;
+    public static double aiTemperature = DEFAULT_TEMPERATURE;
+    public static double aiTopP = DEFAULT_TOP_P;
+    public static int aiMaxOutputTokens = DEFAULT_MAX_OUTPUT_TOKENS;
     public static Map<String, String> nbtStructures = new HashMap<>();
+    private static final Map<String, ProviderProfile> providerProfiles = new LinkedHashMap<>();
+
+    public record ProviderSettings(String providerId, String apiKey, String endpoint, String modelId, String modelName) {
+        public String modelForRequest() {
+            String normalizedModelId = modelId == null ? "" : modelId.trim();
+            if (!normalizedModelId.isEmpty()) {
+                return normalizedModelId;
+            }
+            return modelName == null ? "" : modelName.trim();
+        }
+    }
+
+    private static class ProviderProfile {
+        String providerId;
+        String apiKey;
+        String endpoint;
+        String modelId;
+        String modelName;
+    }
 
     public static boolean isKeyMissing() {
+        ensureLoaded();
         return aiApiKey == null || aiApiKey.isBlank() || aiApiKey.equals(DEFAULT_API_KEY_PLACEHOLDER);
     }
 
@@ -157,69 +192,160 @@ public class LLMConfig {
         return DEFAULT_API_KEY_PLACEHOLDER;
     }
 
+    public static synchronized void ensureLoaded() {
+        if (!loaded && !loading) {
+            load();
+        }
+    }
+
+    public static String getSystemPrompt() {
+        ensureLoaded();
+        return aiSystemPrompt == null ? "" : aiSystemPrompt;
+    }
+
     public static Provider getProvider() {
+        ensureLoaded();
+        return getProviderUnchecked();
+    }
+
+    private static Provider getProviderUnchecked() {
         if (aiProvider == null) {
             aiProvider = Provider.resolve(aiProviderId, aiEndpoint);
+        }
+        if (aiProvider == null) {
+            aiProvider = Provider.QINIU_CLOUD;
         }
         return aiProvider;
     }
 
     public static void setProvider(Provider provider) {
-        aiProvider = provider == null ? Provider.QINIU_CLOUD : provider;
-        if (aiProvider == Provider.CUSTOM) {
-            aiProviderId = normalizeCustomProviderId(aiProviderId);
-            aiEndpoint = normalizeEndpoint(aiEndpoint);
-        } else {
-            aiProviderId = aiProvider.getId();
-            aiEndpoint = aiProvider.getEndpoint();
+        setProvider(provider, false);
+    }
+
+    public static void setProvider(Provider provider, boolean preserveCustomEndpoint) {
+        if (!loading) {
+            ensureLoaded();
         }
+        saveCurrentFieldsToActiveProfile();
+        aiProvider = provider == null ? Provider.QINIU_CLOUD : provider;
+        if (preserveCustomEndpoint && aiEndpoint != null && !aiEndpoint.isBlank()) {
+            getProfile(aiProvider).endpoint = normalizeEndpoint(aiEndpoint);
+        }
+        applyActiveProfileToFields();
+        apiKeyMarkedInvalid = false;
     }
 
     public static String getStoredProviderId() {
-        if (getProvider() == Provider.CUSTOM) {
-            return normalizeCustomProviderId(aiProviderId);
-        }
-        return getProvider().getId();
+        ensureLoaded();
+        return getStoredProviderIdUnchecked();
+    }
+
+    private static String getStoredProviderIdUnchecked() {
+        return getProviderSettingsUnchecked(getProviderUnchecked()).providerId();
     }
 
     public static void setCustomProviderId(String providerId) {
+        if (!loading) {
+            ensureLoaded();
+        }
         aiProvider = Provider.CUSTOM;
         aiProviderId = normalizeCustomProviderId(providerId);
+        getProfile(Provider.CUSTOM).providerId = aiProviderId;
     }
 
     public static String getResolvedEndpoint() {
-        Provider provider = getProvider();
-        if (provider == Provider.CUSTOM) {
-            return normalizeChatEndpoint(aiEndpoint);
-        }
-        return provider.getEndpoint();
+        ensureLoaded();
+        return getResolvedEndpointUnchecked();
+    }
+
+    private static String getResolvedEndpointUnchecked() {
+        return getProviderSettingsUnchecked(getProviderUnchecked()).endpoint();
     }
 
     public static EndpointFormat getResolvedEndpointFormat() {
-        return detectEndpointFormat(getResolvedEndpoint());
+        ensureLoaded();
+        return detectEndpointFormat(getResolvedEndpointUnchecked());
     }
 
     public static String getResolvedModel() {
-        String normalizedModel = aiModel == null ? "" : aiModel.trim();
-        if (!normalizedModel.isEmpty()) {
-            return normalizedModel;
-        }
-        return getProvider() == Provider.CUSTOM ? "" : getProvider().getDefaultModel();
+        ensureLoaded();
+        return getResolvedModelUnchecked();
+    }
+
+    private static String getResolvedModelUnchecked() {
+        return getProviderSettingsUnchecked(getProviderUnchecked()).modelForRequest();
+    }
+
+    public static String getResolvedModelName() {
+        ensureLoaded();
+        return getProviderSettingsUnchecked(getProviderUnchecked()).modelName();
+    }
+
+    public static ProviderSettings getProviderSettings(Provider provider) {
+        ensureLoaded();
+        return getProviderSettingsUnchecked(provider == null ? Provider.QINIU_CLOUD : provider);
+    }
+
+    private static ProviderSettings getProviderSettingsUnchecked(Provider provider) {
+        Provider normalizedProvider = provider == null ? Provider.QINIU_CLOUD : provider;
+        ProviderProfile profile = getProfile(normalizedProvider);
+        normalizeProfile(normalizedProvider, profile);
+        return new ProviderSettings(
+                profile.providerId,
+                profile.apiKey,
+                profile.endpoint,
+                profile.modelId,
+                profile.modelName
+        );
+    }
+
+    public static void saveProviderSettings(Provider provider, String providerId, String apiKey, String endpoint,
+                                            String modelId, String modelName) {
+        ensureLoaded();
+        Provider normalizedProvider = provider == null ? Provider.QINIU_CLOUD : provider;
+        ProviderProfile profile = getProfile(normalizedProvider);
+        profile.providerId = normalizedProvider == Provider.CUSTOM
+                ? normalizeCustomProviderId(providerId)
+                : normalizedProvider.getId();
+        profile.apiKey = normalizeApiKey(apiKey);
+        profile.endpoint = normalizeEndpoint(endpoint);
+        profile.modelId = normalizeModelForProvider(normalizedProvider, modelId);
+        profile.modelName = normalizeModelName(modelName, profile.modelId);
+
+        aiProvider = normalizedProvider;
+        applyActiveProfileToFields();
+        save();
     }
     public static boolean isStreamingEnabled() {
+        ensureLoaded();
         return aiStreamingEnabled;
     }
 
     public static double getConfiguredTemperature() {
-        return clampDouble(aiTemperature, 0.0D, 2.0D, 0.95D);
+        ensureLoaded();
+        return getConfiguredTemperatureUnchecked();
+    }
+
+    private static double getConfiguredTemperatureUnchecked() {
+        return clampDouble(aiTemperature, 0.0D, 2.0D, DEFAULT_TEMPERATURE);
     }
 
     public static double getConfiguredTopP() {
-        return clampDouble(aiTopP, 0.1D, 1.0D, 0.92D);
+        ensureLoaded();
+        return getConfiguredTopPUnchecked();
+    }
+
+    private static double getConfiguredTopPUnchecked() {
+        return clampDouble(aiTopP, 0.1D, 1.0D, DEFAULT_TOP_P);
     }
 
     public static int getConfiguredMaxOutputTokens() {
-        return clampInt(aiMaxOutputTokens, 64, 4096, 512);
+        ensureLoaded();
+        return getConfiguredMaxOutputTokensUnchecked();
+    }
+
+    private static int getConfiguredMaxOutputTokensUnchecked() {
+        return clampInt(aiMaxOutputTokens, 64, 4096, DEFAULT_MAX_OUTPUT_TOKENS);
     }
 
     public static int getEstimatedContextWindowTokens() {
@@ -279,40 +405,179 @@ public class LLMConfig {
 
     private static void normalizeSettings() {
         aiProvider = Provider.resolve(aiProviderId, aiEndpoint);
-        setProvider(aiProvider);
-        if (aiApiKey == null || aiApiKey.isBlank()) {
-            aiApiKey = DEFAULT_API_KEY_PLACEHOLDER;
+        if (aiProvider == null) {
+            aiProvider = Provider.QINIU_CLOUD;
+        }
+        if (!providerProfilesLoaded) {
+            saveCurrentFieldsToActiveProfile();
+            providerProfilesLoaded = true;
+        }
+        for (Provider provider : Provider.values()) {
+            normalizeProfile(provider, getProfile(provider));
+        }
+        applyActiveProfileToFields();
+
+        // 标准化 systemPrompt，确保不为 null
+        if (aiSystemPrompt == null || aiSystemPrompt.isEmpty()) {
+            aiSystemPrompt = DEFAULT_SYSTEM_PROMPT;
         } else {
-            aiApiKey = aiApiKey.trim();
+            aiSystemPrompt = aiSystemPrompt.replace("\r\n", "\n").replace('\r', '\n');
         }
-        aiModel = getResolvedModel();
-        if (getProvider() == Provider.CUSTOM) {
-            aiProviderId = normalizeCustomProviderId(aiProviderId);
-            aiEndpoint = normalizeEndpoint(aiEndpoint);
-        }
-        aiSystemPrompt = aiSystemPrompt == null ? "" : aiSystemPrompt.replace("\r\n", "\n").replace('\r', '\n');
-        aiStreamingEnabled = aiStreamingEnabled;
-        aiTemperature = getConfiguredTemperature();
-        aiTopP = getConfiguredTopP();
-        aiMaxOutputTokens = getConfiguredMaxOutputTokens();
+        // 验证并修正数值范围
+        aiTemperature = clampDouble(aiTemperature, 0.0D, 2.0D, DEFAULT_TEMPERATURE);
+        aiTopP = clampDouble(aiTopP, 0.1D, 1.0D, DEFAULT_TOP_P);
+        aiMaxOutputTokens = clampInt(aiMaxOutputTokens, 64, 4096, DEFAULT_MAX_OUTPUT_TOKENS);
 
         if (nbtStructures == null) {
             nbtStructures = new HashMap<>();
         }
     }
 
-    public static void load() {
+    private static void resetProviderProfiles() {
+        providerProfiles.clear();
+        for (Provider provider : Provider.values()) {
+            providerProfiles.put(provider.getId(), createDefaultProfile(provider));
+        }
+        providerProfilesLoaded = false;
+    }
+
+    private static ProviderProfile createDefaultProfile(Provider provider) {
+        Provider normalizedProvider = provider == null ? Provider.QINIU_CLOUD : provider;
+        ProviderProfile profile = new ProviderProfile();
+        profile.providerId = normalizedProvider.getId();
+        profile.apiKey = DEFAULT_API_KEY_PLACEHOLDER;
+        profile.endpoint = normalizedProvider.getEndpoint();
+        profile.modelId = normalizedProvider.getDefaultModel();
+        profile.modelName = normalizedProvider.getDefaultModel();
+        return profile;
+    }
+
+    private static ProviderProfile getProfile(Provider provider) {
+        Provider normalizedProvider = provider == null ? Provider.QINIU_CLOUD : provider;
+        return providerProfiles.computeIfAbsent(normalizedProvider.getId(), ignored -> createDefaultProfile(normalizedProvider));
+    }
+
+    private static void normalizeProfile(Provider provider, ProviderProfile profile) {
+        Provider normalizedProvider = provider == null ? Provider.QINIU_CLOUD : provider;
+        if (profile.providerId == null || profile.providerId.isBlank()) {
+            profile.providerId = normalizedProvider == Provider.CUSTOM ? Provider.CUSTOM.getId() : normalizedProvider.getId();
+        } else if (normalizedProvider != Provider.CUSTOM) {
+            profile.providerId = normalizedProvider.getId();
+        } else {
+            profile.providerId = normalizeCustomProviderId(profile.providerId);
+        }
+
+        profile.apiKey = normalizeApiKey(profile.apiKey);
+        profile.endpoint = normalizeEndpoint(profile.endpoint);
+        if (profile.endpoint.isEmpty() && normalizedProvider != Provider.CUSTOM) {
+            profile.endpoint = normalizedProvider.getEndpoint();
+        }
+        profile.modelId = normalizeModelForProvider(normalizedProvider, profile.modelId);
+        profile.modelName = normalizeModelName(profile.modelName, profile.modelId);
+    }
+
+    private static void saveCurrentFieldsToActiveProfile() {
+        Provider provider = getProviderUnchecked();
+        ProviderProfile profile = getProfile(provider);
+        profile.providerId = provider == Provider.CUSTOM ? normalizeCustomProviderId(aiProviderId) : provider.getId();
+        profile.apiKey = normalizeApiKey(aiApiKey);
+        profile.endpoint = normalizeEndpoint(aiEndpoint);
+        profile.modelId = normalizeModelForProvider(provider, aiModel);
+        profile.modelName = normalizeModelName(aiModelName, profile.modelId);
+        normalizeProfile(provider, profile);
+    }
+
+    private static void applyActiveProfileToFields() {
+        Provider provider = getProviderUnchecked();
+        ProviderProfile profile = getProfile(provider);
+        normalizeProfile(provider, profile);
+        aiProviderId = profile.providerId;
+        aiApiKey = profile.apiKey;
+        aiEndpoint = profile.endpoint;
+        aiModel = profile.modelId;
+        aiModelName = profile.modelName;
+    }
+
+    private static ProviderProfile copyProfile(Provider provider, ProviderProfile source) {
+        ProviderProfile copy = new ProviderProfile();
+        copy.providerId = source == null ? null : source.providerId;
+        copy.apiKey = source == null ? null : source.apiKey;
+        copy.endpoint = source == null ? null : source.endpoint;
+        copy.modelId = source == null ? null : source.modelId;
+        copy.modelName = source == null ? null : source.modelName;
+        normalizeProfile(provider, copy);
+        return copy;
+    }
+
+    private static void resetToDefaults() {
         aiProvider = Provider.QINIU_CLOUD;
         aiProviderId = aiProvider.getId();
+        aiApiKey = DEFAULT_API_KEY_PLACEHOLDER;
         aiEndpoint = aiProvider.getEndpoint();
+        aiModel = aiProvider.getDefaultModel();
+        aiModelName = aiProvider.getDefaultModel();
+        aiSystemPrompt = DEFAULT_SYSTEM_PROMPT;
+        aiStreamingEnabled = false;
+        aiTemperature = DEFAULT_TEMPERATURE;
+        aiTopP = DEFAULT_TOP_P;
+        aiMaxOutputTokens = DEFAULT_MAX_OUTPUT_TOKENS;
+        nbtStructures = new HashMap<>();
+        resetProviderProfiles();
+        apiKeyMarkedInvalid = false;
+    }
 
-        // 加载公开设置
+    public static synchronized void load() {
+        loading = true;
+        try {
+            resetToDefaults();
+            boolean publicConfigOk = readPublicConfig();
+            boolean privateSecretsOk = readPrivateSecrets();
+
+            normalizeSettings();
+            loaded = true;
+
+            if (!PUBLIC_CONFIG.exists() && publicConfigOk) {
+                try {
+                    savePublicConfig();
+                } catch (IOException e) {
+                    LOGGER.error("Failed to create default Herobrine Companion public AI config at {}", PUBLIC_CONFIG, e);
+                }
+            }
+            if (!PRIVATE_SECRETS.exists() && privateSecretsOk) {
+                try {
+                    savePrivateSecrets();
+                } catch (IOException e) {
+                    LOGGER.error("Failed to create default Herobrine Companion private AI secrets at {}", PRIVATE_SECRETS, e);
+                }
+            }
+        } finally {
+            loading = false;
+        }
+    }
+
+    private static boolean readPublicConfig() {
         if (PUBLIC_CONFIG.exists()) {
             try (InputStreamReader reader = new InputStreamReader(new FileInputStream(PUBLIC_CONFIG), StandardCharsets.UTF_8)) {
                 ConfigData data = GSON.fromJson(reader, ConfigData.class);
                 if (data != null) {
                     if (data.aiModel != null) aiModel = data.aiModel;
-                    if (data.aiSystemPrompt != null) aiSystemPrompt = data.aiSystemPrompt;
+                    if (data.aiModelName != null) {
+                        aiModelName = data.aiModelName;
+                    } else if (data.aiModel != null) {
+                        aiModelName = data.aiModel;
+                    }
+                    if (data.activeProvider != null) aiProviderId = data.activeProvider;
+                    if (data.aiProvider != null) aiProviderId = data.aiProvider;
+                    if (data.providers != null) {
+                        applyProfilesFromData(data.providers);
+                    }
+                    if (data.aiSystemPrompt != null) {
+                        aiSystemPrompt = data.aiSystemPrompt;
+                    } else if (data.systemPrompt != null) {
+                        aiSystemPrompt = data.systemPrompt;
+                    } else if (data.aiPrompt != null) {
+                        aiSystemPrompt = data.aiPrompt;
+                    }
                     if (data.aiStreamingEnabled != null) aiStreamingEnabled = data.aiStreamingEnabled;
                     if (data.aiTemperature != null) aiTemperature = data.aiTemperature;
                     if (data.aiTopP != null) aiTopP = data.aiTopP;
@@ -320,55 +585,110 @@ public class LLMConfig {
 
                     if (data.nbtStructures != null) nbtStructures = data.nbtStructures;
                 }
-            } catch (Exception e) { e.printStackTrace(); }
+            } catch (Exception e) {
+                LOGGER.error("Failed to load Herobrine Companion public AI config from {}", PUBLIC_CONFIG, e);
+                return false;
+            }
         }
+        return true;
+    }
 
-        // 加载私密密钥（覆盖默认值）
+    private static boolean readPrivateSecrets() {
         if (PRIVATE_SECRETS.exists()) {
             try (InputStreamReader reader = new InputStreamReader(new FileInputStream(PRIVATE_SECRETS), StandardCharsets.UTF_8)) {
                 SecretData data = GSON.fromJson(reader, SecretData.class);
                 if (data != null) {
-                    if (data.aiApiKey != null) aiApiKey = data.aiApiKey;
+                    if (data.activeProvider != null) aiProviderId = data.activeProvider;
                     if (data.aiProvider != null) aiProviderId = data.aiProvider;
+                    if (data.providers != null) {
+                        applyProfilesFromData(data.providers);
+                    }
+                    if (data.aiApiKey != null) aiApiKey = data.aiApiKey;
                     if (data.aiEndpoint != null) aiEndpoint = data.aiEndpoint;
-                    aiProvider = Provider.resolve(data.aiProvider, data.aiEndpoint);
+                    if (data.aiModel != null) aiModel = data.aiModel;
+                    if (data.aiModelName != null) {
+                        aiModelName = data.aiModelName;
+                    } else if (data.aiModel != null) {
+                        aiModelName = data.aiModel;
+                    }
+                    aiProvider = Provider.resolve(aiProviderId, data.aiEndpoint);
                 }
-            } catch (Exception e) { e.printStackTrace(); }
+            } catch (Exception e) {
+                LOGGER.error("Failed to load Herobrine Companion private AI secrets from {}", PRIVATE_SECRETS, e);
+                return false;
+            }
         }
-
-        normalizeSettings();
-        save();
+        return true;
     }
 
-    public static void save() {
+    public static synchronized void save() {
         try {
+            loaded = true;
+            saveCurrentFieldsToActiveProfile();
             normalizeSettings();
             markApiKeyValid();
+            savePublicConfig();
+            savePrivateSecrets();
+        } catch (Exception e) {
+            LOGGER.error("Failed to save Herobrine Companion AI config", e);
+        }
+    }
 
-            // 保存公开配置
-            PUBLIC_CONFIG.getParentFile().mkdirs();
-            ConfigData pData = new ConfigData();
-            pData.aiModel = aiModel;
-            pData.aiSystemPrompt = aiSystemPrompt;
-            pData.aiStreamingEnabled = aiStreamingEnabled;
-            pData.aiTemperature = aiTemperature;
-            pData.aiTopP = aiTopP;
-            pData.aiMaxOutputTokens = aiMaxOutputTokens;
-            pData.nbtStructures = nbtStructures;
-            try (Writer writer = new OutputStreamWriter(new FileOutputStream(PUBLIC_CONFIG), StandardCharsets.UTF_8)) {
-                GSON.toJson(pData, writer);
-            }
+    private static void savePublicConfig() throws IOException {
+        PUBLIC_CONFIG.getParentFile().mkdirs();
+        ConfigData pData = new ConfigData();
+        pData.aiModel = aiModel;
+        pData.aiModelName = aiModelName;
+        pData.activeProvider = getProviderUnchecked().getId();
+        pData.aiSystemPrompt = aiSystemPrompt;
+        pData.aiStreamingEnabled = aiStreamingEnabled;
+        pData.aiTemperature = aiTemperature;
+        pData.aiTopP = aiTopP;
+        pData.aiMaxOutputTokens = aiMaxOutputTokens;
+        pData.nbtStructures = nbtStructures;
+        try (Writer writer = new OutputStreamWriter(new FileOutputStream(PUBLIC_CONFIG), StandardCharsets.UTF_8)) {
+            GSON.toJson(pData, writer);
+        }
+    }
 
-            // 保存私密密钥
-            PRIVATE_SECRETS.getParentFile().mkdirs();
-            SecretData sData = new SecretData();
-            sData.aiApiKey = aiApiKey;
-            sData.aiEndpoint = getResolvedEndpoint();
-            sData.aiProvider = getStoredProviderId();
-            try (Writer writer = new OutputStreamWriter(new FileOutputStream(PRIVATE_SECRETS), StandardCharsets.UTF_8)) {
-                GSON.toJson(sData, writer);
+    private static void savePrivateSecrets() throws IOException {
+        PRIVATE_SECRETS.getParentFile().mkdirs();
+        SecretData sData = new SecretData();
+        sData.aiApiKey = aiApiKey;
+        sData.aiEndpoint = getResolvedEndpointUnchecked();
+        sData.aiProvider = getStoredProviderIdUnchecked();
+        sData.aiModel = aiModel;
+        sData.aiModelName = aiModelName;
+        sData.activeProvider = getProviderUnchecked().getId();
+        sData.providers = copyProfilesForSave();
+        try (Writer writer = new OutputStreamWriter(new FileOutputStream(PRIVATE_SECRETS), StandardCharsets.UTF_8)) {
+            GSON.toJson(sData, writer);
+        }
+    }
+
+    private static void applyProfilesFromData(Map<String, ProviderProfile> savedProfiles) {
+        if (savedProfiles == null || savedProfiles.isEmpty()) {
+            return;
+        }
+        for (Map.Entry<String, ProviderProfile> entry : savedProfiles.entrySet()) {
+            Provider provider = Provider.fromSavedValue(entry.getKey());
+            if (provider == null && entry.getValue() != null) {
+                provider = Provider.fromSavedValue(entry.getValue().providerId);
             }
-        } catch (Exception e) { e.printStackTrace(); }
+            if (provider == null) {
+                continue;
+            }
+            providerProfiles.put(provider.getId(), copyProfile(provider, entry.getValue()));
+        }
+        providerProfilesLoaded = true;
+    }
+
+    private static Map<String, ProviderProfile> copyProfilesForSave() {
+        Map<String, ProviderProfile> profilesForSave = new LinkedHashMap<>();
+        for (Provider provider : Provider.values()) {
+            profilesForSave.put(provider.getId(), copyProfile(provider, getProfile(provider)));
+        }
+        return profilesForSave;
     }
 
 
@@ -397,51 +717,36 @@ public class LLMConfig {
         return endpoint == null ? "" : endpoint.trim();
     }
 
+    private static String normalizeApiKey(String apiKey) {
+        String normalized = apiKey == null ? "" : apiKey.trim();
+        return normalized.isEmpty() ? DEFAULT_API_KEY_PLACEHOLDER : normalized;
+    }
+
+    private static String normalizeModelForProvider(Provider provider, String model) {
+        String normalized = model == null ? "" : model.trim();
+        if (!normalized.isEmpty()) {
+            return normalized;
+        }
+        Provider normalizedProvider = provider == null ? Provider.QINIU_CLOUD : provider;
+        return normalizedProvider == Provider.CUSTOM ? "" : normalizedProvider.getDefaultModel();
+    }
+
+    private static String normalizeModelName(String modelName, String modelId) {
+        String normalized = modelName == null ? "" : modelName.trim();
+        if (!normalized.isEmpty()) {
+            return normalized;
+        }
+        return modelId == null ? "" : modelId.trim();
+    }
+
     public static String normalizeChatEndpoint(String endpoint) {
-        String normalized = normalizeEndpoint(endpoint);
-        if (normalized.isEmpty()) {
-            return "";
-        }
-
-        String withoutQuery = removeQueryAndFragment(normalized);
-        String trailing = normalized.substring(withoutQuery.length());
-        withoutQuery = trimTrailingSlash(withoutQuery);
-        String lower = withoutQuery.toLowerCase(Locale.ROOT);
-
-        if (lower.contains("anthropic.com") || lower.endsWith("/v1/messages") || lower.endsWith("/messages")) {
-            if (lower.endsWith("/models")) {
-                return withoutQuery.substring(0, withoutQuery.length() - "/models".length()) + "/messages" + trailing;
-            }
-            if (lower.endsWith("/v1")) {
-                return withoutQuery + "/messages" + trailing;
-            }
-            if (hasNoPath(withoutQuery)) {
-                return withoutQuery + "/v1/messages" + trailing;
-            }
-            return withoutQuery + trailing;
-        }
-
-        if (lower.endsWith("/chat/completions")) {
-            return withoutQuery + trailing;
-        }
-        if (lower.endsWith("/models")) {
-            return withoutQuery.substring(0, withoutQuery.length() - "/models".length()) + "/chat/completions" + trailing;
-        }
-        if (lower.matches(".*/v\\d+(\\.\\d+)?")) {
-            return withoutQuery + "/chat/completions" + trailing;
-        }
-        if (hasNoPath(withoutQuery)) {
-            if (lower.contains("deepseek.com")) {
-                return withoutQuery + "/chat/completions" + trailing;
-            }
-            return withoutQuery + "/v1/chat/completions" + trailing;
-        }
-        return withoutQuery + trailing;
+        return normalizeEndpoint(endpoint);
     }
 
     public static EndpointFormat detectEndpointFormat(String endpoint) {
-        String normalized = normalizeChatEndpoint(endpoint).toLowerCase(Locale.ROOT);
-        if (normalized.contains("anthropic.com") || normalized.endsWith("/v1/messages") || normalized.contains("/v1/messages?")) {
+        String normalized = normalizeEndpoint(endpoint).toLowerCase(Locale.ROOT);
+        String withoutQuery = removeQueryAndFragment(normalized);
+        if (withoutQuery.contains("anthropic.com") || withoutQuery.endsWith("/v1/messages") || withoutQuery.endsWith("/messages")) {
             return EndpointFormat.ANTHROPIC;
         }
         return EndpointFormat.OPENAI_COMPAT;
@@ -460,31 +765,28 @@ public class LLMConfig {
         return cutIndex >= 0 ? endpoint.substring(0, cutIndex) : endpoint;
     }
 
-    private static String trimTrailingSlash(String value) {
-        String trimmed = value;
-        while (trimmed.endsWith("/")) {
-            trimmed = trimmed.substring(0, trimmed.length() - 1);
-        }
-        return trimmed;
-    }
-
-    private static boolean hasNoPath(String endpoint) {
-        try {
-            String path = URI.create(endpoint).getPath();
-            return path == null || path.isBlank() || "/".equals(path);
-        } catch (Exception ignored) {
-            return false;
-        }
-    }
-
     private static class ConfigData {
         String aiModel;
+        String aiModelName;
+        String activeProvider;
+        String aiProvider;
         String aiSystemPrompt;
+        String systemPrompt;
+        String aiPrompt;
         Boolean aiStreamingEnabled;
         Double aiTemperature;
         Double aiTopP;
         Integer aiMaxOutputTokens;
         Map<String, String> nbtStructures;
+        Map<String, ProviderProfile> providers;
 
-    } private static class SecretData { String aiApiKey; String aiEndpoint; String aiProvider; }
+    } private static class SecretData {
+        String aiApiKey;
+        String aiEndpoint;
+        String aiProvider;
+        String aiModel;
+        String aiModelName;
+        String activeProvider;
+        Map<String, ProviderProfile> providers;
+    }
 }
