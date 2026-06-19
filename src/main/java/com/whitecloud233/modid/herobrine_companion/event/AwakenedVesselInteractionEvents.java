@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.event;
 
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.modid.herobrine_companion.init.ModItems;
 import com.whitecloud233.modid.herobrine_companion.entity.awakened.containment.AwakenedMobCaptureService;
 import com.whitecloud233.modid.herobrine_companion.entity.awakened.containment.AwakenedVesselActionGuard;
 import com.whitecloud233.modid.herobrine_companion.entity.awakened.containment.AwakenedVesselFeedback;
@@ -39,7 +40,7 @@ public final class AwakenedVesselInteractionEvents {
         }
 
         ItemStack stack = event.getItemStack();
-        if (!stack.is(HerobrineCompanion.AWAKENED_VESSEL.get())) {
+        if (!stack.is(ModItems.AWAKENED_VESSEL.get())) {
             return;
         }
         if (AwakenedVesselActionGuard.blocksDuplicateEntityInteraction(player, player.serverLevel())) {
