@@ -1,7 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.datagen;
 
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
-import com.whitecloud233.modid.herobrine_companion.event.ModEvents;
+import com.whitecloud233.modid.herobrine_companion.init.ModEntities;
 import net.minecraft.core.HolderSet;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.data.worldgen.BootstapContext;
@@ -23,9 +23,9 @@ public class ModBiomeModifiers {
         var biomes = context.lookup(Registries.BIOME);
 
         context.register(SPAWN_GHOST_STEVE, new ForgeBiomeModifiers.AddSpawnsBiomeModifier(
-                biomes.getOrThrow(BiomeTags.IS_OVERWORLD),
-                // [修改] 将权重从 1 增加到 100，以便更容易生成
-                List.of(new MobSpawnSettings.SpawnerData(ModEvents.GHOST_STEVE.get(), 100, 1, 1))
+            biomes.getOrThrow(BiomeTags.IS_OVERWORLD),
+            // [修改] 将权重从 1 增加到 100，以便更容易生成
+            List.of(new MobSpawnSettings.SpawnerData(ModEntities.GHOST_STEVE.get(), 100, 1, 1))
         ));
     }
 }

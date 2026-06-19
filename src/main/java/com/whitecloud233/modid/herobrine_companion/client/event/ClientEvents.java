@@ -14,7 +14,8 @@ import com.whitecloud233.modid.herobrine_companion.client.model.HeroModel;
 import com.whitecloud233.modid.herobrine_companion.client.render.*;
 import com.whitecloud233.modid.herobrine_companion.compat.ArmourerWorkshop.HeroAWCompat;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
-import com.whitecloud233.modid.herobrine_companion.event.ModEvents;
+import com.whitecloud233.modid.herobrine_companion.init.ModBlockEntities;
+import com.whitecloud233.modid.herobrine_companion.init.ModEntities;
 import com.whitecloud233.modid.herobrine_companion.item.PoemOfTheEndItem;
 import com.whitecloud233.modid.herobrine_companion.world.inventory.ModMenus;
 
@@ -52,19 +53,19 @@ public class ClientEvents {
     public static void registerRenderers(EntityRenderersEvent.RegisterRenderers event) {
         LOGGER.info(">>> [RENDERER REGISTER] 正在注册渲染器... <<<");
 
-        event.registerEntityRenderer(ModEvents.HERO.get(), HeroRenderer::new);
-        event.registerEntityRenderer(ModEvents.DESTRUCTION_GOD_HEROBRINE.get(), DestructionGodHerobrineRenderer::new);
-        event.registerBlockEntityRenderer(HerobrineCompanion.END_RING_PORTAL_BE.get(), EndRingPortalRenderer::new);
+        event.registerEntityRenderer(ModEntities.HERO.get(), HeroRenderer::new);
+        event.registerEntityRenderer(ModEntities.DESTRUCTION_GOD_HEROBRINE.get(), DestructionGodHerobrineRenderer::new);
+        event.registerBlockEntityRenderer(ModBlockEntities.END_RING_PORTAL_BE.get(), EndRingPortalRenderer::new);
 
-        event.registerEntityRenderer(ModEvents.GHOST_CREEPER.get(), GhostCreeperRenderer::new);
-        event.registerEntityRenderer(ModEvents.GHOST_ZOMBIE.get(), GhostZombieRenderer::new);
-        event.registerEntityRenderer(ModEvents.GHOST_SKELETON.get(), GhostSkeletonRenderer::new);
-        event.registerEntityRenderer(ModEvents.GHOST_STEVE.get(), GhostSteveRenderer::new);
-        event.registerEntityRenderer(ModEvents.GLITCH_ECHO.get(), GlitchEchoRenderer::new);
-        event.registerEntityRenderer(ModEvents.REALM_BREAKER_LIGHTNING.get(), RealmBreakerLightningRenderer::new);
-        event.registerEntityRenderer(ModEvents.VOID_RIFT.get(), VoidRiftRenderer::new);
-        event.registerEntityRenderer(ModEvents.GLITCH_VILLAGER.get(), GlitchVillagerRenderer::new);
-        event.registerEntityRenderer(ModEvents.CLEAVE_BLADE.get(), CleaveBladeRenderer::new);
+        event.registerEntityRenderer(ModEntities.GHOST_CREEPER.get(), GhostCreeperRenderer::new);
+        event.registerEntityRenderer(ModEntities.GHOST_ZOMBIE.get(), GhostZombieRenderer::new);
+        event.registerEntityRenderer(ModEntities.GHOST_SKELETON.get(), GhostSkeletonRenderer::new);
+        event.registerEntityRenderer(ModEntities.GHOST_STEVE.get(), GhostSteveRenderer::new);
+        event.registerEntityRenderer(ModEntities.GLITCH_ECHO.get(), GlitchEchoRenderer::new);
+        event.registerEntityRenderer(ModEntities.REALM_BREAKER_LIGHTNING.get(), RealmBreakerLightningRenderer::new);
+        event.registerEntityRenderer(ModEntities.VOID_RIFT.get(), VoidRiftRenderer::new);
+        event.registerEntityRenderer(ModEntities.GLITCH_VILLAGER.get(), GlitchVillagerRenderer::new);
+        event.registerEntityRenderer(ModEntities.CLEAVE_BLADE.get(), CleaveBladeRenderer::new);
         event.registerEntityRenderer(EntityType.BLOCK_DISPLAY, FaultAwareBlockDisplayRenderer::new);
 
         // 尝试正常注册
@@ -87,7 +88,7 @@ public class ClientEvents {
             return;
         }
 
-        var heroRenderer = event.getRenderer(ModEvents.HERO.get());
+        var heroRenderer = event.getRenderer(ModEntities.HERO.get());
         var playerRenderer = event.getSkin("default");
         if (playerRenderer == null) {
             playerRenderer = event.getSkin("slim");

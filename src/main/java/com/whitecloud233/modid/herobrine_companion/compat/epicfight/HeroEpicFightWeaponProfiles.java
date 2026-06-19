@@ -1,6 +1,6 @@
 package com.whitecloud233.modid.herobrine_companion.compat.epicfight;
 
-import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.modid.herobrine_companion.init.ModItems;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.item.PoemOfTheEndItem;
 import net.minecraft.resources.ResourceLocation;
@@ -33,7 +33,7 @@ public final class HeroEpicFightWeaponProfiles {
             return;
         }
 
-        Item poem = HerobrineCompanion.POEM_OF_THE_END.get();
+        Item poem = ModItems.POEM_OF_THE_END.get();
         normalProfile = buildPreset(WeaponCapabilityPresets.SWORD, poem, CapabilityItem.Styles.ONE_HAND);
         realmBreakerProfile = buildPreset(WeaponCapabilityPresets.SWORD, poem, CapabilityItem.Styles.ONE_HAND);
         thunderProfile = buildPreset(WeaponCapabilityPresets.SWORD, poem, CapabilityItem.Styles.ONE_HAND);

@@ -12,6 +12,10 @@ import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroDataHan
 import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroDimensionHandler;
 import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroLogic;
 import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroWorldData;
+import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroCombatProtection;
+import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroCombatTimeline;
+import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroTradeHandler;
+import com.whitecloud233.modid.herobrine_companion.entity.logic.HeroGunAdapter;
 import com.whitecloud233.modid.herobrine_companion.event.HeroTrades;
 import com.whitecloud233.modid.herobrine_companion.event.HeroVisuals;
 import com.whitecloud233.modid.herobrine_companion.world.structure.ModStructures;
@@ -66,9 +70,6 @@ import java.util.Set;
 import java.util.UUID;
 
 public class HeroEntity extends PathfinderMob implements Merchant {
-    private static final String[] VIRTUAL_BULLET_KEYWORDS = new String[] {
-            "bullet", "ammo", "round", "cartridge", "shell", "slug", "musket_ball", "musketball"
-    };
 
     public static final EntityDataAccessor<Boolean> IS_FLOATING = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.BOOLEAN);
     public static final EntityDataAccessor<Integer> TRUST_LEVEL = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.INT);
@@ -120,8 +121,7 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     private long lastSummonedTime = 0;
     private boolean isLoadedFromDisk = false;
     private boolean handlingHeroHurt = false;
-    private int battleBufferedAction = BATTLE_BUFFER_NONE;
-    private int battleBufferTicks = 0;
+    private final HeroCombatTimeline combatTimeline = new HeroCombatTimeline();
     // --- 姿势编辑器专用数据 ---
     public boolean isPoseEditing = false;
     // 0=头, 1=身体, 2=右上臂, 3=右小臂, 4=左上臂, 5=左小臂, 6=右大腿, 7=右小腿, 8=左大腿, 9=左小腿
@@ -134,7 +134,7 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     );
 
     @Nullable private Player tradingPlayer;
-    @Nullable private MerchantOffers offers;
+    private final HeroTradeHandler tradeHandler = new HeroTradeHandler();
     private final HeroBrain brain;
     private final FlyingPathNavigation flyingNavigation;
     private final GroundPathNavigation groundNavigation;
@@ -339,33 +339,11 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     }
 
     public boolean shouldPreventFriendlyFire(@Nullable Entity target) {
-        if (!(target instanceof LivingEntity living)) {
-            return false;
-        }
-        if (living == this || living instanceof HeroEntity) {
-            return true;
-        }
-        if (!this.hasCompanionFriendlyFireProtection()) {
-            return false;
-        }
-        if (living instanceof Player) {
-            return true;
-        }
-        if (this.isAlliedTo(living) || living.isAlliedTo(this)) {
-            return true;
-        }
-
-        UUID ownerUUID = this.getOwnerUUID();
-        if (ownerUUID != null && ownerUUID.equals(living.getUUID())) {
-            return true;
-        }
-
-        Player owner = this.getOwnerPlayer();
-        return owner != null && (living.is(owner) || living.isAlliedTo(owner) || owner.isAlliedTo(living));
+        return HeroCombatProtection.shouldPreventFriendlyFire(this, target);
     }
 
     public boolean hasCompanionFriendlyFireProtection() {
-        return this.getOwnerUUID() != null && !this.isChallengeActiveState();
+        return HeroCombatProtection.hasCompanionFriendlyFireProtection(this);
     }
 
     public boolean isChallengeActiveState() {
@@ -385,60 +363,7 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         if (!projectile.isEmpty()) {
             return projectile;
         }
-
-        if (weaponStack == null || weaponStack.isEmpty()) {
-            return ItemStack.EMPTY;
-        }
-
-        if (weaponStack.getItem() instanceof ProjectileWeaponItem || weaponStack.getItem() instanceof CrossbowItem) {
-            ItemStack virtualProjectile = this.getVirtualProjectileFor(weaponStack);
-            return virtualProjectile.isEmpty() ? new ItemStack(Items.ARROW) : virtualProjectile;
-        }
-
-        UseAnim useAnim = weaponStack.getUseAnimation();
-        if (useAnim == UseAnim.BOW || useAnim == UseAnim.CROSSBOW) {
-            ItemStack virtualProjectile = this.getVirtualProjectileFor(weaponStack);
-            return virtualProjectile.isEmpty() ? new ItemStack(Items.ARROW) : virtualProjectile;
-        }
-
-        return ItemStack.EMPTY;
-    }
-
-    private ItemStack getVirtualProjectileFor(ItemStack weaponStack) {
-        ResourceLocation weaponId = ForgeRegistries.ITEMS.getKey(weaponStack.getItem());
-        String weaponPath = weaponId != null ? weaponId.getPath().toLowerCase() : "";
-
-        if (!this.looksLikeGunWeapon(weaponPath)) {
-            return new ItemStack(Items.ARROW);
-        }
-
-        for (net.minecraft.world.item.Item item : ForgeRegistries.ITEMS.getValues()) {
-            ResourceLocation itemId = ForgeRegistries.ITEMS.getKey(item);
-            if (itemId == null) {
-                continue;
-            }
-
-            String itemPath = itemId.getPath().toLowerCase();
-            for (String keyword : VIRTUAL_BULLET_KEYWORDS) {
-                if (itemPath.contains(keyword)) {
-                    return new ItemStack(item);
-                }
-            }
-        }
-
-        return new ItemStack(Items.ARROW);
-    }
-
-    private boolean looksLikeGunWeapon(String weaponPath) {
-        return weaponPath.contains("gun")
-                || weaponPath.contains("firearm")
-                || weaponPath.contains("rifle")
-                || weaponPath.contains("pistol")
-                || weaponPath.contains("revolver")
-                || weaponPath.contains("musket")
-                || weaponPath.contains("shotgun")
-                || weaponPath.contains("cannon")
-                || weaponPath.contains("blaster");
+        return HeroGunAdapter.getProjectile(this, weaponStack);
     }
 
     @Override
@@ -479,18 +404,7 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     }
 
     private void handleNonChallengeRetaliation(DamageSource source) {
-        if (this.level().isClientSide || !this.isBattleModeActive() || source == null) {
-            return;
-        }
-
-        Entity attacker = source.getEntity();
-        if (attacker instanceof LivingEntity livingAttacker
-                && com.whitecloud233.modid.herobrine_companion.entity.ai.goal.HeroBattleStanceGoal.canHeroAttackTarget(this, livingAttacker)) {
-            this.setLastHurtByMob(livingAttacker);
-            if (this.getTarget() != livingAttacker) {
-                this.setTarget(livingAttacker);
-            }
-        }
+        HeroCombatProtection.handleNonChallengeRetaliation(this, source);
     }
 
     @Override
@@ -632,17 +546,7 @@ public class HeroEntity extends PathfinderMob implements Merchant {
             compound.putString("OwnerUUID_String", getOwnerUUID().toString());
         }
         // 👇 [新增] 保存姿势编辑器数据
-        compound.putBoolean("IsPoseEditing", this.isPoseEditing);
-        if (this.isPoseEditing) {
-            ListTag poseList = new ListTag();
-            // 遍历 10 个部位
-            for (int i = 0; i < 10; i++) {
-                for (int j = 0; j < 3; j++) {
-                    poseList.add(net.minecraft.nbt.FloatTag.valueOf(this.customPoseAngles[i][j]));
-                }
-            }
-            compound.put("CustomPoseAngles", poseList);
-        }
+        HeroDataHandler.savePoseData(this, compound);
     }
 
     @Override
@@ -676,26 +580,7 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         }
         if (ownerUUID != null) setOwnerUUID(ownerUUID);
         // 👇 [新增] 读取姿势编辑器数据
-        if (compound.contains("IsPoseEditing")) {
-            this.isPoseEditing = compound.getBoolean("IsPoseEditing");
-            // 检查 Tag 类型是否为 List (ID 为 9)
-            if (this.isPoseEditing && compound.contains("CustomPoseAngles", 9)) {
-                // 读取 FloatTag (ID 为 5) 的列表
-                ListTag poseList = compound.getList("CustomPoseAngles", 5);
-                // 确保数据完整 (10 * 3 = 30)
-                if (poseList.size() == 30) {
-                    int index = 0;
-                    for (int i = 0; i < 10; i++) {
-                        for (int j = 0; j < 3; j++) {
-                            this.customPoseAngles[i][j] = poseList.getFloat(index++);
-                        }
-                    }
-                } else {
-                    // 数据损坏则重置
-                    this.isPoseEditing = false;
-                }
-            }
-        }
+        HeroDataHandler.loadPoseData(this, compound);
     }
 
     // 委托装备与NBT处理
@@ -771,6 +656,7 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     public void setBattleComboStep(int step) { entityData.set(BATTLE_COMBO_STEP, step); }
     public int getBattleActionSerial() { return entityData.get(BATTLE_ACTION_SERIAL); }
     public void setBattleActionSerial(int serial) { entityData.set(BATTLE_ACTION_SERIAL, serial); }
+
     public void beginBattleAction(int state) {
         HeroEpicFightDebugLog.event(this, "HeroEntity.beginBattleAction", "nextAction=" + state + ",stateBefore=" + HeroEpicFightDebugLog.heroCoreState(this));
         this.clearBattleBufferedAction();
@@ -792,53 +678,28 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         return this.getBattleActionState() == BATTLE_ACTION_HEAVY_RELEASE || this.shockTicks > 0;
     }
     public int getBattleBufferedAction() {
-        return this.battleBufferedAction;
+        return this.combatTimeline.getBattleBufferedAction();
     }
     public int getBattleBufferTicks() {
-        return this.battleBufferTicks;
+        return this.combatTimeline.getBattleBufferTicks();
     }
     public boolean hasBattleBufferedAction() {
-        return this.battleBufferedAction != BATTLE_BUFFER_NONE && this.battleBufferTicks > 0;
+        return this.combatTimeline.hasBattleBufferedAction();
     }
     public void queueBattleBufferedAction(int bufferedAction, int ticks) {
-        if (!this.isBattleModeActive() || bufferedAction == BATTLE_BUFFER_NONE || ticks <= 0) {
-            this.clearBattleBufferedAction();
-            return;
-        }
-
-        this.battleBufferedAction = bufferedAction;
-        this.battleBufferTicks = Math.min(20, ticks);
+        this.combatTimeline.queueBattleBufferedAction(this, bufferedAction, ticks);
     }
     public void tickBattleBufferedAction() {
-        if (!this.hasBattleBufferedAction()) {
-            this.clearBattleBufferedAction();
-            return;
-        }
-
-        this.battleBufferTicks--;
-        if (this.battleBufferTicks <= 0) {
-            this.clearBattleBufferedAction();
-        }
+        this.combatTimeline.tickBattleBufferedAction();
     }
     public void clearBattleBufferedAction() {
-        this.battleBufferedAction = BATTLE_BUFFER_NONE;
-        this.battleBufferTicks = 0;
+        this.combatTimeline.clearBattleBufferedAction();
     }
     public void resetBattleActionTimeline() {
-        if (this.getBattleActionState() != BATTLE_ACTION_IDLE || this.getBattleActionTicks() != 0 || this.hasBattleBufferedAction()) {
-            HeroEpicFightDebugLog.event(this, "HeroEntity.resetBattleActionTimeline", "stateBefore=" + HeroEpicFightDebugLog.heroCoreState(this) + ",buffered=" + this.getBattleBufferedAction() + "/" + this.getBattleBufferTicks());
-        }
-        this.clearBattleBufferedAction();
-        this.setBattleActionState(BATTLE_ACTION_IDLE);
-        this.setBattleActionTicks(0);
+        this.combatTimeline.resetBattleActionTimeline(this);
     }
     public void resetBattleCombatState() {
-        if (this.getBattleActionState() != BATTLE_ACTION_IDLE || this.getBattleActionTicks() != 0 || this.getBattleComboStep() != 0 || this.hasBattleBufferedAction()) {
-            HeroEpicFightDebugLog.event(this, "HeroEntity.resetBattleCombatState", "stateBefore=" + HeroEpicFightDebugLog.heroCoreState(this) + ",buffered=" + this.getBattleBufferedAction() + "/" + this.getBattleBufferTicks());
-        }
-        this.resetBattleActionTimeline();
-        this.setBattleComboStep(0);
-        HeroEpicFightDebugLog.transition(this, "HeroEntity.resetBattleCombatState.end", HeroEpicFightDebugLog.heroCoreState(this), "state=" + HeroEpicFightDebugLog.heroCoreState(this));
+        this.combatTimeline.resetBattleCombatState(this);
     }
     private void refreshNavigationMode() {
         if (this.flyingNavigation == null || this.groundNavigation == null) {
@@ -1008,14 +869,13 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     // 交易系统 (Merchant)
     @Override public void setTradingPlayer(@Nullable Player player) { this.tradingPlayer = player; }
     @Nullable @Override public Player getTradingPlayer() { return this.tradingPlayer; }
-    @Override public MerchantOffers getOffers() { if (this.offers == null) this.offers = HeroTrades.getOffers(this); return this.offers; }
-    @Override public void notifyTrade(MerchantOffer offer) { this.ambientSoundTime = -this.getAmbientSoundInterval(); HeroTrades.onTrade(this, offer); }
-    public void resetOffers() { this.offers = null; if (this.tradingPlayer != null) this.tradingPlayer.sendMerchantOffers(getContainerId(), getOffers(), 0, getVillagerXp(), showProgressBar(), canRestock()); }
-    @Override public void overrideOffers(@Nullable MerchantOffers offers) { this.offers = offers; }
+    @Override public MerchantOffers getOffers() { return this.tradeHandler.getOffers(this); }
+    @Override public void notifyTrade(MerchantOffer offer) { this.tradeHandler.notifyTrade(this, offer); }
+    public void resetOffers() { this.tradeHandler.resetOffers(this); }
+    @Override public void overrideOffers(@Nullable MerchantOffers offers) { this.tradeHandler.overrideOffers(offers); }
     @Override public void notifyTradeUpdated(ItemStack stack) {}
     @Override public int getVillagerXp() { return 0; }
     @Override public void overrideXp(int xp) {}
     @Override public boolean showProgressBar() { return false; }
     @Override public net.minecraft.sounds.SoundEvent getNotifyTradeSound() { return net.minecraft.sounds.SoundEvents.VILLAGER_YES; }
-    private int getContainerId() { return (this.tradingPlayer != null && this.tradingPlayer.containerMenu != null) ? this.tradingPlayer.containerMenu.containerId : 0; }
 }

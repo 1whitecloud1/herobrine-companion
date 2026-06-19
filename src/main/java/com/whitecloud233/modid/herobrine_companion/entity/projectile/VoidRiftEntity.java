@@ -1,9 +1,9 @@
 package com.whitecloud233.modid.herobrine_companion.entity.projectile;
 
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
-import com.whitecloud233.modid.herobrine_companion.event.ModEvents;
-import com.whitecloud233.modid.herobrine_companion.item.PoemOfTheEndItem;
 import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroWorldData;
+import com.whitecloud233.modid.herobrine_companion.init.ModEntities;
+import com.whitecloud233.modid.herobrine_companion.item.PoemOfTheEndItem;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
@@ -24,11 +24,19 @@ import java.util.UUID;
 
 public class VoidRiftEntity extends Entity {
 
-    private static final EntityDataAccessor<Float> ROTATION = SynchedEntityData.defineId(VoidRiftEntity.class, EntityDataSerializers.FLOAT);
+    private static final EntityDataAccessor<Float> ROTATION =
+            SynchedEntityData.defineId(VoidRiftEntity.class, EntityDataSerializers.FLOAT);
+
+    private static final EntityDataAccessor<Integer> TARGET_ID =
+            SynchedEntityData.defineId(VoidRiftEntity.class, EntityDataSerializers.INT);
+
+    private static final EntityDataAccessor<Boolean> VISUAL_ONLY =
+            SynchedEntityData.defineId(VoidRiftEntity.class, EntityDataSerializers.BOOLEAN);
+
+    private static final int MAX_LIFE_TIME = 24;
 
     private UUID ownerUUID;
     private int lifeTime = 0;
-    private static final int MAX_LIFE_TIME = 31; // 1.5秒
 
     public VoidRiftEntity(EntityType<?> entityType, Level level) {
         super(entityType, level);
@@ -36,40 +44,79 @@ public class VoidRiftEntity extends Entity {
     }
 
     public VoidRiftEntity(Level level, double x, double y, double z, UUID ownerUUID) {
-        this(ModEvents.VOID_RIFT.get(), level);
+        this(ModEntities.VOID_RIFT.get(), level);
         this.setPos(x, y, z);
         this.ownerUUID = ownerUUID;
-        // 设置随机旋转 (0-360)
         this.entityData.set(ROTATION, this.random.nextFloat() * 360.0F);
     }
 
     @Override
     protected void defineSynchedData() {
         this.entityData.define(ROTATION, 0.0F);
+        this.entityData.define(TARGET_ID, -1);
+        this.entityData.define(VISUAL_ONLY, false);
     }
 
     public float getRotation() {
         return this.entityData.get(ROTATION);
     }
 
+    public void setTarget(Entity target) {
+        if (target == null) {
+            this.entityData.set(TARGET_ID, -1);
+        } else {
+            this.entityData.set(TARGET_ID, target.getId());
+        }
+    }
+
+    public Entity getTarget() {
+        int id = this.entityData.get(TARGET_ID);
+        if (id < 0 || this.level() == null) {
+            return null;
+        }
+        return this.level().getEntity(id);
+    }
+
+    public void setVisualOnly(boolean visualOnly) {
+        this.entityData.set(VISUAL_ONLY, visualOnly);
+    }
+
+    public boolean isVisualOnly() {
+        return this.entityData.get(VISUAL_ONLY);
+    }
+
     @Override
     protected void readAdditionalSaveData(CompoundTag compound) {
         this.lifeTime = compound.getInt("LifeTime");
+
         if (compound.hasUUID("Owner")) {
             this.ownerUUID = compound.getUUID("Owner");
         }
+
         if (compound.contains("RiftRotation")) {
             this.entityData.set(ROTATION, compound.getFloat("RiftRotation"));
+        }
+
+        if (compound.contains("TargetId")) {
+            this.entityData.set(TARGET_ID, compound.getInt("TargetId"));
+        }
+
+        if (compound.contains("VisualOnly")) {
+            this.entityData.set(VISUAL_ONLY, compound.getBoolean("VisualOnly"));
         }
     }
 
     @Override
     protected void addAdditionalSaveData(CompoundTag compound) {
         compound.putInt("LifeTime", this.lifeTime);
+
         if (this.ownerUUID != null) {
             compound.putUUID("Owner", this.ownerUUID);
         }
+
         compound.putFloat("RiftRotation", this.getRotation());
+        compound.putInt("TargetId", this.entityData.get(TARGET_ID));
+        compound.putBoolean("VisualOnly", this.isVisualOnly());
     }
 
     @Override
@@ -81,22 +128,26 @@ public class VoidRiftEntity extends Entity {
     public boolean canBeCollidedWith() {
         return false;
     }
+
     @Override
     public void tick() {
         super.tick();
 
         if (!this.level().isClientSide) {
             this.lifeTime++;
+
             if (this.lifeTime >= MAX_LIFE_TIME) {
                 this.discard();
                 return;
             }
 
-            // 伤害逻辑 (每 10 tick / 0.5秒)
+            if (this.isVisualOnly()) {
+                return;
+            }
+
             if (this.lifeTime % 10 == 0 && this.level() instanceof ServerLevel serverLevel) {
                 HeroWorldData data = HeroWorldData.get(serverLevel);
-                
-                // [修改] 使用 ownerUUID 获取信任度，如果 ownerUUID 为空则默认为 0
+
                 int trust = 0;
                 if (this.ownerUUID != null) {
                     trust = data.getTrust(this.ownerUUID);
@@ -104,40 +155,48 @@ public class VoidRiftEntity extends Entity {
 
                 float baseDamage = 4.0F + (trust / 20.0F);
 
-                // [修改] 增大伤害范围
                 AABB box = this.getBoundingBox().inflate(2.5);
-                List<LivingEntity> targets = this.level().getEntitiesOfClass(LivingEntity.class, box,
-                        e -> !e.getUUID().equals(this.ownerUUID) && !(e instanceof HeroEntity));
+                List<LivingEntity> targets = this.level().getEntitiesOfClass(
+                        LivingEntity.class,
+                        box,
+                        e -> !e.getUUID().equals(this.ownerUUID) && !(e instanceof HeroEntity)
+                );
 
-                for (LivingEntity target : targets) {
+                for (LivingEntity hurtTarget : targets) {
                     Entity ownerEntity = null;
+
                     if (this.ownerUUID != null) {
                         ownerEntity = serverLevel.getEntity(this.ownerUUID);
                     }
 
-                    target.invulnerableTime = 0;
+                    hurtTarget.invulnerableTime = 0;
 
                     float damage = baseDamage;
+
                     if (ownerEntity instanceof Player player) {
-                        // 如果主人手持 PoemOfTheEndItem，计算附魔加成
                         ItemStack mainHandItem = player.getMainHandItem();
+
                         if (mainHandItem.getItem() instanceof PoemOfTheEndItem) {
-                            damage += EnchantmentHelper.getDamageBonus(mainHandItem, target.getMobType());
+                            damage += EnchantmentHelper.getDamageBonus(mainHandItem, hurtTarget.getMobType());
                         }
-                        target.hurt(this.damageSources().playerAttack(player), damage);
+
+                        hurtTarget.hurt(this.damageSources().playerAttack(player), damage);
                     } else {
-                        target.hurt(this.damageSources().magic(), damage);
+                        hurtTarget.hurt(this.damageSources().magic(), damage);
                     }
                 }
             }
         } else {
-            // 客户端粒子效果
-            if (this.random.nextFloat() < 0.3F) {
-                this.level().addParticle(ParticleTypes.ELECTRIC_SPARK,
-                        this.getX() + (this.random.nextDouble() - 0.5),
-                        this.getY() + (this.random.nextDouble() * 2.0),
-                        this.getZ() + (this.random.nextDouble() - 0.5),
-                        0, 0, 0);
+            if (this.random.nextFloat() < 0.65F) {
+                this.level().addParticle(
+                        ParticleTypes.ELECTRIC_SPARK,
+                        this.getX() + (this.random.nextDouble() - 0.5D) * 1.8D,
+                        this.getY() + (this.random.nextDouble() - 0.5D) * 2.4D,
+                        this.getZ() + (this.random.nextDouble() - 0.5D) * 1.8D,
+                        0.0D,
+                        0.015D,
+                        0.0D
+                );
             }
         }
     }

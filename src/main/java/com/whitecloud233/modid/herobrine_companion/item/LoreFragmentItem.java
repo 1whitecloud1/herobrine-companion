@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.item;
 
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.modid.herobrine_companion.init.ModItems;
 import net.minecraft.ChatFormatting;
 import net.minecraft.advancements.Advancement;
 import net.minecraft.advancements.AdvancementProgress;
@@ -134,15 +135,15 @@ public class LoreFragmentItem extends Item {
     }
 
     private Optional<ItemStack> findHandbook(Player player) {
-        if (player.getMainHandItem().getItem() == HerobrineCompanion.LORE_HANDBOOK.get()) {
+        if (player.getMainHandItem().getItem() == ModItems.LORE_HANDBOOK.get()) {
             return Optional.of(player.getMainHandItem());
         }
-        if (player.getOffhandItem().getItem() == HerobrineCompanion.LORE_HANDBOOK.get()) {
+        if (player.getOffhandItem().getItem() == ModItems.LORE_HANDBOOK.get()) {
             return Optional.of(player.getOffhandItem());
         }
         for (int i = 0; i < player.getInventory().getContainerSize(); ++i) {
             ItemStack stack = player.getInventory().getItem(i);
-            if (stack.getItem() == HerobrineCompanion.LORE_HANDBOOK.get()) {
+            if (stack.getItem() == ModItems.LORE_HANDBOOK.get()) {
                 return Optional.of(stack);
             }
         }

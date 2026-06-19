@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.datagen;
 
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.modid.herobrine_companion.init.ModItems;
 import net.minecraft.data.PackOutput;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
@@ -17,29 +18,29 @@ public class ModItemModelProvider extends ItemModelProvider {
     @SuppressWarnings("removal")
     @Override
     protected void registerModels() {
-        simpleItem(HerobrineCompanion.SOURCE_CODE_FRAGMENT);
-        simpleItem(HerobrineCompanion.HERO_SHELTER);
-        simpleItem(HerobrineCompanion.ETERNAL_KEY);
-        simpleItem(HerobrineCompanion.ABYSSAL_GAZE);
-        simpleItem(HerobrineCompanion.UNSTABLE_GUNPOWDER);
-        simpleItem(HerobrineCompanion.CORRUPTED_CODE);
-        simpleItem(HerobrineCompanion.VOID_MARROW);
-        simpleItem(HerobrineCompanion.GLITCH_FRAGMENT);
-        simpleItem(HerobrineCompanion.MEMORY_SHARD);
-        simpleItem(HerobrineCompanion.RECALL_STONE);
-        simpleItem(HerobrineCompanion.AWAKENED_VESSEL);
-        simpleItem(HerobrineCompanion.SOUL_BOUND_PACT);
-        simpleItem(HerobrineCompanion.TRANSCENDENCE_PERMIT);
-        withExistingParent(HerobrineCompanion.POEM_OF_THE_END.getId().getPath(),
+        simpleItem(ModItems.SOURCE_CODE_FRAGMENT);
+        simpleItem(ModItems.HERO_SHELTER);
+        simpleItem(ModItems.ETERNAL_KEY);
+        simpleItem(ModItems.ABYSSAL_GAZE);
+        simpleItem(ModItems.UNSTABLE_GUNPOWDER);
+        simpleItem(ModItems.CORRUPTED_CODE);
+        simpleItem(ModItems.VOID_MARROW);
+        simpleItem(ModItems.GLITCH_FRAGMENT);
+        simpleItem(ModItems.MEMORY_SHARD);
+        simpleItem(ModItems.RECALL_STONE);
+        simpleItem(ModItems.AWAKENED_VESSEL);
+        simpleItem(ModItems.SOUL_BOUND_PACT);
+        simpleItem(ModItems.TRANSCENDENCE_PERMIT);
+        withExistingParent(ModItems.POEM_OF_THE_END.getId().getPath(),
                 new ResourceLocation(HerobrineCompanion.MODID, "item/poem_of_the_end_base"));
-        simpleItem(HerobrineCompanion.LORE_FRAGMENT);
-        simpleItem(HerobrineCompanion.LORE_HANDBOOK);
-        simpleItem(HerobrineCompanion.TAB_ICON);
+        simpleItem(ModItems.LORE_FRAGMENT);
+        simpleItem(ModItems.LORE_HANDBOOK);
+        simpleItem(ModItems.TAB_ICON);
 
-        withExistingParent(HerobrineCompanion.GHOST_CREEPER_SPAWN_EGG.getId().getPath(), new ResourceLocation("item/template_spawn_egg"));
-        withExistingParent(HerobrineCompanion.GHOST_ZOMBIE_SPAWN_EGG.getId().getPath(), new ResourceLocation("item/template_spawn_egg"));
-        withExistingParent(HerobrineCompanion.GHOST_SKELETON_SPAWN_EGG.getId().getPath(), new ResourceLocation("item/template_spawn_egg"));
-        withExistingParent(HerobrineCompanion.GHOST_STEVE_SPAWN_EGG.getId().getPath(), new ResourceLocation("item/template_spawn_egg"));
+        withExistingParent(ModItems.GHOST_CREEPER_SPAWN_EGG.getId().getPath(), new ResourceLocation("item/template_spawn_egg"));
+        withExistingParent(ModItems.GHOST_ZOMBIE_SPAWN_EGG.getId().getPath(), new ResourceLocation("item/template_spawn_egg"));
+        withExistingParent(ModItems.GHOST_SKELETON_SPAWN_EGG.getId().getPath(), new ResourceLocation("item/template_spawn_egg"));
+        withExistingParent(ModItems.GHOST_STEVE_SPAWN_EGG.getId().getPath(), new ResourceLocation("item/template_spawn_egg"));
     }
 
     @SuppressWarnings("removal")

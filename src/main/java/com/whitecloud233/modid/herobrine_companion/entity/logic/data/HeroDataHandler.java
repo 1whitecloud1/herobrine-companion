@@ -78,4 +78,36 @@ public class HeroDataHandler {
             }
         }
     }
+
+    public static void savePoseData(HeroEntity hero, net.minecraft.nbt.CompoundTag compound) {
+        compound.putBoolean("IsPoseEditing", hero.isPoseEditing);
+        if (hero.isPoseEditing) {
+            net.minecraft.nbt.ListTag poseList = new net.minecraft.nbt.ListTag();
+            for (int i = 0; i < 10; i++) {
+                for (int j = 0; j < 3; j++) {
+                    poseList.add(net.minecraft.nbt.FloatTag.valueOf(hero.customPoseAngles[i][j]));
+                }
+            }
+            compound.put("CustomPoseAngles", poseList);
+        }
+    }
+
+    public static void loadPoseData(HeroEntity hero, net.minecraft.nbt.CompoundTag compound) {
+        if (compound.contains("IsPoseEditing")) {
+            hero.isPoseEditing = compound.getBoolean("IsPoseEditing");
+            if (hero.isPoseEditing && compound.contains("CustomPoseAngles", 9)) {
+                net.minecraft.nbt.ListTag poseList = compound.getList("CustomPoseAngles", 5);
+                if (poseList.size() == 30) {
+                    int index = 0;
+                    for (int i = 0; i < 10; i++) {
+                        for (int j = 0; j < 3; j++) {
+                            hero.customPoseAngles[i][j] = poseList.getFloat(index++);
+                        }
+                    }
+                } else {
+                    hero.isPoseEditing = false;
+                }
+            }
+        }
+    }
 }

@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.datagen;
 
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.modid.herobrine_companion.init.ModItems;
 import com.whitecloud233.modid.herobrine_companion.loot.AddItemModifier;
 import net.minecraft.data.PackOutput;
 import net.minecraft.resources.ResourceLocation;
@@ -25,7 +26,7 @@ public class ModGlobalLootModifiersProvider extends GlobalLootModifierProvider {
                         LootTableIdCondition.builder(new ResourceLocation("minecraft:chests/ancient_city")).build(),
                         LootItemRandomChanceCondition.randomChance(0.3f).build() // 添加 50% 概率
                 },
-                HerobrineCompanion.ETERNAL_KEY.get(),
+                ModItems.ETERNAL_KEY.get(),
                 Optional.empty()
         ));
 
@@ -35,7 +36,7 @@ public class ModGlobalLootModifiersProvider extends GlobalLootModifierProvider {
                         LootTableIdCondition.builder(new ResourceLocation("minecraft:chests/end_city_treasure")).build(),
                         LootItemRandomChanceCondition.randomChance(0.3f).build() // 添加 50% 概率
                 },
-                HerobrineCompanion.ETERNAL_KEY.get(),
+                ModItems.ETERNAL_KEY.get(),
                 Optional.empty()
         ));
 
@@ -45,7 +46,7 @@ public class ModGlobalLootModifiersProvider extends GlobalLootModifierProvider {
                         LootTableIdCondition.builder(new ResourceLocation("minecraft:chests/stronghold_library")).build(),
                         LootItemRandomChanceCondition.randomChance(0.3f).build() // 添加 50% 概率
                 },
-                HerobrineCompanion.ETERNAL_KEY.get(),
+                ModItems.ETERNAL_KEY.get(),
                 Optional.empty()
         ));
 
@@ -55,7 +56,7 @@ public class ModGlobalLootModifiersProvider extends GlobalLootModifierProvider {
                         LootTableIdCondition.builder(new ResourceLocation("minecraft:chests/end_city_treasure")).build(),
                         LootItemRandomChanceCondition.randomChance(0.3f).build() // 1.0f 改为 0.5f
                 },
-                HerobrineCompanion.LORE_FRAGMENT.get(),
+                ModItems.LORE_FRAGMENT.get(),
                 Optional.of("{lore_id:\"fragment_8\"}")
         ));
 
@@ -65,7 +66,7 @@ public class ModGlobalLootModifiersProvider extends GlobalLootModifierProvider {
                         LootTableIdCondition.builder(new ResourceLocation("minecraft:chests/ancient_city")).build(),
                         LootItemRandomChanceCondition.randomChance(0.3f).build() // 1.0f 改为 0.5f
                 },
-                HerobrineCompanion.LORE_FRAGMENT.get(),
+                ModItems.LORE_FRAGMENT.get(),
                 Optional.of("{lore_id:\"fragment_10\"}")
         ));
 
@@ -75,7 +76,7 @@ public class ModGlobalLootModifiersProvider extends GlobalLootModifierProvider {
                         LootTableIdCondition.builder(new ResourceLocation("minecraft:chests/abandoned_mineshaft")).build(),
                         LootItemRandomChanceCondition.randomChance(0.3f).build() // 1.0f 改为 0.5f
                 },
-                HerobrineCompanion.LORE_FRAGMENT.get(),
+                ModItems.LORE_FRAGMENT.get(),
                 Optional.of("{lore_id:\"fragment_2\"}")
         ));
     }

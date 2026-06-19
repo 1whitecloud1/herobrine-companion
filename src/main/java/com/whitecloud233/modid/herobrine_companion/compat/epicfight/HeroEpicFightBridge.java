@@ -1,7 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.compat.epicfight;
 
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
-import com.whitecloud233.modid.herobrine_companion.event.ModEvents;
+import com.whitecloud233.modid.herobrine_companion.init.ModEntities;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.eventbus.api.IEventBus;
@@ -36,7 +36,7 @@ public final class HeroEpicFightBridge {
             return;
         }
         armatureRegistered = true;
-        Armatures.registerEntityTypeArmature(ModEvents.HERO.get(), HERO_NIGHTFALL_ARMATURE);
+        Armatures.registerEntityTypeArmature(ModEntities.HERO.get(), HERO_NIGHTFALL_ARMATURE);
     }
 
     public static boolean isPatched(HeroEntity hero) {
@@ -48,7 +48,7 @@ public final class HeroEpicFightBridge {
     }
 
     private static void onEntityPatchRegistry(EntityPatchRegistryEvent event) {
-        event.getTypeEntry().put(ModEvents.HERO.get(), entity -> HeroEpicFightPatch::new);
+        event.getTypeEntry().put(ModEntities.HERO.get(), entity -> HeroEpicFightPatch::new);
     }
 
     private static void onAnimationRegistry(AnimationRegistryEvent event) {

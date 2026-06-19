@@ -13,7 +13,7 @@ import com.whitecloud233.modid.herobrine_companion.destructiongod.world.Lightnin
 import com.whitecloud233.modid.herobrine_companion.destructiongod.world.OrbTerrainSkill;
 import com.whitecloud233.modid.herobrine_companion.destructiongod.world.RendTerrainSkill;
 import com.whitecloud233.modid.herobrine_companion.entity.projectile.CleaveBladeEntity;
-import com.whitecloud233.modid.herobrine_companion.event.ModEvents;
+import com.whitecloud233.modid.herobrine_companion.init.ModEntities;
 import com.whitecloud233.modid.herobrine_companion.network.PacketHandler;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
@@ -134,7 +134,7 @@ public class DestructionGodCombatGoal extends Goal {
                         int slashDepth = 20 + phase * 4;
                         double bladeSpeed = 5.2D;
                         float slashRoll = randomSlashRoll(serverLevel);
-                        CleaveBladeEntity blade = new CleaveBladeEntity(ModEvents.CLEAVE_BLADE.get(), serverLevel, rendOrigin.x, rendOrigin.y + 0.9D, rendOrigin.z, castDirection.x, castDirection.z, Math.max(14, Mth.ceil(slashLength / bladeSpeed) + 3), slashRoll);
+                        CleaveBladeEntity blade = new CleaveBladeEntity(ModEntities.CLEAVE_BLADE.get(), serverLevel, rendOrigin.x, rendOrigin.y + 0.9D, rendOrigin.z, castDirection.x, castDirection.z, Math.max(14, Mth.ceil(slashLength / bladeSpeed) + 3), slashRoll);
                         blade.setDeltaMovement(castDirection.x * bladeSpeed, 0.0D, castDirection.z * bladeSpeed);
                         serverLevel.addFreshEntity(blade);
                         RendTerrainSkill.startBladeLineRend(serverLevel, this.boss, rendOrigin, castDirection, slashLength, halfWidth, slashDepth, 0, slashRoll);

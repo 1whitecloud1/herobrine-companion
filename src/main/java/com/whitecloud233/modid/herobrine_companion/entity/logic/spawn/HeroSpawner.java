@@ -3,7 +3,7 @@ package com.whitecloud233.modid.herobrine_companion.entity.logic.spawn;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.HeroBrain;
 import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroDataHandler;
-import com.whitecloud233.modid.herobrine_companion.event.ModEvents;
+import com.whitecloud233.modid.herobrine_companion.init.ModEntities;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -93,8 +93,8 @@ public class HeroSpawner {
                 }
 
                 // 检查是否有足够空间 (AABB)
-                if (level.noCollision(ModEvents.HERO.get().getDimensions().makeBoundingBox(targetPos.getX() + 0.5, targetPos.getY(), targetPos.getZ() + 0.5))) {
-                    HeroEntity hero = ModEvents.HERO.get().create(level);
+                if (level.noCollision(ModEntities.HERO.get().getDimensions().makeBoundingBox(targetPos.getX() + 0.5, targetPos.getY(), targetPos.getZ() + 0.5))) {
+                    HeroEntity hero = ModEntities.HERO.get().create(level);
                     if (hero != null) {
                         hero.moveTo(targetPos.getX() + 0.5, targetPos.getY(), targetPos.getZ() + 0.5, random.nextFloat() * 360F, 0);
 

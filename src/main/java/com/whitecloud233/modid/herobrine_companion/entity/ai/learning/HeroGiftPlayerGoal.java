@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.entity.ai.learning;
 
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.modid.herobrine_companion.init.ModItems;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
@@ -110,7 +111,7 @@ public class HeroGiftPlayerGoal extends Goal {
         }
 
         if (state == SimpleNeuralNetwork.MindState.PROTECTOR) {
-            if (roll < 0.2D) return new ItemStack(HerobrineCompanion.VOID_MARROW.get(), 1);
+            if (roll < 0.2D) return new ItemStack(ModItems.VOID_MARROW.get(), 1);
             if (roll < 0.5D) return new ItemStack(Items.DIAMOND, 2);
             return new ItemStack(Items.GOLDEN_APPLE, 1);
         }

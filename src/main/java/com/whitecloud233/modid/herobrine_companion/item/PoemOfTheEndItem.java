@@ -487,7 +487,7 @@ public class PoemOfTheEndItem extends DiggerItem {
 
         CleaveBladeEntity visualBlade =
                 new CleaveBladeEntity(
-                        com.whitecloud233.modid.herobrine_companion.event.ModEvents.CLEAVE_BLADE.get(),
+                        com.whitecloud233.modid.herobrine_companion.init.ModEntities.CLEAVE_BLADE.get(),
                         level, spawnX, startSurfaceY, spawnZ, dirX, dirZ, lifeTicks);
 
         level.addFreshEntity(visualBlade);

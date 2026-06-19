@@ -3,7 +3,8 @@ package com.whitecloud233.modid.herobrine_companion.entity.logic.event;
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.HeroDialogueHandler;
-import com.whitecloud233.modid.herobrine_companion.event.ModEvents;
+import com.whitecloud233.modid.herobrine_companion.init.ModEntities;
+import com.whitecloud233.modid.herobrine_companion.init.ModItems;
 import com.whitecloud233.modid.herobrine_companion.item.LoreFragmentItem;
 import com.whitecloud233.modid.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.modid.herobrine_companion.network.TriggerEternalOathPacket;
@@ -60,7 +61,7 @@ public class StoryAndLoreHandler {
             CompoundTag data = player.getPersistentData();
             if (!data.getBoolean("HasReceivedFragment9")) {
                 if (player.getRandom().nextFloat() < 0.2f) {
-                    ItemStack fragment = new ItemStack(HerobrineCompanion.LORE_FRAGMENT.get());
+                    ItemStack fragment = new ItemStack(ModItems.LORE_FRAGMENT.get());
                     CompoundTag tag = new CompoundTag();
                     tag.putString(LoreFragmentItem.LORE_ID_KEY, "fragment_9");
                     fragment.setTag(tag);
@@ -113,7 +114,7 @@ public class StoryAndLoreHandler {
             data.putInt("StillTicks", stillTicks);
 
             if (stillTicks >= 400) {
-                ItemStack fragment = new ItemStack(HerobrineCompanion.LORE_FRAGMENT.get());
+                ItemStack fragment = new ItemStack(ModItems.LORE_FRAGMENT.get());
                 CompoundTag tag = new CompoundTag();
                 tag.putString(LoreFragmentItem.LORE_ID_KEY, "fragment_6");
                 fragment.setTag(tag);
@@ -161,7 +162,7 @@ public class StoryAndLoreHandler {
             existingHero.getNavigation().stop();
             existingHero.setTarget(null);
         } else {
-            HeroEntity hero = ModEvents.HERO.get().create(level);
+            HeroEntity hero = ModEntities.HERO.get().create(level);
             if (hero != null) {
                 hero.moveTo(targetPos);
                 hero.finalizeSpawn(level, level.getCurrentDifficultyAt(pos), MobSpawnType.EVENT, null, null);

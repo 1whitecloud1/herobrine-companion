@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.entity.logic.event;
 
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.modid.herobrine_companion.init.ModItems;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroStateManager;
 import com.whitecloud233.modid.herobrine_companion.item.LoreFragmentItem;
@@ -136,7 +137,7 @@ public class EndRingDimensionHandler {
             player.addEffect(new net.minecraft.world.effect.MobEffectInstance(MobEffects.CONFUSION, 200, 0));
 
             if (!data.getBoolean("HasReceivedFragment4")) {
-                ItemStack fragment = new ItemStack(HerobrineCompanion.LORE_FRAGMENT.get());
+                ItemStack fragment = new ItemStack(ModItems.LORE_FRAGMENT.get());
                 CompoundTag tag = new CompoundTag();
                 tag.putString(LoreFragmentItem.LORE_ID_KEY, "fragment_4");
                 fragment.setTag(tag);

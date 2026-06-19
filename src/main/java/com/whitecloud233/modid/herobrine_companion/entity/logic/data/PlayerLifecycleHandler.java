@@ -11,6 +11,8 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import com.whitecloud233.modid.herobrine_companion.network.PacketHandler;
+import com.whitecloud233.modid.herobrine_companion.network.SyncHeroVisitPacket;
 
 @Mod.EventBusSubscriber(modid = HerobrineCompanion.MODID)
 public class PlayerLifecycleHandler {
@@ -41,6 +43,8 @@ public class PlayerLifecycleHandler {
                 // 如果没有上面的标记，说明是正常的剧情回归者。
                 // 代码执行到这里就结束了，随后的 EndRingDimensionHandler.onPlayerJoinWorld 会自动把他安全地拉回擂台中心！
             }
+
+            syncVisitState(player);
         }
     }
     /**
@@ -135,6 +139,21 @@ public class PlayerLifecycleHandler {
                 data.remove("HeroPendingRespawn");
                 data.remove("HeroRespawnData");
             }
+
+            syncVisitState(player);
         }
+    }
+
+    @SubscribeEvent
+    public static void onPlayerChangedDimension(PlayerEvent.PlayerChangedDimensionEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            syncVisitState(player);
+        }
+    }
+
+    private static void syncVisitState(ServerPlayer player) {
+        boolean visited = player.getPersistentData().getBoolean("HasVisitedHeroDimension");
+        PacketHandler.sendToPlayer(new SyncHeroVisitPacket(visited), player);
+        HeroCrossChatManager.INSTANCE.syncClientState(player);
     }
 }

@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.datagen;
 
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.modid.herobrine_companion.init.ModItems;
 import net.minecraft.data.PackOutput;
 import net.minecraftforge.common.data.LanguageProvider;
 @Deprecated
@@ -12,22 +13,22 @@ public class ModZhCnLangProvider extends LanguageProvider {
     @Override
     protected void addTranslations() {
         // Items
-        add(HerobrineCompanion.HERO_SHELTER.get(), "创世神的庇护");
-        add(HerobrineCompanion.ETERNAL_KEY.get(), "永恒门钥");
-        add(HerobrineCompanion.UNSTABLE_GUNPOWDER.get(), "不稳定的火药");
-        add(HerobrineCompanion.CORRUPTED_CODE.get(), "损坏片段");
-        add(HerobrineCompanion.VOID_MARROW.get(), "虚空骨髓");
-        add(HerobrineCompanion.GLITCH_FRAGMENT.get(), "故障碎片");
-        add(HerobrineCompanion.MEMORY_SHARD.get(), "记忆碎片");
-        add(HerobrineCompanion.RECALL_STONE.get(), "回溯之石");
-        add(HerobrineCompanion.AWAKENED_VESSEL.get(), "醒魂容器");
-        add(HerobrineCompanion.SOUL_BOUND_PACT.get(), "魂缚之契");
-        add(HerobrineCompanion.TRANSCENDENCE_PERMIT.get(), "凌越之允");
-        add(HerobrineCompanion.END_RING_PORTAL_ITEM.get(), "末地环传送门");
-        add(HerobrineCompanion.GHOST_CREEPER_SPAWN_EGG.get(), "幽灵苦力怕刷怪蛋");
-        add(HerobrineCompanion.GHOST_ZOMBIE_SPAWN_EGG.get(), "幽灵僵尸刷怪蛋");
-        add(HerobrineCompanion.GHOST_SKELETON_SPAWN_EGG.get(), "幽灵骷髅刷怪蛋");
-        add(HerobrineCompanion.DESTRUCTION_GOD_HEROBRINE_SPAWN_EGG.get(), "???");
+        add(ModItems.HERO_SHELTER.get(), "创世神的庇护");
+        add(ModItems.ETERNAL_KEY.get(), "永恒门钥");
+        add(ModItems.UNSTABLE_GUNPOWDER.get(), "不稳定的火药");
+        add(ModItems.CORRUPTED_CODE.get(), "损坏片段");
+        add(ModItems.VOID_MARROW.get(), "虚空骨髓");
+        add(ModItems.GLITCH_FRAGMENT.get(), "故障碎片");
+        add(ModItems.MEMORY_SHARD.get(), "记忆碎片");
+        add(ModItems.RECALL_STONE.get(), "回溯之石");
+        add(ModItems.AWAKENED_VESSEL.get(), "醒魂容器");
+        add(ModItems.SOUL_BOUND_PACT.get(), "魂缚之契");
+        add(ModItems.TRANSCENDENCE_PERMIT.get(), "凌越之允");
+        add(ModItems.END_RING_PORTAL_ITEM.get(), "末地环传送门");
+        add(ModItems.GHOST_CREEPER_SPAWN_EGG.get(), "幽灵苦力怕刷怪蛋");
+        add(ModItems.GHOST_ZOMBIE_SPAWN_EGG.get(), "幽灵僵尸刷怪蛋");
+        add(ModItems.GHOST_SKELETON_SPAWN_EGG.get(), "幽灵骷髅刷怪蛋");
+        add(ModItems.DESTRUCTION_GOD_HEROBRINE_SPAWN_EGG.get(), "???");
 
 
         // Creative Tab

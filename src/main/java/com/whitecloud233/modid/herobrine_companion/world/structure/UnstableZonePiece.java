@@ -1,6 +1,6 @@
 package com.whitecloud233.modid.herobrine_companion.world.structure;
 
-import com.whitecloud233.modid.herobrine_companion.event.ModEvents;
+import com.whitecloud233.modid.herobrine_companion.init.ModEntities;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.util.RandomSource;
@@ -137,9 +137,9 @@ public class UnstableZonePiece extends StructurePiece {
 
     private EntityType<?> getRandomGhostEntity(RandomSource random) {
         int r = random.nextInt(3);
-        if (r == 0) return ModEvents.GHOST_ZOMBIE.get();
-        if (r == 1) return ModEvents.GHOST_SKELETON.get();
-        return ModEvents.GHOST_CREEPER.get();
+        if (r == 0) return ModEntities.GHOST_ZOMBIE.get();
+        if (r == 1) return ModEntities.GHOST_SKELETON.get();
+        return ModEntities.GHOST_CREEPER.get();
     }
 
 }

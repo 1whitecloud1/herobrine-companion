@@ -4,7 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
-import com.whitecloud233.modid.herobrine_companion.event.ModEvents;
+import com.whitecloud233.modid.herobrine_companion.init.ModEntities;
 import com.whitecloud233.modid.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.modid.herobrine_companion.network.SavePosePacket;
 import net.minecraft.client.Minecraft;
@@ -99,7 +99,7 @@ public class HeroPoseScreen extends Screen {
         super.init();
         if (this.minecraft == null || this.minecraft.level == null) return;
 
-        this.dummyHero = ModEvents.HERO.get().create(this.minecraft.level);
+        this.dummyHero = ModEntities.HERO.get().create(this.minecraft.level);
         this.dummyHero.isPoseEditing = true;
 
         Entity realEntity = this.minecraft.level.getEntity(this.entityId);

@@ -10,7 +10,6 @@ import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.player.Player;
-import net.minecraftforge.event.entity.living.LivingChangeTargetEvent;
 import net.minecraftforge.event.entity.player.AttackEntityEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -20,15 +19,7 @@ public class CombatMobsHandler {
 
     private static final String PEACEFUL_TAG = "herobrine_companion_peaceful";
 
-    @SubscribeEvent
-    public static void onMobTarget(LivingChangeTargetEvent event) {
-        if (event.getNewTarget() instanceof Player player) {
 
-            if (player.getTags().contains(PEACEFUL_TAG)) {
-                event.setCanceled(true);
-            }
-        }
-    }
 
     @SubscribeEvent
     public static void onPlayerAttack(AttackEntityEvent event) {

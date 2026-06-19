@@ -43,9 +43,6 @@ public class RecallStoneItem extends Item {
                     level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.ENDERMAN_TELEPORT, SoundSource.PLAYERS, 1.0F, 1.0F);
                     targetLevel.playSound(null, target.pos().getX(), target.pos().getY(), target.pos().getZ(), SoundEvents.ENDERMAN_TELEPORT, SoundSource.PLAYERS, 1.0F, 1.0F);
 
-                    // Consume durability
-                    stack.hurtAndBreak(1, serverPlayer, (p) -> p.broadcastBreakEvent(hand));
-                    
                     player.sendSystemMessage(Component.translatable("message.herobrine_companion.recall_success"));
                     
                     return InteractionResultHolder.success(stack);

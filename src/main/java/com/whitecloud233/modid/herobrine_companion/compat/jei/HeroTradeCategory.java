@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.compat.jei;
 
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.modid.herobrine_companion.init.ModItems;
 import mezz.jei.api.constants.VanillaTypes;
 import mezz.jei.api.gui.builder.IRecipeLayoutBuilder;
 import mezz.jei.api.gui.drawable.IDrawable;
@@ -36,7 +37,7 @@ public class HeroTradeCategory implements IRecipeCategory<MerchantOffer> {
         this.slotBackground = guiHelper.getSlotDrawable();
 
         // 3. 图标 (使用创造模式物品栏图标)
-        this.icon = guiHelper.createDrawableIngredient(VanillaTypes.ITEM_STACK, new ItemStack(HerobrineCompanion.TAB_ICON.get()));
+        this.icon = guiHelper.createDrawableIngredient(VanillaTypes.ITEM_STACK, new ItemStack(ModItems.TAB_ICON.get()));
 
         // 4. 标题
         this.localizedName = Component.translatable("gui.herobrine_companion.jei.hero_trade");

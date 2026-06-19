@@ -1,7 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.item;
 
 import com.whitecloud233.modid.herobrine_companion.entity.GlitchEchoEntity;
-import com.whitecloud233.modid.herobrine_companion.event.ModEvents;
+import com.whitecloud233.modid.herobrine_companion.init.ModEntities;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -37,7 +37,7 @@ public class MemoryShardItem extends Item {
                 level.playSound(null, pos, SoundEvents.ELDER_GUARDIAN_CURSE, SoundSource.BLOCKS, 0.5f, 2.0f);
 
                 // Spawn Glitch Echo
-                GlitchEchoEntity echo = new GlitchEchoEntity(ModEvents.GLITCH_ECHO.get(), level);
+                GlitchEchoEntity echo = new GlitchEchoEntity(ModEntities.GLITCH_ECHO.get(), level);
                 echo.setPos(pos.getX() + 0.5, pos.getY() + 1.5, pos.getZ() + 0.5);
                 level.addFreshEntity(echo);
 

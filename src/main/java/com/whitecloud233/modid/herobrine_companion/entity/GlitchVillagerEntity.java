@@ -1,6 +1,6 @@
 package com.whitecloud233.modid.herobrine_companion.entity;
 
-import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.modid.herobrine_companion.init.ModItems;
 import com.whitecloud233.modid.herobrine_companion.item.LoreFragmentItem;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -32,7 +32,7 @@ public class GlitchVillagerEntity extends Villager {
             // 1.20.1: SoundEvents.MUSIC_DISC_11 is a SoundEvent
             this.playSound(SoundEvents.MUSIC_DISC_11, 1.0F, 0.5F);
 
-            ItemStack fragment = new ItemStack(HerobrineCompanion.LORE_FRAGMENT.get());
+            ItemStack fragment = new ItemStack(ModItems.LORE_FRAGMENT.get());
             CompoundTag tag = new CompoundTag();
             tag.putString(LoreFragmentItem.LORE_ID_KEY, "fragment_11");
             // 1.20.1: Use setTag

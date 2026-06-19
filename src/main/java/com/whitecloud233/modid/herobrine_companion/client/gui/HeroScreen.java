@@ -8,7 +8,7 @@ import com.whitecloud233.modid.herobrine_companion.client.event.ClientHooks;
 import com.whitecloud233.modid.herobrine_companion.client.service.ConversationStore;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.SimpleNeuralNetwork;
-import com.whitecloud233.modid.herobrine_companion.event.ModEvents;
+import com.whitecloud233.modid.herobrine_companion.init.ModEntities;
 import com.whitecloud233.modid.herobrine_companion.network.ClearAreaPacket;
 import com.whitecloud233.modid.herobrine_companion.network.DesolateAreaPacket;
 import com.whitecloud233.modid.herobrine_companion.network.FlattenAreaPacket;
@@ -74,7 +74,7 @@ public class HeroScreen extends Screen {
         if (this.minecraft == null) return;
         super.init();
         if (this.minecraft.level != null) {
-            this.dummyHero = ModEvents.HERO.get().create(this.minecraft.level);
+            this.dummyHero = ModEntities.HERO.get().create(this.minecraft.level);
             // 同步皮肤状态与姿势到 dummyHero 以便预览
             Entity realEntity = this.minecraft.level.getEntity(this.entityId);
             if (realEntity instanceof HeroEntity realHero) {

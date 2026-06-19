@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.entity;
 
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.modid.herobrine_companion.init.ModItems;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
@@ -77,7 +78,7 @@ public class GhostSteveEntity extends Monster {
     @Override
     protected void dropCustomDeathLoot(DamageSource source, int looting, boolean recentlyHit) {
         super.dropCustomDeathLoot(source, looting, recentlyHit);
-        this.spawnAtLocation(HerobrineCompanion.SOURCE_CODE_FRAGMENT.get());
+        this.spawnAtLocation(ModItems.SOURCE_CODE_FRAGMENT.get());
     }
 
     public static boolean checkGhostSteveSpawnRules(EntityType<GhostSteveEntity> entityType, ServerLevelAccessor level, MobSpawnType spawnType, BlockPos pos, RandomSource random) {

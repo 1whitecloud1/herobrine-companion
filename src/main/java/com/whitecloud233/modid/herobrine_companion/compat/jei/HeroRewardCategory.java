@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.compat.jei;
 
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.modid.herobrine_companion.init.ModItems;
 import com.whitecloud233.modid.herobrine_companion.event.HeroRewards;
 import mezz.jei.api.constants.VanillaTypes;
 import mezz.jei.api.gui.builder.IRecipeLayoutBuilder;
@@ -59,7 +60,7 @@ public class HeroRewardCategory implements IRecipeCategory<HeroRewards.Reward> {
         // 这样逻辑上就是：Herobrine (Input) -> Reward (Output)
         // 虽然实际上不需要消耗 Herobrine，但这在 JEI 中很常见
         builder.addSlot(RecipeIngredientRole.INPUT, 5, 5)
-                .addIngredients(VanillaTypes.ITEM_STACK, java.util.List.of(new ItemStack(HerobrineCompanion.TAB_ICON.get())));
+                .addIngredients(VanillaTypes.ITEM_STACK, java.util.List.of(new ItemStack(ModItems.TAB_ICON.get())));
 
         // 显示奖励物品 (Output)
         int x = 5;

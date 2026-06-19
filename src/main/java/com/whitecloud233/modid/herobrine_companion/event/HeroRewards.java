@@ -1,6 +1,6 @@
 package com.whitecloud233.modid.herobrine_companion.event;
 
-import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.modid.herobrine_companion.init.ModItems;
 import com.whitecloud233.modid.herobrine_companion.item.LoreFragmentItem;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.ItemStack;
@@ -52,19 +52,19 @@ public class HeroRewards {
     public static void reset() {
         REWARDS.clear();
         // --- 信任度 2 奖励 (合并) ---
-        ItemStack handbook = new ItemStack(HerobrineCompanion.LORE_HANDBOOK.get());
-        ItemStack fragment1 = new ItemStack(HerobrineCompanion.LORE_FRAGMENT.get());
+        ItemStack handbook = new ItemStack(ModItems.LORE_HANDBOOK.get());
+        ItemStack fragment1 = new ItemStack(ModItems.LORE_FRAGMENT.get());
         CompoundTag tag = new CompoundTag();
         tag.putString(LoreFragmentItem.LORE_ID_KEY, "fragment_1");
         fragment1.setTag(tag); // 1.20.1 使用 setTag
         REWARDS.add(new Reward(6, 2, handbook, fragment1)); // 使用 ID 6
         // 示例奖励，可以根据需求修改
         REWARDS.add(new Reward(0, 10, new ItemStack(Items.TOTEM_OF_UNDYING, 2)));
-        REWARDS.add(new Reward(1, 20, new ItemStack(HerobrineCompanion.ABYSSAL_GAZE.get(), 1)));
+        REWARDS.add(new Reward(1, 20, new ItemStack(ModItems.ABYSSAL_GAZE.get(), 1)));
         REWARDS.add(new Reward(2, 30, new ItemStack(Items.DIAMOND, 32)));
-        REWARDS.add(new Reward(3, 50, new ItemStack(HerobrineCompanion.SOUL_BOUND_PACT.get(), 1)));
-        REWARDS.add(new Reward(4, 75, new ItemStack(HerobrineCompanion.TRANSCENDENCE_PERMIT.get(), 1)));
-        REWARDS.add(new Reward(5, 100, new ItemStack(HerobrineCompanion.POEM_OF_THE_END.get(), 1)));
+        REWARDS.add(new Reward(3, 50, new ItemStack(ModItems.SOUL_BOUND_PACT.get(), 1)));
+        REWARDS.add(new Reward(4, 75, new ItemStack(ModItems.TRANSCENDENCE_PERMIT.get(), 1)));
+        REWARDS.add(new Reward(5, 100, new ItemStack(ModItems.POEM_OF_THE_END.get(), 1)));
     }
     // [修改] 信任度 100 的奖励改为 终末之诗
     public static Reward getReward(int id) {

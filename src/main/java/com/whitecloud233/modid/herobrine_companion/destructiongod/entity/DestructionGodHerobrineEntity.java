@@ -1,6 +1,6 @@
 package com.whitecloud233.modid.herobrine_companion.destructiongod.entity;
 
-import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.modid.herobrine_companion.init.ModItems;
 import com.whitecloud233.modid.herobrine_companion.destructiongod.entity.ai.goal.DestructionGodCombatGoal;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
@@ -90,7 +90,7 @@ public class DestructionGodHerobrineEntity extends Monster {
         this.setNoGravity(true);
         this.xpReward = 250;
         this.bossEvent.setVisible(true);
-        this.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(HerobrineCompanion.POEM_OF_THE_END.get()));
+        this.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(ModItems.POEM_OF_THE_END.get()));
         this.setDropChance(EquipmentSlot.MAINHAND, 0.0F);
     }
 
@@ -178,7 +178,7 @@ public class DestructionGodHerobrineEntity extends Monster {
 
     private void ensureScytheEquipped() {
         if (this.getMainHandItem().isEmpty()) {
-            this.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(HerobrineCompanion.POEM_OF_THE_END.get()));
+            this.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(ModItems.POEM_OF_THE_END.get()));
             this.setDropChance(EquipmentSlot.MAINHAND, 0.0F);
         }
     }

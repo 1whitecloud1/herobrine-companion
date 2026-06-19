@@ -1,7 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.entity.projectile;
 
 import com.whitecloud233.modid.herobrine_companion.config.Config;
-import com.whitecloud233.modid.herobrine_companion.event.ModEvents;
+import com.whitecloud233.modid.herobrine_companion.init.ModEntities;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.syncher.EntityDataAccessor;
@@ -35,7 +35,7 @@ public class RealmBreakerLightningEntity extends Projectile {
     }
 
     public RealmBreakerLightningEntity(Level level, LivingEntity shooter, float damage, float explosionRadius) {
-        this(ModEvents.REALM_BREAKER_LIGHTNING.get(), level);
+        this(ModEntities.REALM_BREAKER_LIGHTNING.get(), level);
         this.setOwner(shooter);
         this.setPos(shooter.getX(), shooter.getEyeY() - 0.1, shooter.getZ());
         this.setDamage(damage);

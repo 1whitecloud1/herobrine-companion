@@ -30,7 +30,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
-import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.modid.herobrine_companion.init.ModItems;
 
 public class GlitchEchoEntity extends Entity {
 
@@ -312,7 +312,7 @@ public class GlitchEchoEntity extends Entity {
     }
 
     private boolean isTargetItem(ItemStack stack) {
-        return stack.getItem() == HerobrineCompanion.ETERNAL_KEY.get();
+        return stack.getItem() == ModItems.ETERNAL_KEY.get();
     }
 
     private BlockPos findNearbyChest(int radius) {

@@ -2,7 +2,7 @@ package com.whitecloud233.modid.herobrine_companion.client.render;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
-import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.modid.herobrine_companion.init.ModItems;
 import com.whitecloud233.modid.herobrine_companion.compat.epicfight.HeroEpicFightCompat;
 import com.whitecloud233.modid.herobrine_companion.compat.cooking.HeroCookingCompat;
 import com.whitecloud233.modid.herobrine_companion.client.model.HeroModel;
@@ -33,7 +33,7 @@ public class HeroHeldItemLayer extends RenderLayer<HeroEntity, PlayerModel<HeroE
         // 状态 1：专属动作 —— 抚摸镰刀
         // ==========================================
         if (entity.isInspectingScythe()) {
-            ItemStack scytheStack = new ItemStack(HerobrineCompanion.POEM_OF_THE_END.get());
+            ItemStack scytheStack = new ItemStack(ModItems.POEM_OF_THE_END.get());
             if (scytheStack.isEmpty()) return;
 
             poseStack.pushPose();

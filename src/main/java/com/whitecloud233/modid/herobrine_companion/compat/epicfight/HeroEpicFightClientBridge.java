@@ -1,6 +1,6 @@
 package com.whitecloud233.modid.herobrine_companion.compat.epicfight;
 
-import com.whitecloud233.modid.herobrine_companion.event.ModEvents;
+import com.whitecloud233.modid.herobrine_companion.init.ModEntities;
 import net.minecraftforge.eventbus.api.IEventBus;
 import yesman.epicfight.api.client.forgeevent.PatchedRenderersEvent;
 
@@ -19,7 +19,7 @@ public final class HeroEpicFightClientBridge {
     }
 
     private static void onAddPatchedRenderers(PatchedRenderersEvent.Add event) {
-        event.addPatchedEntityRenderer(ModEvents.HERO.get(), entityType -> new HeroPatchedHumanoidRenderer(event.getContext(), entityType).initLayerLast(event.getContext(), entityType));
+        event.addPatchedEntityRenderer(ModEntities.HERO.get(), entityType -> new HeroPatchedHumanoidRenderer(event.getContext(), entityType).initLayerLast(event.getContext(), entityType));
     }
 }
 
