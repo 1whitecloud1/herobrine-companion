@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.entity.ai.learning;
 
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.modid.herobrine_companion.entity.ai.goal.HeroGodlyCompanionGoal;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerPlayer;
@@ -27,6 +28,7 @@ public class HeroExtinguishTorchGoal extends Goal {
     @Override
     public boolean canUse() {
         if (this.hero.getTarget() != null) return false;
+        if (HeroGodlyCompanionGoal.isOwnerWithinStayStillRadius(this.hero)) return false;
 
         if (this.cooldown > 0) {
             this.cooldown--;
@@ -46,6 +48,7 @@ public class HeroExtinguishTorchGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
+        if (HeroGodlyCompanionGoal.isOwnerWithinStayStillRadius(this.hero)) return false;
         return this.targetTorch != null && this.hero.distanceToSqr(Vec3.atCenterOf(this.targetTorch)) < 256.0D;
     }
 
@@ -57,10 +60,14 @@ public class HeroExtinguishTorchGoal extends Goal {
     @Override
     public void tick() {
         if (this.targetTorch == null) return;
+        Vec3 targetCenter = Vec3.atCenterOf(this.targetTorch);
+        double distToTargetSqr = this.hero.distanceToSqr(targetCenter);
 
-        this.hero.getLookControl().setLookAt(Vec3.atCenterOf(this.targetTorch));
+        if (distToTargetSqr < 16.0D || this.hero.getNavigation().isDone()) {
+            this.hero.getLookControl().setLookAt(targetCenter);
+        }
 
-        if (this.hero.distanceToSqr(Vec3.atCenterOf(this.targetTorch)) < 4.0D) {
+        if (distToTargetSqr < 4.0D) {
             BlockState state = this.hero.level().getBlockState(this.targetTorch);
             if (state.is(Blocks.TORCH) || state.is(Blocks.WALL_TORCH)) {
                 this.hero.level().destroyBlock(this.targetTorch, true);

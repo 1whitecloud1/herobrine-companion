@@ -1,5 +1,6 @@
 package com.whitecloud233.modid.herobrine_companion.entity.ai.learning.state;
 
+import com.whitecloud233.modid.herobrine_companion.config.Config;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.HeroBrain;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.SimpleNeuralNetwork;
@@ -119,7 +120,8 @@ public final class PranksterStateDefinition implements HeroMindStateDefinition {
             return;
         }
 
-        if (isCooldownReady(hero, COOLDOWN_LEAF_VANISH)
+        if (Config.heroLeafVanishEnabled
+                && isCooldownReady(hero, COOLDOWN_LEAF_VANISH)
                 && hero.getRandom().nextFloat() < LEAF_VANISH_CHANCE * boost
                 && tryVanishNearbyLeaves(hero, level, focus)) {
             startCooldown(hero, COOLDOWN_LEAF_VANISH, LEAF_VANISH_COOLDOWN);

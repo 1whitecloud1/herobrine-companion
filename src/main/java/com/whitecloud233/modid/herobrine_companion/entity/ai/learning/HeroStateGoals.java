@@ -17,12 +17,12 @@ public class HeroStateGoals extends Goal {
 
     @Override
     public boolean canUse() {
-        return hero.getTradingPlayer() == null;
+        return hero.getTradingPlayer() == null && !hero.isCompanionMode();
     }
 
     @Override
     public boolean canContinueToUse() {
-        return hero.getTradingPlayer() == null;
+        return hero.getTradingPlayer() == null && !hero.isCompanionMode();
     }
 
     @Override

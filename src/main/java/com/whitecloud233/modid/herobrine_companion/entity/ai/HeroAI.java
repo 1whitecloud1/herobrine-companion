@@ -17,6 +17,11 @@ public class HeroAI {
         return HeroBattleStanceGoal.canHeroAttackTarget(hero, candidate);
     }
 
+    private static boolean canUseAmbientLook(HeroEntity hero) {
+        return !hero.isFloating()
+                || (hero.getNavigation().isDone() && hero.getDeltaMovement().horizontalDistanceSqr() <= 0.01D);
+    }
+
     public static void registerGoals(HeroEntity hero) {
         hero.targetSelector.addGoal(1, new HurtByTargetGoal(hero) {
             @Override
@@ -122,7 +127,17 @@ public class HeroAI {
         // 暂时注释掉 LookAtPlayerGoal，看看是否解决“强迫向下看”的问题
         // hero.getGoalSelector().addGoal(5, new LookAtPlayerGoal(hero, Player.class, 8.0F));
 
-        // 保留随机看周围，这比较自然
-        hero.getGoalSelector().addGoal(6, new RandomLookAroundGoal(hero));
+        // 保留随机看周围，但浮空移动时不抢 LOOK，避免移动方向与随机视线互相拉扯。
+        hero.getGoalSelector().addGoal(6, new RandomLookAroundGoal(hero) {
+            @Override
+            public boolean canUse() {
+                return canUseAmbientLook(hero) && super.canUse();
+            }
+
+            @Override
+            public boolean canContinueToUse() {
+                return canUseAmbientLook(hero) && super.canContinueToUse();
+            }
+        });
     }
 }

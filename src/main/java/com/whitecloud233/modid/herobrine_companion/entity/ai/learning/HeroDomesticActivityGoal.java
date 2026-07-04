@@ -5,7 +5,6 @@ import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.logic.HeroInvitationHelper;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.ai.goal.Goal;
-import net.minecraft.world.entity.player.Player;
 
 import javax.annotation.Nullable;
 import java.util.EnumSet;
@@ -183,11 +182,8 @@ public class HeroDomesticActivityGoal extends Goal {
         if (this.hero.level().isClientSide) {
             return true;
         }
-        if (this.hero.isCompanionMode() && this.hero.getOwnerUUID() != null) {
-            Player owner = this.hero.level().getPlayerByUUID(this.hero.getOwnerUUID());
-            if (owner != null && owner.level() == this.hero.level() && this.hero.distanceToSqr(owner) > 36.0D) {
-                return true;
-            }
+        if (this.hero.isCompanionMode()) {
+            return true;
         }
         return false;
     }

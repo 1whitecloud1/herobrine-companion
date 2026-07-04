@@ -2,6 +2,7 @@ package com.whitecloud233.modid.herobrine_companion.entity.ai.goal;
 
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.modid.herobrine_companion.entity.ai.HeroMoveControl;
 import com.whitecloud233.modid.herobrine_companion.util.PlayerHealthCompat;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -117,6 +118,15 @@ public class HeroObserveAndRescueGoal extends Goal {
 
         // 1. 始终高冷注视
         this.hero.getLookControl().setLookAt(this.targetPlayer, 10.0F, this.hero.getMaxHeadXRot());
+
+        if (isCompanionOwner && HeroGodlyCompanionGoal.isOwnerWithinStayStillRadius(this.hero)) {
+            this.hero.getNavigation().stop();
+            if (this.hero.getMoveControl() instanceof HeroMoveControl heroMoveControl) {
+                heroMoveControl.stopMoving();
+            }
+            this.hero.setDeltaMovement(Vec3.ZERO);
+            return;
+        }
 
         // 2. 【绝对实时的平滑排斥系统】
         double distanceSq = this.hero.distanceToSqr(this.targetPlayer);

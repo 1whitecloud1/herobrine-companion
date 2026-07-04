@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.entity.ai.learning;
 
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.modid.herobrine_companion.entity.ai.goal.HeroGodlyCompanionGoal;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerPlayer;
@@ -27,6 +28,7 @@ public class HeroInspectBlockGoal extends Goal {
     public boolean canUse() {
         if (this.hero.isBattleModeActive()) return false;
         if (this.hero.getTarget() != null) return false;
+        if (HeroGodlyCompanionGoal.isOwnerWithinStayStillRadius(this.hero)) return false;
         
         if (this.cooldown > 0) {
             this.cooldown--;
@@ -64,6 +66,7 @@ public class HeroInspectBlockGoal extends Goal {
     @Override
     public boolean canContinueToUse() {
         if (this.hero.isBattleModeActive()) return false;
+        if (HeroGodlyCompanionGoal.isOwnerWithinStayStillRadius(this.hero)) return false;
         return this.targetPos != null && this.timer < 100 && this.hero.distanceToSqr(Vec3.atCenterOf(this.targetPos)) < 256.0D;
     }
 
@@ -79,19 +82,21 @@ public class HeroInspectBlockGoal extends Goal {
     @Override
     public void tick() {
         if (this.targetPos == null) return;
+        Vec3 targetCenter = Vec3.atCenterOf(this.targetPos);
+        double distToTargetSqr = this.hero.distanceToSqr(targetCenter);
 
         // [修复] 限制头部转动速度，避免快速摇摆
         // 使用 lookAt 的平滑版本，或者降低更新频率
         // 原来的 this.hero.getLookControl().setLookAt(...) 会每 tick 强制更新，可能导致与身体转向冲突
 
-        // 只有当距离较远时才频繁看，近距离时偶尔看
-        if (this.timer % 5 == 0) {
-            this.hero.getLookControl().setLookAt(Vec3.atCenterOf(this.targetPos));
+        // 移动途中不抢视线；停稳或接近目标后再观察方块。
+        if (this.timer % 5 == 0 && (distToTargetSqr < 16.0D || this.hero.getNavigation().isDone())) {
+            this.hero.getLookControl().setLookAt(targetCenter);
         }
 
         this.timer++;
 
-        if (this.hero.distanceToSqr(Vec3.atCenterOf(this.targetPos)) < 16.0D) {
+        if (distToTargetSqr < 16.0D) {
             this.hero.getNavigation().stop();
             
             if (this.timer % 5 == 0) {

@@ -35,6 +35,19 @@ public class HeroModel extends PlayerModel<HeroEntity> {
     public final ModelPart rightPantsLower;
     public final ModelPart leftPantsLower;
 
+    private static final float[][] FLYING_POSE = new float[][] {
+            {0.0F, 0.0F, 0.0F},
+            {0.11219974F, 0.0F, 0.0F},
+            {0.25244942F, 0.028049935F, -0.19634955F},
+            {0.0F, 0.0F, -0.19634955F},
+            {0.25244942F, -0.028049935F, 0.19634955F},
+            {0.0F, 0.0F, 0.19634955F},
+            {-0.11219974F, 0.3926991F, 0.0F},
+            {0.420749F, -0.05609987F, 0.0F},
+            {0.30854928F, -0.28049934F, 0.0F},
+            {-0.028049935F, 0.0F, 0.0F}
+    };
+
     public HeroModel(ModelPart root, boolean slim) {
         super(root, slim);
 
@@ -198,7 +211,10 @@ public class HeroModel extends PlayerModel<HeroEntity> {
             return;
         }
 
-        if (entity.isBattleModeActive() && !entity.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE)) {
+        float partialTick = ageInTicks - entity.tickCount;
+        float floatAmount = entity.getFloatingAmount(partialTick);
+
+        if (floatAmount <= 0.0F && entity.isBattleModeActive() && !entity.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE)) {
             setupBattleModeAnim(entity, limbSwing, limbSwingAmount, ageInTicks);
             return;
         }
@@ -213,9 +229,6 @@ public class HeroModel extends PlayerModel<HeroEntity> {
             return;
         }
 
-        float partialTick = ageInTicks - entity.tickCount;
-        float floatAmount = entity.getFloatingAmount(partialTick);
-
         boolean observerState = entity.getMindState() == SimpleNeuralNetwork.MindState.OBSERVER;
         float headTilt = observerState ? 0.0F : Mth.sin(ageInTicks * 0.05f) * 0.05f;
         if (!observerState) {
@@ -225,24 +238,10 @@ public class HeroModel extends PlayerModel<HeroEntity> {
         this.hat.zRot = this.head.zRot;
 
         float walkBodyY = 0.0F;
-        float walkBodyXRot = this.body.xRot;
         float floatBodyY = -2.0F + Mth.sin(ageInTicks * 0.1f) * 3.0F;
-        float floatBodyXRot = 0.05F;
-
-        float legLag = Mth.cos(ageInTicks * 0.1f) * 0.1f;
-        float floatRightLegX = 0.3f + legLag;
-        float floatLeftLegX = 0.2f + legLag * 0.8f;
-        float floatLegZ = 0.05f;
-
-        float armBreath = Mth.sin(ageInTicks * 0.06f) * 0.1f;
-        float floatRightArmZ = 0.2f + armBreath;
-        float floatLeftArmZ = -0.2f - armBreath;
-        float floatArmX = -0.2f + armBreath * 0.5f;
 
         if (!entity.isCrouching()) {
             this.body.y = Mth.lerp(floatAmount, walkBodyY, floatBodyY);
-            this.body.xRot = Mth.lerp(floatAmount, walkBodyXRot, floatBodyXRot);
-            this.body.yRot = Mth.lerp(floatAmount, this.body.yRot, 0.0F);
 
             this.head.y = this.body.y;
             this.rightArm.y = 2.0F + this.body.y;
@@ -258,25 +257,88 @@ public class HeroModel extends PlayerModel<HeroEntity> {
             this.leftPants.y = this.leftLeg.y;
         }
 
-        this.rightLeg.xRot = Mth.lerp(floatAmount, this.rightLeg.xRot, floatRightLegX);
-        this.leftLeg.xRot = Mth.lerp(floatAmount, this.leftLeg.xRot, floatLeftLegX);
-        this.rightLeg.yRot = Mth.lerp(floatAmount, this.rightLeg.yRot, 0.0F);
-        this.leftLeg.yRot = Mth.lerp(floatAmount, this.leftLeg.yRot, 0.0F);
-        this.rightLeg.zRot = Mth.lerp(floatAmount, 0.0F, floatLegZ);
-        this.leftLeg.zRot = Mth.lerp(floatAmount, 0.0F, -floatLegZ);
-
-        if (this.attackTime <= 0 && this.rightArmPose == ArmPose.EMPTY) {
-            this.rightArm.xRot = Mth.lerp(floatAmount, this.rightArm.xRot, floatArmX);
-            this.rightArm.zRot = Mth.lerp(floatAmount, 0.0F, floatRightArmZ);
-        }
-        if (this.attackTime <= 0 && this.leftArmPose == ArmPose.EMPTY) {
-            this.leftArm.xRot = Mth.lerp(floatAmount, this.leftArm.xRot, floatArmX);
-            this.leftArm.zRot = Mth.lerp(floatAmount, 0.0F, floatLeftArmZ);
-        }
+        applyFlyingPresetPose(floatAmount);
 
         com.whitecloud233.modid.herobrine_companion.client.fight.animation.HeroChallengeAnimations.setupChallengeAnims(this, entity, ageInTicks);
 
         copyAllModelProperties();
+    }
+
+    private void applyFlyingPresetPose(float floatAmount) {
+        if (floatAmount <= 0.0F) {
+            return;
+        }
+
+        float[] cHead = FLYING_POSE[0];
+        float[] cBody = FLYING_POSE[1];
+        float[] cRArm = FLYING_POSE[2];
+        float[] cRArmL = FLYING_POSE[3];
+        float[] cLArm = FLYING_POSE[4];
+        float[] cLArmL = FLYING_POSE[5];
+        float[] cRLeg = FLYING_POSE[6];
+        float[] cRLegL = FLYING_POSE[7];
+        float[] cLLeg = FLYING_POSE[8];
+        float[] cLLegL = FLYING_POSE[9];
+
+        this.body.xRot = Mth.lerp(floatAmount, this.body.xRot, cBody[0]);
+        this.body.yRot = Mth.lerp(floatAmount, this.body.yRot, cBody[1]);
+        this.body.zRot = Mth.lerp(floatAmount, this.body.zRot, cBody[2]);
+
+        this.head.xRot = Mth.lerp(floatAmount, this.head.xRot, cBody[0] + cHead[0]);
+        this.head.yRot = Mth.lerp(floatAmount, this.head.yRot, cBody[1] + cHead[1]);
+        this.head.zRot = Mth.lerp(floatAmount, this.head.zRot, cBody[2] + cHead[2]);
+
+        if (this.attackTime <= 0 && this.rightArmPose == ArmPose.EMPTY) {
+            blendRootedFlyingPose(this.rightArm, -5.0F, 2.0F, 0.0F, cBody, cRArm, floatAmount);
+            blendLocalFlyingPose(this.rightArmLower, cRArmL, floatAmount);
+        }
+        if (this.attackTime <= 0 && this.leftArmPose == ArmPose.EMPTY) {
+            blendRootedFlyingPose(this.leftArm, 5.0F, 2.0F, 0.0F, cBody, cLArm, floatAmount);
+            blendLocalFlyingPose(this.leftArmLower, cLArmL, floatAmount);
+        }
+
+        blendRootedFlyingPose(this.rightLeg, -1.9F, 12.0F, 0.0F, cBody, cRLeg, floatAmount);
+        blendRootedFlyingPose(this.leftLeg, 1.9F, 12.0F, 0.0F, cBody, cLLeg, floatAmount);
+        blendLocalFlyingPose(this.rightLegLower, cRLegL, floatAmount);
+        blendLocalFlyingPose(this.leftLegLower, cLLegL, floatAmount);
+    }
+
+    private void blendRootedFlyingPose(ModelPart part, float baseX, float baseY, float baseZ, float[] bodyAngles, float[] partAngles, float amount) {
+        float x = baseX;
+        float y = baseY;
+        float z = baseZ;
+
+        float sinX = Mth.sin(bodyAngles[0]);
+        float cosX = Mth.cos(bodyAngles[0]);
+        float rotatedY = y * cosX - z * sinX;
+        float rotatedZ = y * sinX + z * cosX;
+        y = rotatedY;
+        z = rotatedZ;
+
+        float sinY = Mth.sin(bodyAngles[1]);
+        float cosY = Mth.cos(bodyAngles[1]);
+        float rotatedX = x * cosY + z * sinY;
+        rotatedZ = -x * sinY + z * cosY;
+        x = rotatedX;
+        z = rotatedZ;
+
+        float sinZ = Mth.sin(bodyAngles[2]);
+        float cosZ = Mth.cos(bodyAngles[2]);
+        rotatedX = x * cosZ - y * sinZ;
+        rotatedY = x * sinZ + y * cosZ;
+
+        part.x = Mth.lerp(amount, part.x, rotatedX);
+        part.y = Mth.lerp(amount, part.y, rotatedY + this.body.y);
+        part.z = Mth.lerp(amount, part.z, z);
+        part.xRot = Mth.lerp(amount, part.xRot, bodyAngles[0] + partAngles[0]);
+        part.yRot = Mth.lerp(amount, part.yRot, bodyAngles[1] + partAngles[1]);
+        part.zRot = Mth.lerp(amount, part.zRot, bodyAngles[2] + partAngles[2]);
+    }
+
+    private void blendLocalFlyingPose(ModelPart part, float[] angles, float amount) {
+        part.xRot = Mth.lerp(amount, part.xRot, angles[0]);
+        part.yRot = Mth.lerp(amount, part.yRot, angles[1]);
+        part.zRot = Mth.lerp(amount, part.zRot, angles[2]);
     }
 
     private boolean isCookingPoseActive(HeroEntity entity) {

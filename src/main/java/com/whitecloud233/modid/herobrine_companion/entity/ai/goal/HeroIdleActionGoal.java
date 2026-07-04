@@ -64,6 +64,10 @@ public class HeroIdleActionGoal extends Goal {
 
         // 3. 跟随模式下的特殊检查
         if (this.hero.isCompanionMode()) {
+            if (HeroGodlyCompanionGoal.isOwnerWithinStayStillRadius(this.hero)) {
+                return false;
+            }
+
             if (this.hero.getOwnerUUID() != null) {
                 // 只有在几乎静止时才触发
                 if (this.hero.getDeltaMovement().horizontalDistanceSqr() > 0.02) {
@@ -150,6 +154,10 @@ public class HeroIdleActionGoal extends Goal {
     @Override
     public boolean canContinueToUse() {
         if (this.hero.isBattleModeActive()) {
+            return false;
+        }
+
+        if (HeroGodlyCompanionGoal.isOwnerWithinStayStillRadius(this.hero)) {
             return false;
         }
 

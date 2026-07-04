@@ -33,6 +33,9 @@ public class ToggleCompanionPacket {
                 if (entity instanceof HeroEntity hero) {
                     if (hero.getTrustLevel() >= 50) {
                         boolean newState = !hero.isCompanionMode();
+                        if (newState && hero.getOwnerUUID() == null) {
+                            hero.setOwnerUUID(serverPlayer.getUUID());
+                        }
                         hero.setCompanionMode(newState);
                         
                         String msgKey = newState ? "message.herobrine_companion.companion_on" : "message.herobrine_companion.companion_off";
