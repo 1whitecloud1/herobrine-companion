@@ -40,17 +40,7 @@ public class HeroFloatingFlyGoal extends Goal {
     
     @Override
     public void tick() {
-        // [新增] 在自由飞行时，偶尔看看周围，避免一直盯着前方死板
-        if (hero.tickCount % 40 == 0 && hero.getRandom().nextBoolean()) {
-             // 随机看一个方向，或者看前方
-             // 这里不做强制操作，依赖 RandomLookAroundGoal 即可
-             // 但为了防止 MoveControl 强制把头扭回来，我们可以手动设置一下 LookControl
-             // 让它看向移动方向，保持自然
-             Vec3 delta = hero.getDeltaMovement();
-             if (delta.lengthSqr() > 0.01) {
-                 hero.getLookControl().setLookAt(hero.getX() + delta.x * 5, hero.getEyeY() + delta.y * 5, hero.getZ() + delta.z * 5, 10.0F, 10.0F);
-             }
-        }
+        // 移动朝向由 MoveControl 管理；这里不再写 LookControl，避免非陪伴自由飞行时抽搐。
     }
 
     private Vec3 findRandomAirPos() {

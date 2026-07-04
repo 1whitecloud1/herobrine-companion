@@ -58,6 +58,10 @@ public class HeroIdleActionGoal extends Goal {
 
         // 3. 跟随模式下的特殊检查
         if (this.hero.isCompanionMode()) {
+            if (HeroGodlyCompanionGoal.isOwnerWithinStayStillRadius(this.hero)) {
+                return false;
+            }
+
              if (this.hero.getOwnerUUID() != null) {
                  if (this.hero.getDeltaMovement().horizontalDistanceSqr() > 0.02) {
                      return false;
@@ -133,7 +137,12 @@ public class HeroIdleActionGoal extends Goal {
     public boolean canContinueToUse() {
         if (this.hero.isBattleModeActive()) {
             return false;
-        }  // [新增] 如果中途进入邀请状态，立即停止
+        }
+        if (HeroGodlyCompanionGoal.isOwnerWithinStayStillRadius(this.hero)) {
+            return false;
+        }
+
+        // [新增] 如果中途进入邀请状态，立即停止
         if (this.hero.getInvitedPos() != null) {
             return false;
         }

@@ -3,6 +3,7 @@ package com.whitecloud233.herobrine_companion.entity;
 import com.mojang.authlib.GameProfile;
 import com.whitecloud233.herobrine_companion.entity.ai.HeroMoveControl;
 import com.whitecloud233.herobrine_companion.entity.ai.HeroAI;
+import com.whitecloud233.herobrine_companion.entity.ai.goal.HeroGodlyCompanionGoal;
 import com.whitecloud233.herobrine_companion.entity.ai.combat.HeroCombatPlanner;
 import com.whitecloud233.herobrine_companion.entity.ai.learning.HeroBrain;
 import com.whitecloud233.herobrine_companion.entity.ai.learning.SimpleNeuralNetwork;
@@ -53,6 +54,7 @@ import net.minecraft.world.item.trading.Merchant;
 import net.minecraft.world.item.trading.MerchantOffer;
 import net.minecraft.world.item.trading.MerchantOffers;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
 
 import javax.annotation.Nullable;
 import java.util.HashSet;
@@ -274,13 +276,25 @@ public class HeroEntity extends PathfinderMob implements Merchant {
             if (this.isCompanionMode()) this.setCompanionMode(false);
         }
 
-        if (this.level().isClientSide) HeroVisuals.tickClientAmbient(this);
+        if (!this.level().isClientSide && this.isCompanionMode() && !this.isBattleModeActive()) {
+            maintainCompanionFlightState();
+        }
+
+        if (this.level().isClientSide) {
+            HeroLogic.tick(this);
+            HeroVisuals.tickClientAmbient(this);
+        }
     }
 
     @Override
     public void aiStep() {
         super.aiStep();
-        if (!this.isCompanionMode()) {
+        if (this.isCompanionMode() && !this.isBattleModeActive()) {
+            maintainCompanionFlightState();
+        } else {
+            if (this.noPhysics) {
+                this.noPhysics = false;
+            }
             boolean inIntro = level().dimension() == ModStructures.END_RING_DIMENSION_KEY && getTags().contains("hero_intro_sequence");
             if (!inIntro && this.isBattleModeActive()) {
                 this.outOfWaterTimer = 0;
@@ -298,6 +312,35 @@ public class HeroEntity extends PathfinderMob implements Merchant {
                     if (!this.isNoGravity()) this.setNoGravity(true);
                 }
             }
+        }
+    }
+
+    private void maintainCompanionFlightState() {
+        if (!this.isFloating()) this.setFloating(true);
+        if (!this.isNoGravity()) this.setNoGravity(true);
+        this.fallDistance = 0.0F;
+
+        if (HeroGodlyCompanionGoal.isOwnerWithinStayStillRadius(this)) {
+            if (!this.getNavigation().isDone()) {
+                this.getNavigation().stop();
+            }
+            if (this.getMoveControl() instanceof HeroMoveControl heroMoveControl) {
+                heroMoveControl.stopMoving();
+            }
+            if (this.getDeltaMovement().lengthSqr() > 1.0E-6D) {
+                this.setDeltaMovement(Vec3.ZERO);
+            }
+            return;
+        }
+
+        Vec3 movement = this.getDeltaMovement();
+        if (this.noPhysics && movement.y < 0.0D && this.getMoveControl() instanceof HeroMoveControl heroMoveControl) {
+            Vec3 protectedMovement = heroMoveControl.protectCompanionFloor(movement);
+            if (protectedMovement.y < 0.0D
+                    && (this.getOwnerUUID() == null || HeroGodlyCompanionGoal.isOwnerWithinStayStillRadius(this))) {
+                protectedMovement = new Vec3(protectedMovement.x, 0.0D, protectedMovement.z);
+            }
+            this.setDeltaMovement(protectedMovement);
         }
     }
 
@@ -643,7 +686,24 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     }
     public void increaseTrust(int amount) { setTrustLevel(getTrustLevel() + amount); }
     public boolean isCompanionMode() { return entityData.get(IS_COMPANION_MODE); }
-    public void setCompanionMode(boolean active) { entityData.set(IS_COMPANION_MODE, active); }
+    public void setCompanionMode(boolean active) {
+        boolean previous = this.isCompanionMode();
+        entityData.set(IS_COMPANION_MODE, active);
+        if (previous && !active) {
+            cleanupCompanionMovementState();
+        }
+    }
+    private void cleanupCompanionMovementState() {
+        this.noPhysics = false;
+        this.getNavigation().stop();
+        if (this.getMoveControl() instanceof HeroMoveControl heroMoveControl) {
+            heroMoveControl.stopMoving();
+        }
+        this.setDeltaMovement(Vec3.ZERO);
+        this.fallDistance = 0.0F;
+        if (this.isFloating()) this.setFloating(false);
+        if (this.isNoGravity()) this.setNoGravity(false);
+    }
     public boolean isBattleModeActive() { return entityData.get(BATTLE_MODE_ACTIVE); }
     public void setBattleModeActive(boolean active) {
         entityData.set(BATTLE_MODE_ACTIVE, active);

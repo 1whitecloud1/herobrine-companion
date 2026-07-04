@@ -31,6 +31,9 @@ public record ToggleCompanionPacket(int entityId) implements CustomPacketPayload
                     // 再次在服务端校验信任度，防止作弊
                     if (hero.getTrustLevel() >= 50) {
                         boolean newState = !hero.isCompanionMode();
+                        if (newState && hero.getOwnerUUID() == null) {
+                            hero.setOwnerUUID(serverPlayer.getUUID());
+                        }
                         hero.setCompanionMode(newState);
                         
                         // 发送反馈消息
