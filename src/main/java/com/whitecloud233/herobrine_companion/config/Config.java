@@ -14,6 +14,7 @@ public class Config {
     public static final ModConfigSpec.BooleanValue HERO_KING_AURA_ENABLED = BUILDER.comment("是否启用 Herobrine 的怪物臣服AI").define("heroKingAuraEnabled_v2", true);
     public static final ModConfigSpec.BooleanValue HERO_BLOCK_RESTORATION = BUILDER.comment("Herobrine是否自动修复被破坏的方块").define("heroBlockRestoration_v2", false);
     public static final ModConfigSpec.BooleanValue HERO_CLEAN_ITEMS = BUILDER.comment("Herobrine是否自动清理地上的掉落物").define("heroCleanItems_v2", false);
+    public static final ModConfigSpec.BooleanValue HERO_LEAF_VANISH_ENABLED = BUILDER.comment("Herobrine是否允许在恶作剧状态下拔掉附近树叶").define("heroLeafVanishEnabled", true);
     public static final ModConfigSpec.BooleanValue CLEAVE_SKILL_ENABLED = BUILDER.comment("是否启用镰刀的 5 键存档毁灭术").define("cleaveSkillEnabled", false);
     public static final ModConfigSpec.BooleanValue SOUL_BOUND_PACT_ENABLED = BUILDER.comment("是否启用魂缚之契物品").define("soulBoundPactEnabled", true);
     public static final ModConfigSpec.BooleanValue ABYSSAL_GAZE_ENABLED = BUILDER.comment("是否启用幽邃之视物品").define("abyssalGazeEnabled", true);
@@ -81,6 +82,7 @@ public class Config {
     public static boolean heroKingAuraEnabled;
     public static boolean heroBlockRestoration;
     public static boolean heroCleanItems;
+    public static boolean heroLeafVanishEnabled;
     public static boolean cleaveSkillEnabled;
     public static boolean soulBoundPactEnabled;
     public static boolean abyssalGazeEnabled;
@@ -105,6 +107,7 @@ public class Config {
         heroKingAuraEnabled = HERO_KING_AURA_ENABLED.get();
         heroBlockRestoration = HERO_BLOCK_RESTORATION.get();
         heroCleanItems = HERO_CLEAN_ITEMS.get();
+        heroLeafVanishEnabled = HERO_LEAF_VANISH_ENABLED.get();
         cleaveSkillEnabled = CLEAVE_SKILL_ENABLED.get();
         soulBoundPactEnabled = SOUL_BOUND_PACT_ENABLED.get();
         abyssalGazeEnabled = ABYSSAL_GAZE_ENABLED.get();
@@ -125,8 +128,8 @@ public class Config {
         // 【新增】获取更新检查器配置
         enableUpdateChecker = ENABLE_UPDATE_CHECKER.get();
 
-        LOGGER.info("Herobrine Companion Config Loaded: Explosion={}, Aura={}, BlockRestoration={}, CleanItems={}, CleaveSkill={}, DGTerrainEnabled={}, DGTerrainMode={}, DGBreakContainers={}, DGArenaRestore={}, DGMaxBreakPerTick={}, DGWorldCollapse={}, Pact={}, Gaze={}, Permit={}, AIVision={}, AIInterval={}, AIStyle={}, AwakenedMobAI={}",
-                poemOfTheEndExplosion, heroKingAuraEnabled, heroBlockRestoration, heroCleanItems, cleaveSkillEnabled,
+        LOGGER.info("Herobrine Companion Config Loaded: Explosion={}, Aura={}, BlockRestoration={}, CleanItems={}, LeafVanish={}, CleaveSkill={}, DGTerrainEnabled={}, DGTerrainMode={}, DGBreakContainers={}, DGArenaRestore={}, DGMaxBreakPerTick={}, DGWorldCollapse={}, Pact={}, Gaze={}, Permit={}, AIVision={}, AIInterval={}, AIStyle={}, AwakenedMobAI={}",
+                poemOfTheEndExplosion, heroKingAuraEnabled, heroBlockRestoration, heroCleanItems, heroLeafVanishEnabled, cleaveSkillEnabled,
                 destructionGodTerrainDamageEnabled, destructionGodTerrainDamageMode, destructionGodBreakContainers,
                 destructionGodArenaRestore, destructionGodMaxBrokenBlocksPerTick, destructionGodFinalPhaseWorldCollapse,
                 soulBoundPactEnabled, abyssalGazeEnabled, transcendencePermitEnabled, aiVisionEnabled, aiVisionInterval,

@@ -25,8 +25,7 @@ public class ModItemModelProvider extends ItemModelProvider {
         basicItem(ModItems.MEMORY_SHARD.get());
         basicItem(ModItems.RECALL_STONE.get());
         basicItem(ModItems.ABYSSAL_GAZE.get());
-        withExistingParent(ModItems.AWAKENED_VESSEL.getId().getPath(), mcLoc("item/generated"))
-                .texture("layer0", modLoc("item/soul_bound_pact"));
+        basicItem(ModItems.AWAKENED_VESSEL.get());
         basicItem(ModItems.SOUL_BOUND_PACT.get());
         basicItem(ModItems.TRANSCENDENCE_PERMIT.get());
         basicItem(ModItems.SOURCE_FLOW.get());
