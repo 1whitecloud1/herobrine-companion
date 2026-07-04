@@ -1,0 +1,1385 @@
+{
+  "schema_version": 1,
+  "source_catalog": "minecraft_java_command_catalog.json",
+  "edition": "java",
+  "project_minecraft_version": "1.20.1",
+  "generated_from": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4 and linked command pages",
+  "note": "Clean LLM-facing index. The full catalog keeps wiki prose for audit; this file keeps only Java command names, aliases, compact syntax, extracted parameter names, and 1.20.1 runtime status.",
+  "commands": [
+    {
+      "name": "clear",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "clear [<targets>] [<item>] [<maxCount>]"
+      ],
+      "parameters": [
+        "targets",
+        "item",
+        "maxCount"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/clear"
+    },
+    {
+      "name": "clone",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "clone ...",
+        "clone from <sourceDimension> ...",
+        "... <begin> <end> ...",
+        "... <destination> ...",
+        "... to <targetDimension> <destination> ...",
+        "... [replace|masked]",
+        "... (replace|masked) [force|move|normal]",
+        "... filtered <filter> [force|move|normal]"
+      ],
+      "parameters": [
+        "sourceDimension",
+        "begin",
+        "end",
+        "destination",
+        "targetDimension",
+        "filter"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/clone"
+    },
+    {
+      "name": "damage",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "damage <target> <amount> [<damageType>] [at <location>]",
+        "damage <target> <amount> [<damageType>] [by <entity>] [from <source>]"
+      ],
+      "parameters": [
+        "target",
+        "amount",
+        "damageType",
+        "location",
+        "entity",
+        "source"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/damage"
+    },
+    {
+      "name": "deop",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "deop <targets>"
+      ],
+      "parameters": [
+        "targets"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/deop"
+    },
+    {
+      "name": "difficulty",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "difficulty [easy|hard|normal|peaceful]"
+      ],
+      "parameters": [],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/difficulty"
+    },
+    {
+      "name": "effect",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "effect clear [<targets>]",
+        "effect clear <targets> [<effect>]",
+        "effect give <targets> <effect> [<seconds>]",
+        "effect give <targets> <effect> <seconds> [<amplifier>]",
+        "effect give <targets> <effect> <seconds> <amplifier> [<hideParticles>]"
+      ],
+      "parameters": [
+        "targets",
+        "effect",
+        "seconds",
+        "amplifier",
+        "hideParticles"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/effect"
+    },
+    {
+      "name": "enchant",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "enchant <targets> <enchantment> [<level>]"
+      ],
+      "parameters": [
+        "targets",
+        "enchantment",
+        "level"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/enchant"
+    },
+    {
+      "name": "execute",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "execute ...",
+        "... align <axes> -> execute",
+        "... anchored <anchor> -> execute",
+        "... as <targets> -> execute",
+        "... at <targets> -> execute",
+        "... facing <pos> -> execute",
+        "... facing entity <targets> <anchor> -> execute",
+        "... in <dimension> -> execute"
+      ],
+      "parameters": [
+        "axes",
+        "anchor",
+        "targets",
+        "pos",
+        "dimension"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/execute"
+    },
+    {
+      "name": "experience",
+      "aliases": [
+        "xp"
+      ],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "experience add <targets> <amount> [levels|points]",
+        "experience set <targets> <amount> [levels|points]",
+        "experience query <targets> (levels|points)"
+      ],
+      "parameters": [
+        "targets",
+        "amount"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/experience"
+    },
+    {
+      "name": "fill",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "fill <from> <to> <block> [outline|hollow|destroy|strict|replace|keep]",
+        "fill <from> <to> <block> replace <filter> [outline|hollow|destroy|strict]"
+      ],
+      "parameters": [
+        "from",
+        "to",
+        "block",
+        "filter"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/fill"
+    },
+    {
+      "name": "function",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "function <name>",
+        "function <name> <arguments>",
+        "function <name> with (block <sourcePos>|entity <source>|storage <source>) [<path>][失效：JE 26.3]",
+        "function <name> with (block|entity|storage) <source> [<path>][新增：JE 26.3]",
+        "function <name: filepath>"
+      ],
+      "parameters": [
+        "name",
+        "arguments",
+        "sourcePos",
+        "source",
+        "path"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/function"
+    },
+    {
+      "name": "gamemode",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "gamemode <gamemode> [<target>]"
+      ],
+      "parameters": [
+        "gamemode",
+        "target"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/gamemode"
+    },
+    {
+      "name": "gamerule",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "gamerule <规则名称> [<value>]"
+      ],
+      "parameters": [
+        "规则名称",
+        "value"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/gamerule"
+    },
+    {
+      "name": "give",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "give <targets> <item> [<count>]"
+      ],
+      "parameters": [
+        "targets",
+        "item",
+        "count"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/give"
+    },
+    {
+      "name": "help",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "help",
+        "help <command>"
+      ],
+      "parameters": [],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/help"
+    },
+    {
+      "name": "kick",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "kick <targets> [<reason>]"
+      ],
+      "parameters": [
+        "targets",
+        "reason"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/kick"
+    },
+    {
+      "name": "kill",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "kill [<targets>]"
+      ],
+      "parameters": [
+        "targets"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/kill"
+    },
+    {
+      "name": "list",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "list",
+        "list uuids"
+      ],
+      "parameters": [],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/list"
+    },
+    {
+      "name": "locate",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "locate biome <biome>",
+        "locate poi <poi>",
+        "locate structure <structure>"
+      ],
+      "parameters": [
+        "biome",
+        "poi",
+        "structure"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/locate"
+    },
+    {
+      "name": "loot",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "loot <目标> <来源>",
+        "loot <loot_table>"
+      ],
+      "parameters": [
+        "目标",
+        "来源",
+        "loot_table"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/loot"
+    },
+    {
+      "name": "me",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "me <action>"
+      ],
+      "parameters": [
+        "action"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/me"
+    },
+    {
+      "name": "op",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "/op <targets>"
+      ],
+      "parameters": [
+        "targets"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/op"
+    },
+    {
+      "name": "particle",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "particle <name> [<pos>]",
+        "particle <name> <pos> <delta> <speed> <count> [force|normal] [<viewers>]"
+      ],
+      "parameters": [
+        "name",
+        "pos",
+        "delta",
+        "speed",
+        "count",
+        "viewers"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/particle"
+    },
+    {
+      "name": "place",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "place feature <feature> [<pos>]",
+        "place jigsaw <pool> <target> <max_depth> [<position>]",
+        "place structure <structure> [<pos>]",
+        "place template <template> [<pos>] [<rotation>] [<mirror>] [<integrity>] [<seed>] [strict]"
+      ],
+      "parameters": [
+        "feature",
+        "pos",
+        "pool",
+        "target",
+        "max_depth",
+        "position",
+        "structure",
+        "template",
+        "rotation",
+        "mirror",
+        "integrity",
+        "seed"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/place"
+    },
+    {
+      "name": "playsound",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "playsound <sound> [<类别>] [<targets>] [<pos>] [<volume>] [<pitch>] [<minVolume>]"
+      ],
+      "parameters": [
+        "sound",
+        "类别",
+        "targets",
+        "pos",
+        "volume",
+        "pitch",
+        "minVolume"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/playsound"
+    },
+    {
+      "name": "recipe",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "recipe give <targets> *",
+        "recipe take <targets> *",
+        "recipe give <targets> <recipe>",
+        "recipe take <targets> <recipe>"
+      ],
+      "parameters": [
+        "targets",
+        "recipe"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/recipe"
+    },
+    {
+      "name": "reload",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "reload"
+      ],
+      "parameters": [],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/reload"
+    },
+    {
+      "name": "ride",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "ride <target> mount <vehicle>",
+        "ride <target> dismount"
+      ],
+      "parameters": [
+        "target",
+        "vehicle"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/ride"
+    },
+    {
+      "name": "say",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "say <message>"
+      ],
+      "parameters": [
+        "message"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/say"
+    },
+    {
+      "name": "schedule",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "schedule function <function> <time> [append|replace]",
+        "schedule clear <function>"
+      ],
+      "parameters": [
+        "function",
+        "time"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/schedule"
+    },
+    {
+      "name": "scoreboard",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "scoreboard objectives list",
+        "scoreboard objectives add <objective> <criteria> [<displayName>]",
+        "scoreboard objectives remove <objective>",
+        "scoreboard objectives setdisplay <slot> [<objective>]",
+        "scoreboard objectives modify <objective> displayautoupdate (true|false)",
+        "scoreboard objectives modify <objective> displayname <displayName>",
+        "scoreboard objectives modify <objective> numberformat",
+        "scoreboard objectives modify <objective> numberformat blank"
+      ],
+      "parameters": [
+        "objective",
+        "criteria",
+        "displayName",
+        "slot"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/scoreboard"
+    },
+    {
+      "name": "setblock",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "setblock <pos> <block> [destroy|keep|replace|strict]"
+      ],
+      "parameters": [
+        "pos",
+        "block"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/setblock"
+    },
+    {
+      "name": "setworldspawn",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "setworldspawn [<pos>] [<rotation>]"
+      ],
+      "parameters": [
+        "pos",
+        "rotation"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/setworldspawn"
+    },
+    {
+      "name": "spawnpoint",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "spawnpoint [<targets>] [<pos>] [<rotation>]"
+      ],
+      "parameters": [
+        "targets",
+        "pos",
+        "rotation"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/spawnpoint"
+    },
+    {
+      "name": "spreadplayers",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "spreadplayers <center> <spreadDistance> <maxRange> <respectTeams> <targets>",
+        "spreadplayers <center> <spreadDistance> <maxRange> under <maxHeight> <respectTeams> <targets>"
+      ],
+      "parameters": [
+        "center",
+        "spreadDistance",
+        "maxRange",
+        "respectTeams",
+        "targets",
+        "maxHeight"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/spreadplayers"
+    },
+    {
+      "name": "stop",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "stop"
+      ],
+      "parameters": [],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/stop"
+    },
+    {
+      "name": "stopsound",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "stopsound <targets> * <sound>",
+        "stopsound <targets> [<类别>] [<sound>]"
+      ],
+      "parameters": [
+        "targets",
+        "sound",
+        "类别"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/stopsound"
+    },
+    {
+      "name": "summon",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "summon <entity> [<pos>]",
+        "summon <entity> <pos> [<nbt>]"
+      ],
+      "parameters": [
+        "entity",
+        "pos",
+        "nbt"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/summon"
+    },
+    {
+      "name": "tag",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "tag <targets> add <name>",
+        "tag <targets> remove <name>",
+        "tag <targets> list"
+      ],
+      "parameters": [
+        "targets",
+        "name"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/tag"
+    },
+    {
+      "name": "msg",
+      "aliases": [
+        "tell",
+        "w"
+      ],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "msg <targets> <message>",
+        "tell <targets> <message>",
+        "w <targets> <message>"
+      ],
+      "parameters": [
+        "targets",
+        "message"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/msg"
+    },
+    {
+      "name": "tellraw",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "tellraw <targets> <message>"
+      ],
+      "parameters": [
+        "targets",
+        "message"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/tellraw"
+    },
+    {
+      "name": "time",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "time of <clock> add <time>",
+        "time add <time>",
+        "time of <clock> pause",
+        "time pause",
+        "time query gametime",
+        "time of <clock> query time",
+        "time query time",
+        "time of <clock> query <timeline> repetition"
+      ],
+      "parameters": [
+        "clock",
+        "time",
+        "timeline"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/time"
+    },
+    {
+      "name": "title",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "title <targets> (clear|reset)",
+        "title <targets> (title|subtitle|actionbar) <title>",
+        "title <targets> times <fadeIn> <stay> <fadeOut>",
+        "title <player: target> <clear|reset>",
+        "title <player: target> <title|subtitle|actionbar> <titleText: message>",
+        "title <player: target> times <fadeIn: int> <stay: int> <fadeOut: int>",
+        "... clear",
+        "... reset"
+      ],
+      "parameters": [
+        "targets",
+        "title",
+        "fadeIn",
+        "stay",
+        "fadeOut",
+        "player",
+        "clear",
+        "titleText"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/title"
+    },
+    {
+      "name": "teleport",
+      "aliases": [
+        "tp"
+      ],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "teleport <destination>",
+        "teleport <targets> <destination>",
+        "teleport <location>",
+        "teleport <targets> <location>",
+        "teleport <targets> <location> <rotation>",
+        "teleport <targets> <location> facing <facingLocation>",
+        "teleport <targets> <location> facing entity <facingEntity> [<facingAnchor>]"
+      ],
+      "parameters": [
+        "destination",
+        "targets",
+        "location",
+        "rotation",
+        "facingLocation",
+        "facingEntity",
+        "facingAnchor"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/teleport"
+    },
+    {
+      "name": "transfer",
+      "aliases": [],
+      "status": "wiki_current_may_reject_in_1_20_1",
+      "syntax": [
+        "transfer <hostname> [<port>] [<players>]"
+      ],
+      "parameters": [
+        "hostname",
+        "port",
+        "players"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/transfer"
+    },
+    {
+      "name": "weather",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "weather (clear|rain|thunder) [<duration>]"
+      ],
+      "parameters": [
+        "duration"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/weather"
+    },
+    {
+      "name": "whitelist",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "whitelist add <targets>",
+        "whitelist list",
+        "whitelist off",
+        "whitelist on",
+        "whitelist reload",
+        "whitelist remove <targets>"
+      ],
+      "parameters": [
+        "targets"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/whitelist"
+    },
+    {
+      "name": "advancement",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "advancement (grant|revoke) <targets> everything",
+        "advancement (grant|revoke) <targets> only <advancement> [<criterion>]",
+        "advancement (grant|revoke) <targets> from <advancement>",
+        "advancement (grant|revoke) <targets> through <advancement>",
+        "advancement (grant|revoke) <targets> until <advancement>"
+      ],
+      "parameters": [
+        "targets",
+        "advancement",
+        "criterion"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/advancement"
+    },
+    {
+      "name": "attribute",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "attribute <target> <attribute> get [<scale>]",
+        "attribute <target> <attribute> base get [<scale>]",
+        "attribute <target> <attribute> base reset",
+        "attribute <target> <attribute> base set <value>",
+        "attribute <target> <attribute> modifier add <id> <value> (add_value|add_multiplied_total|add_multiplied_base)",
+        "attribute <target> <attribute> modifier remove <id>",
+        "attribute <target> <attribute> modifier value get <id> [<scale>]"
+      ],
+      "parameters": [
+        "target",
+        "attribute",
+        "scale",
+        "value",
+        "id"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/attribute"
+    },
+    {
+      "name": "ban",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "ban <targets> [<reason>]"
+      ],
+      "parameters": [
+        "targets",
+        "reason"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/ban"
+    },
+    {
+      "name": "ban-ip",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "ban-ip <target> [<reason>]"
+      ],
+      "parameters": [
+        "target",
+        "reason"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/ban#ban-ip"
+    },
+    {
+      "name": "banlist",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "banlist ips",
+        "banlist players"
+      ],
+      "parameters": [],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/ban#banlist"
+    },
+    {
+      "name": "bossbar",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "bossbar add <id> <name>",
+        "bossbar get <id> (max|players|value|visible)",
+        "bossbar list",
+        "bossbar remove <id>",
+        "bossbar set <id> (color|max|name|players|style|value|visible)",
+        "... color (blue|green|pink|purple|red|white|yellow)",
+        "... max <max>",
+        "... name <name>"
+      ],
+      "parameters": [
+        "id",
+        "name",
+        "max"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/bossbar"
+    },
+    {
+      "name": "data",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "/data ...",
+        "... get (block <targetPos>|entity <target>|storage <target>) [<path>]",
+        "... get (block <targetPos>|entity <target>|storage <target>) <path> [<scale>]",
+        "... merge (block <targetPos>|entity <target>|storage <target>) <nbt>",
+        "... modify (block <targetPos>|entity <target>|storage <target>) <targetPath> ...",
+        "... append ...",
+        "... insert <index> ...",
+        "... merge ..."
+      ],
+      "parameters": [
+        "targetPos",
+        "target",
+        "path",
+        "scale",
+        "nbt",
+        "targetPath",
+        "index"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/data"
+    },
+    {
+      "name": "datapack",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "datapack create <id> <description>",
+        "datapack disable <name>",
+        "datapack enable <name>",
+        "datapack enable <name> (first|last)",
+        "datapack enable <name> (before|after) <existing>",
+        "datapack list [available|enabled]"
+      ],
+      "parameters": [
+        "id",
+        "description",
+        "name",
+        "existing"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/datapack"
+    },
+    {
+      "name": "debug",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "debug start",
+        "debug stop",
+        "debug function <name>"
+      ],
+      "parameters": [
+        "name"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/debug"
+    },
+    {
+      "name": "defaultgamemode",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "defaultgamemode <gamemode>"
+      ],
+      "parameters": [
+        "gamemode"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/defaultgamemode"
+    },
+    {
+      "name": "dialog",
+      "aliases": [],
+      "status": "wiki_current_may_reject_in_1_20_1",
+      "syntax": [
+        "dialog clear <targets>",
+        "dialog show <targets> <dialog>"
+      ],
+      "parameters": [
+        "targets",
+        "dialog"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/dialog"
+    },
+    {
+      "name": "fetchprofile",
+      "aliases": [],
+      "status": "wiki_current_may_reject_in_1_20_1",
+      "syntax": [
+        "fetchprofile id <id>",
+        "fetchprofile name <name>",
+        "fetchprofile entity <entity>"
+      ],
+      "parameters": [
+        "id",
+        "name",
+        "entity"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/fetchprofile"
+    },
+    {
+      "name": "fillbiome",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "/fillbiome <from> <to> <biome>",
+        "/fillbiome <from> <to> <biome> replace <filter>"
+      ],
+      "parameters": [
+        "from",
+        "to",
+        "biome",
+        "filter"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/fillbiome"
+    },
+    {
+      "name": "forceload",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "forceload add <from> [<to>]",
+        "forceload remove <from> [<to>]",
+        "forceload remove all",
+        "forceload query [<pos>]"
+      ],
+      "parameters": [
+        "from",
+        "to",
+        "pos"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/forceload"
+    },
+    {
+      "name": "item",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "item modify (block <pos>|entity <targets>) <slot> <modifier>",
+        "item replace (block <pos>|entity <targets>) <slot> from (block|entity) <source> <sourceSlot> [<modifier>]",
+        "item replace (block <pos>|entity <targets>) <slot> with <item> [<count>]",
+        "item fill (block|entity) <target> <slots> from (block|entity) <source> <sourceSlots> [<modifier>]",
+        "item fill (block|entity) <target> <slots> with <item> [<count>]",
+        "item modify (block|entity) <target> <slots> <modifier>",
+        "item override (block|entity) <target> <slots> from (block|entity) <source> <sourceSlots> [<modifier>]",
+        "item override (block|entity) <target> <slots> with <item> [<count>]"
+      ],
+      "parameters": [
+        "pos",
+        "targets",
+        "slot",
+        "modifier",
+        "source",
+        "sourceSlot",
+        "item",
+        "count",
+        "target",
+        "slots",
+        "sourceSlots"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/item"
+    },
+    {
+      "name": "jfr",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "jfr start",
+        "jfr stop"
+      ],
+      "parameters": [],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/jfr"
+    },
+    {
+      "name": "pardon",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "pardon <targets>"
+      ],
+      "parameters": [
+        "targets"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/pardon"
+    },
+    {
+      "name": "pardon-ip",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "pardon-ip <target>"
+      ],
+      "parameters": [
+        "target"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/pardon#pardon-ip"
+    },
+    {
+      "name": "perf",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "perf start",
+        "perf stop"
+      ],
+      "parameters": [],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/perf"
+    },
+    {
+      "name": "publish",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "publish [<allowCommands>] [<gamemode>] [<port>]"
+      ],
+      "parameters": [
+        "allowCommands",
+        "gamemode",
+        "port"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/publish"
+    },
+    {
+      "name": "random",
+      "aliases": [],
+      "status": "wiki_current_may_reject_in_1_20_1",
+      "syntax": [
+        "random (value|roll) <range>",
+        "random (value|roll) <range> <sequence>",
+        "random reset *",
+        "random reset * <seed> [<includeWorldSeed>]",
+        "random reset * <seed> <includeWorldSeed> [<includeSequenceId>]",
+        "random reset <sequence>",
+        "random reset <sequence> [<seed>]",
+        "random reset <sequence> <seed> [<includeWorldSeed>]"
+      ],
+      "parameters": [
+        "range",
+        "sequence",
+        "seed",
+        "includeWorldSeed",
+        "includeSequenceId"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/random"
+    },
+    {
+      "name": "return",
+      "aliases": [],
+      "status": "wiki_current_may_reject_in_1_20_1",
+      "syntax": [
+        "return <value>",
+        "return fail",
+        "return run <command>"
+      ],
+      "parameters": [
+        "value"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/return"
+    },
+    {
+      "name": "rotate",
+      "aliases": [],
+      "status": "wiki_current_may_reject_in_1_20_1",
+      "syntax": [
+        "rotate <target> <rotation>",
+        "rotate <target> facing <facingLocation>",
+        "rotate <target> facing entity <facingEntity> [<facingAnchor>]"
+      ],
+      "parameters": [
+        "target",
+        "rotation",
+        "facingLocation",
+        "facingEntity",
+        "facingAnchor"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/rotate"
+    },
+    {
+      "name": "save-all",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "save-all",
+        "save-all flush"
+      ],
+      "parameters": [],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/save#save-all"
+    },
+    {
+      "name": "save-off",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "save-off"
+      ],
+      "parameters": [],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/save#save-off"
+    },
+    {
+      "name": "save-on",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "save-on"
+      ],
+      "parameters": [],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/save#save-on"
+    },
+    {
+      "name": "seed",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "seed"
+      ],
+      "parameters": [],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/seed"
+    },
+    {
+      "name": "setidletimeout",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "setidletimeout <minutes>"
+      ],
+      "parameters": [
+        "minutes"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/setidletimeout"
+    },
+    {
+      "name": "spectate",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "spectate <target> [<player>]",
+        "spectate"
+      ],
+      "parameters": [
+        "target",
+        "player"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/spectate"
+    },
+    {
+      "name": "stopwatch",
+      "aliases": [],
+      "status": "wiki_current_may_reject_in_1_20_1",
+      "syntax": [
+        "stopwatch create <id>",
+        "stopwatch query <id> [<scale>]",
+        "stopwatch restart <id>",
+        "stopwatch remove <id>"
+      ],
+      "parameters": [
+        "id",
+        "scale"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/stopwatch"
+    },
+    {
+      "name": "swing",
+      "aliases": [],
+      "status": "wiki_current_may_reject_in_1_20_1",
+      "syntax": [
+        "swing <targets> [mainhand|offhand]",
+        "swing [<targets>]"
+      ],
+      "parameters": [
+        "targets"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/swing"
+    },
+    {
+      "name": "team",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "team list [<team>]",
+        "team add <team> [<displayName>]",
+        "team remove <team>",
+        "team empty <team>",
+        "team join <team> [<members>]",
+        "team leave <members>",
+        "team modify <team> <选项> <值>"
+      ],
+      "parameters": [
+        "team",
+        "displayName",
+        "members",
+        "选项",
+        "值"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/team"
+    },
+    {
+      "name": "teammsg",
+      "aliases": [
+        "tm"
+      ],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "teammsg <message>",
+        "tm <message>"
+      ],
+      "parameters": [
+        "message"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/teammsg"
+    },
+    {
+      "name": "test",
+      "aliases": [],
+      "status": "wiki_current_may_reject_in_1_20_1",
+      "syntax": [
+        "test (clearall [<radius>]|clearthat|clearthese)",
+        "test create <id> [<width>] [<height> <depth>]",
+        "test locate <tests>",
+        "test pos [<var>]",
+        "test (resetclosest|resetthat|reseetthese)",
+        "test run <tests> [<numberOfTimes>] [<untilFailed>] [<rotationSteps>] [<testsPerRow>]",
+        "test (runclosest|runthat|runthese) [<numberOfTimes>] [<untilFailed>]",
+        "test runmultiple <tests> [<amount>]"
+      ],
+      "parameters": [
+        "radius",
+        "id",
+        "width",
+        "height",
+        "depth",
+        "tests",
+        "var",
+        "numberOfTimes",
+        "untilFailed",
+        "rotationSteps",
+        "testsPerRow",
+        "amount"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/test"
+    },
+    {
+      "name": "tick",
+      "aliases": [],
+      "status": "wiki_current_may_reject_in_1_20_1",
+      "syntax": [
+        "tick query",
+        "tick rate <rate>",
+        "tick freeze",
+        "tick unfreeze",
+        "tick step [<time>]",
+        "tick step stop",
+        "tick sprint [<time>]",
+        "tick sprint stop"
+      ],
+      "parameters": [
+        "rate",
+        "time"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/tick"
+    },
+    {
+      "name": "trigger",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "trigger <objective>",
+        "trigger <objective> add <value>",
+        "trigger <objective> set <value>"
+      ],
+      "parameters": [
+        "objective",
+        "value"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/trigger"
+    },
+    {
+      "name": "unpublish",
+      "aliases": [],
+      "status": "wiki_current_may_reject_in_1_20_1",
+      "syntax": [
+        "unpublish"
+      ],
+      "parameters": [],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/unpublish"
+    },
+    {
+      "name": "version",
+      "aliases": [],
+      "status": "wiki_current_may_reject_in_1_20_1",
+      "syntax": [
+        "version"
+      ],
+      "parameters": [],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/version"
+    },
+    {
+      "name": "waypoint",
+      "aliases": [],
+      "status": "wiki_current_may_reject_in_1_20_1",
+      "syntax": [
+        "waypoint list",
+        "waypoint modify <waypoint> color <color>",
+        "waypoint modify <waypoint> color hex <color>",
+        "waypoint modify <waypoint> color reset",
+        "waypoint modify <waypoint> style set <style>",
+        "waypoint modify <waypoint> style reset"
+      ],
+      "parameters": [
+        "waypoint",
+        "color",
+        "style"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/waypoint"
+    },
+    {
+      "name": "worldborder",
+      "aliases": [],
+      "status": "java_1_20_1_dispatcher_expected",
+      "syntax": [
+        "worldborder add <distance> [<time>]",
+        "worldborder center <pos>",
+        "worldborder damage amount <damagePerBlock>",
+        "worldborder damage buffer <distance>",
+        "worldborder get",
+        "worldborder set <distance> [<time>]",
+        "worldborder warning distance <distance>",
+        "worldborder warning time <time>"
+      ],
+      "parameters": [
+        "distance",
+        "time",
+        "pos",
+        "damagePerBlock"
+      ],
+      "source_url": "https://zh.minecraft.wiki/w/%E5%91%BD%E4%BB%A4/worldborder"
+    }
+  ]
+}
