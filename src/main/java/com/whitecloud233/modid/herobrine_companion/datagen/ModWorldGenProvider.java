@@ -19,7 +19,6 @@ public class ModWorldGenProvider extends DatapackBuiltinEntriesProvider {
             // [修改] 将 STRUCTURE 和 STRUCTURE_SET 都指向合并后的类和对应的方法
             .add(Registries.STRUCTURE, ModStructures::bootstrapStructures)
             .add(Registries.STRUCTURE_SET, ModStructures::bootstrapSets)
-
             .add(Registries.DIMENSION_TYPE, ModDimensions::bootstrapType)
             .add(Registries.LEVEL_STEM, ModDimensions::bootstrapStem)
             .add(ForgeRegistries.Keys.BIOME_MODIFIERS, ModBiomeModifiers::bootstrap);

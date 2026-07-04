@@ -33,6 +33,11 @@ public class Config {
             .comment("Herobrine是否自动清理地上的掉落物")
             .define("heroCleanItems_v2", false);
 
+    public static final ForgeConfigSpec.BooleanValue HERO_LEAF_VANISH_ENABLED = BUILDER
+            .comment("Whether Herobrine can vanish nearby tree leaves in Prankster state")
+            .comment("Herobrine是否允许在恶作剧状态下拔掉附近树叶")
+            .define("heroLeafVanishEnabled", true);
+
     public static final ForgeConfigSpec.BooleanValue CLEAVE_SKILL_ENABLED = BUILDER
             .comment("Whether the World Cleave skill (5 key) is enabled")
             .comment("是否启用镰刀的 5 键存档毁灭术")
@@ -115,6 +120,7 @@ public class Config {
     public static boolean heroKingAuraEnabled;
     public static boolean heroBlockRestoration;
     public static boolean heroCleanItems;
+    public static boolean heroLeafVanishEnabled;
     public static boolean cleaveSkillEnabled;
     public static boolean destructionGodTerrainDamageEnabled;
     public static String destructionGodTerrainDamageMode;
@@ -141,6 +147,7 @@ public class Config {
         heroKingAuraEnabled = HERO_KING_AURA_ENABLED.get();
         heroBlockRestoration = HERO_BLOCK_RESTORATION.get();
         heroCleanItems = HERO_CLEAN_ITEMS.get();
+        heroLeafVanishEnabled = HERO_LEAF_VANISH_ENABLED.get();
         cleaveSkillEnabled = CLEAVE_SKILL_ENABLED.get();
         destructionGodTerrainDamageEnabled = DESTRUCTION_GOD_TERRAIN_DAMAGE_ENABLED.get();
         destructionGodTerrainDamageMode = DESTRUCTION_GOD_TERRAIN_DAMAGE_MODE.get();
@@ -161,8 +168,8 @@ public class Config {
         // 【新增】语言风格赋值
         aiLanguageStyle = AI_LANGUAGE_STYLE.get();
 
-        LOGGER.info("Herobrine Companion Config Loaded: Explosion={}, Aura={}, BlockRestoration={}, CleanItems={}, CleaveSkill={}, DGTerrainEnabled={}, DGTerrainMode={}, DGBreakContainers={}, DGArenaRestore={}, DGMaxBreakPerTick={}, DGWorldCollapse={}, Pact={}, Gaze={}, Permit={}, AIVision={}, AwakenedMobAIDialogue={}, AIInterval={}, AIStyle={}",
-                poemOfTheEndExplosion, heroKingAuraEnabled, heroBlockRestoration, heroCleanItems, cleaveSkillEnabled,
+        LOGGER.info("Herobrine Companion Config Loaded: Explosion={}, Aura={}, BlockRestoration={}, CleanItems={}, LeafVanish={}, CleaveSkill={}, DGTerrainEnabled={}, DGTerrainMode={}, DGBreakContainers={}, DGArenaRestore={}, DGMaxBreakPerTick={}, DGWorldCollapse={}, Pact={}, Gaze={}, Permit={}, AIVision={}, AwakenedMobAIDialogue={}, AIInterval={}, AIStyle={}",
+                poemOfTheEndExplosion, heroKingAuraEnabled, heroBlockRestoration, heroCleanItems, heroLeafVanishEnabled, cleaveSkillEnabled,
                 destructionGodTerrainDamageEnabled, destructionGodTerrainDamageMode, destructionGodBreakContainers,
                 destructionGodArenaRestore, destructionGodMaxBrokenBlocksPerTick, destructionGodFinalPhaseWorldCollapse,
                 soulBoundPactEnabled, abyssalGazeEnabled, transcendencePermitEnabled, aiVisionEnabled, awakenedMobAiDialogueEnabled, aiVisionInterval, aiLanguageStyle);

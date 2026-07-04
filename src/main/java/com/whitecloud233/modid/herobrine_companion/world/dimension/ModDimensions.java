@@ -25,20 +25,20 @@ public class ModDimensions {
 
     public static void bootstrapType(BootstapContext<DimensionType> context) {
         context.register(END_RING_DIM_TYPE, new DimensionType(
-                OptionalLong.of(6000), 
-                false, 
-                false, 
-                false, 
-                false, 
-                1.0, 
-                true, 
-                false, 
-                0, 
-                1024, 
-                1024, 
-                BlockTags.INFINIBURN_OVERWORLD, 
-                new ResourceLocation("minecraft:the_void"), 
-                0.0f, 
+                OptionalLong.of(6000),
+                false,
+                false,
+                false,
+                false,
+                1.0,
+                true,
+                false,
+                0,
+                1024,
+                1024,
+                BlockTags.INFINIBURN_OVERWORLD,
+                new ResourceLocation("minecraft:the_void"),
+                0.0f,
                 new DimensionType.MonsterSettings(false, false, ConstantInt.of(0), 0)
         ));
     }
