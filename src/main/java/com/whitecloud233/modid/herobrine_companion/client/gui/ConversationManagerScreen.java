@@ -18,8 +18,14 @@ import java.util.List;
 import java.util.UUID;
 
 public class ConversationManagerScreen extends Screen {
-    private static final int PANEL_WIDTH = 340;
-    private static final int PANEL_HEIGHT = 245;
+    private static final int MAX_PANEL_WIDTH = 340;
+    private static final int MAX_PANEL_HEIGHT = 245;
+    private static final int MIN_PANEL_WIDTH = 260;
+    private static final int MIN_PANEL_HEIGHT = 220;
+    private static final int SCREEN_MARGIN = 8;
+    private static final int CONTENT_MARGIN = 10;
+    private static final int CONTROL_GAP = 6;
+    private static final int BUTTON_HEIGHT = 20;
     private static final int COL_BG = 0xFF2B2B2B;
     private static final int COL_BORDER = 0xFF555555;
     private static final int COL_TEXT = 0xFFA9B7C6;
@@ -52,19 +58,16 @@ public class ConversationManagerScreen extends Screen {
             this.conversationStore.ensureActiveConversation(playerUUID);
         }
 
-        int centerX = this.width / 2;
-        int centerY = this.height / 2;
-        int startX = centerX - PANEL_WIDTH / 2;
-        int startY = centerY - PANEL_HEIGHT / 2;
+        Layout layout = this.createLayout();
 
         this.addRenderableWidget(new HeroScreen.ThemedButton(
-                startX + 10, startY + 38, 76, 20,
+                layout.apiButtonX, layout.controlsY, layout.topButtonWidth, BUTTON_HEIGHT,
                 Component.translatable("gui.herobrine_companion.conversation_manager.api_setup"),
                 button -> Minecraft.getInstance().setScreen(new ApiKeyInputScreen(this)),
                 null
         ));
 
-        this.searchBox = new EditBox(this.font, startX + 92, startY + 38, PANEL_WIDTH - 186, 20,
+        this.searchBox = new EditBox(this.font, layout.searchX, layout.controlsY, layout.searchWidth, BUTTON_HEIGHT,
                 Component.translatable("gui.herobrine_companion.conversation_manager.search"));
         this.searchBox.setMaxLength(80);
         this.searchBox.setSuggestion(Component.translatable("gui.herobrine_companion.conversation_manager.search_hint").getString());
@@ -72,19 +75,20 @@ public class ConversationManagerScreen extends Screen {
         this.addRenderableWidget(this.searchBox);
 
         this.addRenderableWidget(new HeroScreen.ThemedButton(
-                startX + PANEL_WIDTH - 86, startY + 38, 76, 20,
+                layout.settingsButtonX, layout.controlsY, layout.topButtonWidth, BUTTON_HEIGHT,
                 Component.translatable("gui.herobrine_companion.conversation_manager.llm_settings"),
                 button -> Minecraft.getInstance().setScreen(new LLMSettingsScreen(this)),
                 null
         ));
 
-        this.conversationList = new HeroActionList(this.minecraft, PANEL_WIDTH - 20, 96, startY + 66, 24);
-        this.conversationList.setLeftPos(startX + 10);
+        this.conversationList = new HeroActionList(this.minecraft, layout.contentWidth, layout.listHeight, layout.listTop, 24);
+        this.conversationList.setLeftPos(layout.contentLeft);
         this.refreshConversationList();
         this.addRenderableWidget(this.conversationList);
 
+        int actionWidth = (layout.contentWidth - CONTROL_GAP * 3) / 4;
         this.addRenderableWidget(new HeroScreen.ThemedButton(
-                startX + 10, startY + PANEL_HEIGHT - 52, 74, 20,
+                layout.contentLeft, layout.actionY, actionWidth, BUTTON_HEIGHT,
                 Component.translatable("gui.herobrine_companion.conversation_manager.new"),
                 button -> {
                     UUID uuid = this.getPlayerUUID();
@@ -97,21 +101,21 @@ public class ConversationManagerScreen extends Screen {
         ));
 
         this.exportButton = this.addRenderableWidget(new HeroScreen.ThemedButton(
-                startX + 92, startY + PANEL_HEIGHT - 52, 74, 20,
+                layout.contentLeft + (actionWidth + CONTROL_GAP), layout.actionY, actionWidth, BUTTON_HEIGHT,
                 Component.translatable("gui.herobrine_companion.conversation_manager.export"),
                 button -> this.exportActiveConversation(),
                 null
         ));
 
         this.continueButton = this.addRenderableWidget(new HeroScreen.ThemedButton(
-                startX + 174, startY + PANEL_HEIGHT - 52, 74, 20,
+                layout.contentLeft + (actionWidth + CONTROL_GAP) * 2, layout.actionY, actionWidth, BUTTON_HEIGHT,
                 Component.translatable("gui.herobrine_companion.conversation_manager.continue"),
                 button -> this.openChat(),
                 null
         ));
 
         this.deleteButton = this.addRenderableWidget(new HeroScreen.ThemedButton(
-                startX + 256, startY + PANEL_HEIGHT - 52, 74, 20,
+                layout.contentLeft + (actionWidth + CONTROL_GAP) * 3, layout.actionY, actionWidth, BUTTON_HEIGHT,
                 Component.translatable("gui.herobrine_companion.conversation_manager.delete"),
                 button -> {
                     UUID uuid = this.getPlayerUUID();
@@ -132,13 +136,45 @@ public class ConversationManagerScreen extends Screen {
         this.setInitialFocus(this.searchBox);
 
         this.addRenderableWidget(new HeroScreen.ThemedButton(
-                centerX - 50, startY + PANEL_HEIGHT - 25, 100, 20,
+                layout.left + (layout.panelWidth - 100) / 2, layout.backY, 100, BUTTON_HEIGHT,
                 Component.translatable("gui.herobrine_companion.back"),
                 button -> Minecraft.getInstance().setScreen(new HeroScreen(this.entityId)),
                 null
         ));
 
         this.updateButtonStates();
+    }
+
+    private Layout createLayout() {
+        int availableWidth = Math.max(1, this.width - SCREEN_MARGIN * 2);
+        int availableHeight = Math.max(1, this.height - SCREEN_MARGIN * 2);
+        int panelWidth = clampToAvailable(MIN_PANEL_WIDTH, MAX_PANEL_WIDTH, availableWidth);
+        int panelHeight = clampToAvailable(MIN_PANEL_HEIGHT, MAX_PANEL_HEIGHT, availableHeight);
+        int left = (this.width - panelWidth) / 2;
+        int top = (this.height - panelHeight) / 2;
+        int contentLeft = left + CONTENT_MARGIN;
+        int contentWidth = Math.max(1, panelWidth - CONTENT_MARGIN * 2);
+        int controlsY = top + 38;
+        int topButtonWidth = contentWidth >= 210
+                ? Math.min(76, Math.max(54, (contentWidth - 70 - CONTROL_GAP * 2) / 2))
+                : Math.max(32, (contentWidth - CONTROL_GAP * 2) / 3);
+        int searchX = contentLeft + topButtonWidth + CONTROL_GAP;
+        int settingsButtonX = left + panelWidth - CONTENT_MARGIN - topButtonWidth;
+        int searchWidth = Math.max(1, settingsButtonX - CONTROL_GAP - searchX);
+        int backY = top + panelHeight - 28;
+        int actionY = backY - 26;
+        int hintTop = actionY - 24;
+        int listTop = controlsY + 28;
+        int listHeight = Math.max(40, hintTop - listTop - 4);
+
+        return new Layout(panelWidth, panelHeight, left, top, contentLeft, contentWidth, controlsY,
+                contentLeft, searchX, searchWidth, settingsButtonX, topButtonWidth,
+                listTop, listHeight, hintTop, actionY, backY);
+    }
+
+    private static int clampToAvailable(int min, int max, int available) {
+        int clamped = Math.min(max, available);
+        return Math.max(Math.min(min, available), clamped);
     }
 
     private UUID getPlayerUUID() {
@@ -238,14 +274,11 @@ public class ConversationManagerScreen extends Screen {
 
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        int centerX = this.width / 2;
-        int centerY = this.height / 2;
-        int startX = centerX - PANEL_WIDTH / 2;
-        int startY = centerY - PANEL_HEIGHT / 2;
+        Layout layout = this.createLayout();
 
-        guiGraphics.fill(startX, startY, startX + PANEL_WIDTH, startY + PANEL_HEIGHT, COL_BG);
-        guiGraphics.renderOutline(startX, startY, PANEL_WIDTH, PANEL_HEIGHT, COL_BORDER);
-        guiGraphics.drawCenteredString(this.font, this.title, centerX, startY + 10, COL_TITLE);
+        guiGraphics.fill(layout.left, layout.top, layout.left + layout.panelWidth, layout.top + layout.panelHeight, COL_BG);
+        guiGraphics.renderOutline(layout.left, layout.top, layout.panelWidth, layout.panelHeight, COL_BORDER);
+        guiGraphics.drawCenteredString(this.font, this.title, layout.left + layout.panelWidth / 2, layout.top + 10, COL_TITLE);
 
         UUID playerUUID = this.getPlayerUUID();
         String activeTitle = playerUUID == null
@@ -253,10 +286,14 @@ public class ConversationManagerScreen extends Screen {
                 : this.conversationStore.getActiveConversationTitle(playerUUID);
         guiGraphics.drawString(this.font,
                 Component.translatable("gui.herobrine_companion.conversation_manager.active", Component.literal(activeTitle)),
-                startX + 10, startY + 22, COL_INFO, false);
+                layout.contentLeft, layout.top + 22, COL_INFO, false);
+
+        guiGraphics.enableScissor(layout.contentLeft, layout.hintTop,
+                layout.contentLeft + layout.contentWidth, layout.actionY - 2);
         guiGraphics.drawWordWrap(this.font,
                 Component.translatable("gui.herobrine_companion.conversation_manager.hint"),
-                startX + 10, startY + 168, PANEL_WIDTH - 20, COL_TEXT);
+                layout.contentLeft, layout.hintTop, layout.contentWidth, COL_TEXT);
+        guiGraphics.disableScissor();
 
         super.render(guiGraphics, mouseX, mouseY, partialTick);
     }
@@ -264,6 +301,48 @@ public class ConversationManagerScreen extends Screen {
     @Override
     public boolean isPauseScreen() {
         return false;
+    }
+
+    private static class Layout {
+        private final int panelWidth;
+        private final int panelHeight;
+        private final int left;
+        private final int top;
+        private final int contentLeft;
+        private final int contentWidth;
+        private final int controlsY;
+        private final int apiButtonX;
+        private final int searchX;
+        private final int searchWidth;
+        private final int settingsButtonX;
+        private final int topButtonWidth;
+        private final int listTop;
+        private final int listHeight;
+        private final int hintTop;
+        private final int actionY;
+        private final int backY;
+
+        private Layout(int panelWidth, int panelHeight, int left, int top, int contentLeft, int contentWidth,
+                       int controlsY, int apiButtonX, int searchX, int searchWidth, int settingsButtonX,
+                       int topButtonWidth, int listTop, int listHeight, int hintTop, int actionY, int backY) {
+            this.panelWidth = panelWidth;
+            this.panelHeight = panelHeight;
+            this.left = left;
+            this.top = top;
+            this.contentLeft = contentLeft;
+            this.contentWidth = contentWidth;
+            this.controlsY = controlsY;
+            this.apiButtonX = apiButtonX;
+            this.searchX = searchX;
+            this.searchWidth = searchWidth;
+            this.settingsButtonX = settingsButtonX;
+            this.topButtonWidth = topButtonWidth;
+            this.listTop = listTop;
+            this.listHeight = listHeight;
+            this.hintTop = hintTop;
+            this.actionY = actionY;
+            this.backY = backY;
+        }
     }
 }
 

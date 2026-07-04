@@ -25,12 +25,12 @@ public class ConfigScreen extends Screen {
 
         int centerX = this.width / 2;
         int buttonWidth = 150;
-        int buttonHeight = 20;
+        int buttonHeight = 18;
 
-        // 缩小行距，从 24 缩小到 22，给小屏幕留出更多呼吸空间
-        int spacingY = 22;
+        // 紧凑排布，给小屏幕留出更多呼吸空间
+        int spacingY = 20;
         // 顶部按钮群固定起始 Y 坐标
-        int startY = 35;
+        int startY = 25;
 
         int col1X = centerX - buttonWidth - 5;
         int col2X = centerX + 5;
@@ -237,13 +237,29 @@ public class ConfigScreen extends Screen {
                 .build()
         );
 
+        // 12. Leaf Vanish Toggle
+        this.addRenderableWidget(Button.builder(
+                        Component.translatable("gui.herobrine_companion.config.leaf_vanish", Config.HERO_LEAF_VANISH_ENABLED.get()),
+                        button -> {
+                            boolean newValue = !Config.HERO_LEAF_VANISH_ENABLED.get();
+                            Config.HERO_LEAF_VANISH_ENABLED.set(newValue);
+                            Config.heroLeafVanishEnabled = newValue;
+                            Config.SPEC.save();
+                            button.setMessage(Component.translatable("gui.herobrine_companion.config.leaf_vanish", newValue));
+                        })
+                .pos(col1X, startY + spacingY * 6)
+                .size(buttonWidth, buttonHeight)
+                .tooltip(Tooltip.create(Component.translatable("gui.herobrine_companion.config.leaf_vanish.tooltip")))
+                .build()
+        );
+
         int doneButtonY = this.height - 28; // 完成按钮紧贴屏幕底端
         int noteY = doneButtonY - 14;       // 提示文字在按钮上方
         int editBoxY = noteY - 26;          // 输入框在提示文字上方
 
         // 【碰撞检测】如果窗口极其扁平（比如高度被压到了240像素以下），上下可能会重叠
-        // 强制计算一个最小的Y坐标，保证无论如何都不覆盖上方的第5行按钮
-        int minEditBoxY = startY + spacingY * 5 + buttonHeight + 15;
+        // 强制计算一个最小的Y坐标，保证无论如何都不覆盖上方的配置按钮
+        int minEditBoxY = startY + spacingY * 6 + buttonHeight + 15;
         if (editBoxY < minEditBoxY) {
             editBoxY = minEditBoxY;
             noteY = editBoxY + 26;
@@ -253,7 +269,7 @@ public class ConfigScreen extends Screen {
         // 记录输入框的Y坐标供 render 绘制标题使用
         this.currentEditBoxY = editBoxY;
 
-        // 12. AI 语言风格输入框
+        // 13. AI 语言风格输入框
         EditBox languageStyleBox = new EditBox(this.font, centerX - 150, editBoxY, 300, 20, Component.translatable("gui.herobrine_companion.config.ai_language_style"));
         languageStyleBox.setMaxLength(256);
         languageStyleBox.setValue(Config.AI_LANGUAGE_STYLE.get());
@@ -264,13 +280,13 @@ public class ConfigScreen extends Screen {
         });
         this.addRenderableWidget(languageStyleBox);
 
-        // 13. 返回按钮
+        // 14. 返回按钮
         this.addRenderableWidget(Button.builder(Component.translatable("gui.done"), button -> this.onClose())
                 .pos(centerX - 100, doneButtonY)
                 .size(200, 20)
                 .build());
 
-        // 14. 重启提示标签
+        // 15. 重启提示标签
         this.addRenderableWidget(Button.builder(Component.translatable("gui.herobrine_companion.config.restart_note").withStyle(ChatFormatting.RED), button -> {})
                 .pos(centerX - 100, noteY)
                 .size(200, 10)
