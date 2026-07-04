@@ -125,6 +125,39 @@ public class LLMConfig {
         ANTHROPIC
     }
 
+    public enum CommandMode {
+        NORMAL("normal"),
+        EAGER("eager");
+
+        private final String id;
+
+        CommandMode(String id) {
+            this.id = id;
+        }
+
+        public String getId() {
+            return this.id;
+        }
+
+        public CommandMode next() {
+            CommandMode[] modes = values();
+            return modes[(this.ordinal() + 1) % modes.length];
+        }
+
+        public static CommandMode fromSavedValue(String value) {
+            if (value == null || value.isBlank()) {
+                return null;
+            }
+            String normalized = value.trim().toLowerCase(Locale.ROOT);
+            for (CommandMode mode : values()) {
+                if (mode.id.equals(normalized) || mode.name().toLowerCase(Locale.ROOT).equals(normalized)) {
+                    return mode;
+                }
+            }
+            return null;
+        }
+    }
+
     // 静态变量
     public static Provider aiProvider = Provider.QINIU_CLOUD;
     private static String aiProviderId = Provider.QINIU_CLOUD.getId();
@@ -134,6 +167,7 @@ public class LLMConfig {
     public static String aiModelName = Provider.QINIU_CLOUD.getDefaultModel();
     public static String aiSystemPrompt = DEFAULT_SYSTEM_PROMPT;
     public static boolean aiStreamingEnabled = false;
+    public static CommandMode aiCommandMode = CommandMode.NORMAL;
     public static double aiTemperature = DEFAULT_TEMPERATURE;
     public static double aiTopP = DEFAULT_TOP_P;
     public static int aiMaxOutputTokens = DEFAULT_MAX_OUTPUT_TOKENS;
@@ -325,6 +359,23 @@ public class LLMConfig {
         return aiStreamingEnabled;
     }
 
+    public static CommandMode getCommandMode() {
+        ensureLoaded();
+        return getCommandModeUnchecked();
+    }
+
+    private static CommandMode getCommandModeUnchecked() {
+        if (aiCommandMode == null) {
+            aiCommandMode = CommandMode.NORMAL;
+        }
+        return aiCommandMode;
+    }
+
+    public static boolean isCommandEagerMode() {
+        ensureLoaded();
+        return getCommandModeUnchecked() == CommandMode.EAGER;
+    }
+
     public static double getConfiguredTemperature() {
         ensureLoaded();
         return getConfiguredTemperatureUnchecked();
@@ -428,6 +479,9 @@ public class LLMConfig {
             aiSystemPrompt = aiSystemPrompt.replace("\r\n", "\n").replace('\r', '\n');
         }
         // 验证并修正数值范围
+        if (aiCommandMode == null) {
+            aiCommandMode = CommandMode.NORMAL;
+        }
         aiTemperature = clampDouble(aiTemperature, 0.0D, 2.0D, DEFAULT_TEMPERATURE);
         aiTopP = clampDouble(aiTopP, 0.1D, 1.0D, DEFAULT_TOP_P);
         aiMaxOutputTokens = clampInt(aiMaxOutputTokens, 64, 4096, DEFAULT_MAX_OUTPUT_TOKENS);
@@ -522,6 +576,7 @@ public class LLMConfig {
         aiModelName = aiProvider.getDefaultModel();
         aiSystemPrompt = DEFAULT_SYSTEM_PROMPT;
         aiStreamingEnabled = false;
+        aiCommandMode = CommandMode.NORMAL;
         aiTemperature = DEFAULT_TEMPERATURE;
         aiTopP = DEFAULT_TOP_P;
         aiMaxOutputTokens = DEFAULT_MAX_OUTPUT_TOKENS;
@@ -583,6 +638,11 @@ public class LLMConfig {
                         aiSystemPrompt = data.aiPrompt;
                     }
                     if (data.aiStreamingEnabled != null) aiStreamingEnabled = data.aiStreamingEnabled;
+                    CommandMode savedCommandMode = CommandMode.fromSavedValue(data.aiCommandMode);
+                    if (savedCommandMode == null) {
+                        savedCommandMode = CommandMode.fromSavedValue(data.commandMode);
+                    }
+                    if (savedCommandMode != null) aiCommandMode = savedCommandMode;
                     if (data.aiTemperature != null) aiTemperature = data.aiTemperature;
                     if (data.aiTopP != null) aiTopP = data.aiTopP;
                     if (data.aiMaxOutputTokens != null) aiMaxOutputTokens = data.aiMaxOutputTokens;
@@ -646,6 +706,7 @@ public class LLMConfig {
         pData.activeProvider = getProviderUnchecked().getId();
         pData.aiSystemPrompt = aiSystemPrompt;
         pData.aiStreamingEnabled = aiStreamingEnabled;
+        pData.aiCommandMode = getCommandModeUnchecked().getId();
         pData.aiTemperature = aiTemperature;
         pData.aiTopP = aiTopP;
         pData.aiMaxOutputTokens = aiMaxOutputTokens;
@@ -795,6 +856,8 @@ public class LLMConfig {
         String systemPrompt;
         String aiPrompt;
         Boolean aiStreamingEnabled;
+        String aiCommandMode;
+        String commandMode;
         Double aiTemperature;
         Double aiTopP;
         Integer aiMaxOutputTokens;
