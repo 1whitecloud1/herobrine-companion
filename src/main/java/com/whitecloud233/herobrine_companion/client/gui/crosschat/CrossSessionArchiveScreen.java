@@ -21,8 +21,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class CrossSessionArchiveScreen extends Screen {
-    private static final int PANEL_WIDTH = 420;
-    private static final int PANEL_HEIGHT = 332;
+    private static final int MAX_PANEL_WIDTH = 420;
+    private static final int MAX_PANEL_HEIGHT = 310;
+    private static final int MIN_PANEL_WIDTH = 340;
+    private static final int MIN_PANEL_HEIGHT = 300;
+    private static final int SCREEN_MARGIN = 8;
+    private static final int CONTENT_MARGIN = 12;
+    private static final int CONTROL_GAP = 8;
+    private static final int BUTTON_HEIGHT = 20;
     private static final int COL_BG = 0xFF2B2B2B;
     private static final int COL_BORDER = 0xFF555555;
     private static final int COL_TEXT = 0xFFA9B7C6;
@@ -61,24 +67,22 @@ public class CrossSessionArchiveScreen extends Screen {
     @Override
     protected void init() {
         super.init();
-        int left = (this.width - PANEL_WIDTH) / 2;
-        int top = (this.height - PANEL_HEIGHT) / 2;
+        Layout layout = this.createLayout();
 
-        this.searchBox = new EditBox(this.font, left + 12, top + 34, PANEL_WIDTH - 24, 20,
+        this.searchBox = new EditBox(this.font, layout.contentLeft, layout.searchY, layout.contentWidth, BUTTON_HEIGHT,
                 Component.translatable("gui.herobrine_companion.cross_chat.archive_search"));
         this.searchBox.setMaxLength(80);
         this.searchBox.setSuggestion(Component.translatable("gui.herobrine_companion.cross_chat.archive_search_hint").getString());
         this.searchBox.setResponder(value -> this.refreshArchiveList());
         this.addRenderableWidget(this.searchBox);
 
-        this.archiveList = new ArchiveList(Minecraft.getInstance(), 176, 186, top + 62, 24);
-        this.archiveList.setX(left + 12);
+        this.archiveList = new ArchiveList(Minecraft.getInstance(), layout.listWidth, layout.mainHeight, layout.mainTop, 24);
+        this.archiveList.setX(layout.listLeft);
         this.addRenderableWidget(this.archiveList);
 
-        int rowOneY = top + PANEL_HEIGHT - 58;
-        int rowTwoY = top + PANEL_HEIGHT - 32;
+        int buttonWidth = (layout.contentWidth - CONTROL_GAP * 3) / 4;
         this.playerViewButton = this.addRenderableWidget(new HeroScreen.ThemedButton(
-                left + 12, rowOneY, 92, 20,
+                layout.contentLeft, layout.rowOneY, buttonWidth, BUTTON_HEIGHT,
                 Component.translatable("gui.herobrine_companion.cross_chat.archive_view_player"),
                 button -> {
                     this.previewHbMode = false;
@@ -87,7 +91,7 @@ public class CrossSessionArchiveScreen extends Screen {
         ));
 
         this.hbViewButton = this.addRenderableWidget(new HeroScreen.ThemedButton(
-                left + 112, rowOneY, 92, 20,
+                layout.contentLeft + buttonWidth + CONTROL_GAP, layout.rowOneY, buttonWidth, BUTTON_HEIGHT,
                 Component.translatable("gui.herobrine_companion.cross_chat.archive_view_hb"),
                 button -> {
                     this.previewHbMode = true;
@@ -96,37 +100,37 @@ public class CrossSessionArchiveScreen extends Screen {
         ));
 
         this.exportPlayerButton = this.addRenderableWidget(new HeroScreen.ThemedButton(
-                left + 212, rowOneY, 92, 20,
+                layout.contentLeft + (buttonWidth + CONTROL_GAP) * 2, layout.rowOneY, buttonWidth, BUTTON_HEIGHT,
                 Component.translatable("gui.herobrine_companion.cross_chat.export_player_only"),
                 button -> this.exportSelectedArchive(false), null
         ));
 
         this.exportHbButton = this.addRenderableWidget(new HeroScreen.ThemedButton(
-                left + 312, rowOneY, 92, 20,
+                layout.contentLeft + (buttonWidth + CONTROL_GAP) * 3, layout.rowOneY, buttonWidth, BUTTON_HEIGHT,
                 Component.translatable("gui.herobrine_companion.cross_chat.export_hb_only"),
                 button -> this.exportSelectedArchive(true), null
         ));
 
         this.deletePlayerButton = this.addRenderableWidget(new HeroScreen.ThemedButton(
-                left + 12, rowTwoY, 92, 20,
+                layout.contentLeft, layout.rowTwoY, buttonWidth, BUTTON_HEIGHT,
                 Component.translatable("gui.herobrine_companion.cross_chat.delete_player_only"),
                 button -> this.deleteSelectedModeHistory(false), null
         ));
 
         this.deleteHbButton = this.addRenderableWidget(new HeroScreen.ThemedButton(
-                left + 112, rowTwoY, 92, 20,
+                layout.contentLeft + buttonWidth + CONTROL_GAP, layout.rowTwoY, buttonWidth, BUTTON_HEIGHT,
                 Component.translatable("gui.herobrine_companion.cross_chat.delete_hb_only"),
                 button -> this.deleteSelectedModeHistory(true), null
         ));
 
         this.deleteAllButton = this.addRenderableWidget(new HeroScreen.ThemedButton(
-                left + 212, rowTwoY, 92, 20,
+                layout.contentLeft + (buttonWidth + CONTROL_GAP) * 2, layout.rowTwoY, buttonWidth, BUTTON_HEIGHT,
                 Component.translatable("gui.herobrine_companion.cross_chat.delete_all_peer"),
                 button -> this.deleteSelectedArchive(), null
         ));
 
         this.addRenderableWidget(new HeroScreen.ThemedButton(
-                left + 312, rowTwoY, 92, 20,
+                layout.contentLeft + (buttonWidth + CONTROL_GAP) * 3, layout.rowTwoY, buttonWidth, BUTTON_HEIGHT,
                 Component.translatable("gui.herobrine_companion.back"),
                 button -> Minecraft.getInstance().setScreen(this.parentScreen != null ? this.parentScreen : new CrossSessionHubScreen(this.entityId)), null
         ));
@@ -134,6 +138,32 @@ public class CrossSessionArchiveScreen extends Screen {
         this.refreshArchiveList();
         this.updateButtons();
         this.setInitialFocus(this.searchBox);
+    }
+
+    private Layout createLayout() {
+        int availableWidth = Math.max(1, this.width - SCREEN_MARGIN * 2);
+        int availableHeight = Math.max(1, this.height - SCREEN_MARGIN * 2);
+        int panelWidth = clampToAvailable(MIN_PANEL_WIDTH, MAX_PANEL_WIDTH, availableWidth);
+        int panelHeight = clampToAvailable(MIN_PANEL_HEIGHT, MAX_PANEL_HEIGHT, availableHeight);
+        int left = (this.width - panelWidth) / 2;
+        int top = (this.height - panelHeight) / 2;
+        int contentLeft = left + CONTENT_MARGIN;
+        int contentWidth = Math.max(1, panelWidth - CONTENT_MARGIN * 2);
+        int searchY = top + 34;
+        int mainTop = top + 62;
+        int rowOneY = top + panelHeight - 58;
+        int rowTwoY = top + panelHeight - 32;
+        int mainHeight = Math.min(180, Math.max(80, rowOneY - mainTop - 10));
+        int listWidth = Math.min(176, Math.max(120, (contentWidth - CONTROL_GAP) / 2 - 16));
+        int detailLeft = contentLeft + listWidth + CONTROL_GAP;
+        int detailWidth = Math.max(1, contentLeft + contentWidth - detailLeft);
+        return new Layout(panelWidth, panelHeight, left, top, contentLeft, contentWidth,
+                searchY, mainTop, mainHeight, contentLeft, listWidth, detailLeft, detailWidth, rowOneY, rowTwoY);
+    }
+
+    private static int clampToAvailable(int min, int max, int available) {
+        int clamped = Math.min(max, available);
+        return Math.max(Math.min(min, available), clamped);
     }
 
     private void refreshArchiveList() {
@@ -282,37 +312,30 @@ public class CrossSessionArchiveScreen extends Screen {
 
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        int left = (this.width - PANEL_WIDTH) / 2;
-        int top = (this.height - PANEL_HEIGHT) / 2;
-        guiGraphics.fill(left, top, left + PANEL_WIDTH, top + PANEL_HEIGHT, COL_BG);
-        guiGraphics.renderOutline(left, top, PANEL_WIDTH, PANEL_HEIGHT, COL_BORDER);
-        guiGraphics.drawCenteredString(this.font, this.title, this.width / 2, top + 10, COL_TITLE);
+        Layout layout = this.createLayout();
+        guiGraphics.fill(layout.left, layout.top, layout.left + layout.panelWidth, layout.top + layout.panelHeight, COL_BG);
+        guiGraphics.renderOutline(layout.left, layout.top, layout.panelWidth, layout.panelHeight, COL_BORDER);
+        guiGraphics.drawCenteredString(this.font, this.title, this.width / 2, layout.top + 10, COL_TITLE);
 
         guiGraphics.drawString(this.font,
                 Component.translatable("gui.herobrine_companion.cross_chat.archive_subtitle"),
-                left + 12, top + 22, COL_INFO, false);
+                layout.contentLeft, layout.top + 22, COL_INFO, false);
 
-        int listLeft = left + 12;
-        int listTop = top + 62;
-        int listWidth = 176;
-        int listHeight = 162;
-        guiGraphics.fill(listLeft, listTop, listLeft + listWidth, listTop + listHeight, LIST_BG);
-        guiGraphics.renderOutline(listLeft, listTop, listWidth, listHeight, COL_BORDER);
+        guiGraphics.fill(layout.listLeft, layout.mainTop,
+                layout.listLeft + layout.listWidth, layout.mainTop + layout.mainHeight, LIST_BG);
+        guiGraphics.renderOutline(layout.listLeft, layout.mainTop, layout.listWidth, layout.mainHeight, COL_BORDER);
 
-        int detailLeft = left + 196;
-        int detailTop = top + 62;
-        int detailWidth = PANEL_WIDTH - 208;
-        int detailHeight = 162;
-        guiGraphics.fill(detailLeft, detailTop, detailLeft + detailWidth, detailTop + detailHeight, DETAIL_BG);
-        guiGraphics.renderOutline(detailLeft, detailTop, detailWidth, detailHeight, COL_BORDER);
+        guiGraphics.fill(layout.detailLeft, layout.mainTop,
+                layout.detailLeft + layout.detailWidth, layout.mainTop + layout.mainHeight, DETAIL_BG);
+        guiGraphics.renderOutline(layout.detailLeft, layout.mainTop, layout.detailWidth, layout.mainHeight, COL_BORDER);
 
         if (this.archiveList != null && this.archiveList.isEmpty()) {
             guiGraphics.drawCenteredString(this.font,
                     Component.translatable("gui.herobrine_companion.cross_chat.archive_empty"),
-                    listLeft + (listWidth / 2), listTop + (listHeight / 2) - 4, COL_TEXT);
+                    layout.listLeft + (layout.listWidth / 2), layout.mainTop + (layout.mainHeight / 2) - 4, COL_TEXT);
         }
 
-        this.renderDetailPanel(guiGraphics, detailLeft, detailTop, detailWidth, detailHeight);
+        this.renderDetailPanel(guiGraphics, layout.detailLeft, layout.mainTop, layout.detailWidth, layout.mainHeight);
         super.render(guiGraphics, mouseX, mouseY, partialTick);
     }
 
@@ -386,6 +409,44 @@ public class CrossSessionArchiveScreen extends Screen {
     @Override
     public boolean isPauseScreen() {
         return false;
+    }
+
+    private static class Layout {
+        private final int panelWidth;
+        private final int panelHeight;
+        private final int left;
+        private final int top;
+        private final int contentLeft;
+        private final int contentWidth;
+        private final int searchY;
+        private final int mainTop;
+        private final int mainHeight;
+        private final int listLeft;
+        private final int listWidth;
+        private final int detailLeft;
+        private final int detailWidth;
+        private final int rowOneY;
+        private final int rowTwoY;
+
+        private Layout(int panelWidth, int panelHeight, int left, int top, int contentLeft, int contentWidth,
+                       int searchY, int mainTop, int mainHeight, int listLeft, int listWidth,
+                       int detailLeft, int detailWidth, int rowOneY, int rowTwoY) {
+            this.panelWidth = panelWidth;
+            this.panelHeight = panelHeight;
+            this.left = left;
+            this.top = top;
+            this.contentLeft = contentLeft;
+            this.contentWidth = contentWidth;
+            this.searchY = searchY;
+            this.mainTop = mainTop;
+            this.mainHeight = mainHeight;
+            this.listLeft = listLeft;
+            this.listWidth = listWidth;
+            this.detailLeft = detailLeft;
+            this.detailWidth = detailWidth;
+            this.rowOneY = rowOneY;
+            this.rowTwoY = rowTwoY;
+        }
     }
 
     private class ArchiveList extends ObjectSelectionList<ArchiveList.ArchiveEntry> {

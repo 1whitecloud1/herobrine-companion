@@ -22,8 +22,16 @@ import java.io.File;
 import java.util.*;
 
 public class CrossSessionHubScreen extends Screen {
-    private static final int PANEL_WIDTH = 352;
-    private static final int PANEL_HEIGHT = 344;
+    private static final int MAX_PANEL_WIDTH = 352;
+    private static final int MAX_PANEL_HEIGHT = 344;
+    private static final int MIN_PANEL_WIDTH = 300;
+    private static final int MIN_PANEL_HEIGHT = 310;
+    private static final int SCREEN_MARGIN = 8;
+    private static final int CONTENT_MARGIN = 16;
+    private static final int ROW_GAP = 6;
+    private static final int BUTTON_GAP = 8;
+    private static final int TOOL_BUTTON_GAP = 5;
+    private static final int BUTTON_HEIGHT = 20;
     private static final int BG = 0xFF2B2B2B;
     private static final int BORDER = 0xFF555555;
     private static final int TITLE = 0xFFD16D9E;
@@ -61,27 +69,27 @@ public class CrossSessionHubScreen extends Screen {
     @Override
     protected void init() {
         super.init();
-        int left = (this.width - PANEL_WIDTH) / 2;
-        int top = (this.height - PANEL_HEIGHT) / 2;
+        Layout layout = this.createLayout();
 
-        this.playerList = new OnlinePlayerList(Minecraft.getInstance(), PANEL_WIDTH - 32, 80, top + 42, 22);
-        this.playerList.setX(left + 16);
+        this.playerList = new OnlinePlayerList(Minecraft.getInstance(), layout.contentWidth, layout.listHeight, layout.listTop, 22);
+        this.playerList.setX(layout.contentLeft);
         this.addRenderableWidget(this.playerList);
 
+        int twoColumnWidth = (layout.contentWidth - BUTTON_GAP) / 2;
         this.requestButton = this.addRenderableWidget(new HeroScreen.ThemedButton(
-                left + 16, top + 128, 156, 20,
+                layout.contentLeft, layout.requestY, twoColumnWidth, BUTTON_HEIGHT,
                 Component.translatable("gui.herobrine_companion.cross_chat.request"),
                 button -> this.sendSelectedRequest(), null
         ));
 
         this.refreshButton = this.addRenderableWidget(new HeroScreen.ThemedButton(
-                left + 180, top + 128, 156, 20,
+                layout.contentLeft + twoColumnWidth + BUTTON_GAP, layout.requestY, twoColumnWidth, BUTTON_HEIGHT,
                 Component.translatable("gui.herobrine_companion.cross_chat.refresh"),
                 button -> this.refreshOnlinePlayers(), null
         ));
 
         this.permissionButton = this.addRenderableWidget(new HeroScreen.ThemedButton(
-                left + 16, top + 154, PANEL_WIDTH - 32, 20,
+                layout.contentLeft, layout.permissionY, layout.contentWidth, BUTTON_HEIGHT,
                 Component.empty(),
                 button -> {
                     boolean next = !ClientHooks.isAllowIncomingCrossChat();
@@ -90,56 +98,58 @@ public class CrossSessionHubScreen extends Screen {
                 }, null
         ));
 
+        int threeColumnWidth = (layout.contentWidth - BUTTON_GAP * 2) / 3;
         this.playerChatButton = this.addRenderableWidget(new HeroScreen.ThemedButton(
-                left + 16, top + 180, 100, 20,
+                layout.contentLeft, layout.chatY, threeColumnWidth, BUTTON_HEIGHT,
                 Component.translatable("gui.herobrine_companion.cross_chat.player_chat"),
                 button -> this.openPlayerCrossChat(), null
         ));
 
         this.hbChatButton = this.addRenderableWidget(new HeroScreen.ThemedButton(
-                left + 126, top + 180, 100, 20,
+                layout.contentLeft + threeColumnWidth + BUTTON_GAP, layout.chatY, threeColumnWidth, BUTTON_HEIGHT,
                 Component.translatable("gui.herobrine_companion.cross_chat.hb_chat"),
                 button -> this.openHbCrossChat(), null
         ));
 
         this.autoChatButton = this.addRenderableWidget(new HeroScreen.ThemedButton(
-                left + 236, top + 180, 100, 20,
+                layout.contentLeft + (threeColumnWidth + BUTTON_GAP) * 2, layout.chatY, threeColumnWidth, BUTTON_HEIGHT,
                 Component.empty(),
                 button -> this.toggleAutoChat(), null
         ));
 
         this.autoTurnDownButton = this.addRenderableWidget(new HeroScreen.ThemedButton(
-                left + 276, top + 232, 28, 20,
+                layout.contentLeft + layout.contentWidth - 60, layout.autoY, 28, BUTTON_HEIGHT,
                 Component.translatable("gui.herobrine_companion.cross_chat.auto_turn_limit_decrease"),
                 button -> this.adjustAutoTurnLimit(-1), null
         ));
 
         this.autoTurnUpButton = this.addRenderableWidget(new HeroScreen.ThemedButton(
-                left + 308, top + 232, 28, 20,
+                layout.contentLeft + layout.contentWidth - 28, layout.autoY, 28, BUTTON_HEIGHT,
                 Component.translatable("gui.herobrine_companion.cross_chat.auto_turn_limit_increase"),
                 button -> this.adjustAutoTurnLimit(1), null
         ));
 
+        int toolButtonWidth = (layout.contentWidth - TOOL_BUTTON_GAP * 4) / 5;
         this.guideButton = this.addRenderableWidget(new HeroScreen.ThemedButton(
-                left + 16, top + 206, 60, 20,
+                layout.contentLeft, layout.toolsY, toolButtonWidth, BUTTON_HEIGHT,
                 Component.translatable("gui.herobrine_companion.cross_chat.guide"),
                 button -> Minecraft.getInstance().setScreen(new CrossChatGuideScreen(this)), null
         ));
 
         this.archiveButton = this.addRenderableWidget(new HeroScreen.ThemedButton(
-                left + 81, top + 206, 60, 20,
+                layout.contentLeft + toolButtonWidth + TOOL_BUTTON_GAP, layout.toolsY, toolButtonWidth, BUTTON_HEIGHT,
                 Component.translatable("gui.herobrine_companion.cross_chat.archive"),
                 button -> Minecraft.getInstance().setScreen(new CrossSessionArchiveScreen(this.entityId, this)), null
         ));
 
         this.exportButton = this.addRenderableWidget(new HeroScreen.ThemedButton(
-                left + 146, top + 206, 60, 20,
+                layout.contentLeft + (toolButtonWidth + TOOL_BUTTON_GAP) * 2, layout.toolsY, toolButtonWidth, BUTTON_HEIGHT,
                 Component.translatable("gui.herobrine_companion.cross_chat.export"),
                 button -> this.exportCurrentPeerHistory(), null
         ));
 
         this.closeButton = this.addRenderableWidget(new HeroScreen.ThemedButton(
-                left + 211, top + 206, 60, 20,
+                layout.contentLeft + (toolButtonWidth + TOOL_BUTTON_GAP) * 3, layout.toolsY, toolButtonWidth, BUTTON_HEIGHT,
                 Component.translatable("gui.herobrine_companion.cross_chat.close"),
                 button -> {
                     PacketHandler.sendToServer(new CloseCrossChatSessionPacket());
@@ -148,7 +158,7 @@ public class CrossSessionHubScreen extends Screen {
         ));
 
         this.addRenderableWidget(new HeroScreen.ThemedButton(
-                left + 276, top + 206, 60, 20,
+                layout.contentLeft + (toolButtonWidth + TOOL_BUTTON_GAP) * 4, layout.toolsY, toolButtonWidth, BUTTON_HEIGHT,
                 Component.translatable("gui.herobrine_companion.back"),
                 button -> Minecraft.getInstance().setScreen(new HeroScreen(this.entityId)), null
         ));
@@ -157,6 +167,33 @@ public class CrossSessionHubScreen extends Screen {
         this.refreshTicker = PLAYER_REFRESH_INTERVAL;
         this.updateButtons();
         this.setInitialFocus(this.playerList);
+    }
+
+    private Layout createLayout() {
+        int availableWidth = Math.max(1, this.width - SCREEN_MARGIN * 2);
+        int availableHeight = Math.max(1, this.height - SCREEN_MARGIN * 2);
+        int panelWidth = clampToAvailable(MIN_PANEL_WIDTH, MAX_PANEL_WIDTH, availableWidth);
+        int panelHeight = clampToAvailable(MIN_PANEL_HEIGHT, MAX_PANEL_HEIGHT, availableHeight);
+        int left = (this.width - panelWidth) / 2;
+        int top = (this.height - panelHeight) / 2;
+        int contentLeft = left + CONTENT_MARGIN;
+        int contentWidth = Math.max(1, panelWidth - CONTENT_MARGIN * 2);
+        int listTop = top + 42;
+        int listHeight = Math.min(80, Math.max(44, panelHeight - 264));
+        int requestY = listTop + listHeight + 6;
+        int permissionY = requestY + BUTTON_HEIGHT + ROW_GAP;
+        int chatY = permissionY + BUTTON_HEIGHT + ROW_GAP;
+        int toolsY = chatY + BUTTON_HEIGHT + ROW_GAP;
+        int autoY = toolsY + BUTTON_HEIGHT + ROW_GAP;
+        int infoTop = autoY + 24;
+
+        return new Layout(panelWidth, panelHeight, left, top, contentLeft, contentWidth,
+                listTop, listHeight, requestY, permissionY, chatY, toolsY, autoY, infoTop);
+    }
+
+    private static int clampToAvailable(int min, int max, int available) {
+        int clamped = Math.min(max, available);
+        return Math.max(Math.min(min, available), clamped);
     }
 
     private void updateButtons() {
@@ -353,27 +390,23 @@ public class CrossSessionHubScreen extends Screen {
 
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        int left = (this.width - PANEL_WIDTH) / 2;
-        int top = (this.height - PANEL_HEIGHT) / 2;
-        guiGraphics.fill(left, top, left + PANEL_WIDTH, top + PANEL_HEIGHT, BG);
-        guiGraphics.renderOutline(left, top, PANEL_WIDTH, PANEL_HEIGHT, BORDER);
-        guiGraphics.drawCenteredString(this.font, this.title, this.width / 2, top + 12, TITLE);
+        Layout layout = this.createLayout();
+        guiGraphics.fill(layout.left, layout.top, layout.left + layout.panelWidth, layout.top + layout.panelHeight, BG);
+        guiGraphics.renderOutline(layout.left, layout.top, layout.panelWidth, layout.panelHeight, BORDER);
+        guiGraphics.drawCenteredString(this.font, this.title, this.width / 2, layout.top + 12, TITLE);
         guiGraphics.drawString(this.font,
                 Component.translatable("gui.herobrine_companion.cross_chat.online_players"),
-                left + 16, top + 30, TEXT, false);
+                layout.contentLeft, layout.top + 30, TEXT, false);
 
-        int listLeft = left + 16;
-        int listTop = top + 42;
-        int listWidth = PANEL_WIDTH - 32;
-        int listHeight = 80;
-        guiGraphics.fill(listLeft, listTop, listLeft + listWidth, listTop + listHeight, LIST_BG);
-        guiGraphics.renderOutline(listLeft, listTop, listWidth, listHeight, BORDER);
+        guiGraphics.fill(layout.contentLeft, layout.listTop,
+                layout.contentLeft + layout.contentWidth, layout.listTop + layout.listHeight, LIST_BG);
+        guiGraphics.renderOutline(layout.contentLeft, layout.listTop, layout.contentWidth, layout.listHeight, BORDER);
 
         if (this.playerList != null && this.playerList.isEmpty()) {
             guiGraphics.drawCenteredString(this.font,
                     Component.translatable("gui.herobrine_companion.cross_chat.no_players"),
                     this.width / 2,
-                    listTop + (listHeight / 2) - 4,
+                    layout.listTop + (layout.listHeight / 2) - 4,
                     TEXT);
         }
 
@@ -400,13 +433,16 @@ public class CrossSessionHubScreen extends Screen {
                 ClientHooks.getCrossChatAutoHbTurnLimit()
         );
 
-        guiGraphics.drawString(this.font, autoTurnLimit, left + 16, top + 238, INFO, false);
-        guiGraphics.drawString(this.font, selectedPlayer, left + 16, top + 256, INFO, false);
-        guiGraphics.drawString(this.font, currentPeer, left + 16, top + 270, INFO, false);
-        guiGraphics.drawString(this.font, status, left + 16, top + 284, TEXT, false);
+        guiGraphics.drawString(this.font, autoTurnLimit, layout.contentLeft, layout.autoY + 6, INFO, false);
+        guiGraphics.drawString(this.font, selectedPlayer, layout.contentLeft, layout.infoTop, INFO, false);
+        guiGraphics.drawString(this.font, currentPeer, layout.contentLeft, layout.infoTop + 14, INFO, false);
+        guiGraphics.drawString(this.font, status, layout.contentLeft, layout.infoTop + 28, TEXT, false);
+        guiGraphics.enableScissor(layout.contentLeft, layout.infoTop + 42,
+                layout.contentLeft + layout.contentWidth, layout.top + layout.panelHeight - 8);
         guiGraphics.drawWordWrap(this.font,
                 Component.translatable("gui.herobrine_companion.cross_chat.hint"),
-                left + 16, top + 298, PANEL_WIDTH - 32, TEXT);
+                layout.contentLeft, layout.infoTop + 42, layout.contentWidth, TEXT);
+        guiGraphics.disableScissor();
 
         super.render(guiGraphics, mouseX, mouseY, partialTick);
     }
@@ -414,6 +450,42 @@ public class CrossSessionHubScreen extends Screen {
     @Override
     public boolean isPauseScreen() {
         return false;
+    }
+
+    private static class Layout {
+        private final int panelWidth;
+        private final int panelHeight;
+        private final int left;
+        private final int top;
+        private final int contentLeft;
+        private final int contentWidth;
+        private final int listTop;
+        private final int listHeight;
+        private final int requestY;
+        private final int permissionY;
+        private final int chatY;
+        private final int toolsY;
+        private final int autoY;
+        private final int infoTop;
+
+        private Layout(int panelWidth, int panelHeight, int left, int top, int contentLeft, int contentWidth,
+                       int listTop, int listHeight, int requestY, int permissionY, int chatY,
+                       int toolsY, int autoY, int infoTop) {
+            this.panelWidth = panelWidth;
+            this.panelHeight = panelHeight;
+            this.left = left;
+            this.top = top;
+            this.contentLeft = contentLeft;
+            this.contentWidth = contentWidth;
+            this.listTop = listTop;
+            this.listHeight = listHeight;
+            this.requestY = requestY;
+            this.permissionY = permissionY;
+            this.chatY = chatY;
+            this.toolsY = toolsY;
+            this.autoY = autoY;
+            this.infoTop = infoTop;
+        }
     }
 
     private class OnlinePlayerList extends ObjectSelectionList<OnlinePlayerList.PlayerEntry> {
