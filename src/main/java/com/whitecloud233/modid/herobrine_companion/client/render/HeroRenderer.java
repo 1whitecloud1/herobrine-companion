@@ -46,9 +46,19 @@ public class HeroRenderer extends LivingEntityRenderer<HeroEntity, PlayerModel<H
     private static final ResourceLocation HERO_TEXTURE = ResourceLocation.tryParse(HerobrineCompanion.MODID + ":textures/entity/hero.png");
     private static final ResourceLocation HEROBRINE_TEXTURE = ResourceLocation.tryParse(HerobrineCompanion.MODID + ":textures/entity/herobrine.png");
 
+    // 内置皮肤沿用的固定发光眼睛贴图(白点位置已按内置脸部手工对齐)
+    public static final ResourceLocation DEFAULT_EYES = new ResourceLocation(HerobrineCompanion.MODID, "textures/entity/hero_eyes.png");
+    // 哨兵:表示某皮肤已分析过且不含白色眼睛,避免重复分析
+    private static final ResourceLocation NO_EYES = new ResourceLocation(HerobrineCompanion.MODID, "no_eyes");
+
     private static final Map<String, ResourceLocation> LOCAL_SKIN_CACHE = new HashMap<>();
     private static final Map<UUID, ResourceLocation> SYNCED_SKIN_CACHE = new HashMap<>();
     private static final Map<UUID, Integer> SYNCED_SKIN_HASH_CACHE = new HashMap<>();
+
+    // 自定义皮肤自动识别生成的眼睛叠加图缓存(与上面的皮肤缓存一一对应)
+    private static final Map<String, ResourceLocation> LOCAL_EYES_CACHE = new HashMap<>();
+    private static final Map<UUID, ResourceLocation> SYNCED_EYES_CACHE = new HashMap<>();
+    private static final Map<UUID, Integer> SYNCED_EYES_HASH_CACHE = new HashMap<>();
 
     public HeroRenderer(EntityRendererProvider.Context context) {
         super(context, new HeroModel(context.bakeLayer(HeroModel.LAYER_LOCATION), false), 0.5f);
@@ -104,26 +114,68 @@ public class HeroRenderer extends LivingEntityRenderer<HeroEntity, PlayerModel<H
         }
     }
 
-    private ResourceLocation getLocalSkin(String path) {
-        if (LOCAL_SKIN_CACHE.containsKey(path)) {
-            return LOCAL_SKIN_CACHE.get(path);
+    /**
+     * 返回当前应使用的发光眼睛贴图,逻辑与 {@link #getTextureLocation} 保持一致:
+     * 内置皮肤用固定 {@link #DEFAULT_EYES};自定义皮肤用从其像素自动识别生成的对齐叠加图;
+     * 自定义皮肤未检出白色眼睛时返回 {@code null}(不渲染发光)。
+     */
+    public static ResourceLocation getEyesTexture(HeroEntity entity) {
+        if (entity.level().dimension() == ModStructures.END_RING_DIMENSION_KEY) {
+            return DEFAULT_EYES;
         }
 
+        if (entity.getSkinVariant() == HeroEntity.SKIN_CUSTOM) {
+            // 眼睛图必须与身体图取自同一张皮肤:优先同步皮肤,其次本地文件
+            if (getSyncedSkin(entity.getUUID()) != null) {
+                return getSyncedEyes(entity.getUUID());
+            }
+            String customPath = entity.getCustomSkinName();
+            if (customPath != null && !customPath.isEmpty()) {
+                return getLocalEyes(customPath);
+            }
+            return null; // 回退默认玩家皮肤,无发光眼睛
+        }
+
+        // 内置 Herobrine / Hero 皮肤:沿用手工对齐的固定眼睛图
+        return DEFAULT_EYES;
+    }
+
+    private static ResourceLocation getLocalSkin(String path) {
+        if (!LOCAL_SKIN_CACHE.containsKey(path)) {
+            loadLocalSkinAndEyes(path);
+        }
+        return LOCAL_SKIN_CACHE.get(path);
+    }
+
+    private static ResourceLocation getLocalEyes(String path) {
+        if (!LOCAL_EYES_CACHE.containsKey(path)) {
+            loadLocalSkinAndEyes(path);
+        }
+        ResourceLocation eyes = LOCAL_EYES_CACHE.get(path);
+        return eyes == NO_EYES ? null : eyes;
+    }
+
+    // 一次解码,同时产出底图与眼睛叠加图并写入各自缓存
+    private static void loadLocalSkinAndEyes(String path) {
         File file = new File(path);
         if (file.exists() && file.isFile()) {
             try (InputStream inputStream = new FileInputStream(file)) {
                 NativeImage image = NativeImage.read(inputStream);
+                String hash = Integer.toHexString(path.hashCode());
+                // 先读取像素生成眼睛图,再把 image 交给 DynamicTexture(顺序安全)
+                ResourceLocation eyes = buildEyesOverlay(image, "custom_skin_eyes_" + hash);
+                LOCAL_EYES_CACHE.put(path, eyes == null ? NO_EYES : eyes);
+
                 DynamicTexture texture = new DynamicTexture(image);
-                String safeName = "custom_skin_" + Integer.toHexString(path.hashCode());
-                ResourceLocation location = Minecraft.getInstance().getTextureManager().register(safeName, texture);
+                ResourceLocation location = Minecraft.getInstance().getTextureManager().register("custom_skin_" + hash, texture);
                 LOCAL_SKIN_CACHE.put(path, location);
-                return location;
+                return;
             } catch (Exception e) {
                 LOGGER.warn("Failed to load local hero skin from {}", path, e);
             }
         }
         LOCAL_SKIN_CACHE.put(path, DefaultPlayerSkin.getDefaultSkin());
-        return DefaultPlayerSkin.getDefaultSkin();
+        LOCAL_EYES_CACHE.put(path, NO_EYES);
     }
 
     private static ResourceLocation getSyncedSkin(UUID heroId) {
@@ -141,13 +193,21 @@ public class HeroRenderer extends LivingEntityRenderer<HeroEntity, PlayerModel<H
         if (skinData.length == 0) {
             SYNCED_SKIN_CACHE.remove(heroId);
             SYNCED_SKIN_HASH_CACHE.remove(heroId);
+            SYNCED_EYES_CACHE.remove(heroId);
+            SYNCED_EYES_HASH_CACHE.remove(heroId);
             return null;
         }
 
         try (InputStream inputStream = new ByteArrayInputStream(skinData)) {
             NativeImage image = NativeImage.read(inputStream);
+            String safeId = heroId.toString().replace('-', '_');
+            // 先读取像素生成眼睛图,再把 image 交给 DynamicTexture(顺序安全)
+            ResourceLocation eyes = buildEyesOverlay(image, "synced_hero_skin_eyes_" + safeId);
+            SYNCED_EYES_CACHE.put(heroId, eyes == null ? NO_EYES : eyes);
+            SYNCED_EYES_HASH_CACHE.put(heroId, currentHash);
+
             DynamicTexture texture = new DynamicTexture(image);
-            ResourceLocation location = Minecraft.getInstance().getTextureManager().register("synced_hero_skin_" + heroId.toString().replace('-', '_'), texture);
+            ResourceLocation location = Minecraft.getInstance().getTextureManager().register("synced_hero_skin_" + safeId, texture);
             SYNCED_SKIN_CACHE.put(heroId, location);
             SYNCED_SKIN_HASH_CACHE.put(heroId, currentHash);
             return location;
@@ -155,6 +215,47 @@ public class HeroRenderer extends LivingEntityRenderer<HeroEntity, PlayerModel<H
             LOGGER.warn("Failed to register synced hero skin for {}", heroId, e);
             SYNCED_SKIN_CACHE.remove(heroId);
             SYNCED_SKIN_HASH_CACHE.remove(heroId);
+            SYNCED_EYES_CACHE.remove(heroId);
+            SYNCED_EYES_HASH_CACHE.remove(heroId);
+            return null;
+        }
+    }
+
+    private static ResourceLocation getSyncedEyes(UUID heroId) {
+        if (heroId == null) {
+            return null;
+        }
+        int currentHash = HeroClientSkinCache.getHash(heroId);
+        if (SYNCED_EYES_CACHE.containsKey(heroId)
+                && Integer.valueOf(currentHash).equals(SYNCED_EYES_HASH_CACHE.get(heroId))) {
+            ResourceLocation eyes = SYNCED_EYES_CACHE.get(heroId);
+            return eyes == NO_EYES ? null : eyes;
+        }
+        // 缓存缺失或已过期:触发皮肤(连同眼睛)重新加载
+        getSyncedSkin(heroId);
+        ResourceLocation eyes = SYNCED_EYES_CACHE.get(heroId);
+        return (eyes == null || eyes == NO_EYES) ? null : eyes;
+    }
+
+    /**
+     * 从皮肤正脸区域识别白色眼睛,生成同尺寸、除眼睛外全透明的发光叠加图。
+     * 命中则注册为动态贴图并返回其 ResourceLocation;未命中返回 null。
+     */
+    private static ResourceLocation buildEyesOverlay(NativeImage skin, String registerName) {
+        try {
+            HeroSkinEyeDetector.Result detection = HeroSkinEyeDetector.detect(skin);
+            if (detection == null) {
+                LOGGER.debug("No paired white eyes found in hero skin '{}' ({}x{})",
+                        registerName, skin.getWidth(), skin.getHeight());
+                return null;
+            }
+
+            LOGGER.debug("Detected {} eye pixels in hero skin '{}' at scale {}",
+                    detection.pixelCount(), registerName, detection.scale());
+            DynamicTexture texture = new DynamicTexture(detection.overlay());
+            return Minecraft.getInstance().getTextureManager().register(registerName, texture);
+        } catch (Exception e) {
+            LOGGER.warn("Failed to build eyes overlay '{}'", registerName, e);
             return null;
         }
     }

@@ -12,13 +12,15 @@ import java.util.EnumSet;
 
 public class HeroGodlyCompanionGoal extends Goal {
     private static final double HOVER_HEIGHT_AIR = 2.0D;
-    private static final double MIN_FOLLOW_DISTANCE = 6.8D;
-    private static final double MAX_FOLLOW_DISTANCE = 9.5D;
-    private static final double MIN_SIDE_OFFSET = 0.8D;
-    private static final double MAX_SIDE_OFFSET = 3.6D;
-    private static final double COMFORT_RADIUS = 1.45D;
-    public static final double STAY_STILL_RADIUS = 6.0D;
-    private static final double FOLLOW_START_RADIUS = 7.5D;
+    private static final double MIN_FOLLOW_DISTANCE = 1.4D;
+    private static final double MAX_FOLLOW_DISTANCE = 2.2D;
+    private static final double MIN_SIDE_OFFSET = 0.0D;
+    private static final double MAX_SIDE_OFFSET = 0.7D;
+    private static final double COMFORT_RADIUS = 0.85D;
+    public static final double STAY_STILL_RADIUS = 2.0D;
+    private static final double FOLLOW_START_RADIUS = 3.25D;
+    private static final double START_FLYING_DISTANCE_SQR = 144.0D;
+    private static final double STOP_FLYING_DISTANCE_SQR = 64.0D;
     private static final double HARD_TELEPORT_DISTANCE_SQR = 625.0D;
     private static final int COMBAT_TIMEOUT = 100;
     private static final float HEAD_RETURN_SPEED = 4.0F;
@@ -110,42 +112,35 @@ public class HeroGodlyCompanionGoal extends Goal {
 
     @Override
     public void start() {
-        this.hero.setFloating(true);
-        this.hero.setNoGravity(true);
-        this.hero.noPhysics = true;
-        this.hero.getNavigation().stop();
-        stopMoveControl();
-
         initializeFollowAnchor();
         chooseFollowSide();
         pickPersonalSpace(true);
+        updateMovementMode(horizontalDistanceToOwnerSqr(this.hero, this.owner));
     }
 
     @Override
     public void stop() {
         this.owner = null;
-        this.hero.setDeltaMovement(Vec3.ZERO);
+        this.hero.setDeltaMovement(0.0D, this.hero.getDeltaMovement().y, 0.0D);
         stopMoveControl();
-        if (!this.hero.isCompanionMode() || this.hero.level().noCollision(this.hero, this.hero.getBoundingBox())) {
-            this.hero.noPhysics = false;
-        }
+        this.hero.noPhysics = false;
         syncHeadToBody();
     }
 
     @Override
     public void tick() {
-        this.hero.noPhysics = true;
-        stopMoveControl();
+        double horizontalDistanceSqr = horizontalDistanceToOwnerSqr(this.hero, this.owner);
+        boolean flying = updateMovementMode(horizontalDistanceSqr);
 
         if (isOwnerWithinStayStillRadius(this.hero)) {
             this.hero.getNavigation().stop();
-            this.hero.setDeltaMovement(Vec3.ZERO);
+            this.hero.setDeltaMovement(0.0D, this.hero.getDeltaMovement().y, 0.0D);
             return;
         }
 
         double distToOwnerSqr = this.hero.distanceToSqr(this.owner);
         boolean ownerMoving = this.owner.getDeltaMovement().horizontalDistanceSqr() > 0.0025D;
-        if (this.hero.tickCount >= this.nextPersonalSpaceTick && (ownerMoving || distToOwnerSqr < 49.0D)) {
+        if (this.hero.tickCount >= this.nextPersonalSpaceTick && ownerMoving && distToOwnerSqr > 25.0D) {
             pickPersonalSpace(false);
         }
 
@@ -157,10 +152,15 @@ public class HeroGodlyCompanionGoal extends Goal {
             return;
         }
 
-        if (!this.hero.isFloating()) this.hero.setFloating(true);
-        if (!this.hero.isNoGravity()) this.hero.setNoGravity(true);
+        if (!flying) {
+            tickGroundFollow(horizontalDistanceSqr);
+            return;
+        }
 
-        Vec3 targetPos = calculateFollowTarget();
+        this.hero.noPhysics = true;
+        stopMoveControl();
+
+        Vec3 targetPos = calculateFollowTarget(true);
         Vec3 toTarget = targetPos.subtract(this.hero.position());
         double distToTarget = toTarget.length();
         boolean comfortable = distToTarget < COMFORT_RADIUS && this.hero.hasLineOfSight(this.owner);
@@ -234,7 +234,38 @@ public class HeroGodlyCompanionGoal extends Goal {
         }
     }
 
-    private Vec3 calculateFollowTarget() {
+    private boolean updateMovementMode(double horizontalDistanceSqr) {
+        double verticalDistance = Math.abs(this.owner.getY() - this.hero.getY());
+        boolean ownerIsFlying = this.owner.getAbilities().flying || this.owner.isFallFlying();
+        boolean shouldFly = ownerIsFlying
+                || verticalDistance > 3.0D
+                || (this.hero.isFloating()
+                    ? horizontalDistanceSqr > STOP_FLYING_DISTANCE_SQR
+                    : horizontalDistanceSqr > START_FLYING_DISTANCE_SQR);
+        if (shouldFly) {
+            if (!this.hero.isFloating()) this.hero.setFloating(true);
+            if (!this.hero.isNoGravity()) this.hero.setNoGravity(true);
+            this.hero.noPhysics = true;
+            return true;
+        }
+        this.hero.noPhysics = false;
+        if (this.hero.isFloating()) this.hero.setFloating(false);
+        if (this.hero.isNoGravity()) this.hero.setNoGravity(false);
+        return false;
+    }
+
+    private void tickGroundFollow(double horizontalDistanceSqr) {
+        if (horizontalDistanceSqr <= STAY_STILL_RADIUS * STAY_STILL_RADIUS) {
+            this.hero.getNavigation().stop();
+            return;
+        }
+        if (this.hero.getNavigation().isDone() || this.hero.tickCount % 10 == 0) {
+            this.hero.getNavigation().moveTo(this.owner, this.speedModifier);
+        }
+        this.hero.getLookControl().setLookAt(this.owner, 18.0F, 25.0F);
+    }
+
+    private Vec3 calculateFollowTarget(boolean flying) {
         Vec3 ownerVelocity = this.owner.getDeltaMovement();
         if (ownerVelocity.horizontalDistanceSqr() > 0.0025D) {
             float moveYaw = (float) (Mth.atan2(ownerVelocity.z, ownerVelocity.x) * (180.0D / Math.PI)) - 90.0F;
@@ -244,9 +275,11 @@ public class HeroGodlyCompanionGoal extends Goal {
         Vec3 behind = Vec3.directionFromRotation(0.0F, this.stableFollowYaw + 180.0F).scale(this.desiredFollowDistance);
         Vec3 side = Vec3.directionFromRotation(0.0F, this.stableFollowYaw + 90.0F).scale(this.desiredSideOffset * this.followSideSign);
 
-        double targetY = this.owner.getAbilities().flying || !this.owner.onGround()
-                ? this.owner.getY() + HOVER_HEIGHT_AIR
-                : this.owner.getY() + 0.5D + this.desiredHeightOffset;
+        double targetY = flying
+                ? (this.owner.getAbilities().flying || this.owner.isFallFlying()
+                    ? this.owner.getY() + HOVER_HEIGHT_AIR
+                    : this.owner.getY() + 0.5D + this.desiredHeightOffset)
+                : this.owner.getY();
 
         return new Vec3(this.owner.getX() + behind.x + side.x, targetY, this.owner.getZ() + behind.z + side.z);
     }
@@ -289,9 +322,11 @@ public class HeroGodlyCompanionGoal extends Goal {
                 : this.owner.yBodyRot;
         chooseFollowSide();
         pickPersonalSpace(true);
-        Vec3 target = calculateFollowTarget();
+        boolean flying = updateMovementMode(horizontalDistanceToOwnerSqr(this.hero, this.owner));
+        Vec3 target = calculateFollowTarget(flying);
         this.hero.moveTo(target.x, target.y, target.z, this.hero.getYRot(), this.hero.getXRot());
         this.hero.setDeltaMovement(Vec3.ZERO);
+        this.hero.noPhysics = flying;
         stopMoveControl();
         syncHeadToBodyInstant();
     }

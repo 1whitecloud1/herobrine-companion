@@ -54,7 +54,9 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
     @Override
     public boolean overrideRender() {
         HeroEntity hero = this.getOriginal();
-        if (hero != null && hero.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE)) {
+        if (hero == null
+                || hero.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE)
+                || !hero.isBattleModeActive()) {
             return false;
         }
 

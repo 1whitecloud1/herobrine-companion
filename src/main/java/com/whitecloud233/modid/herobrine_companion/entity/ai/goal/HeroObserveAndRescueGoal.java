@@ -107,8 +107,14 @@ public class HeroObserveAndRescueGoal extends Goal {
     @Override
     public void start() {
         this.hero.getNavigation().stop();
-        this.hero.setFloating(true);
-        this.hero.setNoGravity(true);
+        if (this.targetPlayer != null && isOwner(this.targetPlayer)) {
+            this.hero.noPhysics = false;
+            this.hero.setFloating(false);
+            this.hero.setNoGravity(false);
+        } else {
+            this.hero.setFloating(true);
+            this.hero.setNoGravity(true);
+        }
     }
 
     @Override
@@ -131,7 +137,7 @@ public class HeroObserveAndRescueGoal extends Goal {
         // 2. 【绝对实时的平滑排斥系统】
         double distanceSq = this.hero.distanceToSqr(this.targetPlayer);
 
-        if (distanceSq < 144.0D) {
+        if (!isCompanionOwner && distanceSq < 144.0D) {
             Vec3 dir = this.hero.position().subtract(this.targetPlayer.position());
 
             if (dir.lengthSqr() < 0.001) {

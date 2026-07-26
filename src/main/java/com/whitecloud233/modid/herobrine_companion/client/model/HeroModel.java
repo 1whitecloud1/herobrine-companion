@@ -47,6 +47,16 @@ public class HeroModel extends PlayerModel<HeroEntity> {
             {0.30854928F, -0.28049934F, 0.0F},
             {-0.028049935F, 0.0F, 0.0F}
     };
+    private static final float[] WALK_ROOT_Y = {0.0F, -1.0F, -1.0F, -1.0F, 0.0F};
+    private static final float[] WALK_LEFT_LEG_X = {0.0F, 15.0F, -10.0F, 15.0F, 0.0F};
+    private static final float[] WALK_LEFT_LEG_LOWER_X = {0.0F, 2.5F, 10.0F, 2.5F, 0.0F};
+    private static final float[] WALK_RIGHT_LEG_X = {0.0F, -10.0F, 15.0F, -10.0F, 0.0F};
+    private static final float[] WALK_RIGHT_LEG_LOWER_X = {0.0F, 10.0F, 2.5F, 10.0F, 0.0F};
+    private static final float[] WALK_LOWER_LEG_Y = {0.0F, 1.0F, 1.0F, 1.0F, 0.0F};
+    private static final float[] WALK_LEFT_ARM_X = {0.0F, -7.5F, 12.5F, -7.5F, 0.0F};
+    private static final float[] WALK_LEFT_ARM_LOWER_X = {0.0F, -12.5F, -7.5F, -12.5F, 0.0F};
+    private static final float[] WALK_RIGHT_ARM_X = {0.0F, 12.5F, -7.5F, 12.5F, 0.0F};
+    private static final float[] WALK_RIGHT_ARM_LOWER_X = {0.0F, -7.5F, -12.5F, -7.5F, 0.0F};
 
     public HeroModel(ModelPart root, boolean slim) {
         super(root, slim);
@@ -107,6 +117,10 @@ public class HeroModel extends PlayerModel<HeroEntity> {
         this.leftArm.setPos(5.0F, 2.0F, 0.0F);
         this.rightLeg.setPos(-1.9F, 12.0F, 0.0F);
         this.leftLeg.setPos(1.9F, 12.0F, 0.0F);
+        this.rightArmLower.setPos(0.0F, 4.0F, 0.0F);
+        this.leftArmLower.setPos(0.0F, 4.0F, 0.0F);
+        this.rightLegLower.setPos(0.0F, 6.0F, 0.0F);
+        this.leftLegLower.setPos(0.0F, 6.0F, 0.0F);
 
         // 强行清零上半身的绝对旋转
         this.head.xRot = 0; this.head.yRot = 0; this.head.zRot = 0;
@@ -229,6 +243,25 @@ public class HeroModel extends PlayerModel<HeroEntity> {
             return;
         }
 
+        float horizontalSpeed = (float) entity.getDeltaMovement().horizontalDistance();
+        float frameDisplacement = Mth.sqrt(
+                Mth.square((float) (entity.getX() - entity.xOld))
+                        + Mth.square((float) (entity.getZ() - entity.zOld)));
+        float vanillaWalkSpeed = entity.walkAnimation.speed(partialTick);
+        float walkIntensity = Math.max(limbSwingAmount,
+                Math.max(vanillaWalkSpeed, Mth.clamp(Math.max(horizontalSpeed, frameDisplacement) * 4.0F, 0.0F, 1.0F)));
+        if (entity.isGroundWalking()) walkIntensity = Math.max(walkIntensity, 0.35F);
+        if (!entity.isFloating()
+                && !entity.isBattleModeActive()
+                && !entity.isPassenger()
+                && !entity.isCrouching()
+                && !entity.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE)
+                && (entity.isGroundWalking() || walkIntensity > 0.001F)) {
+            applyImportedWalkAnimation(entity, walkIntensity, partialTick);
+            copyAllModelProperties();
+            return;
+        }
+
         boolean observerState = entity.getMindState() == SimpleNeuralNetwork.MindState.OBSERVER;
         float headTilt = observerState ? 0.0F : Mth.sin(ageInTicks * 0.05f) * 0.05f;
         if (!observerState) {
@@ -262,6 +295,53 @@ public class HeroModel extends PlayerModel<HeroEntity> {
         com.whitecloud233.modid.herobrine_companion.client.fight.animation.HeroChallengeAnimations.setupChallengeAnims(this, entity, ageInTicks);
 
         copyAllModelProperties();
+    }
+
+    private void applyImportedWalkAnimation(HeroEntity entity, float limbSwingAmount, float partialTick) {
+        float blend = Mth.clamp(limbSwingAmount * 4.0F, 0.0F, 1.0F);
+        float animationTime = positiveModulo(entity.getImportedWalkAnimationTime(partialTick), 2.0F);
+        float rootOffsetY = -sampleWalkKeyframes(WALK_ROOT_Y, animationTime) * blend;
+        this.body.y += rootOffsetY;
+        this.head.y += rootOffsetY;
+        this.rightArm.y += rootOffsetY;
+        this.leftArm.y += rootOffsetY;
+        this.rightLeg.y += rootOffsetY;
+        this.leftLeg.y += rootOffsetY;
+        this.leftLeg.xRot = blendDegrees(this.leftLeg.xRot, sampleWalkKeyframes(WALK_LEFT_LEG_X, animationTime), blend);
+        this.leftLegLower.xRot = blendDegrees(this.leftLegLower.xRot, sampleWalkKeyframes(WALK_LEFT_LEG_LOWER_X, animationTime), blend);
+        this.rightLeg.xRot = blendDegrees(this.rightLeg.xRot, sampleWalkKeyframes(WALK_RIGHT_LEG_X, animationTime), blend);
+        this.rightLegLower.xRot = blendDegrees(this.rightLegLower.xRot, sampleWalkKeyframes(WALK_RIGHT_LEG_LOWER_X, animationTime), blend);
+        float lowerLegOffset = sampleWalkKeyframes(WALK_LOWER_LEG_Y, animationTime) * blend;
+        this.leftLegLower.y = 6.0F - lowerLegOffset;
+        this.rightLegLower.y = 6.0F - lowerLegOffset;
+        this.leftArm.xRot = blendDegrees(this.leftArm.xRot, sampleWalkKeyframes(WALK_LEFT_ARM_X, animationTime), blend);
+        this.leftArmLower.xRot = blendDegrees(this.leftArmLower.xRot, sampleWalkKeyframes(WALK_LEFT_ARM_LOWER_X, animationTime), blend);
+        this.rightArm.xRot = blendDegrees(this.rightArm.xRot, sampleWalkKeyframes(WALK_RIGHT_ARM_X, animationTime), blend);
+        this.rightArmLower.xRot = blendDegrees(this.rightArmLower.xRot, sampleWalkKeyframes(WALK_RIGHT_ARM_LOWER_X, animationTime), blend);
+    }
+
+    private static float sampleWalkKeyframes(float[] values, float animationTime) {
+        float scaledTime = Mth.clamp(animationTime * 2.0F, 0.0F, 3.9999F);
+        int segment = Mth.floor(scaledTime);
+        float progress = scaledTime - segment;
+        float p0 = values[Math.max(0, segment - 1)];
+        float p1 = values[segment];
+        float p2 = values[Math.min(values.length - 1, segment + 1)];
+        float p3 = values[Math.min(values.length - 1, segment + 2)];
+        float p2t = progress * progress;
+        float p3t = p2t * progress;
+        return 0.5F * ((2.0F * p1) + (-p0 + p2) * progress
+                + (2.0F * p0 - 5.0F * p1 + 4.0F * p2 - p3) * p2t
+                + (-p0 + 3.0F * p1 - 3.0F * p2 + p3) * p3t);
+    }
+
+    private static float blendDegrees(float currentRadians, float targetDegrees, float blend) {
+        return Mth.lerp(blend, currentRadians, targetDegrees * ((float) Math.PI / 180.0F));
+    }
+
+    private static float positiveModulo(float value, float modulus) {
+        float result = value % modulus;
+        return result < 0.0F ? result + modulus : result;
     }
 
     private void applyFlyingPresetPose(float floatAmount) {

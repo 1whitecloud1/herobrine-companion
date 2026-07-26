@@ -1,7 +1,8 @@
 package com.whitecloud233.modid.herobrine_companion.compat.epicfight;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.modid.herobrine_companion.client.render.HeroRenderer;
+import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
@@ -16,18 +17,22 @@ import yesman.epicfight.client.renderer.patched.layer.PatchedLayer;
 import yesman.epicfight.world.capabilities.entitypatch.LivingEntityPatch;
 
 public class HeroPatchedEyesLayer extends PatchedLayer<LivingEntity, LivingEntityPatch<LivingEntity>, HumanoidModel<LivingEntity>, RenderLayer<LivingEntity, HumanoidModel<LivingEntity>>> {
-    private static final ResourceLocation EYES = ResourceLocation.fromNamespaceAndPath(HerobrineCompanion.MODID, "textures/entity/hero_eyes.png");
-    private final RenderType renderType;
     private final AssetAccessor<? extends SkinnedMesh> mesh;
 
     public HeroPatchedEyesLayer(AssetAccessor<? extends SkinnedMesh> mesh) {
         this.mesh = mesh;
-        this.renderType = RenderType.eyes(EYES);
     }
 
     @Override
     protected void renderLayer(LivingEntityPatch<LivingEntity> entitypatch, LivingEntity entityliving, RenderLayer<LivingEntity, HumanoidModel<LivingEntity>> vanillaLayer, PoseStack postStack, MultiBufferSource buffer, int packedLight, OpenMatrix4f[] poses, float bob, float yRot, float xRot, float partialTicks) {
-        this.mesh.get().draw(postStack, buffer, this.renderType, 15728640, 1.0F, 1.0F, 1.0F, 1.0F, OverlayTexture.NO_OVERLAY, entitypatch.getArmature(), poses);
+        // 与原版 HeroEyesLayer 一致:自定义皮肤用自动识别的对齐眼睛图,无白眼则不渲染
+        ResourceLocation eyes = (entityliving instanceof HeroEntity hero)
+                ? HeroRenderer.getEyesTexture(hero)
+                : HeroRenderer.DEFAULT_EYES;
+        if (eyes == null) {
+            return;
+        }
+        this.mesh.get().draw(postStack, buffer, RenderType.eyes(eyes), 15728640, 1.0F, 1.0F, 1.0F, 1.0F, OverlayTexture.NO_OVERLAY, entitypatch.getArmature(), poses);
     }
 }
 

@@ -74,6 +74,7 @@ import java.util.UUID;
 public class HeroEntity extends PathfinderMob implements Merchant {
 
     public static final EntityDataAccessor<Boolean> IS_FLOATING = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.BOOLEAN);
+    public static final EntityDataAccessor<Boolean> IS_GROUND_WALKING = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.BOOLEAN);
     public static final EntityDataAccessor<Integer> TRUST_LEVEL = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.INT);
     public static final EntityDataAccessor<Boolean> IS_COMPANION_MODE = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.BOOLEAN);
     public static final EntityDataAccessor<Integer> SKIN_VARIANT = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.INT);
@@ -116,6 +117,8 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     private final Set<Integer> claimedRewards = new HashSet<>();
     public float clientFloatingAmount;
     public float clientFloatingAmountO;
+    public float clientImportedWalkTicks;
+    public float clientImportedWalkTicksO;
     public boolean clientSideSetupDone = false;
     public int patrolTimer = 2400;
     public MoveControl moveControl;
@@ -221,6 +224,17 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     @Override
     public void tick() {
         super.tick();
+        if (!this.level().isClientSide) {
+            double movedX = this.getX() - this.xOld;
+            double movedZ = this.getZ() - this.zOld;
+            boolean groundWalking = !this.isFloating()
+                    && (movedX * movedX + movedZ * movedZ > 1.0E-5D
+                        || this.getDeltaMovement().horizontalDistanceSqr() > 1.0E-5D
+                        || !this.getNavigation().isDone());
+            if (groundWalking != this.entityData.get(IS_GROUND_WALKING)) {
+                this.entityData.set(IS_GROUND_WALKING, groundWalking);
+            }
+        }
 
         // 👇 【核心修改】：强制清空受伤无敌时间渲染，取消挑战模式下的闪红效果
         if (this.getEntityData().get(IS_CHALLENGE_ACTIVE)) {
@@ -281,7 +295,7 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         }
 
         if (!this.level().isClientSide && this.isCompanionMode() && !this.isBattleModeActive()) {
-            maintainCompanionFlightState();
+            maintainCompanionMovementState();
         }
 
         if (this.level().isClientSide) {
@@ -294,7 +308,7 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     public void aiStep() {
         super.aiStep();
         if (this.isCompanionMode() && !this.isBattleModeActive()) {
-            maintainCompanionFlightState();
+            maintainCompanionMovementState();
         } else {
             if (this.noPhysics) {
                 this.noPhysics = false;
@@ -315,8 +329,24 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         }
     }
 
-    private void maintainCompanionFlightState() {
-        if (!this.isFloating()) this.setFloating(true);
+    private void maintainCompanionMovementState() {
+        if (this.isFloating() && this.getOwnerUUID() != null) {
+            Player owner = this.level().getPlayerByUUID(this.getOwnerUUID());
+            if (owner != null && owner.isAlive()
+                    && !owner.getAbilities().flying
+                    && !owner.isFallFlying()
+                    && Math.abs(owner.getY() - this.getY()) <= 3.0D
+                    && HeroGodlyCompanionGoal.horizontalDistanceToOwnerSqr(this, owner) <= 64.0D) {
+                this.noPhysics = false;
+                this.setFloating(false);
+                this.setNoGravity(false);
+            }
+        }
+        if (!this.isFloating()) {
+            this.noPhysics = false;
+            if (this.isNoGravity()) this.setNoGravity(false);
+            return;
+        }
         if (!this.isNoGravity()) this.setNoGravity(true);
         this.fallDistance = 0.0F;
 
@@ -550,7 +580,8 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     @Override
     protected void defineSynchedData() {
         super.defineSynchedData();
-        this.entityData.define(IS_FLOATING, true);
+        this.entityData.define(IS_FLOATING, false);
+        this.entityData.define(IS_GROUND_WALKING, false);
         this.entityData.define(TRUST_LEVEL, 0);
         this.entityData.define(IS_COMPANION_MODE, false);
         this.entityData.define(SKIN_VARIANT, SKIN_HEROBRINE);
@@ -639,6 +670,10 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     // Getters & Setters
     public boolean isLoadedFromDisk() { return this.isLoadedFromDisk; }
     public boolean isFloating() { return entityData.get(IS_FLOATING); }
+    public boolean isGroundWalking() { return entityData.get(IS_GROUND_WALKING); }
+    public float getImportedWalkAnimationTime(float partialTick) {
+        return Mth.lerp(partialTick, this.clientImportedWalkTicksO, this.clientImportedWalkTicks) / 20.0F;
+    }
     public void setFloating(boolean floating) {
         entityData.set(IS_FLOATING, floating);
         this.refreshNavigationMode();
@@ -654,6 +689,11 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     public void setCompanionMode(boolean active) {
         boolean previous = this.isCompanionMode();
         entityData.set(IS_COMPANION_MODE, active);
+        if (!previous && active && !this.isBattleModeActive()) {
+            this.noPhysics = false;
+            if (this.isFloating()) this.setFloating(false);
+            if (this.isNoGravity()) this.setNoGravity(false);
+        }
         if (previous && !active) {
             cleanupCompanionMovementState();
         }

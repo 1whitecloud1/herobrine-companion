@@ -605,7 +605,7 @@ public class AIService {
                         allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount,
                         partialConsumer, useStreaming, outputLanguageCode, crossSessionMode, true);
             }
-            return CompletableFuture.completedFuture(completeReply(buildNoActionFallback(outputLanguageCode),
+            return CompletableFuture.completedFuture(completeReply(appendNoActionNotice(finalizedReply, outputLanguageCode),
                     conversationScopeId, originalUserMessage, persistConversation, allowTitleRefresh));
         }
 
@@ -619,7 +619,7 @@ public class AIService {
                         allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount,
                         partialConsumer, useStreaming, outputLanguageCode, crossSessionMode, true);
             }
-            return CompletableFuture.completedFuture(completeReply(buildNoActionFallback(outputLanguageCode),
+            return CompletableFuture.completedFuture(completeReply(finalizedReply,
                     conversationScopeId, originalUserMessage, persistConversation, allowTitleRefresh));
         }
 
@@ -1095,12 +1095,12 @@ public class AIService {
                 "no command", "without executing", "failed", "cannot", "can't", "unable", "i won't", "i would");
     }
 
-    private static String buildNoActionFallback(String outputLanguageCode) {
+    private static String appendNoActionNotice(String reply, String outputLanguageCode) {
         String languageCode = resolveOutputLanguageCode(outputLanguageCode);
         if (languageCode.startsWith("zh")) {
-            return "我没有执行任何指令；世界没有被改变。";
+            return reply + "\n§7（这次没有实际改变世界。）";
         }
-        return "No command was executed; the world was not changed.";
+        return reply + "\n§7(No world change was actually performed.)";
     }
 
     private static String inferReplyDrivenAction(String originalUserMessage, String cleanReply) {

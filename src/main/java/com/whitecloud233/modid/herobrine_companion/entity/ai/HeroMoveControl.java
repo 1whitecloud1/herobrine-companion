@@ -19,7 +19,7 @@ public class HeroMoveControl extends MoveControl {
         if (HeroGodlyCompanionGoal.isOwnerWithinStayStillRadius(this.hero)) {
             this.operation = Operation.WAIT;
             this.hero.getNavigation().stop();
-            this.hero.setDeltaMovement(Vec3.ZERO);
+            this.hero.setDeltaMovement(0.0D, this.hero.getDeltaMovement().y, 0.0D);
             return;
         }
 

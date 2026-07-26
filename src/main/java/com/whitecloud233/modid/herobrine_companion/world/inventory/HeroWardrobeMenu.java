@@ -18,7 +18,8 @@ import net.minecraftforge.fml.ModList;
 public class HeroWardrobeMenu extends AbstractContainerMenu {
 
     private static final int ACCESSORY_COLUMNS = 4;
-    private static final int BASE_SCREEN_WIDTH = 248;
+    private static final int BASE_SCREEN_WIDTH = 176;
+    private static final int ACCESSORY_SCREEN_WIDTH = 248;
     private static final int BASE_SCREEN_HEIGHT = 166;
     private static final int ACCESSORY_START_X = 154;
     private static final int ACCESSORY_START_Y = 8;
@@ -84,7 +85,9 @@ public class HeroWardrobeMenu extends AbstractContainerMenu {
     public int getCurioBackSlotIndex() { return this.curioBackSlotIndex; }
     public int getMainHandSlotIndex() { return this.mainHandSlotIndex; }
     public int getOffHandSlotIndex() { return this.offHandSlotIndex; }
-    public int getScreenWidth() { return BASE_SCREEN_WIDTH; }
+    public int getScreenWidth() {
+        return this.accessorySlotCount > 0 ? ACCESSORY_SCREEN_WIDTH : BASE_SCREEN_WIDTH;
+    }
     public int getScreenHeight() { return BASE_SCREEN_HEIGHT + this.inventoryOffsetY; }
     @Override public boolean stillValid(Player player) { return this.hero != null && this.hero.isAlive() && this.hero.distanceTo(player) < 8.0F; }
 
