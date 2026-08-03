@@ -1,6 +1,6 @@
-package com.whitecloud233.modid.herobrine_companion.client.fight.event;
+package com.whitecloud233.modid.herobrine_companion.fight.event;
 
-import com.whitecloud233.modid.herobrine_companion.client.fight.HeroChallengeManager;
+import com.whitecloud233.modid.herobrine_companion.fight.HeroChallengeManager;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.util.EndRingContext;
 import com.whitecloud233.modid.herobrine_companion.world.structure.ModStructures;

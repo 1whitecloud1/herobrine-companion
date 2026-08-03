@@ -44,9 +44,9 @@ public class ToggleSkinPacket {
         buf.writeByteArray(this.customSkinData);
     }
 
-    public boolean handle(Supplier<NetworkEvent.Context> supplier) {
+    public void handle(Supplier<NetworkEvent.Context> supplier) {
         NetworkEvent.Context context = supplier.get();
-        context.enqueueWork(() -> {
+        PacketDispatch.enqueueServer(context, () -> {
             ServerPlayer player = context.getSender();
             if (player != null) {
                 Entity entity = player.level().getEntity(this.entityId);
@@ -72,7 +72,5 @@ public class ToggleSkinPacket {
                 }
             }
         });
-        context.setPacketHandled(true);
-        return true;
     }
 }

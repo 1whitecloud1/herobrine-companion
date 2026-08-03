@@ -1,4 +1,4 @@
-package com.whitecloud233.modid.herobrine_companion.client.fight.animation;
+package com.whitecloud233.modid.herobrine_companion.fight.animation;
 
 import com.whitecloud233.modid.herobrine_companion.client.model.HeroModel;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;

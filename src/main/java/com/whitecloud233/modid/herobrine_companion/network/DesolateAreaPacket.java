@@ -53,7 +53,7 @@ public class DesolateAreaPacket {
 
     public void handle(Supplier<NetworkEvent.Context> contextSupplier) {
         NetworkEvent.Context context = contextSupplier.get();
-        context.enqueueWork(() -> {
+        PacketDispatch.enqueueServer(context, () -> {
             ServerPlayer player = context.getSender();
             if (player != null) {
                 ServerLevel level = player.serverLevel();
@@ -89,7 +89,6 @@ public class DesolateAreaPacket {
                 MinecraftForge.EVENT_BUS.register(task);
             }
         });
-        context.setPacketHandled(true);
     }
 
     public static class DesolateTask {

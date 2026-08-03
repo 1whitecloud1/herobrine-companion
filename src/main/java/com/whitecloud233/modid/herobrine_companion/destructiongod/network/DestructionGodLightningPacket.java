@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.destructiongod.network;
 
 import com.whitecloud233.modid.herobrine_companion.network.NetworkClientBridge;
+import com.whitecloud233.modid.herobrine_companion.network.PacketDispatch;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.network.NetworkEvent;
@@ -36,6 +37,7 @@ public class DestructionGodLightningPacket {
 
     public void handle(Supplier<NetworkEvent.Context> supplier) {
         NetworkEvent.Context context = supplier.get();
+        PacketDispatch.assertClient(context);
         context.enqueueWork(() -> NetworkClientBridge.handleDestructionGodLightning(this));
         context.setPacketHandled(true);
     }

@@ -33,7 +33,7 @@ public class ClaimRewardPacket {
 
     public static void handle(ClaimRewardPacket packet, Supplier<NetworkEvent.Context> contextSupplier) {
         NetworkEvent.Context context = contextSupplier.get();
-        context.enqueueWork(() -> {
+        PacketDispatch.enqueueServer(context, () -> {
             ServerPlayer player = context.getSender();
 
             // 确保玩家和服务器维度存在
@@ -79,6 +79,5 @@ public class ClaimRewardPacket {
                 }
             }
         });
-        context.setPacketHandled(true);
     }
 }

@@ -1,6 +1,6 @@
 package com.whitecloud233.modid.herobrine_companion.network;
 
-import com.whitecloud233.modid.herobrine_companion.client.fight.HeroChallengeManager;
+import com.whitecloud233.modid.herobrine_companion.fight.HeroChallengeManager;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.item.HeroSummonItem;
 import net.minecraft.network.FriendlyByteBuf;
@@ -38,13 +38,12 @@ public class HeroAIActionPacket {
 
     public void handle(Supplier<NetworkEvent.Context> contextSupplier) {
         NetworkEvent.Context context = contextSupplier.get();
-        context.enqueueWork(() -> {
+        PacketDispatch.enqueueServer(context, () -> {
             ServerPlayer player = context.getSender();
             if (player != null) {
                 performAction(player, this.action);
             }
         });
-        context.setPacketHandled(true);
     }
 
     public static boolean isSupportedAction(String action) {

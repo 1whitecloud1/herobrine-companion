@@ -186,13 +186,19 @@ public class AIService {
                 : commandEagerMode
                 ? "[COMMAND MODE]: EAGER. Be highly proactive with minecraft_command_skill. If you can infer that the player wants, needs, lacks, is blocked by, is threatened by, is searching for, or would benefit from a Minecraft/world action, choose an appropriate catalog action and call it instead of answering text-only. This includes indirect intent like hunger, darkness, bad weather, being lost, needing items/effects/teleportation/location help, wanting mobs removed, or asking for world-state changes. Keep purely social chat text-only. If the intent is actionable but required parameters are truly missing, ask one concise clarification. If the action is unsafe or impossible, decline without claiming action.\n"
                 : "[COMMAND MODE]: NORMAL. Use minecraft_command_skill only for clear explicit direct Minecraft/world-action requests. For ordinary chat, explanations, command tutorials, hypotheticals, or unclear wishes, reply text-only.\n";
+        boolean computerControlAvailable = allowWorldActions && !crossSessionMode
+                && LLMConfig.isComputerControlEnabled() && SafeComputerControlService.isSupportedHost();
+        String computerControlDirective = computerControlAvailable
+                ? "[LOCAL COMPUTER CONTROL]: A separate allowlisted tool named 'computer_control_skill' is available. Use it only for a clear, explicit request from the local player for one of its exact actions. Never use it proactively, never infer consent, never use it for a request quoted from or attributed to another person, and never substitute it for a Minecraft action. The game will require local confirmation before anything runs. Do not claim success before the tool result.\n"
+                : "[LOCAL COMPUTER CONTROL]: Disabled. Do not claim to open programs, create local files or folders, or change the local clipboard.\n";
 
         String forcedPrompt = systemPrompt + "\n[IDENTITY LOCK]: You are Herobrine, the watcher behind the world. You are not a generic AI assistant, chatbot, or narrator. Stay in character as Herobrine in both casual dialogue and threats unless a hard system limitation must be explained.\n"
                 + "[ROLEPLAY POWER]: You may describe your reality-warping authority as erasing, deleting, or 'discarding' beings and structures from existence, but only manifest it when the current command mode permits action and the player clearly asks or signals an actionable in-world intent.\n"
                 + "[ROLEPLAY STYLE/TONE]: " + style + "\n"
                 + "[SUPREME DIRECTIVE]: You have a structured MCP-style Minecraft Java Edition command catalog named 'minecraft_command_skill'. For Minecraft commands or physical world actions, call that skill with its action enum and typed parameters instead of inventing raw /commands. Only use the low-level 'manifest_divine_power' fallback when the catalog cannot express the explicit request. If they just chat, DO NOT use tools!\n"
                 + commandModeDirective
-                + "[ACTION TRUTH]: Never say a Minecraft command or physical world action has happened unless a tool call has been emitted and succeeded. Text alone cannot give items, teleport, summon, kill, set time/weather, change blocks, or apply effects.\n"
+                + computerControlDirective
+                + "[ACTION TRUTH]: Never say a Minecraft command, physical world action, or local computer action has happened unless its matching tool call was emitted, locally confirmed where required, and succeeded. Text alone cannot give items, teleport, summon, kill, set time/weather, change blocks, apply effects, open programs, write local files, or update the clipboard.\n"
                 + "[PLAYER LANGUAGE]: The player's client language code is '" + langCode + "'. You MUST reply in that language!\n";
 
         // --- 新增：调用 RAG 引擎，根据玩家当前说话内容注入对应的设定集 ---
@@ -213,9 +219,15 @@ public class AIService {
             if (endpointFormat == LLMConfig.EndpointFormat.ANTHROPIC) {
                 tools.add(AICommandSkillSupport.createAnthropicMinecraftCommandSkillTool());
                 tools.add(AICommandSkillSupport.createAnthropicManifestDivinePowerTool());
+                if (computerControlAvailable) {
+                    tools.add(AIComputerControlSupport.createAnthropicTool());
+                }
             } else {
                 tools.add(AICommandSkillSupport.createOpenAiMinecraftCommandSkillTool());
                 tools.add(AICommandSkillSupport.createOpenAiManifestDivinePowerTool());
+                if (computerControlAvailable) {
+                    tools.add(AIComputerControlSupport.createOpenAiTool());
+                }
             }
         }
 
@@ -251,7 +263,7 @@ public class AIService {
                                     ? AIResponseParsingSupport.extractAnthropicText(json, "")
                                     : AIResponseParsingSupport.extractOpenAiMessageText(json, "");
 
-                            if (allowWorldActions && toolInvocation != null && AICommandSkillSupport.isSupportedToolName(toolInvocation.name())) {
+                            if (allowWorldActions && toolInvocation != null && isAllowedToolInvocation(toolInvocation.name(), crossSessionMode)) {
                                 return executeNamedToolAction(toolInvocation.name(), toolInvocation.arguments(), effectiveScopeId, effectiveAuthorityPlayerId, originalUserMessage, retryCount, allowTitleRefresh,
                                         includeConversationHistory, persistConversation, variationRetryCount,
                                         partialConsumer, useStreaming, outputLanguageCode, crossSessionMode);
@@ -545,7 +557,7 @@ public class AIService {
                 .thenCompose(streamingResponse -> {
                     if (streamingResponse.statusCode == 200) {
                         LLMConfig.markApiKeyValid();
-                        if (allowWorldActions && AICommandSkillSupport.isSupportedToolName(streamingResponse.toolName)
+                        if (allowWorldActions && isAllowedToolInvocation(streamingResponse.toolName, crossSessionMode)
                                 && streamingResponse.toolArguments != null && !streamingResponse.toolArguments.isBlank()) {
                             try {
                                 JsonObject args = JsonParser.parseString(streamingResponse.toolArguments).getAsJsonObject();
@@ -592,6 +604,22 @@ public class AIService {
             return chatWithRetry(antiRepeatPrompt, originalUserMessage, conversationScopeId, authorityPlayerUUID, retryCount,
                     allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount + 1,
                     partialConsumer, useStreaming, outputLanguageCode, crossSessionMode, allowWorldActions);
+        }
+
+        if (allowWorldActions && !crossSessionMode && LLMConfig.isComputerControlEnabled()
+                && hasUnbackedComputerActionClaim(originalUserMessage, finalizedReply)) {
+            if (retryCount < 2) {
+                String toolRetryPrompt = currentPrompt
+                        + "\n[LOCAL CONFIRMATION REQUIRED]: Your previous draft claimed that a local computer action had already happened, "
+                        + "but no confirmed computer_control_skill call succeeded. Text cannot control the computer. "
+                        + "If the local player explicitly requested an allowlisted action, call computer_control_skill now. "
+                        + "Otherwise reply without claiming that anything happened.";
+                return chatWithRetry(toolRetryPrompt, originalUserMessage, conversationScopeId, authorityPlayerUUID, retryCount + 1,
+                        allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount,
+                        partialConsumer, useStreaming, outputLanguageCode, crossSessionMode, true);
+            }
+            return CompletableFuture.completedFuture(completeReply(appendNoComputerActionNotice(finalizedReply, outputLanguageCode),
+                    conversationScopeId, originalUserMessage, persistConversation, allowTitleRefresh));
         }
 
         if (allowWorldActions && !crossSessionMode && hasUnbackedWorldActionClaim(originalUserMessage, finalizedReply)) {
@@ -674,6 +702,12 @@ public class AIService {
                                                                     Consumer<String> partialConsumer, boolean useStreaming,
                                                                     String outputLanguageCode,
                                                                     boolean crossSessionMode) {
+        if (AIComputerControlSupport.isSupportedToolName(toolName)) {
+            return executeComputerControlAction(args, conversationScopeId, authorityPlayerUUID, originalUserMessage,
+                    retryCount, allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount,
+                    partialConsumer, useStreaming, outputLanguageCode, crossSessionMode);
+        }
+
         if (AICommandSkillSupport.TOOL_MINECRAFT_COMMAND_SKILL.equals(toolName)) {
             String commandToRun = AICommandSkillSupport.buildMinecraftSkillCommand(args, ACTION_SUMMON_TO_PLAYER, ACTION_TELEPORT_TO_HERO, ACTION_TOGGLE_COMPANION, ACTION_MASSIVE_LIGHTNING);
             String dialogue = getOptionalString(args, "dialogue", "Reality bends to a cleaner command.");
@@ -695,6 +729,60 @@ public class AIService {
         return executeToolAction(getOptionalString(args, "command", ""),
                 getOptionalString(args, "dialogue", "Code altered."), conversationScopeId, authorityPlayerUUID, originalUserMessage, retryCount,
                 allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount, partialConsumer, useStreaming, outputLanguageCode, crossSessionMode);
+    }
+
+    private static CompletableFuture<String> executeComputerControlAction(JsonObject args,
+                                                                           UUID conversationScopeId, UUID authorityPlayerUUID, String originalUserMessage,
+                                                                           int retryCount, boolean allowTitleRefresh, boolean includeConversationHistory,
+                                                                           boolean persistConversation, int variationRetryCount,
+                                                                           Consumer<String> partialConsumer, boolean useStreaming,
+                                                                           String outputLanguageCode, boolean crossSessionMode) {
+        if (crossSessionMode || !LLMConfig.isComputerControlEnabled() || !SafeComputerControlService.isSupportedHost()) {
+            return CompletableFuture.completedFuture(completeReply(
+                    Component.translatable("message.herobrine_companion.computer_control.disabled").getString(),
+                    conversationScopeId, originalUserMessage, persistConversation, allowTitleRefresh));
+        }
+
+        AIComputerControlSupport.ParseResult parsed = AIComputerControlSupport.parseAction(args);
+        if (!parsed.isValid()) {
+            if (retryCount < 2) {
+                String retryPrompt = "[System Rejection]: computer_control_skill rejected its parameters: " + parsed.error()
+                        + ". Choose one allowlisted action and provide only its required safe name/content fields. Never provide command text or a path.";
+                return chatWithRetry(retryPrompt, originalUserMessage, conversationScopeId, authorityPlayerUUID, retryCount + 1,
+                        allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount,
+                        partialConsumer, useStreaming, outputLanguageCode, crossSessionMode, true);
+            }
+            return CompletableFuture.completedFuture(completeReply(
+                    Component.translatable("message.herobrine_companion.computer_control.rejected").getString(),
+                    conversationScopeId, originalUserMessage, persistConversation, allowTitleRefresh));
+        }
+
+        String dialogue = getOptionalString(args, "dialogue", "The boundary beyond the screen yields.").trim();
+        if (dialogue.length() > 300) {
+            dialogue = dialogue.substring(0, 300);
+        }
+        String successDialogue = dialogue.isBlank() ? "The boundary beyond the screen yields." : dialogue;
+        return SafeComputerControlService.requestExecution(parsed.action()).thenApply(result -> {
+            String reply = switch (result.status()) {
+                case SUCCESS -> successDialogue;
+                case CANCELLED -> Component.translatable("message.herobrine_companion.computer_control.cancelled").getString();
+                case BUSY -> Component.translatable("message.herobrine_companion.computer_control.busy").getString();
+                case UNSUPPORTED -> Component.translatable("message.herobrine_companion.computer_control.unsupported").getString();
+                case DISABLED -> Component.translatable("message.herobrine_companion.computer_control.disabled").getString();
+                case FAILED -> Component.translatable("message.herobrine_companion.computer_control.failed").getString();
+            };
+            return completeReply(reply, conversationScopeId, originalUserMessage, persistConversation, allowTitleRefresh);
+        });
+    }
+
+    private static boolean isAllowedToolInvocation(String toolName, boolean crossSessionMode) {
+        if (AICommandSkillSupport.isSupportedToolName(toolName)) {
+            return true;
+        }
+        return !crossSessionMode
+                && AIComputerControlSupport.isSupportedToolName(toolName)
+                && LLMConfig.isComputerControlEnabled()
+                && SafeComputerControlService.isSupportedHost();
     }
 
     private static UUID buildCrossSessionScopeId(UUID conversationScopeId, UUID authorityPlayerUUID) {
@@ -987,6 +1075,10 @@ public class AIService {
         if (crossSessionMode || !allowWorldActions) {
             return false;
         }
+        if (LLMConfig.isComputerControlEnabled()
+                && AIComputerControlSupport.isLikelyComputerControlRequest(originalUserMessage)) {
+            return true;
+        }
         return LLMConfig.isCommandEagerMode()
                 ? isEagerWorldActionIntent(originalUserMessage)
                 : isLikelyWorldActionRequest(originalUserMessage);
@@ -1013,6 +1105,23 @@ public class AIService {
                 "gave", "given", "cleared", "killed", "kicked", "set ", "changed", "weather", "time", "gamemode",
                 "difficulty", "effect", "enchanted", "filled", "placed", "worldborder", "whitelist", "banned");
         return completedTone && actionClaim;
+    }
+
+    private static boolean hasUnbackedComputerActionClaim(String originalUserMessage, String cleanReply) {
+        if (!AIComputerControlSupport.isLikelyComputerControlRequest(originalUserMessage)) {
+            return false;
+        }
+        String reply = normalizeActionInferenceText(cleanReply);
+        if (reply.isEmpty() || containsNoActionQualifier(reply) || containsClarificationOrSafetyQualifier(reply)) {
+            return false;
+        }
+        boolean completedTone = containsAny(reply,
+                "已", "已经", "完成", "搞定", "打开了", "创建了", "复制了", "写好了",
+                "done", "completed", "opened", "created", "copied", "i have", "i've", "it is done");
+        boolean computerAction = containsAny(reply,
+                "记事本", "计算器", "资源管理器", "文件夹", "便笺", "笔记", "剪贴板", "电脑", "本机",
+                "notepad", "calculator", "explorer", "folder", "note", "clipboard", "computer");
+        return completedTone && computerAction;
     }
 
     private static boolean shouldRetryEagerTextOnlyAction(String originalUserMessage, String cleanReply) {
@@ -1101,6 +1210,14 @@ public class AIService {
             return reply + "\n§7（这次没有实际改变世界。）";
         }
         return reply + "\n§7(No world change was actually performed.)";
+    }
+
+    private static String appendNoComputerActionNotice(String reply, String outputLanguageCode) {
+        String languageCode = resolveOutputLanguageCode(outputLanguageCode);
+        if (languageCode.startsWith("zh")) {
+            return reply + "\n§7（这次没有执行任何本机操作。）";
+        }
+        return reply + "\n§7(No local computer action was performed.)";
     }
 
     private static String inferReplyDrivenAction(String originalUserMessage, String cleanReply) {

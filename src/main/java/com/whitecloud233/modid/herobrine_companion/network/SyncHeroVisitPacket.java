@@ -22,6 +22,7 @@ public class SyncHeroVisitPacket {
 
     public void handle(Supplier<NetworkEvent.Context> contextSupplier) {
         NetworkEvent.Context context = contextSupplier.get();
+        PacketDispatch.assertClient(context);
         context.enqueueWork(() -> NetworkClientBridge.setVisitedHeroDimension(this.visited));
         context.setPacketHandled(true);
     }

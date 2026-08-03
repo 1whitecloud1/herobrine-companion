@@ -27,7 +27,7 @@ public class HeroPunishmentPacket {
 
     public void handle(Supplier<NetworkEvent.Context> supplier) {
         NetworkEvent.Context context = supplier.get();
-        context.enqueueWork(() -> {
+        PacketDispatch.enqueueServer(context, () -> {
             ServerPlayer player = context.getSender();
             if (player == null) {
                 return;
@@ -44,7 +44,6 @@ public class HeroPunishmentPacket {
                 }
             }
         });
-        context.setPacketHandled(true);
     }
 }
 

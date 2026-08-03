@@ -35,6 +35,7 @@ public class SyncRewardsPacket {
 
     public void handle(Supplier<NetworkEvent.Context> contextSupplier) {
         NetworkEvent.Context context = contextSupplier.get();
+        PacketDispatch.assertClient(context);
         context.enqueueWork(() -> NetworkClientBridge.applySyncRewards(this.entityId, this.claimedRewards));
         context.setPacketHandled(true);
     }

@@ -2,6 +2,7 @@ package com.whitecloud233.modid.herobrine_companion.compat.cooking;
 
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroLogic;
+import com.whitecloud233.modid.herobrine_companion.network.PacketDispatch;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
@@ -40,7 +41,7 @@ public class SelectCookOptionPacket {
 
     public void handle(Supplier<NetworkEvent.Context> contextSupplier) {
         NetworkEvent.Context context = contextSupplier.get();
-        context.enqueueWork(() -> {
+        PacketDispatch.enqueueServer(context, () -> {
             ServerPlayer player = context.getSender();
             if (player == null) {
                 return;
@@ -51,6 +52,5 @@ public class SelectCookOptionPacket {
                 HeroLogic.handleCookSelection(hero, player, this.cookwarePos, this.recipeId, this.repeatCount);
             }
         });
-        context.setPacketHandled(true);
     }
 }

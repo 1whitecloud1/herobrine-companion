@@ -34,7 +34,7 @@ java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 def enableAccessoriesRuntime = providers.gradleProperty("enableAccessoriesRuntime")
         .map { it.toBoolean() }
         .orElse(false)
-def enableEpicFightCompat = providers.gradleProperty("enableEpicFightCompat")
+/*def enableEpicFightCompat = providers.gradleProperty("enableEpicFightCompat")
         .map { it.toBoolean() }
         .orElse(false)
 def epicFightCompatSourceExcludes = [
@@ -75,7 +75,7 @@ configurations.configureEach { configuration ->
         configuration.extendsFrom configurations.implementation
     }
 }
-
+*/
 println "Java: ${System.getProperty 'java.version'}, JVM: ${System.getProperty 'java.vm.version'} (${System.getProperty 'java.vendor'}), Arch: ${System.getProperty 'os.arch'}"
 
 minecraft {
@@ -92,9 +92,9 @@ minecraft {
             mods {
                 "${mod_id}" {
                     source sourceSets.main
-                    if (enableEpicFightCompat.get()) {
-                        source sourceSets.epicfightCompat
-                    }
+                    //if (enableEpicFightCompat.get()) {
+                    //    source sourceSets.epicfightCompat
+                    //}
                 }
             }
         }
@@ -288,11 +288,11 @@ dependencies {
   // compileOnly fg.deobf("curse.maven:epic-fight-avalon-1268823:7619938")
   // runtimeOnly fg.deobf("curse.maven:epic-fight-avalon-1268823:7619938")
 
-    if (enableEpicFightCompat.get()) {
-        epicfightCompatRuntimeOnly fg.deobf("curse.maven:epicfight-nightfall-1307848:8082392")
-        epicfightCompatCompileOnly fg.deobf("curse.maven:epic-fight-mod-405076:8049910")
-        epicfightCompatRuntimeOnly fg.deobf("curse.maven:epic-fight-mod-405076:8049910")
-   }
+    //if (enableEpicFightCompat.get()) {
+      //  epicfightCompatRuntimeOnly fg.deobf("curse.maven:epicfight-nightfall-1307848:8082392")
+    compileOnly fg.deobf("curse.maven:epic-fight-mod-405076:8049910")
+    runtimeOnly fg.deobf("curse.maven:epic-fight-mod-405076:8049910")
+
 
 // 引入 Armourer's Workshop 进行测试和 API 调用 (需替换为真实的 ID)
     // 引入 Armourer's Workshop 进行测试和 API 调用 (软依赖声明)
@@ -336,7 +336,7 @@ tasks.named('processResources', ProcessResources).configure {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 // === 原生 Jar 构建逻辑 ===
-tasks.named('jar', Jar).configure {
+/*tasks.named('jar', Jar).configure {
     if (enableEpicFightCompat.get()) {
         from sourceSets.epicfightCompat.output
     }
@@ -357,7 +357,7 @@ tasks.named('jar', Jar).configure {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     finalizedBy 'reobfJar'
 }
-
+*/
 // 配置 Forge 重混淆处理 shadowJar 的产物
 
 

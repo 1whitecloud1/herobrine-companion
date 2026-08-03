@@ -27,7 +27,7 @@ public class ToggleBattleModePacket {
 
     public void handle(Supplier<NetworkEvent.Context> contextSupplier) {
         NetworkEvent.Context context = contextSupplier.get();
-        context.enqueueWork(() -> {
+        PacketDispatch.enqueueServer(context, () -> {
             ServerPlayer serverPlayer = context.getSender();
             if (serverPlayer == null) {
                 return;
@@ -56,7 +56,6 @@ public class ToggleBattleModePacket {
                     : "message.herobrine_companion.battle_mode_off";
             serverPlayer.sendSystemMessage(Component.translatable(key));
         });
-        context.setPacketHandled(true);
     }
 }
 

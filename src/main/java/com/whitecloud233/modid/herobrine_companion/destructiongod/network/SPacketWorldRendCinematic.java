@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.destructiongod.network;
 
 import com.whitecloud233.modid.herobrine_companion.network.NetworkClientBridge;
+import com.whitecloud233.modid.herobrine_companion.network.PacketDispatch;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraftforge.network.NetworkEvent;
 
@@ -23,7 +24,7 @@ public class SPacketWorldRendCinematic {
         this.z = buf.readDouble();
     }
 
-    public void toBytes(FriendlyByteBuf buf) {
+    public void encode(FriendlyByteBuf buf) {
         buf.writeDouble(this.x);
         buf.writeDouble(this.y);
         buf.writeDouble(this.z);
@@ -31,6 +32,7 @@ public class SPacketWorldRendCinematic {
 
     public void handle(Supplier<NetworkEvent.Context> supplier) {
         NetworkEvent.Context context = supplier.get();
+        PacketDispatch.assertClient(context);
         context.enqueueWork(() -> NetworkClientBridge.handleWorldRendCinematic(this.x, this.y, this.z));
         context.setPacketHandled(true);
     }

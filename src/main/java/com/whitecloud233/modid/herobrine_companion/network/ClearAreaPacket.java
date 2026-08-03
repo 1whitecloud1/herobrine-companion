@@ -48,7 +48,7 @@ public class ClearAreaPacket {
 
     public void handle(Supplier<NetworkEvent.Context> contextSupplier) {
         NetworkEvent.Context context = contextSupplier.get();
-        context.enqueueWork(() -> {
+        PacketDispatch.enqueueServer(context, () -> {
             ServerPlayer player = context.getSender();
             if (player != null) {
                 startVoidDomain(player, DEFAULT_VOID_DOMAIN_RADIUS, true, true,
@@ -56,7 +56,6 @@ public class ClearAreaPacket {
                                 player.getPersistentData().getInt("VoidDomainUsageCount") + 1));
             }
         });
-        context.setPacketHandled(true);
     }
 
     public static boolean startVoidDomain(ServerPlayer player, int radius, boolean requireHeroDimensionVisit,

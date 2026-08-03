@@ -1,6 +1,9 @@
-package com.whitecloud233.modid.herobrine_companion.client.fight;
+package com.whitecloud233.modid.herobrine_companion.fight;
 
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.modid.herobrine_companion.fight.animation.ArenaCollapseManager;
+import com.whitecloud233.modid.herobrine_companion.fight.goal.HeroPhase1Goal;
+import com.whitecloud233.modid.herobrine_companion.fight.network.SPacketFakeCrash;
 import net.minecraft.network.chat.Component; // [引用]
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -55,7 +58,7 @@ public class HeroChallengeState {
             // 在第 60 帧到 135 帧（经过 3 秒死寂后），世界从边缘开始坍塌！
             if (timer >= 60 && timer <= 135) {
                 // 【调用新类】：将坍塌逻辑委托给专门的崩坏管理器，以玩家为中心引爆！
-                com.whitecloud233.modid.herobrine_companion.client.fight.animation.ArenaCollapseManager.tickCollapse(hero, level, timer);
+                ArenaCollapseManager.tickCollapse(hero, level, timer);
             }
 
             // ... 前面的方块乱飞爆炸代码保持不变 ...
@@ -66,7 +69,7 @@ public class HeroChallengeState {
                 for (ServerPlayer player : level.players()) {
                     if (player.getPersistentData().getBoolean("HeroFakeOutPhase")) {
                         com.whitecloud233.modid.herobrine_companion.network.PacketHandler.sendToPlayer(
-                                new com.whitecloud233.modid.herobrine_companion.client.fight.network.SPacketFakeCrash(),
+                                new SPacketFakeCrash(),
                                 player
                         );
                     }
@@ -78,7 +81,7 @@ public class HeroChallengeState {
             // 正常情况下客户端播完 25 秒的演出就会发包传回主世界，这个只用来防止玩家断网或卡死在虚空里。
             if (timer >= 1200) {
                 hero.getPersistentData().remove("FakeOutTimer");
-                com.whitecloud233.modid.herobrine_companion.client.fight.HeroChallengeManager.endChallenge(hero, true);
+                HeroChallengeManager.endChallenge(hero, true);
             }
 
             // 假死演出期间，直接 return，冻结下方所有的挑战检测逻辑！
@@ -143,7 +146,7 @@ public class HeroChallengeState {
             hero.setTarget(null);
             hero.getNavigation().stop();
             hero.moveControl = new ChallengeMoveControl(hero);
-            hero.goalSelector.addGoal(1, new com.whitecloud233.modid.herobrine_companion.client.fight.goal.HeroPhase1Goal(hero));
+            hero.goalSelector.addGoal(1, new HeroPhase1Goal(hero));
         }
     }
 

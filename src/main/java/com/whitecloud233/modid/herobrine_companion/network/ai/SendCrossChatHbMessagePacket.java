@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.network.ai;
 
 import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroCrossChatManager;
+import com.whitecloud233.modid.herobrine_companion.network.PacketDispatch;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.network.NetworkEvent;
@@ -24,13 +25,12 @@ public class SendCrossChatHbMessagePacket {
 
     public void handle(Supplier<NetworkEvent.Context> contextSupplier) {
         NetworkEvent.Context context = contextSupplier.get();
-        context.enqueueWork(() -> {
+        PacketDispatch.enqueueServer(context, () -> {
             ServerPlayer sender = context.getSender();
             if (sender != null) {
                 HeroCrossChatManager.INSTANCE.sendHbToHbMessage(sender, this.message);
             }
         });
-        context.setPacketHandled(true);
     }
 }
 

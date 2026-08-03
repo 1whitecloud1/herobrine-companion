@@ -17,8 +17,12 @@ import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroCombatP
 import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroCombatTimeline;
 import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroTradeHandler;
 import com.whitecloud233.modid.herobrine_companion.entity.logic.HeroGunAdapter;
-import com.whitecloud233.modid.herobrine_companion.event.HeroTrades;
 import com.whitecloud233.modid.herobrine_companion.event.HeroVisuals;
+import com.whitecloud233.modid.herobrine_companion.fight.HeroChallengeState;
+import com.whitecloud233.modid.herobrine_companion.fight.HeroAfterimage;
+import com.whitecloud233.modid.herobrine_companion.fight.goal.HeroPhase1Goal;
+import com.whitecloud233.modid.herobrine_companion.network.ChallengeAfterimagePacket;
+import com.whitecloud233.modid.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.modid.herobrine_companion.world.structure.ModStructures;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -29,7 +33,6 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerBossEvent;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -53,20 +56,17 @@ import net.minecraft.world.entity.ai.navigation.FlyingPathNavigation;
 import net.minecraft.world.entity.ai.navigation.GroundPathNavigation;
 import net.minecraft.world.entity.ai.navigation.PathNavigation;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.CrossbowItem;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.item.ProjectileWeaponItem;
-import net.minecraft.world.item.UseAnim;
 import net.minecraft.world.item.trading.Merchant;
 import net.minecraft.world.item.trading.MerchantOffer;
 import net.minecraft.world.item.trading.MerchantOffers;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.registries.ForgeRegistries;
 
 import javax.annotation.Nullable;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -127,6 +127,7 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     private boolean isLoadedFromDisk = false;
     private boolean handlingHeroHurt = false;
     private final HeroCombatTimeline combatTimeline = new HeroCombatTimeline();
+    private final List<HeroAfterimage> challengeAfterimages = new ArrayList<>();
     // --- 姿势编辑器专用数据 ---
     public boolean isPoseEditing = false;
     // 0=头, 1=身体, 2=右上臂, 3=右小臂, 4=左上臂, 5=左小臂, 6=右大腿, 7=右小腿, 8=左大腿, 9=左小腿
@@ -177,7 +178,7 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         if (this.getPersistentData().getBoolean("IsChallengeActive")) {
             this.goalSelector.removeAllGoals(goal -> true);
             this.targetSelector.removeAllGoals(goal -> true);
-            this.goalSelector.addGoal(1, new com.whitecloud233.modid.herobrine_companion.client.fight.goal.HeroPhase1Goal(this));
+            this.goalSelector.addGoal(1, new HeroPhase1Goal(this));
         } else {
             HeroAI.registerGoals(this);
         }
@@ -224,6 +225,7 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     @Override
     public void tick() {
         super.tick();
+        this.challengeAfterimages.removeIf(HeroAfterimage::tick);
         if (!this.level().isClientSide) {
             double movedX = this.getX() - this.xOld;
             double movedZ = this.getZ() - this.zOld;
@@ -252,7 +254,7 @@ public class HeroEntity extends PathfinderMob implements Merchant {
                 this.resetBattleCombatState();
             }
 
-            com.whitecloud233.modid.herobrine_companion.client.fight.HeroChallengeState.tick(this);
+            HeroChallengeState.tick(this);
 
             // 同步血条逻辑
             if (this.getEntityData().get(IS_CHALLENGE_ACTIVE)) {
@@ -628,7 +630,7 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         super.readAdditionalSaveData(compound);
         this.isLoadedFromDisk = true;
 
-        com.whitecloud233.modid.herobrine_companion.client.fight.HeroChallengeState.onRestoreFromDisk(this);
+        HeroChallengeState.onRestoreFromDisk(this);
 
         if (compound.contains("TrustLevel")) setTrustLevel(compound.getInt("TrustLevel"));
         if (compound.contains("PatrolTimer")) patrolTimer = compound.getInt("PatrolTimer");
@@ -903,6 +905,21 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     public GoalSelector getGoalSelector() { return this.goalSelector; }
     public void setFallDistance(float distance) { this.fallDistance = distance; }
     public HeroBrain getHeroBrain() { return this.brain; }
+
+    public void addChallengeAfterimage(HeroAfterimage afterimage) {
+        if (!this.level().isClientSide) {
+            PacketHandler.sendToTracking(new ChallengeAfterimagePacket(this.getId(), afterimage), this);
+        }
+        this.challengeAfterimages.add(afterimage);
+    }
+
+    public List<HeroAfterimage> getChallengeAfterimages() {
+        return this.challengeAfterimages;
+    }
+
+    public void clearChallengeAfterimages() {
+        this.challengeAfterimages.clear();
+    }
 
     public SimpleNeuralNetwork.MindState getMindState() {
         int index = this.entityData.get(MIND_STATE);

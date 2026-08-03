@@ -59,6 +59,7 @@ public class SyncHeroCosmeticsPacket {
 
     public void handle(Supplier<NetworkEvent.Context> supplier) {
         NetworkEvent.Context context = supplier.get();
+        PacketDispatch.assertClient(context);
         context.enqueueWork(() -> NetworkClientBridge.applySyncHeroCosmetics(
                 this.entityId,
                 this.skinVariant,

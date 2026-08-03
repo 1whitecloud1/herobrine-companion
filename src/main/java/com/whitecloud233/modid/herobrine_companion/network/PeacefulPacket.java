@@ -26,7 +26,7 @@ public class PeacefulPacket {
 
     public void handle(Supplier<NetworkEvent.Context> contextSupplier) {
         NetworkEvent.Context context = contextSupplier.get();
-        context.enqueueWork(() -> {
+        PacketDispatch.enqueueServer(context, () -> {
             ServerPlayer serverPlayer = context.getSender();
             if (serverPlayer != null) {
                 // 检查前置条件：是否去过维度
@@ -56,6 +56,5 @@ public class PeacefulPacket {
                 }
             }
         });
-        context.setPacketHandled(true);
     }
 }

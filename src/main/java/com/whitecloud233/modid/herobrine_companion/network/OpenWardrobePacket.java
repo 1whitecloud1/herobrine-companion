@@ -23,13 +23,13 @@ public class OpenWardrobePacket {
         this.entityId = buf.readInt();
     }
 
-    public void toBytes(FriendlyByteBuf buf) {
+    public void encode(FriendlyByteBuf buf) {
         buf.writeInt(this.entityId);
     }
 
-    public boolean handle(Supplier<NetworkEvent.Context> supplier) {
+    public void handle(Supplier<NetworkEvent.Context> supplier) {
         NetworkEvent.Context context = supplier.get();
-        context.enqueueWork(() -> {
+        PacketDispatch.enqueueServer(context, () -> {
             ServerPlayer player = context.getSender();
             if (player != null) {
                 // 在服务端获取对应的实体
@@ -46,6 +46,5 @@ public class OpenWardrobePacket {
                 }
             }
         });
-        return true;
     }
 }

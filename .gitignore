@@ -53,3 +53,10 @@ hs_err_pid*
 /local-maven/
 /.codex-tmp/
 /.claude/
+/.gradle-home/
+/statepython参考/
+/.gradle-home-verify3/
+/.gradle-home-verify2/
+/.gradle-home-verify/
+/.java-tmp/
+/docs/

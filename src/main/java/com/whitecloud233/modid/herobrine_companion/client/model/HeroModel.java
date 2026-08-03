@@ -6,6 +6,7 @@ import com.whitecloud233.modid.herobrine_companion.compat.epicfight.HeroEpicFigh
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.HeroCombatWeaponHelper;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.SimpleNeuralNetwork;
+import com.whitecloud233.modid.herobrine_companion.fight.animation.HeroChallengeAnimations;
 import com.whitecloud233.modid.herobrine_companion.item.PoemOfTheEndItem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.PlayerModel;
@@ -292,7 +293,7 @@ public class HeroModel extends PlayerModel<HeroEntity> {
 
         applyFlyingPresetPose(floatAmount);
 
-        com.whitecloud233.modid.herobrine_companion.client.fight.animation.HeroChallengeAnimations.setupChallengeAnims(this, entity, ageInTicks);
+        HeroChallengeAnimations.setupChallengeAnims(this, entity, ageInTicks);
 
         copyAllModelProperties();
     }

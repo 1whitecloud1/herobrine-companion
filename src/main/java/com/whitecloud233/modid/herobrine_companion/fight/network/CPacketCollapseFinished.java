@@ -1,7 +1,8 @@
-package com.whitecloud233.modid.herobrine_companion.client.fight.network;
+package com.whitecloud233.modid.herobrine_companion.fight.network;
 
-import com.whitecloud233.modid.herobrine_companion.client.fight.HeroChallengeManager;
+import com.whitecloud233.modid.herobrine_companion.fight.HeroChallengeManager;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.modid.herobrine_companion.network.PacketDispatch;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -15,11 +16,11 @@ public class CPacketCollapseFinished {
 
     public CPacketCollapseFinished(FriendlyByteBuf buf) {}
 
-    public void toBytes(FriendlyByteBuf buf) {}
+    public void encode(FriendlyByteBuf buf) {}
 
     public void handle(Supplier<NetworkEvent.Context> supplier) {
         NetworkEvent.Context context = supplier.get();
-        context.enqueueWork(() -> {
+        PacketDispatch.enqueueServer(context, () -> {
             // 这是服务器收到包后执行的逻辑
             ServerPlayer player = context.getSender();
             if (player != null && player.level() instanceof ServerLevel level) {
@@ -36,6 +37,5 @@ public class CPacketCollapseFinished {
                 }
             }
         });
-        context.setPacketHandled(true);
     }
 }

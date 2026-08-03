@@ -28,7 +28,7 @@ public class OpenTradePacket {
 
     public void handle(Supplier<NetworkEvent.Context> contextSupplier) {
         NetworkEvent.Context context = contextSupplier.get();
-        context.enqueueWork(() -> {
+        PacketDispatch.enqueueServer(context, () -> {
             ServerPlayer player = context.getSender();
             if (player != null) {
                 Entity entity = player.level().getEntity(this.entityId);
@@ -64,6 +64,5 @@ public class OpenTradePacket {
                 }
             }
         });
-        context.setPacketHandled(true);
     }
 }

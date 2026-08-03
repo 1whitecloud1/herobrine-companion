@@ -9,6 +9,7 @@ import com.whitecloud233.modid.herobrine_companion.compat.accessories.HeroAccess
 import com.whitecloud233.modid.herobrine_companion.compat.simplehats.HeroSimpleHatsCompat;
 import com.whitecloud233.modid.herobrine_companion.compat.waveycapes.HeroWaveyCapesCompat;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.modid.herobrine_companion.fight.HeroAfterimage;
 import com.whitecloud233.modid.herobrine_companion.world.structure.ModStructures;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -26,6 +27,7 @@ import net.minecraft.client.resources.DefaultPlayerSkin;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
+import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.slf4j.Logger;
@@ -269,11 +271,13 @@ public class HeroRenderer extends LivingEntityRenderer<HeroEntity, PlayerModel<H
     @Override
     public void render(HeroEntity entity, float entityYaw, float partialTicks, PoseStack poseStack, MultiBufferSource buffer, int packedLight) {
         float floatAmount = entity.getFloatingAmount(partialTicks);
+        float floatOffsetY = 0.0F;
         if (floatAmount > 0.01f) {
             float ageInTicks = entity.tickCount + partialTicks;
             float floatHeight = Mth.sin(ageInTicks * 0.1f) * 0.05f * floatAmount;
             float baseOffset = 0.05f * floatAmount;
-            poseStack.translate(0.0D, floatHeight + baseOffset, 0.0D);
+            floatOffsetY = floatHeight + baseOffset;
+            poseStack.translate(0.0D, floatOffsetY, 0.0D);
         }
 
         boolean isGlitching = entity.isGlitching();
@@ -314,6 +318,64 @@ public class HeroRenderer extends LivingEntityRenderer<HeroEntity, PlayerModel<H
             poseStack.translate(bX, bY, bZ);
             VertexConsumer blueBuffer = buffer.getBuffer(RenderType.entityTranslucent(this.getTextureLocation(entity)));
             this.getModel().renderToBuffer(poseStack, blueBuffer, packedLight, OverlayTexture.NO_OVERLAY, 0.0F, 1.0F, 1.0F, 0.5F);
+            poseStack.popPose();
+        }
+
+        renderChallengeAfterimages(entity, partialTicks, poseStack, buffer, floatOffsetY);
+    }
+
+    private void renderChallengeAfterimages(HeroEntity entity, float partialTicks, PoseStack poseStack,
+                                             MultiBufferSource buffer, float floatOffsetY) {
+        if (entity.getChallengeAfterimages().isEmpty()) {
+            return;
+        }
+
+        Vec3 entityRenderPos = entity.getPosition(partialTicks).add(0.0D, floatOffsetY, 0.0D);
+        ResourceLocation texture = this.getTextureLocation(entity);
+        ResourceLocation eyes = HeroRenderer.getEyesTexture(entity);
+
+        for (HeroAfterimage afterimage : entity.getChallengeAfterimages()) {
+            int alphaInt = afterimage.getAlpha(partialTicks);
+            if (alphaInt <= 0) {
+                continue;
+            }
+
+            float alpha = alphaInt / 255.0F;
+            Vec3 translation = afterimage.getPosition().subtract(entityRenderPos);
+
+            poseStack.pushPose();
+            poseStack.translate(translation.x, translation.y + 1.5D, translation.z);
+            poseStack.scale(1.0F, -1.0F, 1.0F);
+            this.setupRotations(entity, poseStack, getBob(entity, partialTicks), afterimage.getYRot(), partialTicks);
+
+            if (texture != null) {
+                VertexConsumer vertexConsumer = buffer.getBuffer(RenderType.entityTranslucent(texture));
+                this.getModel().renderToBuffer(
+                        poseStack,
+                        vertexConsumer,
+                        0xF000F0,
+                        OverlayTexture.NO_OVERLAY,
+                        0.45F,
+                        0.85F,
+                        1.0F,
+                        alpha
+                );
+            }
+
+            if (eyes != null) {
+                VertexConsumer eyeConsumer = buffer.getBuffer(RenderType.eyes(eyes));
+                this.getModel().renderToBuffer(
+                        poseStack,
+                        eyeConsumer,
+                        0xF000F0,
+                        OverlayTexture.NO_OVERLAY,
+                        1.0F,
+                        1.0F,
+                        1.0F,
+                        alpha
+                );
+            }
+
             poseStack.popPose();
         }
     }

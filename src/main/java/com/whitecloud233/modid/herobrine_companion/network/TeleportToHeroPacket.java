@@ -13,17 +13,16 @@ public class TeleportToHeroPacket {
 
     public TeleportToHeroPacket(FriendlyByteBuf buf) {}
 
-    public void toBytes(FriendlyByteBuf buf) {}
+    public void encode(FriendlyByteBuf buf) {}
 
-    public boolean handle(Supplier<NetworkEvent.Context> supplier) {
+    public void handle(Supplier<NetworkEvent.Context> supplier) {
         NetworkEvent.Context context = supplier.get();
-        context.enqueueWork(() -> {
+        PacketDispatch.enqueueServer(context, () -> {
             ServerPlayer player = context.getSender();
             if (player != null) {
                 // 直接调用 SourceFlowItem 里的传送逻辑
                 SourceFlowItem.performTeleportToHero(player);
             }
         });
-        return true;
     }
 }

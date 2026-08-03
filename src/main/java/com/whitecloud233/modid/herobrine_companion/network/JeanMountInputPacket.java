@@ -42,15 +42,13 @@ public class JeanMountInputPacket {
         buf.writeFloat(this.pitch);
     }
 
-    public boolean handle(Supplier<NetworkEvent.Context> supplier) {
+    public void handle(Supplier<NetworkEvent.Context> supplier) {
         NetworkEvent.Context ctx = supplier.get();
-        ctx.enqueueWork(() -> {
+        PacketDispatch.enqueueServer(ctx, () -> {
             ServerPlayer player = ctx.getSender();
             if (player != null) {
                 HerobrineFamilyMountEvents.updateInput(player, this.strafe, this.forward, this.jump, this.dismount, this.yaw, this.pitch);
             }
         });
-        ctx.setPacketHandled(true);
-        return true;
     }
 }

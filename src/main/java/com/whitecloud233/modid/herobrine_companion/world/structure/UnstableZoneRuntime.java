@@ -21,7 +21,6 @@ import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -53,20 +52,6 @@ public final class UnstableZoneRuntime {
             Blocks.TINTED_GLASS
     );
 
-    private static final Set<Block> SOURCE_ANOMALY_BLOCKS = Set.of(
-            Blocks.SPAWNER,
-            Blocks.NETHERRACK,
-            Blocks.SOUL_SOIL,
-            Blocks.BLACKSTONE,
-            Blocks.BASALT,
-            Blocks.MAGMA_BLOCK,
-            Blocks.END_STONE,
-            Blocks.TINTED_GLASS,
-            Blocks.WET_SPONGE,
-            Blocks.GILDED_BLACKSTONE,
-            Blocks.CRYING_OBSIDIAN
-    );
-
     private static volatile List<Block> mutationBlockPool;
 
     private UnstableZoneRuntime() {
@@ -88,17 +73,7 @@ public final class UnstableZoneRuntime {
         if (level == null || pos == null || state == null || state.isAir()) {
             return false;
         }
-        SavedZones savedZones = SavedZones.get(level);
-        if (!savedZones.isTracked(pos)) {
-            if (!isSourceAnomalyBlock(state)) {
-                return false;
-            }
-            ensureTrackedZoneAt(level, pos);
-            if (!savedZones.isTracked(pos)) {
-                return false;
-            }
-        }
-        return true;
+        return SavedZones.get(level).isTracked(pos);
     }
 
     public static void registerGeneratedBlocks(ServerLevel level, BoundingBox bounds, Collection<BlockPos> positions) {
@@ -115,25 +90,6 @@ public final class UnstableZoneRuntime {
         SavedZones.get(level).removeTrackedPositions(positions);
     }
 
-    public static void ensureTrackedZoneAt(ServerLevel level, BlockPos pos) {
-        if (level == null || pos == null) {
-            return;
-        }
-        StructureStart start = getUnstableZoneStart(level, pos);
-        if (!start.isValid()) {
-            return;
-        }
-        BoundingBox bounds = start.getBoundingBox();
-        SavedZones savedZones = SavedZones.get(level);
-        if (savedZones.hasZone(bounds) || !areBoundsLoaded(level, bounds)) {
-            return;
-        }
-        Set<BlockPos> backfilled = scanExistingAnomalyBlocks(level, bounds);
-        if (!backfilled.isEmpty()) {
-            savedZones.addTrackedPositions(bounds, backfilled);
-        }
-    }
-
     public static void tick(ServerLevel level) {
         if (level == null || level.isClientSide()) {
             return;
@@ -141,13 +97,6 @@ public final class UnstableZoneRuntime {
         long gameTime = level.getGameTime();
         if (gameTime <= 0L || gameTime % BLOCK_MUTATION_INTERVAL_TICKS != 0L) {
             return;
-        }
-
-        for (var player : level.players()) {
-            BlockPos playerPos = player.blockPosition();
-            if (isInUnstableZone(level, playerPos)) {
-                ensureTrackedZoneAt(level, playerPos);
-            }
         }
 
         SavedZones savedZones = SavedZones.get(level);
@@ -191,31 +140,6 @@ public final class UnstableZoneRuntime {
             return StructureStart.INVALID_START;
         }
         return level.structureManager().getStructureWithPieceAt(pos, structure);
-    }
-
-    private static boolean isSourceAnomalyBlock(BlockState state) {
-        return state != null && SOURCE_ANOMALY_BLOCKS.contains(state.getBlock());
-    }
-
-    private static Set<BlockPos> scanExistingAnomalyBlocks(ServerLevel level, BoundingBox bounds) {
-        if (!areBoundsLoaded(level, bounds)) {
-            return Collections.emptySet();
-        }
-        Set<BlockPos> positions = new LinkedHashSet<>();
-        int minY = Math.max(level.getMinBuildHeight(), bounds.minY());
-        int maxY = Math.min(level.getMaxBuildHeight() - 1, bounds.maxY());
-        for (int x = bounds.minX(); x <= bounds.maxX(); x++) {
-            for (int z = bounds.minZ(); z <= bounds.maxZ(); z++) {
-                for (int y = minY; y <= maxY; y++) {
-                    BlockPos scanPos = new BlockPos(x, y, z);
-                    BlockState state = level.getBlockState(scanPos);
-                    if (isSourceAnomalyBlock(state)) {
-                        positions.add(scanPos.immutable());
-                    }
-                }
-            }
-        }
-        return positions;
     }
 
     private static boolean areBoundsLoaded(ServerLevel level, BoundingBox bounds) {
@@ -363,10 +287,6 @@ public final class UnstableZoneRuntime {
 
         public boolean isTracked(BlockPos pos) {
             return trackedPositions.contains(pos.asLong());
-        }
-
-        public boolean hasZone(BoundingBox bounds) {
-            return zones.containsKey(zoneId(bounds));
         }
 
         public Collection<ZoneRecord> getZones() {

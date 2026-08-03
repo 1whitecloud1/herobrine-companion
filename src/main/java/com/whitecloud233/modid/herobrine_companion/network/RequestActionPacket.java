@@ -34,7 +34,7 @@ public class RequestActionPacket {
 
     public static void handle(RequestActionPacket packet, Supplier<NetworkEvent.Context> contextSupplier) {
         NetworkEvent.Context context = contextSupplier.get();
-        context.enqueueWork(() -> {
+        PacketDispatch.enqueueServer(context, () -> {
             ServerPlayer player = context.getSender();
             if (player != null) {
                 Entity entity = player.level().getEntity(packet.entityId);
@@ -47,7 +47,6 @@ public class RequestActionPacket {
                 }
             }
         });
-        context.setPacketHandled(true);
     }
 
     public enum Action {

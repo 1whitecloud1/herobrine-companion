@@ -1,4 +1,4 @@
-package com.whitecloud233.modid.herobrine_companion.client.fight.particles;
+package com.whitecloud233.modid.herobrine_companion.fight.particles;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;

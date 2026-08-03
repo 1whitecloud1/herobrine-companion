@@ -164,6 +164,7 @@ public class LLMConfig {
     public static String aiModelName = Provider.QINIU_CLOUD.getDefaultModel();
     public static String aiSystemPrompt = DEFAULT_SYSTEM_PROMPT;
     public static boolean aiStreamingEnabled = false;
+    public static volatile boolean aiComputerControlEnabled = false;
     public static CommandMode aiCommandMode = CommandMode.NORMAL;
     public static double aiTemperature = DEFAULT_TEMPERATURE;
     public static double aiTopP = DEFAULT_TOP_P;
@@ -353,6 +354,11 @@ public class LLMConfig {
     public static boolean isStreamingEnabled() {
         ensureLoaded();
         return aiStreamingEnabled;
+    }
+
+    public static boolean isComputerControlEnabled() {
+        ensureLoaded();
+        return aiComputerControlEnabled;
     }
 
     public static CommandMode getCommandMode() {
@@ -572,6 +578,7 @@ public class LLMConfig {
         aiModelName = aiProvider.getDefaultModel();
         aiSystemPrompt = DEFAULT_SYSTEM_PROMPT;
         aiStreamingEnabled = false;
+        aiComputerControlEnabled = false;
         aiCommandMode = CommandMode.NORMAL;
         aiTemperature = DEFAULT_TEMPERATURE;
         aiTopP = DEFAULT_TOP_P;
@@ -634,6 +641,7 @@ public class LLMConfig {
                         aiSystemPrompt = data.aiPrompt;
                     }
                     if (data.aiStreamingEnabled != null) aiStreamingEnabled = data.aiStreamingEnabled;
+                    if (data.aiComputerControlEnabled != null) aiComputerControlEnabled = data.aiComputerControlEnabled;
                     CommandMode savedCommandMode = CommandMode.fromSavedValue(data.aiCommandMode);
                     if (savedCommandMode == null) {
                         savedCommandMode = CommandMode.fromSavedValue(data.commandMode);
@@ -702,6 +710,7 @@ public class LLMConfig {
         pData.activeProvider = getProviderUnchecked().getId();
         pData.aiSystemPrompt = aiSystemPrompt;
         pData.aiStreamingEnabled = aiStreamingEnabled;
+        pData.aiComputerControlEnabled = aiComputerControlEnabled;
         pData.aiCommandMode = getCommandModeUnchecked().getId();
         pData.aiTemperature = aiTemperature;
         pData.aiTopP = aiTopP;
@@ -835,6 +844,7 @@ public class LLMConfig {
         String systemPrompt;
         String aiPrompt;
         Boolean aiStreamingEnabled;
+        Boolean aiComputerControlEnabled;
         String aiCommandMode;
         String commandMode;
         Double aiTemperature;

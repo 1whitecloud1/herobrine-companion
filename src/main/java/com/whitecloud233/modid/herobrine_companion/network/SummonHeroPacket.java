@@ -14,17 +14,16 @@ public class SummonHeroPacket {
 
     public SummonHeroPacket(FriendlyByteBuf buf) {}
 
-    public void toBytes(FriendlyByteBuf buf) {}
+    public void encode(FriendlyByteBuf buf) {}
 
-    public boolean handle(Supplier<NetworkEvent.Context> supplier) {
+    public void handle(Supplier<NetworkEvent.Context> supplier) {
         NetworkEvent.Context context = supplier.get();
-        context.enqueueWork(() -> {
+        PacketDispatch.enqueueServer(context, () -> {
             ServerPlayer player = context.getSender();
             if (player != null && player.level() instanceof ServerLevel serverLevel) {
                 // 直接调用你写好的公共召唤/跨维度传送逻辑！
                 HeroSummonItem.performSummonOrTeleport(serverLevel, player, player.position());
             }
         });
-        return true;
     }
 }

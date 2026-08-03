@@ -1,4 +1,4 @@
-package com.whitecloud233.modid.herobrine_companion.client.fight.event;
+package com.whitecloud233.modid.herobrine_companion.fight.event;
 
 import com.whitecloud233.modid.herobrine_companion.world.structure.ModStructures;
 import net.minecraft.client.Minecraft;

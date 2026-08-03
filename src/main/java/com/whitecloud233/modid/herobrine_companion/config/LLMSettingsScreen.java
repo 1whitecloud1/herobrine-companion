@@ -5,6 +5,7 @@ import com.whitecloud233.modid.herobrine_companion.client.service.LLMConfig;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
@@ -27,6 +28,7 @@ public class LLMSettingsScreen extends Screen {
     private EditBox maxOutputTokensBox;
     private HeroScreen.ThemedButton saveButton;
     private boolean streamingEnabled;
+    private boolean computerControlEnabled;
     private LLMConfig.CommandMode commandMode;
     private Component validationMessage;
     private boolean settingsLoaded;
@@ -48,6 +50,7 @@ public class LLMSettingsScreen extends Screen {
         LLMConfig.ensureLoaded();
         if (!this.settingsLoaded) {
             this.streamingEnabled = LLMConfig.isStreamingEnabled();
+            this.computerControlEnabled = LLMConfig.isComputerControlEnabled();
             this.commandMode = LLMConfig.getCommandMode();
             this.systemPromptDraft = LLMConfig.getSystemPrompt();
             this.temperatureDraft = Double.toString(LLMConfig.getConfiguredTemperature());
@@ -89,6 +92,16 @@ public class LLMSettingsScreen extends Screen {
                     button.setMessage(this.getCommandModeButtonMessage());
                 },
                 null
+        ));
+
+        this.addRenderableWidget(new HeroScreen.ThemedButton(
+                layout.computerButtonX(), layout.toggleButtonY(), layout.toggleButtonWidth(), BUTTON_HEIGHT,
+                this.getComputerControlButtonMessage(),
+                button -> {
+                    this.computerControlEnabled = !this.computerControlEnabled;
+                    button.setMessage(this.getComputerControlButtonMessage());
+                },
+                Tooltip.create(Component.translatable("gui.herobrine_companion.llm_settings.computer_control_tooltip"))
         ));
 
         this.temperatureBox = this.createNumberBox(layout.temperatureBoxX(), layout.numberBoxY(), layout.numberBoxWidth(),
@@ -168,8 +181,9 @@ public class LLMSettingsScreen extends Screen {
         int toggleButtonY = editorHintY - 26;
         int toggleLabelY = toggleButtonY - 12;
         int editorHeight = Math.max(42, toggleLabelY - editorY - 8);
-        int toggleButtonWidth = Math.max(1, (contentWidth - CONTROL_GAP) / 2);
+        int toggleButtonWidth = Math.max(1, (contentWidth - CONTROL_GAP * 2) / 3);
         int commandButtonX = editorX + toggleButtonWidth + CONTROL_GAP;
+        int computerButtonX = commandButtonX + toggleButtonWidth + CONTROL_GAP;
         int numberBoxWidth = Math.max(1, (contentWidth - CONTROL_GAP * 2) / 3);
         int topPBoxX = editorX + numberBoxWidth + CONTROL_GAP;
         int maxOutputTokensBoxX = topPBoxX + numberBoxWidth + CONTROL_GAP;
@@ -178,22 +192,24 @@ public class LLMSettingsScreen extends Screen {
         int saveButtonX = startX + (panelWidth - actionGroupWidth) / 2;
         int backButtonX = saveButtonX + actionButtonWidth + CONTROL_GAP;
         return new Layout(startX, startY, panelWidth, panelHeight, editorX, editorY, contentWidth, editorHeight,
-                toggleLabelY, toggleButtonY, toggleButtonWidth, commandButtonX, editorHintY, numberLabelY, numberBoxY,
+                toggleLabelY, toggleButtonY, toggleButtonWidth, commandButtonX, computerButtonX, editorHintY, numberLabelY, numberBoxY,
                 numberBoxWidth, topPBoxX, maxOutputTokensBoxX, numericHintY, validationY, saveButtonX, backButtonX,
                 actionButtonY, actionButtonWidth);
     }
 
     private Component getStreamingButtonMessage() {
-        return Component.translatable("gui.herobrine_companion.llm_settings.streaming",
-                Component.translatable(this.streamingEnabled ? "options.on" : "options.off"));
+        return Component.translatable(this.streamingEnabled ? "options.on" : "options.off");
     }
 
     private Component getCommandModeButtonMessage() {
         String modeKey = this.commandMode == LLMConfig.CommandMode.EAGER
                 ? "gui.herobrine_companion.llm_settings.command_mode.eager"
                 : "gui.herobrine_companion.llm_settings.command_mode.normal";
-        return Component.translatable("gui.herobrine_companion.llm_settings.command_mode",
-                Component.translatable(modeKey));
+        return Component.translatable(modeKey);
+    }
+
+    private Component getComputerControlButtonMessage() {
+        return Component.translatable(this.computerControlEnabled ? "options.on" : "options.off");
     }
 
     private void updateSaveState() {
@@ -246,6 +262,7 @@ public class LLMSettingsScreen extends Screen {
     private void saveAndClose() {
         LLMConfig.aiSystemPrompt = this.systemPromptBox.getValue();
         LLMConfig.aiStreamingEnabled = this.streamingEnabled;
+        LLMConfig.aiComputerControlEnabled = this.computerControlEnabled;
         LLMConfig.aiCommandMode = this.commandMode == null ? LLMConfig.CommandMode.NORMAL : this.commandMode;
         LLMConfig.aiTemperature = Double.parseDouble(this.temperatureBox.getValue().trim());
         LLMConfig.aiTopP = Double.parseDouble(this.topPBox.getValue().trim());
@@ -295,6 +312,9 @@ public class LLMSettingsScreen extends Screen {
                 Component.translatable("gui.herobrine_companion.llm_settings.command_mode_label"),
                 layout.commandButtonX(), layout.toggleLabelY(), 0xFFFFFF, false);
         guiGraphics.drawString(this.font,
+                Component.translatable("gui.herobrine_companion.llm_settings.computer_control_label"),
+                layout.computerButtonX(), layout.toggleLabelY(), 0xFFFFFF, false);
+        guiGraphics.drawString(this.font,
                 Component.translatable("gui.herobrine_companion.llm_settings.temperature"),
                 layout.editorX(), layout.numberLabelY(), 0xFFFFFF, false);
         guiGraphics.drawString(this.font,
@@ -339,6 +359,7 @@ public class LLMSettingsScreen extends Screen {
             int toggleButtonY,
             int toggleButtonWidth,
             int commandButtonX,
+            int computerButtonX,
             int editorHintY,
             int numberLabelY,
             int numberBoxY,

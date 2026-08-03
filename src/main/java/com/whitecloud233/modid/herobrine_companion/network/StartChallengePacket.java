@@ -1,6 +1,6 @@
 package com.whitecloud233.modid.herobrine_companion.network;
 
-import com.whitecloud233.modid.herobrine_companion.client.fight.HeroChallengeManager;
+import com.whitecloud233.modid.herobrine_companion.fight.HeroChallengeManager;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerLevel;
@@ -31,7 +31,7 @@ public class StartChallengePacket {
 
     public void handle(Supplier<NetworkEvent.Context> contextSupplier) {
         NetworkEvent.Context context = contextSupplier.get();
-        context.enqueueWork(() -> {
+        PacketDispatch.enqueueServer(context, () -> {
             ServerPlayer player = context.getSender();
             if (player == null) return;
 
@@ -45,6 +45,5 @@ public class StartChallengePacket {
                 HeroChallengeManager.startChallenge(hero, player, this.challengeMode);
             }
         });
-        context.setPacketHandled(true);
     }
 }

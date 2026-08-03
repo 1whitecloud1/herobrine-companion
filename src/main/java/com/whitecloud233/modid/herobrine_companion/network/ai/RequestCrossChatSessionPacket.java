@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.network.ai;
 
 import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroCrossChatManager;
+import com.whitecloud233.modid.herobrine_companion.network.PacketDispatch;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
@@ -26,7 +27,7 @@ public class RequestCrossChatSessionPacket {
 
     public void handle(Supplier<NetworkEvent.Context> contextSupplier) {
         NetworkEvent.Context context = contextSupplier.get();
-        context.enqueueWork(() -> {
+        PacketDispatch.enqueueServer(context, () -> {
             ServerPlayer sender = context.getSender();
             if (sender == null || sender.server == null) {
                 return;
@@ -56,7 +57,6 @@ public class RequestCrossChatSessionPacket {
 
             HeroCrossChatManager.INSTANCE.requestSession(sender, target);
         });
-        context.setPacketHandled(true);
     }
 }
 

@@ -43,8 +43,9 @@ public class SavePosePacket {
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
         NetworkEvent.Context context = ctx.get();
-        context.enqueueWork(() -> {
-            if (context.getDirection().getReceptionSide().isServer()) {
+        if (PacketDispatch.isServer(context)) {
+            // 服务端:应用姿势、写全局备份,并回传给所有能看到实体的玩家
+            PacketDispatch.enqueueServer(context, () -> {
                 ServerPlayer sender = context.getSender();
                 if (sender != null && sender.level() != null) {
                     Entity entity = sender.level().getEntity(this.entityId);
@@ -55,11 +56,13 @@ public class SavePosePacket {
                         PacketHandler.sendToTracking(new SavePosePacket(this.entityId, this.isPosing, hero.customPoseAngles), hero);
                     }
                 }
-            } else {
-                NetworkClientBridge.applySavePose(this.entityId, this.isPosing, copyAngles(this.angles));
-            }
-        });
-        context.setPacketHandled(true);
+            });
+        } else {
+            // 客户端:把姿势数据应用到本地实体
+            PacketDispatch.assertClient(context);
+            context.enqueueWork(() -> NetworkClientBridge.applySavePose(this.entityId, this.isPosing, copyAngles(this.angles)));
+            context.setPacketHandled(true);
+        }
     }
 
     private static float[][] copyAngles(float[][] source) {

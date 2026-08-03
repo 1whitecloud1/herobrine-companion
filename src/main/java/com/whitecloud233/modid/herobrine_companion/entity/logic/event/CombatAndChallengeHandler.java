@@ -3,6 +3,7 @@ package com.whitecloud233.modid.herobrine_companion.entity.logic.event;
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.HeroDialogueHandler;
+import com.whitecloud233.modid.herobrine_companion.fight.HeroChallengeManager;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.monster.Monster;
@@ -36,7 +37,7 @@ public class CombatAndChallengeHandler {
         // 玩家死亡（挑战失败逻辑）
         if (event.getEntity() instanceof ServerPlayer deadPlayer) {
             if (deadPlayer.getPersistentData().getBoolean("IsChallengeActive")) {
-                com.whitecloud233.modid.herobrine_companion.client.fight.HeroChallengeManager.failChallenge(deadPlayer);
+                HeroChallengeManager.failChallenge(deadPlayer);
             }
         }
     }

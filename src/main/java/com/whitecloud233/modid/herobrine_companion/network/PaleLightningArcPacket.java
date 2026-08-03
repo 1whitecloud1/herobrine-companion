@@ -31,6 +31,7 @@ public class PaleLightningArcPacket {
 
     public void handle(Supplier<NetworkEvent.Context> contextSupplier) {
         NetworkEvent.Context context = contextSupplier.get();
+        PacketDispatch.assertClient(context);
         context.enqueueWork(() -> NetworkClientBridge.handlePaleLightningArc(this));
         context.setPacketHandled(true);
     }

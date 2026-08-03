@@ -1,11 +1,12 @@
-package com.whitecloud233.modid.herobrine_companion.client.fight;
+package com.whitecloud233.modid.herobrine_companion.fight;
 
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.HeroAI;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.HeroMoveControl;
-import com.whitecloud233.modid.herobrine_companion.client.fight.goal.HeroPhase1Goal;
+import com.whitecloud233.modid.herobrine_companion.fight.goal.HeroPhase1Goal;
 import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroDataHandler;
 import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroWorldData;
+import com.whitecloud233.modid.herobrine_companion.fight.network.SPacketStartCollapse;
 import com.whitecloud233.modid.herobrine_companion.util.EndRingContext;
 import com.whitecloud233.modid.herobrine_companion.world.structure.ModStructures;
 import net.minecraft.ChatFormatting;
@@ -126,6 +127,8 @@ public class HeroChallengeManager {
 
         hero.moveControl = new HeroMoveControl(hero);
 
+        hero.clearChallengeAfterimages();
+        hero.getPersistentData().putInt("ChallengeMode", challengeMode);
         float damageMultiplier = DIFFICULTY_DAMAGE_MULTIPLIER.getOrDefault(challengeMode, 1.0f);
         float maxHealth = DIFFICULTY_MAX_HEALTH.getOrDefault(challengeMode, 1000.0f);
 
@@ -160,6 +163,7 @@ public class HeroChallengeManager {
         hero.getEntityData().set(HeroEntity.CHALLENGE_TICKS, 0);
         hero.getPersistentData().putBoolean("IsChallengeActive", false);
         hero.getPersistentData().remove("ChallengePhaseTicks");
+        hero.clearChallengeAfterimages();
         // 【新增】：结束时清空假死标记
         hero.getPersistentData().remove("IsFakeOutPhase");
         hero.goalSelector.removeAllGoals(goal -> true);
@@ -316,6 +320,7 @@ public class HeroChallengeManager {
             activeHero.getEntityData().set(HeroEntity.IS_CHALLENGE_ACTIVE, false);
             activeHero.getEntityData().set(HeroEntity.CHALLENGE_TICKS, 0);
             activeHero.getPersistentData().putBoolean("IsChallengeActive", false);
+            activeHero.clearChallengeAfterimages();
 
             // 【核心修复】：在这里使用 activeHero 清除存档的进度！
             activeHero.getPersistentData().remove("ChallengePhaseTicks");
@@ -422,7 +427,7 @@ public class HeroChallengeManager {
                     // 【核心】使用你自己的 PacketHandler 发送崩坏数据包！
                     // 这会通知客户端开始黑屏和隐藏UI
                     com.whitecloud233.modid.herobrine_companion.network.PacketHandler.sendToPlayer(
-                            new com.whitecloud233.modid.herobrine_companion.client.fight.network.SPacketStartCollapse(),
+                            new SPacketStartCollapse(),
                             player
                     );
                 }

@@ -17,7 +17,9 @@ public class TriggerEternalOathPacket {
     }
 
     public void handle(Supplier<NetworkEvent.Context> context) {
-        context.get().enqueueWork(NetworkClientBridge::triggerEternalOath);
-        context.get().setPacketHandled(true);
+        NetworkEvent.Context ctx = context.get();
+        PacketDispatch.assertClient(ctx);
+        ctx.enqueueWork(NetworkClientBridge::triggerEternalOath);
+        ctx.setPacketHandled(true);
     }
 }
