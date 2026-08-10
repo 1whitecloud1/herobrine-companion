@@ -540,7 +540,8 @@ public final class HeroCombatPlanner {
             return false;
         }
 
-        if (hero.isFloating() || hero.getDeltaMovement().y >= 0.25D) {
+        // 起飞后的空中攻击允许浮空态触发（飞行追击中衔接空中连段），仅拦截快速上升以免打断爬升
+        if (hero.getDeltaMovement().y >= 0.25D) {
             return false;
         }
 

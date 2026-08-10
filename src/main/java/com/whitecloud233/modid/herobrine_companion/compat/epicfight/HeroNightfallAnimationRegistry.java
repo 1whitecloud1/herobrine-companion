@@ -48,12 +48,16 @@ final class HeroNightfallAnimationRegistry {
             return;
         }
 
+        // Hero 骨架（含爪/刺轮关节）的注册改在 FMLCommonSetupEvent（实体已注册后）进行，
+        // 见 HeroEpicFightBridge.onCommonSetup；这里只负责动画克隆
         event.newBuilder(HerobrineCompanion.MODID, HeroNightfallAnimationRegistry::buildHeroNightfallAnimations);
     }
 
     @Nullable
     static AnimationAccessor<? extends StaticAnimation> remap(@Nullable AnimationAccessor<? extends StaticAnimation> originalAccessor) {
-        if (AnimationManager.checkNull(originalAccessor)) {
+        if (originalAccessor == null || originalAccessor.isEmpty()) {
+            // 不调用 AnimationManager.checkNull：它对 null/empty 在 dev 下打印整段栈（刷屏），
+            // 且空 accessor 无需重映射，直接原样返回
             return originalAccessor;
         }
 
@@ -123,7 +127,22 @@ final class HeroNightfallAnimationRegistry {
         clone.setAccessor(cloneAccessor);
         copyProperties(original, clone);
         copyStateBlueprint(original, clone);
+        copyTotalTime(original, clone);
         return (T) clone;
+    }
+
+    /**
+     * 关键防御：克隆动画的 AnimationClip 是新建的空 clip，clipTime 默认为 0。
+     * 当 Hero 用 ConcurrentLinkAnimation 做动作/武器过渡时 {@code elapsed % totalTime} 得 NaN，
+     * 进而触发 {@code AnimationClip.getPoseInTime(NaN)} 的二分查找死循环（渲染线程卡死）。
+     * 从原动画继承有效 clipTime，避免 totalTime 为 0/NaN。
+     */
+    private static void copyTotalTime(StaticAnimation original, StaticAnimation clone) {
+        float clipTime = original.getTotalTime();
+        if (Float.isNaN(clipTime) || clipTime <= 0.0F) {
+            clipTime = 1.0F;
+        }
+        clone.setTotalTime(clipTime);
     }
 
     private static AttackAnimation.Phase[] clonePhases(AttackAnimation original, AssetAccessor<? extends Armature> heroArmature) {

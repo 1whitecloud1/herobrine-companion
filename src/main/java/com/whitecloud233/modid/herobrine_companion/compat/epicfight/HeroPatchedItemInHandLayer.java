@@ -2,6 +2,7 @@ package com.whitecloud233.modid.herobrine_companion.compat.epicfight;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
+import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import net.minecraft.client.model.EntityModel;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.layers.RenderLayer;
@@ -34,9 +35,27 @@ public class HeroPatchedItemInHandLayer<E extends LivingEntity, T extends Living
 
     private void renderItem(RenderEngine renderEngine, ItemStack stack, T entitypatch, InteractionHand hand, OpenMatrix4f[] poses, MultiBufferSource buffer, PoseStack poseStack, int packedLight, float partialTicks) {
         poseStack.pushPose();
-        applyHeroNightfallWeaponOffset(stack, hand, poseStack);
-        renderEngine.getItemRenderer(stack).renderItemInHand(stack, entitypatch, hand, poses, buffer, poseStack, packedLight, partialTicks);
-        poseStack.popPose();
+        try {
+            // 诊断（节流）：记录该物品用的渲染器类与 getArmature 结果，定位爪/轮模型分离。
+            // Avalon 物品应命中 com.merlin204.avalon...RenderAnimationItem（走 avalon$renderLayer），
+            // 若是默认 RenderItemBase 则武器以普通物品渲染、pose 对不上 → 分离。
+            ResourceLocation itemId = ForgeRegistries.ITEMS.getKey(stack.getItem());
+            if (itemId != null && "efn".equals(itemId.getNamespace())) {
+                HeroEntity hero = entitypatch.getOriginal() instanceof HeroEntity h ? h : null;
+                HeroEpicFightDebugLog.repeatedEvent(hero, "weaponRender", itemId.toString(),
+                        "renderer=" + renderEngine.getItemRenderer(stack).getClass().getName()
+                                + ",armatureJoints=" + (entitypatch.getArmature() != null ? entitypatch.getArmature().getJointNumber() : -1)
+                                + ",hand=" + hand);
+            }
+
+            applyHeroNightfallWeaponOffset(stack, hand, poseStack);
+            renderEngine.getItemRenderer(stack).renderItemInHand(stack, entitypatch, hand, poses, buffer, poseStack, packedLight, partialTicks);
+        } catch (RuntimeException exception) {
+            // 持有物渲染异常（例如某些模组物品/Geo 物品在怪物持有者身上缺上下文）不能拖垮渲染线程；
+            // 跳过该帧的持有物渲染即可，避免武器切换时卡死
+        } finally {
+            poseStack.popPose();
+        }
     }
 
     private void applyHeroNightfallWeaponOffset(ItemStack stack, InteractionHand hand, PoseStack poseStack) {

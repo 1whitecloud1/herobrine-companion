@@ -4,6 +4,8 @@ import com.mojang.datafixers.util.Pair;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.HeroCombatWeaponHelper;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.combat.HeroCombatPlanner;
+import com.whitecloud233.modid.herobrine_companion.entity.ai.combat.HeroCombatPursuit;
+import com.whitecloud233.modid.herobrine_companion.entity.ai.goal.HeroEpicFightChaseGoal;
 import com.whitecloud233.modid.herobrine_companion.item.PoemOfTheEndItem;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.LivingEntity;
@@ -17,6 +19,7 @@ import yesman.epicfight.api.animation.LivingMotions;
 import yesman.epicfight.api.asset.AssetAccessor;
 import yesman.epicfight.api.client.animation.ClientAnimator;
 import yesman.epicfight.api.animation.types.StaticAnimation;
+import yesman.epicfight.api.model.Armature;
 import yesman.epicfight.gameasset.Animations;
 import yesman.epicfight.network.EpicFightNetworkManager;
 import yesman.epicfight.network.server.SPChangeLivingMotion;
@@ -27,7 +30,6 @@ import yesman.epicfight.world.capabilities.entitypatch.Factions;
 import yesman.epicfight.world.capabilities.entitypatch.HumanoidMobPatch;
 import yesman.epicfight.world.entity.ai.goal.AnimatedAttackGoal;
 import yesman.epicfight.world.entity.ai.goal.CombatBehaviors;
-import yesman.epicfight.world.entity.ai.goal.TargetChasingGoal;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.ItemStack;
@@ -46,6 +48,8 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
     private String lastWeaponProfileKey = "";
     private Goal heroAttackGoal;
     private Goal heroChasingGoal;
+    /** 追击/近战的攻击半径，供飞行追击落地收尾判断使用 */
+    private double currentChaseAttackRadius;
 
     public HeroEpicFightPatch() {
         super(Factions.NEUTRAL);
@@ -130,6 +134,12 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
         super.serverTick(event);
         HeroCombatPlanner.tickEpicFightActionClock(hero);
         HeroNightfallMovesets.tickSkillEffects(this, hero);
+        // 飞行追击收尾：目标已消失 / 已能贴地命中时，让悬停的 Hero 落回地面，避免永久悬空。
+        // 仅浮空态才走反射查询 isHeroMidAttack，避免每 tick 无谓开销。
+        if (hero != null && hero.isFloating()) {
+            HeroCombatPursuit.landHeroIfCombatIdle(hero, hero.getTarget(), this.currentChaseAttackRadius,
+                    HeroEpicFightCompat.isHeroMidAttack(hero));
+        }
         this.logTickState("HeroEpicFightPatch.serverTick");
     }
 
@@ -146,6 +156,13 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
                 + ",state=" + this.debugPatchState(hero));
 
         this.infantryAiConfigured = false;
+
+        // 主手武器变化时强制清空上一把武器的战斗状态机（尤其赤月的 HEAVY_HOLD/RELEASE 两段态、
+        // 缓冲动作与连段计数），避免上一把武器的姿态泄漏到新武器上引发异常行为/卡顿
+        if (hand == InteractionHand.MAIN_HAND && !ItemStack.matches(from, to)) {
+            hero.resetBattleCombatState();
+        }
+
         if (!hero.isBattleModeActive()) {
             this.removeHeroCombatGoals();
             this.resetActionAnimator();
@@ -324,10 +341,9 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
             if (attackRadius <= 0.0D) {
                 attackRadius = this.getPlayerLikeChaseRadius(HeroEpicFightWeaponProfiles.resolveCapability(hero));
             }
+            this.currentChaseAttackRadius = attackRadius;
             this.heroAttackGoal = new AnimatedAttackGoal<>(this, builder.build(this));
-            this.heroChasingGoal = attackRadius > 0.0D
-                    ? new TargetChasingGoal(this, hero, 1.0D, true, attackRadius)
-                    : new TargetChasingGoal(this, hero, 1.0D, true);
+            this.heroChasingGoal = new HeroEpicFightChaseGoal(hero, 1.0D, attackRadius);
             hero.goalSelector.addGoal(0, this.heroAttackGoal);
             hero.goalSelector.addGoal(1, this.heroChasingGoal);
         }
@@ -348,7 +364,9 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
             return;
         }
 
-        if (hero.isFloating() && !hero.isBattleModeActive()) {
+        // 战斗模式新增了飞行追击（HeroCombatPursuit），浮空时同样走 FLY/FLOAT 动作，
+        // 避免 Hero 在空中仍摆出地面奔跑姿态。
+        if (hero.isFloating()) {
             this.currentLivingMotion = hero.getDeltaMovement().lengthSqr() > 0.01D ? LivingMotions.FLY : LivingMotions.FLOAT;
             this.currentCompositeMotion = this.resolveCompositeMotion(hero, this.currentLivingMotion);
             return;
@@ -846,7 +864,8 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
         LivingEntity target = this.getTrackedTarget(hero);
         HeroCombatPlanner.CombatTuning tuning = this.getPlayerLikeCombatTuning(HeroEpicFightWeaponProfiles.resolveCapability(hero));
         return !hero.onGround()
-                && !hero.isFloating()
+                // 飞行追击悬停时同样允许空中连段（浮空态不再拦截）；
+                // HeroCombatPlanner.canStartAirAttack 已放行悬停、仅拦截快速爬升
                 && hero.getDeltaMovement().y < 0.08D
                 && HeroCombatPlanner.canStartAirAttack(hero, target, this.resolveAirAttackMaxDistance(hero), 5)
                 && HeroCombatPlanner.prefersAction(hero, target, tuning, HeroCombatPlanner.PlannedAction.AIR);

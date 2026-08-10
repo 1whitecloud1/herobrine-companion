@@ -17,7 +17,10 @@
     "MobSubmissionMixin",
     "AwakenedMobMixin",
     "LevelMixin",
-    "epicfight.JsonAssetLoaderMixin"
+    "epicfight.JsonAssetLoaderMixin",
+    "epicfight.AnimationClipMixin",
+    "epicfight.RenderAnimationItemMixin",
+    "epicfight.EffekUnitsVfxMixin"
   ],
   "client": [
   ],

@@ -4,6 +4,7 @@ import com.whitecloud233.modid.herobrine_companion.compat.epicfight.HeroEpicFigh
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.HeroCombatWeaponHelper;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.combat.HeroCombatPlanner;
+import com.whitecloud233.modid.herobrine_companion.entity.ai.combat.HeroCombatPursuit;
 import com.whitecloud233.modid.herobrine_companion.item.PoemOfTheEndItem;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.InteractionHand;
@@ -14,6 +15,7 @@ import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.Comparator;
@@ -33,6 +35,10 @@ public class HeroBattleStanceGoal extends Goal {
     private int comboGraceTicks;
     private int queuedAttackAction;
     private boolean hitApplied;
+    // 追击寻路状态：地面寻路失败计数 / 是否飞行追击 / 落地后的防反复起飞冷却
+    private int groundPathFailures;
+    private boolean flyingPursuit;
+    private int landCooldown;
 
     public HeroBattleStanceGoal(HeroEntity hero) {
         this.hero = hero;
@@ -56,6 +62,9 @@ public class HeroBattleStanceGoal extends Goal {
         this.comboGraceTicks = 0;
         this.queuedAttackAction = HeroEntity.BATTLE_ACTION_IDLE;
         this.hitApplied = false;
+        this.groundPathFailures = 0;
+        this.flyingPursuit = false;
+        this.landCooldown = 0;
         this.hero.setFloating(false);
         this.hero.setNoGravity(false);
         this.hero.setAggressive(true);
@@ -72,6 +81,13 @@ public class HeroBattleStanceGoal extends Goal {
         this.attackRecoveryTicks = 0;
         this.comboGraceTicks = 0;
         this.queuedAttackAction = HeroEntity.BATTLE_ACTION_IDLE;
+        if (this.flyingPursuit || this.hero.isFloating()) {
+            HeroCombatPursuit.land(this.hero);
+        }
+        this.hero.setSprinting(false);
+        this.flyingPursuit = false;
+        this.groundPathFailures = 0;
+        this.landCooldown = 0;
         this.hero.setAggressive(false);
         this.hero.resetBattleCombatState();
     }
@@ -139,7 +155,14 @@ public class HeroBattleStanceGoal extends Goal {
                 startNextAttackAction(this.resolveOpeningAttackAction());
             }
         } else {
-            moveTowardsTarget(MOVE_SPEED);
+            if (this.flyingPursuit) {
+                this.tickBattleFlight(this.target, Math.sqrt(this.getAttackReachSqr(this.target)));
+            } else if (this.shouldEnterBattleFlight()) {
+                this.enterBattleFlight();
+            } else {
+                // 远离目标时冲刺，贴近时正常移速
+                moveTowardsTarget(HeroCombatPursuit.chaseSpeed(this.hero, this.target));
+            }
         }
     }
 
@@ -165,6 +188,7 @@ public class HeroBattleStanceGoal extends Goal {
         this.hero.setBattleComboStep(normalizedAction == HeroEntity.BATTLE_ACTION_LIGHT_COMBO_2 ? 2 : 1);
         this.hero.beginBattleAction(normalizedAction);
         this.hero.swing(InteractionHand.MAIN_HAND);
+        this.hero.setSprinting(false);
         this.queuedAttackAction = HeroEntity.BATTLE_ACTION_IDLE;
         this.comboGraceTicks = 0;
         this.hitApplied = false;
@@ -271,9 +295,47 @@ public class HeroBattleStanceGoal extends Goal {
         this.hero.setBattleActionState(HeroEntity.BATTLE_ACTION_APPROACH);
         this.hero.setBattleActionTicks(0);
         boolean pathStarted = this.hero.getNavigation().moveTo(this.target, speed);
-        if (!pathStarted) {
+        if (pathStarted) {
+            this.groundPathFailures = 0;
+        } else {
+            this.groundPathFailures++;
             this.hero.getMoveControl().setWantedPosition(this.target.getX(), this.target.getY(), this.target.getZ(), speed);
         }
+    }
+
+    // ==================== 飞行追击回退 ====================
+
+    private boolean shouldEnterBattleFlight() {
+        boolean targetHigh = HeroCombatPursuit.isTargetHighAbove(this.hero, this.target);
+        boolean inFluid = HeroCombatPursuit.isHeroInFluid(this.hero);
+        // 目标高位或身处流体立即起飞；地面寻路失败则尊重落地冷却，避免反复横跳
+        return HeroCombatPursuit.shouldTakeFlight(this.hero, this.target, this.groundPathFailures)
+                && (targetHigh || inFluid || this.landCooldown <= 0);
+    }
+
+    private void enterBattleFlight() {
+        this.flyingPursuit = true;
+        this.groundPathFailures = 0;
+        HeroCombatPursuit.startFlight(this.hero);
+    }
+
+    private void tickBattleFlight(LivingEntity target, double attackRadius) {
+        if (HeroCombatPursuit.shouldLand(this.hero, target, attackRadius)) {
+            HeroCombatPursuit.land(this.hero);
+            this.flyingPursuit = false;
+            this.landCooldown = 60;
+            this.groundPathFailures = 0;
+            return;
+        }
+
+        if (!this.hero.isFloating()) {
+            // 浮空被外部重置（如入水、传送），回落到地面追击状态
+            this.flyingPursuit = false;
+            return;
+        }
+
+        Vec3 flyTarget = HeroCombatPursuit.flightTarget(this.hero, target, attackRadius);
+        HeroCombatPursuit.flyTo(this.hero, flyTarget, HeroCombatPursuit.FLY_SPEED);
     }
 
     private LivingEntity findNearestHostile() {

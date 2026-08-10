@@ -274,22 +274,26 @@ dependencies {
     compileOnly fg.deobf("curse.maven:farmers-delight-398521:8083474")
     runtimeOnly fg.deobf("curse.maven:farmers-delight-398521:8083474")
 
-    compileOnly fg.deobf("curse.maven:delighto-flight-1347014:8012633")
-    runtimeOnly fg.deobf("curse.maven:delighto-flight-1347014:8012633")
+   // compileOnly fg.deobf("curse.maven:delighto-flight-1347014:8012633")
+  //  runtimeOnly fg.deobf("curse.maven:delighto-flight-1347014:8012633")
    // https://www.curseforge.com/minecraft/mc-mods/delighto-flight/download/8012633
     // https://www.curseforge.com/minecraft/mc-mods/farmers-delight/download/8083474
    // compileOnly fg.deobf("curse.maven:kaleidoscope-end-1456076:7987176")
    // runtimeOnly fg.deobf("curse.maven:kaleidoscope-end-1456076:7987176")
     //https://www.curseforge.com/minecraft/mc-mods/kaleidoscope-end/download/7987176
 
- //   compileOnly fg.deobf("com.whitecloud233.localmods:epic-fight-invincible-lib:20.14.8.2-mc1.20.1-forge")
- // runtimeOnly fg.deobf("com.whitecloud233.localmods:epic-fight-invincible-lib:20.14.8.2-mc1.20.1-forge")
+  compileOnly fg.deobf("com.whitecloud233.localmods:epic-fight-invincible-lib:20.14.8.2-mc1.20.1-forge")
+  runtimeOnly fg.deobf("com.whitecloud233.localmods:epic-fight-invincible-lib:20.14.8.2-mc1.20.1-forge")
 
-  // compileOnly fg.deobf("curse.maven:epic-fight-avalon-1268823:7619938")
-  // runtimeOnly fg.deobf("curse.maven:epic-fight-avalon-1268823:7619938")
+   compileOnly fg.deobf("curse.maven:epic-fight-avalon-1268823:7619938")
+   runtimeOnly fg.deobf("curse.maven:epic-fight-avalon-1268823:7619938")
 
     //if (enableEpicFightCompat.get()) {
-      //  epicfightCompatRuntimeOnly fg.deobf("curse.maven:epicfight-nightfall-1307848:8082392")
+      //  epicfightCompatRuntimeOnly fg.deobf("curse.maven:epicfight-nightfall-1307848:8366962")
+
+    compileOnly fg.deobf("curse.maven:epicfight-nightfall-1307848:8366962")
+    runtimeOnly fg.deobf("curse.maven:epicfight-nightfall-1307848:8366962")
+
     compileOnly fg.deobf("curse.maven:epic-fight-mod-405076:8049910")
     runtimeOnly fg.deobf("curse.maven:epic-fight-mod-405076:8049910")
 

@@ -3,6 +3,7 @@ package com.whitecloud233.modid.herobrine_companion.entity;
 import com.whitecloud233.modid.herobrine_companion.compat.epicfight.HeroEpicFightDebugLog;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.HeroMoveControl;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.HeroAI;
+import com.whitecloud233.modid.herobrine_companion.entity.ai.combat.HeroCombatPursuit;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.goal.HeroGodlyCompanionGoal;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.HeroBrain;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.SimpleNeuralNetwork;
@@ -121,7 +122,6 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     public float clientImportedWalkTicksO;
     public boolean clientSideSetupDone = false;
     public int patrolTimer = 2400;
-    public MoveControl moveControl;
     private int outOfWaterTimer = 0;
     private long lastSummonedTime = 0;
     private boolean isLoadedFromDisk = false;
@@ -142,6 +142,7 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     @Nullable private Player tradingPlayer;
     private final HeroTradeHandler tradeHandler = new HeroTradeHandler();
     private final HeroBrain brain;
+    private final com.whitecloud233.modid.herobrine_companion.entity.ai.agent.HeroAgent agent;
     private final FlyingPathNavigation flyingNavigation;
     private final GroundPathNavigation groundNavigation;
 
@@ -163,6 +164,7 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         this.setPersistenceRequired();
         this.moveControl = new HeroMoveControl(this);
         this.brain = new HeroBrain(this);
+        this.agent = new com.whitecloud233.modid.herobrine_companion.entity.ai.agent.HeroAgent();
         this.flyingNavigation = this.navigation instanceof FlyingPathNavigation flying ? flying : new FlyingPathNavigation(this, level);
         this.groundNavigation = new GroundPathNavigation(this, level);
         this.groundNavigation.setCanFloat(false);
@@ -279,6 +281,8 @@ public class HeroEntity extends PathfinderMob implements Merchant {
                 HeroLogic.tick(this);
                 if (this.isAlive()) {
                     this.brain.tick();
+                    this.agent.tick(this);
+                    this.agent.tickTasks(this);
                     if (this.getMindState() != this.brain.getState()) this.setMindState(this.brain.getState());
 
                     if (this.level() instanceof ServerLevel serverLevel) {
@@ -317,11 +321,19 @@ public class HeroEntity extends PathfinderMob implements Merchant {
             }
             boolean inIntro = level().dimension() == ModStructures.END_RING_DIMENSION_KEY && getTags().contains("hero_intro_sequence");
             if (!inIntro) {
-                if (this.isInWater()) {
+                if (this.isInWater() || this.isInLava()) {
                     this.outOfWaterTimer = 40;
                     if (!this.isFloating()) this.setFloating(true);
                     if (!this.isNoGravity()) this.setNoGravity(true);
                     if (this.getDeltaMovement().y < 0.1) this.setDeltaMovement(this.getDeltaMovement().add(0, 0.05, 0));
+                    // 【战斗模式飞行修复】身处流体时主动飞出液面悬停，而不是只靠浮力泡在水面。
+                    // 有可追击目标时由 HeroCombatPursuit 飞行追击接管；无目标时兜底脱困。
+                    if (this.isBattleModeActive()) {
+                        LivingEntity fluidTarget = this.getTarget();
+                        if (fluidTarget == null || !fluidTarget.isAlive() || fluidTarget.isRemoved()) {
+                            HeroCombatPursuit.hoverAboveFluid(this);
+                        }
+                    }
                 } else if (this.outOfWaterTimer > 0) {
                     this.outOfWaterTimer--;
                     if (!this.isFloating()) this.setFloating(true);
@@ -623,6 +635,8 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         }
         // 👇 [新增] 保存姿势编辑器数据
         HeroDataHandler.savePoseData(this, compound);
+        // 👇 [新增] 保存 Agent 任务队列（断线 / 重进恢复）
+        this.agent.saveTasks(compound);
     }
 
     @Override
@@ -657,6 +671,8 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         if (ownerUUID != null) setOwnerUUID(ownerUUID);
         // 👇 [新增] 读取姿势编辑器数据
         HeroDataHandler.loadPoseData(this, compound);
+        // 👇 [新增] 恢复 Agent 任务队列
+        this.agent.loadTasks(compound);
     }
 
     // 委托装备与NBT处理
@@ -903,8 +919,17 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     public void setLastSummonedTime(long time) { this.lastSummonedTime = time; }
     public long getLastSummonedTime() { return this.lastSummonedTime; }
     public GoalSelector getGoalSelector() { return this.goalSelector; }
+
+    /**
+     * 替换实际参与 {@code Mob.aiStep} 的 MoveControl（继承自 {@code Mob.moveControl}）。
+     * <p><b>关键</b>：切勿在子类里重声明同名字段去"覆盖"它——Java 字段是隐藏而非重写，
+     * {@code Mob.aiStep()} 直接访问 {@code this.moveControl}（Mob 的字段），重声明的字段永远不会被 tick。
+     * 需要替换移动控制时一律走本方法。</p>
+     */
+    public void setMoveControl(MoveControl control) { this.moveControl = control; }
     public void setFallDistance(float distance) { this.fallDistance = distance; }
     public HeroBrain getHeroBrain() { return this.brain; }
+    public com.whitecloud233.modid.herobrine_companion.entity.ai.agent.HeroAgent getHeroAgent() { return this.agent; }
 
     public void addChallengeAfterimage(HeroAfterimage afterimage) {
         if (!this.level().isClientSide) {

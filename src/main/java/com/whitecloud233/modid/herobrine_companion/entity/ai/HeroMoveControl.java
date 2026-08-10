@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.entity.ai;
 
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.modid.herobrine_companion.entity.ai.combat.HeroCombatPursuit;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.goal.HeroGodlyCompanionGoal;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.ai.control.MoveControl;
@@ -16,7 +17,9 @@ public class HeroMoveControl extends MoveControl {
 
     @Override
     public void tick() {
-        if (HeroGodlyCompanionGoal.isOwnerWithinStayStillRadius(this.hero)) {
+        // 战斗模式必须覆盖陪伴"贴近主人就原地不动"的行为：否则战斗+陪伴同时开启、
+        // 玩家站在 Hero 2 格内时整段移动被冻结，飞行追击也飞不起来
+        if (!this.hero.isBattleModeActive() && HeroGodlyCompanionGoal.isOwnerWithinStayStillRadius(this.hero)) {
             this.operation = Operation.WAIT;
             this.hero.getNavigation().stop();
             this.hero.setDeltaMovement(0.0D, this.hero.getDeltaMovement().y, 0.0D);
@@ -29,8 +32,10 @@ public class HeroMoveControl extends MoveControl {
         }
 
         if (this.operation == Operation.MOVE_TO) {
-            Vec3 targetVec = new Vec3(this.wantedX - this.hero.getX(), this.wantedY - this.hero.getY(), this.wantedZ - this.hero.getZ());
-            double distSq = targetVec.lengthSqr();
+            double dx = this.wantedX - this.hero.getX();
+            double dy = this.wantedY - this.hero.getY();
+            double dz = this.wantedZ - this.hero.getZ();
+            double distSq = dx * dx + dy * dy + dz * dz;
 
             // 1. 极近点平滑刹车，消除抖动
             if (distSq < 0.5D) {
@@ -50,11 +55,29 @@ public class HeroMoveControl extends MoveControl {
                 actualSpeed = Math.sqrt(distSq);
             }
 
-            Vec3 desiredVelocity = targetVec.normalize().scale(actualSpeed);
+            // 【战斗飞行核心修复】战斗态垂直爬升独立推进，不再被远距水平分量稀释：
+            // 目标在高处 / 越水面时，Hero 以固定爬升速率真正"飞起来"，而不是贴着水面 /
+            // 崖底悬停横移；到达目标高度后进入垂直收尾带线性刹车，悬停等待空中连段。
+            Vec3 desiredVelocity;
+            if (this.hero.isBattleModeActive()) {
+                double horizDistSq = dx * dx + dz * dz;
+                double horizDist = Math.sqrt(horizDistSq);
+                double hSpeed = this.speedModifier * 0.9D;
+                if (horizDistSq > 16.0D) hSpeed *= 1.5D;
+                if (horizDistSq < hSpeed * hSpeed) hSpeed = Math.sqrt(horizDistSq);
+                double vSpeed = Mth.clamp(dy, -HeroCombatPursuit.FLY_DESCENT_SPEED, HeroCombatPursuit.FLY_CLIMB_SPEED);
+                if (Math.abs(dy) < HeroCombatPursuit.FLY_VERTICAL_EASE) vSpeed = dy;
+                desiredVelocity = horizDist > 1.0E-4D
+                        ? new Vec3(dx / horizDist * hSpeed, vSpeed, dz / horizDist * hSpeed)
+                        : new Vec3(0.0D, vSpeed, 0.0D);
+            } else {
+                desiredVelocity = new Vec3(dx, dy, dz).normalize().scale(actualSpeed);
+            }
 
             // 4. 【核心动力注入】
-            // 抛弃迟缓的 Lerp！直接赋予期望速度，并乘以 1.1 的系数，强行抵消原版引擎的空气阻力扣减
-            double comp = this.hero.isCompanionMode() ? 1.35D : 1.8D;
+            // 抛弃迟缓的 Lerp！直接赋予期望速度，并乘以补偿系数，强行抵消原版引擎的空气阻力扣减。
+            // 战斗模式新增了飞行追击（HeroCombatPursuit），需要更可控的悬停速度，因此战斗态不再放大。
+            double comp = this.hero.isBattleModeActive() ? 1.0D : (this.hero.isCompanionMode() ? 1.35D : 1.8D);
             double newX = desiredVelocity.x * comp;
             double newY = desiredVelocity.y * comp;
             double newZ = desiredVelocity.z * comp;

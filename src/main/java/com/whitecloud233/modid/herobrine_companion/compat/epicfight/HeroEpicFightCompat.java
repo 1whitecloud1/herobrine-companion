@@ -188,6 +188,40 @@ public final class HeroEpicFightCompat {
                 && !hero.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE);
     }
 
+    /**
+     * Hero 是否正处在 Epic Fight 攻击/动作状态。
+     * 飞行追击（HeroEpicFightChaseGoal）据此在悬停时让出空中连段窗口、不落地打断。
+     */
+    public static boolean isHeroMidAttack(HeroEntity hero) {
+        if (!isRuntimeBridgeReady() || hero == null) {
+            return false;
+        }
+        try {
+            Object result = invokeStatic(BRIDGE_CLASS, "isHeroMidAttack", new Class<?>[]{HeroEntity.class}, hero);
+            return result instanceof Boolean midAttack && midAttack;
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            return false;
+        }
+    }
+
+    /**
+     * 让 Hero 立即施放一个夜幕技能（agent 工具 {@code hero_use_skill} 的门面）。
+     * 返回 {@code "OK|…"} / {@code "FAIL|…"}；桥未就绪或调用异常返回 {@code null}。
+     * 本类只反射调用 bridge，不直接触碰任何 EpicFight 类。
+     */
+    public static String triggerSkill(HeroEntity hero, String skillName) {
+        if (!isRuntimeBridgeReady() || hero == null) {
+            return null;
+        }
+        try {
+            Object result = invokeStatic(BRIDGE_CLASS, "triggerSkill",
+                    new Class<?>[]{HeroEntity.class, String.class}, hero, skillName);
+            return result instanceof String message ? message : null;
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            return null;
+        }
+    }
+
     public static boolean shouldUseEpicFightHeldItemLayer(HeroEntity hero) {
         return isRuntimeBridgeReady()
                 && hero != null
