@@ -46,7 +46,7 @@ public class HeroChallengeManager {
         ServerLevel endRingLevel = server.getLevel(ModStructures.END_RING_DIMENSION_KEY);
 
         if (endRingLevel == null) {
-            player.sendSystemMessage(Component.literal("§c[系统] 无法连接到试炼维度，挑战失败！"));
+            player.sendSystemMessage(Component.translatable("message.herobrine_companion.challenge.dimension_unreachable"));
             return;
         }
 
@@ -58,7 +58,7 @@ public class HeroChallengeManager {
             ServerPlayer challenger = server.getPlayerList().getPlayer(currentChallenger);
             // 如果锁定的玩家在线，且真的在挑战中，则拦截当前玩家
             if (challenger != null && challenger.getPersistentData().getBoolean("IsChallengeActive")) {
-                player.sendSystemMessage(Component.literal("§c[系统] 试炼场地已被玩家 §e" + challenger.getName().getString() + " §c占用，请稍后再试！"));
+                player.sendSystemMessage(Component.translatable("message.herobrine_companion.challenge.occupied", challenger.getName()));
                 return;
             } else {
                 // 如果锁定的玩家已经离线或者状态异常，说明是死锁，强行解开
@@ -125,7 +125,7 @@ public class HeroChallengeManager {
         hero.setTarget(null);
         hero.getNavigation().stop();
 
-        hero.moveControl = new HeroMoveControl(hero);
+        hero.setMoveControl(new HeroMoveControl(hero));
 
         hero.clearChallengeAfterimages();
         hero.getPersistentData().putInt("ChallengeMode", challengeMode);
@@ -144,7 +144,7 @@ public class HeroChallengeManager {
         hero.goalSelector.addGoal(1, new HeroPhase1Goal(hero));
 
         if (target != null) {
-            target.sendSystemMessage(Component.literal("§c[系统] 试炼已启动，目标锁定！").withStyle(ChatFormatting.BOLD));
+            target.sendSystemMessage(Component.translatable("message.herobrine_companion.challenge.started").withStyle(ChatFormatting.BOLD));
             // 缓慢下落防止网络延迟时掉虚空
             target.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.SLOW_FALLING, 100, 0, false, false));
 
@@ -171,7 +171,7 @@ public class HeroChallengeManager {
         hero.setTarget(null);
         hero.getNavigation().stop();
 
-        hero.moveControl = new HeroMoveControl(hero);
+        hero.setMoveControl(new HeroMoveControl(hero));
         HeroAI.registerGoals(hero);
 
         hero.getAttribute(Attributes.MAX_HEALTH).setBaseValue(20.0D);
@@ -270,7 +270,7 @@ public class HeroChallengeManager {
                     newHero.goalSelector.removeAllGoals(goal -> true);
                     newHero.targetSelector.removeAllGoals(goal -> true);
                     newHero.setTarget(null);
-                    newHero.moveControl = new HeroMoveControl(newHero);
+                    newHero.setMoveControl(new HeroMoveControl(newHero));
                     HeroAI.registerGoals(newHero);
                 }
 

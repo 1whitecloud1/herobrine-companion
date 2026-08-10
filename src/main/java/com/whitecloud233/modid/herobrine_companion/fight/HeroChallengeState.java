@@ -105,7 +105,7 @@ public class HeroChallengeState {
         hero.setDeltaMovement(0, hero.getDeltaMovement().y, 0);
 
         if (!(hero.getMoveControl() instanceof ChallengeMoveControl)) {
-            hero.moveControl = new ChallengeMoveControl(hero);
+            hero.setMoveControl(new ChallengeMoveControl(hero));
         }
 
         if (hero.level() instanceof ServerLevel serverLevel) {
@@ -145,7 +145,7 @@ public class HeroChallengeState {
             hero.targetSelector.removeAllGoals(goal -> true);
             hero.setTarget(null);
             hero.getNavigation().stop();
-            hero.moveControl = new ChallengeMoveControl(hero);
+            hero.setMoveControl(new ChallengeMoveControl(hero));
             hero.goalSelector.addGoal(1, new HeroPhase1Goal(hero));
         }
     }

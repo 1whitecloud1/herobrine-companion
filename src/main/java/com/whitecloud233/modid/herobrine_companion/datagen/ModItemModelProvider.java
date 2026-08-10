@@ -31,8 +31,8 @@ public class ModItemModelProvider extends ItemModelProvider {
         simpleItem(ModItems.AWAKENED_VESSEL);
         simpleItem(ModItems.SOUL_BOUND_PACT);
         simpleItem(ModItems.TRANSCENDENCE_PERMIT);
-        withExistingParent(ModItems.POEM_OF_THE_END.getId().getPath(),
-                new ResourceLocation(HerobrineCompanion.MODID, "item/poem_of_the_end_base"));
+        // 终末之诗：模型为手写的自定义 Bedrock 几何加载器（见 src/main/resources/models/item/poem_of_the_end.json），
+        // 不再用 datagen 生成，避免覆盖手写 loader 字段。
         simpleItem(ModItems.LORE_FRAGMENT);
         simpleItem(ModItems.LORE_HANDBOOK);
         simpleItem(ModItems.TAB_ICON);
