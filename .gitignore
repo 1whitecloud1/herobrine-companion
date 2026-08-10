@@ -60,3 +60,9 @@ hs_err_pid*
 /.gradle-home-verify/
 /.java-tmp/
 /docs/
+/sync-neoforge-apikey-settings.ps1
+/src/main/java/com/whitecloud233/modid/herobrine_companion/client/render/VoidRiftDistortionHandler.java
+/src/main/java/com/whitecloud233/modid/herobrine_companion/event/VoidRiftOnHurtHandler.java
+/src/main/resources/assets/herobrine_companion/shaders/core/void_rift_distortion.vsh
+/src/main/resources/assets/herobrine_companion/shaders/core/void_rift_distortion.json
+/src/main/resources/assets/herobrine_companion/shaders/core/void_rift_distortion.fsh

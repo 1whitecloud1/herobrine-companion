@@ -5,21 +5,15 @@ import com.whitecloud233.modid.herobrine_companion.entity.GhostSkeletonEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.GhostZombieEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.event.HeroQuestHandler;
-import com.whitecloud233.modid.herobrine_companion.world.structure.UnstableZoneRuntime;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LightningBolt;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.level.block.state.BlockState;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public class HeroFixAnomalyGoal extends Goal {
@@ -94,34 +88,7 @@ public class HeroFixAnomalyGoal extends Goal {
     }
 
     private BlockPos findGlitchBlock() {
-        BlockPos heroPos = this.hero.blockPosition();
-        // [修改] 扩大扫描范围，特别是 Y 轴
-        // 原来: 16x16x8 (x: -32~32, y: -8~8, z: -32~32)
-        // 现在: 32x32x32 (x: -32~32, y: -32~32, z: -32~32)
-        for (int x = -32; x <= 32; x++) {
-            for (int y = -32; y <= 32; y++) { // Y轴范围扩大到上下32格
-                for (int z = -32; z <= 32; z++) {
-                    BlockPos p = heroPos.offset(x, y, z);
-                    BlockState state = this.hero.level().getBlockState(p);
-
-                    if (this.hero.level() instanceof ServerLevel serverLevel) {
-                        if (isGlitchBlock(serverLevel, p, state)) {
-                            return p;
-                        }
-                    }
-                }
-            }
-        }
-        return null;
-    }
-
-    private boolean isGlitchBlock(ServerLevel level, BlockPos pos, BlockState state) {
-        return UnstableZoneRuntime.isTrackedAnomalyBlock(level, pos, state);
-    }
-
-    // [新增] 检查方块是否在 Unstable Zone 结构范围内
-    private boolean isInUnstableZone(ServerLevel level, BlockPos pos) {
-        return UnstableZoneRuntime.isInUnstableZone(level, pos);
+        return HeroAnomalySupport.findGlitchBlock(this.hero);
     }
 
     @Override
@@ -171,53 +138,7 @@ public class HeroFixAnomalyGoal extends Goal {
     }
 
     private void performAreaCleanse(BlockPos center) {
-        if (!(this.hero.level() instanceof ServerLevel serverLevel)) return;
-
-        serverLevel.playSound(null, center, SoundEvents.WITHER_DEATH, SoundSource.HOSTILE, 0.5F, 1.5F);
-
-        int radius = 8; // 扩大范围
-        for (int i = 0; i < 10; i++) { // 召唤10道雷电
-            int x = center.getX() + this.hero.getRandom().nextInt(radius * 2) - radius;
-            int z = center.getZ() + this.hero.getRandom().nextInt(radius * 2) - radius;
-            int y = serverLevel.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, x, z);
-
-            LightningBolt lightning = EntityType.LIGHTNING_BOLT.create(serverLevel);
-            if (lightning != null) {
-                lightning.moveTo(x, y, z);
-                lightning.setVisualOnly(true); // [修复] 设置为仅视觉效果，防止产生火焰和伤害
-                serverLevel.addFreshEntity(lightning);
-            }
-        }
-
-        // 延迟一小段时间后清除方块，让雷电效果更明显
-        serverLevel.getServer().tell(new net.minecraft.server.TickTask(serverLevel.getServer().getTickCount() + 5, () -> {
-            List<BlockPos> removedBlocks = new ArrayList<>();
-            for (int x = -radius; x <= radius; x++) {
-                for (int y = -radius; y <= radius; y++) {
-                    for (int z = -radius; z <= radius; z++) {
-                        BlockPos p = center.offset(x, y, z);
-                        BlockState state = serverLevel.getBlockState(p);
-
-                        if (isGlitchBlock(serverLevel, p, state)) {
-                            if (isInUnstableZone(serverLevel, p)) {
-                                serverLevel.destroyBlock(p, false);
-                                removedBlocks.add(p.immutable());
-                                serverLevel.sendParticles(ParticleTypes.LARGE_SMOKE, p.getX() + 0.5, p.getY() + 0.5, p.getZ() + 0.5, 5, 0.5, 0.5, 0.5, 0.05);
-                            }
-                        }
-                    }
-                }
-            }
-            UnstableZoneRuntime.removeTrackedBlocks(serverLevel, removedBlocks);
-
-            // [新增] 触发对话
-            if (this.hero.isCompanionMode() && this.hero.getOwnerUUID() != null) {
-                Player owner = this.hero.level().getPlayerByUUID(this.hero.getOwnerUUID());
-                if (owner instanceof ServerPlayer serverPlayer) {
-                    HeroDialogueHandler.onCleanseArea(this.hero, serverPlayer);
-                }
-            }
-        }));
+        HeroAnomalySupport.performAreaCleanse(this.hero, center);
     }
 
     @Override

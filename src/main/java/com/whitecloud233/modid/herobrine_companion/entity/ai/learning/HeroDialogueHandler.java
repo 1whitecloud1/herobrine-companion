@@ -27,6 +27,8 @@ import java.util.UUID;
 
 public class HeroDialogueHandler {
     private static final String TAG_LAST_SPEECH = "HeroLastSpeechTime";
+    private static final String TAG_LAST_DOMESTIC_SPEECH = "HeroLastDomesticSpeechTime";
+    private static final long DOMESTIC_SPEECH_COOLDOWN_TICKS = 20L * 180; // 自主做菜/休息的 AI 台词至少间隔 3 分钟
     public static final String AUTONOMOUS_REST_FALLBACK_KEY = "message.herobrine_companion.autonomous_rest";
     public static final String AUTONOMOUS_COOK_FALLBACK_KEY = "message.herobrine_companion.autonomous_cook";
 
@@ -34,6 +36,19 @@ public class HeroDialogueHandler {
         long time = hero.level().getGameTime();
         long last = hero.getPersistentData().getLong(TAG_LAST_SPEECH);
         return (time - last) >= (com.whitecloud233.modid.herobrine_companion.config.Config.aiVisionInterval * 20L);
+    }
+
+    /**
+     * 自主做菜/休息的台词既要遵守全局发话冷却，还要额外限频（默认 3 分钟一条），
+     * 避免 Hero 每次坐下/开火都触发一次 LLM 调用。
+     */
+    private static boolean canAutonomousSpeak(HeroEntity hero) {
+        if (!canSpeak(hero)) {
+            return false;
+        }
+        long time = hero.level().getGameTime();
+        long last = hero.getPersistentData().getLong(TAG_LAST_DOMESTIC_SPEECH);
+        return (time - last) >= DOMESTIC_SPEECH_COOLDOWN_TICKS;
     }
 
     public static void tryAIDialogueOrFallback(HeroEntity hero, ServerPlayer player, String aiPrompt, String fallbackKey,
@@ -199,7 +214,11 @@ public class HeroDialogueHandler {
         }
 
         String blockName = restState.getBlock().getName().getString();
-        forceAIDialogueOrFallback(
+        if (!canAutonomousSpeak(hero)) {
+            return;
+        }
+        hero.getPersistentData().putLong(TAG_LAST_DOMESTIC_SPEECH, hero.level().getGameTime());
+        tryAIDialogueOrFallback(
                 hero,
                 owner,
                 "You are Hero. You yourself chose to rest on [" + blockName + "]. Speak to the player with one brief, natural first-person line about taking a quiet break there. Do not describe the player as the one resting.",
@@ -217,7 +236,11 @@ public class HeroDialogueHandler {
         }
 
         String dishName = cookedResult.getHoverName().getString();
-        forceAIDialogueOrFallback(
+        if (!canAutonomousSpeak(hero)) {
+            return;
+        }
+        hero.getPersistentData().putLong(TAG_LAST_DOMESTIC_SPEECH, hero.level().getGameTime());
+        tryAIDialogueOrFallback(
                 hero,
                 owner,
                 "You are Hero. You yourself are about to cook [" + dishName + "] with nearby cookware, without using the player's ingredients. Speak to the player with one brief, natural first-person line that shows interest in the dish. Do not describe the player as the one cooking.",
