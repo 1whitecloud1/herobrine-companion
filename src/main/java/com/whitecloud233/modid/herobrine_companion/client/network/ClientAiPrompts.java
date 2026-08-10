@@ -8,6 +8,7 @@ import com.whitecloud233.modid.herobrine_companion.client.service.LLMConfig;
 import com.whitecloud233.modid.herobrine_companion.client.service.LocalChatService;
 import com.whitecloud233.modid.herobrine_companion.config.Config;
 import com.whitecloud233.modid.herobrine_companion.entity.dialogue.SpeechBubbleAccessor;
+import com.whitecloud233.modid.herobrine_companion.network.AgentChatOutcomePacket;
 import com.whitecloud233.modid.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.modid.herobrine_companion.network.ai.ActorDialogueResultPacket;
 import com.whitecloud233.modid.herobrine_companion.network.ai.HeroCrossChatPromptPacket;
@@ -41,6 +42,21 @@ public final class ClientAiPrompts {
     private static final int MAX_BUBBLE_TICKS = 180;
 
     private ClientAiPrompts() {
+    }
+
+    /**
+     * 把一次对话回合的最小摘要回流给服务端 agent(M4 Phase 1)。
+     * 仅在回复可用(非空 / 非错误文案)时发送,避免把错误文本写进记忆。
+     */
+    public static void sendAgentChatOutcome(String message, String reply, int kind) {
+        if (reply == null || reply.isBlank()) {
+            return;
+        }
+        String r = reply.trim();
+        if (r.startsWith("§c") || r.startsWith("搂c") || r.startsWith("鎼係")) {
+            return;
+        }
+        PacketHandler.sendToServer(new AgentChatOutcomePacket(message, reply, kind));
     }
 
     public static void handleAIObservation(int heroId, String observationDesc, String fallbackKey, int fallbackVariants,
@@ -140,7 +156,11 @@ public final class ClientAiPrompts {
                 ))
                 .thenApply(reply -> normalizeReply(reply, fallback))
                 .exceptionally(ignored -> fallback)
-                .thenAccept(reply -> PacketHandler.sendToServer(new ActorDialogueResultPacket(jobId, reply)));
+                .thenAccept(reply -> {
+                    PacketHandler.sendToServer(new ActorDialogueResultPacket(jobId, reply));
+                    // M4 Phase 1:角色台词结果回流给 agent 记忆(场景=userPrompt)。
+                    sendAgentChatOutcome(userPrompt, reply, AgentChatOutcomePacket.KIND_ACTOR_DIALOGUE);
+                });
     }
 
     private static boolean shouldSuppressDuplicate(UUID playerUUID, int heroId, String observationDesc) {

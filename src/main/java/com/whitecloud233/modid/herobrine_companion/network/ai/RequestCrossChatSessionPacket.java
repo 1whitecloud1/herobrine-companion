@@ -35,7 +35,7 @@ public class RequestCrossChatSessionPacket {
 
             String requestedName = this.targetName == null ? "" : this.targetName.trim();
             if (requestedName.isEmpty()) {
-                sender.sendSystemMessage(net.minecraft.network.chat.Component.literal("§d[跨HB] §f目标玩家名称不能为空。"));
+                sender.sendSystemMessage(net.minecraft.network.chat.Component.translatable("message.herobrine_companion.cross_chat.target_name_empty"));
                 return;
             }
 
@@ -51,7 +51,7 @@ public class RequestCrossChatSessionPacket {
             }
 
             if (target == null) {
-                sender.sendSystemMessage(net.minecraft.network.chat.Component.literal("§d[跨HB] §f未找到在线玩家：" + requestedName));
+                sender.sendSystemMessage(net.minecraft.network.chat.Component.translatable("message.herobrine_companion.cross_chat.target_not_found", requestedName));
                 return;
             }
 

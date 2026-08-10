@@ -143,6 +143,29 @@ public class PacketHandler {
         // ---------- 骑乘输入 / 竞技场切片 ----------
         reg(id, JeanMountInputPacket.class, JeanMountInputPacket::encode, JeanMountInputPacket::new, JeanMountInputPacket::handle);
         reg(id, SPacketChallengeArenaSlice.class, SPacketChallengeArenaSlice::encode, SPacketChallengeArenaSlice::new, SPacketChallengeArenaSlice::handle);
+
+        // ---------- Agent 工具/任务请求(C→S, M4) ----------
+        reg(id, AgentRequestPacket.class, AgentRequestPacket::encode, AgentRequestPacket::new, AgentRequestPacket::handle);
+
+        // ---------- Agent 对话结果回流(C→S, M4 Phase 1) ----------
+        reg(id, AgentChatOutcomePacket.class, AgentChatOutcomePacket::encode, AgentChatOutcomePacket::new, AgentChatOutcomePacket::handle);
+
+        // ---------- Agent 可观测面板(C→S 查询 / S→C 快照, M5) ----------
+        reg(id, RequestAgentStatusPacket.class, RequestAgentStatusPacket::encode, RequestAgentStatusPacket::new, RequestAgentStatusPacket::handle);
+        reg(id, AgentStatusPacket.class, AgentStatusPacket::encode, AgentStatusPacket::new, AgentStatusPacket::handle);
+
+        // ---------- Agent 长期记忆(记忆摘要 C→S / S→C, 清理 C→S, M4 Phase 1) ----------
+        reg(id, RequestHeroMemoryDigestPacket.class, RequestHeroMemoryDigestPacket::encode, RequestHeroMemoryDigestPacket::new, RequestHeroMemoryDigestPacket::handle);
+        reg(id, HeroMemoryDigestPacket.class, HeroMemoryDigestPacket::encode, HeroMemoryDigestPacket::new, HeroMemoryDigestPacket::handle);
+        reg(id, ClearHeroMemoryPacket.class, ClearHeroMemoryPacket::encode, ClearHeroMemoryPacket::new, ClearHeroMemoryPacket::handle);
+
+        // ---------- Agent 工具结果(S→C, M4 共享基础设施) ----------
+        reg(id, AgentToolResultPacket.class, AgentToolResultPacket::encode, AgentToolResultPacket::new, AgentToolResultPacket::handle);
+
+        // ---------- Agent 工具审批(S→C 提示 / C→S 同意·拒绝, P3) ----------
+        reg(id, ToolApprovalPromptPacket.class, ToolApprovalPromptPacket::encode, ToolApprovalPromptPacket::new, ToolApprovalPromptPacket::handle);
+        reg(id, ApproveToolPacket.class, ApproveToolPacket::encode, ApproveToolPacket::new, ApproveToolPacket::handle);
+        reg(id, RejectToolPacket.class, RejectToolPacket::encode, RejectToolPacket::new, RejectToolPacket::handle);
     }
 
     /**

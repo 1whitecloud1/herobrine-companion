@@ -61,6 +61,8 @@ public final class LLMModelDiscovery {
         if (endpointFormat == LLMConfig.EndpointFormat.ANTHROPIC) {
             requestBuilder.header("x-api-key", apiKey)
                     .header("anthropic-version", ANTHROPIC_VERSION);
+        } else if (endpointFormat == LLMConfig.EndpointFormat.GEMINI) {
+            requestBuilder.header("x-goog-api-key", apiKey);
         } else {
             requestBuilder.header("Authorization", "Bearer " + apiKey);
         }
@@ -123,7 +125,14 @@ public final class LLMModelDiscovery {
         TreeSet<String> modelIds = new TreeSet<>();
         for (JsonElement element : modelArray) {
             String modelId = extractModelId(element);
-            if (modelId != null && !modelId.isBlank()) {
+            if (modelId == null || modelId.isBlank()) {
+                continue;
+            }
+            // Gemini 返回的标识带 models/ 前缀，剥掉后与请求 URL 用法一致
+            if (modelId.startsWith("models/")) {
+                modelId = modelId.substring("models/".length());
+            }
+            if (!modelId.isBlank()) {
                 modelIds.add(modelId.trim());
             }
         }

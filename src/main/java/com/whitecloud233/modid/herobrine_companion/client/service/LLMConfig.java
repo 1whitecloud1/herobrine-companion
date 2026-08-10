@@ -3,11 +3,15 @@ package com.whitecloud233.modid.herobrine_companion.client.service;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.mojang.logging.LogUtils;
+import com.whitecloud233.modid.herobrine_companion.client.llm.LlmSettings;
+import com.whitecloud233.modid.herobrine_companion.client.llm.LlmTask;
+import com.whitecloud233.modid.herobrine_companion.client.llm.ResolvedTask;
 import net.minecraftforge.fml.loading.FMLPaths;
 import org.slf4j.Logger;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Locale;
@@ -41,6 +45,7 @@ public class LLMConfig {
         OPENROUTER("openrouter", "https://openrouter.ai/api/v1/chat/completions", "deepseek/deepseek-v3.2-251201"),
         QINIU_CLOUD("qiniu_cloud", "https://api.qnaigc.com/v1/chat/completions", "deepseek/deepseek-v3.2-251201"),
         QINIU_CLOUD_ANTHROPIC("qiniu_cloud_anthropic", "https://anthropic.qnaigc.com/v1/messages", "claude-3-5-sonnet-20241022"),
+        GEMINI("gemini", "https://generativelanguage.googleapis.com/v1beta", "gemini-2.5-flash"),
         CUSTOM("custom", "", "");
 
         private final String id;
@@ -118,8 +123,10 @@ public class LLMConfig {
     }
 
     public enum EndpointFormat {
-        OPENAI_COMPAT,
-        ANTHROPIC
+        OPENAI_CHAT,
+        OPENAI_RESPONSES,
+        ANTHROPIC,
+        GEMINI
     }
 
     public enum CommandMode {
@@ -164,12 +171,20 @@ public class LLMConfig {
     public static String aiModelName = Provider.QINIU_CLOUD.getDefaultModel();
     public static String aiSystemPrompt = DEFAULT_SYSTEM_PROMPT;
     public static boolean aiStreamingEnabled = false;
+    public static boolean aiConversationSummaryEnabled = true;
+    public static boolean aiWebLookupEnabled = false;
     public static volatile boolean aiComputerControlEnabled = false;
+    public static volatile boolean aiJvmCodeSkillEnabled = false;
+    /** JVM 优先模式：普通聊天更倾向用 jvm_code_skill 改世界，同时关闭 Minecraft 指令工具。 */
+    public static volatile boolean aiJvmPreferredEnabled = false;
     public static CommandMode aiCommandMode = CommandMode.NORMAL;
+    /** 自定义 provider 的显式 API 格式（空 = 按 endpoint 自动探测）。 */
+    public static String customApiFormat = "";
     public static double aiTemperature = DEFAULT_TEMPERATURE;
     public static double aiTopP = DEFAULT_TOP_P;
     public static int aiMaxOutputTokens = DEFAULT_MAX_OUTPUT_TOKENS;
     public static Map<String, String> nbtStructures = new HashMap<>();
+    private static final Map<LlmTask, TaskRoute> taskRoutes = new EnumMap<>(LlmTask.class);
     private static final Map<String, ProviderProfile> providerProfiles = new LinkedHashMap<>();
 
     public record ProviderSettings(String providerId, String apiKey, String endpoint, String modelId, String modelName) {
@@ -179,6 +194,18 @@ public class LLMConfig {
                 return normalizedModelId;
             }
             return modelName == null ? "" : modelName.trim();
+        }
+    }
+
+    /** 任务路由：该任务的 provider（空=跟随全局激活）与其备用 provider（空=无备用）。 */
+    public record TaskRoute(String providerId, String fallbackProviderId) {
+        public TaskRoute {
+            if (providerId == null) {
+                providerId = "";
+            }
+            if (fallbackProviderId == null) {
+                fallbackProviderId = "";
+            }
         }
     }
 
@@ -321,6 +348,85 @@ public class LLMConfig {
         return getProviderSettingsUnchecked(provider == null ? Provider.QINIU_CLOUD : provider);
     }
 
+    /**
+     * 解析全局激活 provider 的一组 LLM 调用设置（Phase 2 之前 AIService 的默认入口；
+     * Phase 2 起按任务路由解析，此方法保留为"跟随全局"的语义）。
+     */
+    public static LlmSettings resolveGlobalSettings() {
+        ensureLoaded();
+        Provider provider = getProviderUnchecked();
+        ProviderSettings settings = getProviderSettingsUnchecked(provider);
+        return buildLlmSettings(settings, provider);
+    }
+
+    /** 自定义 provider 的显式格式；空 = 按 endpoint 自动探测。 */
+    public static EndpointFormat getCustomApiFormat() {
+        ensureLoaded();
+        if (customApiFormat == null || customApiFormat.isBlank()) {
+            return null;
+        }
+        try {
+            return EndpointFormat.valueOf(customApiFormat.trim().toUpperCase(Locale.ROOT));
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private static LlmSettings buildLlmSettings(ProviderSettings settings, Provider provider) {
+        EndpointFormat explicitFormat = provider == Provider.CUSTOM ? getCustomApiFormat() : null;
+        return LlmSettings.of(settings.endpoint(), settings.apiKey(), settings.modelForRequest(), provider, explicitFormat);
+    }
+
+    /** 读取某任务的路由（未配置返回 null）。 */
+    public static TaskRoute getTaskRoute(LlmTask task) {
+        ensureLoaded();
+        return task == null ? null : taskRoutes.get(task);
+    }
+
+    /** 写入某任务的路由；route 为 null 时清除该任务路由。 */
+    public static void setTaskRoute(LlmTask task, TaskRoute route) {
+        ensureLoaded();
+        if (task == null) {
+            return;
+        }
+        if (route == null || (route.providerId().isBlank() && route.fallbackProviderId().isBlank())) {
+            taskRoutes.remove(task);
+        } else {
+            taskRoutes.put(task, route);
+        }
+    }
+
+    /**
+     * 解析某任务的调用设置：主 provider（未路由则跟随全局激活）+ 备用 provider（未配置为 null）。
+     */
+    public static ResolvedTask resolveTaskSettings(LlmTask task) {
+        ensureLoaded();
+        TaskRoute route = task == null ? null : taskRoutes.get(task);
+        String primaryId = route == null ? null : route.providerId();
+        String fallbackId = route == null ? null : route.fallbackProviderId();
+
+        LlmSettings primary = resolveRoutedProviderSettings(primaryId);
+        if (primary == null) {
+            Provider active = getProviderUnchecked();
+            ProviderSettings activeSettings = getProviderSettingsUnchecked(active);
+            primary = buildLlmSettings(activeSettings, active);
+        }
+        LlmSettings fallback = resolveRoutedProviderSettings(fallbackId);
+        return new ResolvedTask(primary, fallback);
+    }
+
+    private static LlmSettings resolveRoutedProviderSettings(String providerId) {
+        if (providerId == null || providerId.isBlank()) {
+            return null;
+        }
+        Provider provider = Provider.fromSavedValue(providerId);
+        if (provider == null) {
+            return null;
+        }
+        ProviderSettings settings = getProviderSettingsUnchecked(provider);
+        return buildLlmSettings(settings, provider);
+    }
+
     private static ProviderSettings getProviderSettingsUnchecked(Provider provider) {
         Provider normalizedProvider = provider == null ? Provider.QINIU_CLOUD : provider;
         ProviderProfile profile = getProfile(normalizedProvider);
@@ -356,9 +462,29 @@ public class LLMConfig {
         return aiStreamingEnabled;
     }
 
+    public static boolean isConversationSummaryEnabled() {
+        ensureLoaded();
+        return aiConversationSummaryEnabled;
+    }
+
+    public static boolean isWebLookupEnabled() {
+        ensureLoaded();
+        return aiWebLookupEnabled;
+    }
+
     public static boolean isComputerControlEnabled() {
         ensureLoaded();
         return aiComputerControlEnabled;
+    }
+
+    public static boolean isJvmCodeSkillEnabled() {
+        ensureLoaded();
+        return aiJvmCodeSkillEnabled;
+    }
+
+    public static boolean isJvmPreferredEnabled() {
+        ensureLoaded();
+        return aiJvmPreferredEnabled;
     }
 
     public static CommandMode getCommandMode() {
@@ -578,12 +704,18 @@ public class LLMConfig {
         aiModelName = aiProvider.getDefaultModel();
         aiSystemPrompt = DEFAULT_SYSTEM_PROMPT;
         aiStreamingEnabled = false;
+        aiConversationSummaryEnabled = true;
+        aiWebLookupEnabled = false;
         aiComputerControlEnabled = false;
+        aiJvmCodeSkillEnabled = false;
+        aiJvmPreferredEnabled = false;
         aiCommandMode = CommandMode.NORMAL;
+        customApiFormat = "";
         aiTemperature = DEFAULT_TEMPERATURE;
         aiTopP = DEFAULT_TOP_P;
         aiMaxOutputTokens = DEFAULT_MAX_OUTPUT_TOKENS;
         nbtStructures = new HashMap<>();
+        taskRoutes.clear();
         resetProviderProfiles();
         apiKeyMarkedInvalid = false;
     }
@@ -641,17 +773,35 @@ public class LLMConfig {
                         aiSystemPrompt = data.aiPrompt;
                     }
                     if (data.aiStreamingEnabled != null) aiStreamingEnabled = data.aiStreamingEnabled;
+                    if (data.aiConversationSummaryEnabled != null) aiConversationSummaryEnabled = data.aiConversationSummaryEnabled;
+                    if (data.aiWebLookupEnabled != null) aiWebLookupEnabled = data.aiWebLookupEnabled;
                     if (data.aiComputerControlEnabled != null) aiComputerControlEnabled = data.aiComputerControlEnabled;
+                    if (data.aiJvmCodeSkillEnabled != null) aiJvmCodeSkillEnabled = data.aiJvmCodeSkillEnabled;
+                    if (data.aiJvmPreferredEnabled != null) aiJvmPreferredEnabled = data.aiJvmPreferredEnabled;
                     CommandMode savedCommandMode = CommandMode.fromSavedValue(data.aiCommandMode);
                     if (savedCommandMode == null) {
                         savedCommandMode = CommandMode.fromSavedValue(data.commandMode);
                     }
                     if (savedCommandMode != null) aiCommandMode = savedCommandMode;
+                    if (data.customApiFormat != null) customApiFormat = data.customApiFormat;
                     if (data.aiTemperature != null) aiTemperature = data.aiTemperature;
                     if (data.aiTopP != null) aiTopP = data.aiTopP;
                     if (data.aiMaxOutputTokens != null) aiMaxOutputTokens = data.aiMaxOutputTokens;
 
                     if (data.nbtStructures != null) nbtStructures = data.nbtStructures;
+                    if (data.taskRoutes != null) {
+                        taskRoutes.clear();
+                        for (Map.Entry<String, TaskRoute> entry : data.taskRoutes.entrySet()) {
+                            if (entry.getValue() == null) {
+                                continue;
+                            }
+                            try {
+                                LlmTask task = LlmTask.valueOf(entry.getKey().trim().toUpperCase(Locale.ROOT));
+                                taskRoutes.put(task, entry.getValue());
+                            } catch (Exception ignored) {
+                            }
+                        }
+                    }
                 }
             } catch (Exception e) {
                 LOGGER.error("Failed to load Herobrine Companion public AI config from {}", PUBLIC_CONFIG, e);
@@ -710,12 +860,18 @@ public class LLMConfig {
         pData.activeProvider = getProviderUnchecked().getId();
         pData.aiSystemPrompt = aiSystemPrompt;
         pData.aiStreamingEnabled = aiStreamingEnabled;
+        pData.aiConversationSummaryEnabled = aiConversationSummaryEnabled;
+        pData.aiWebLookupEnabled = aiWebLookupEnabled;
         pData.aiComputerControlEnabled = aiComputerControlEnabled;
+        pData.aiJvmCodeSkillEnabled = aiJvmCodeSkillEnabled;
+        pData.aiJvmPreferredEnabled = aiJvmPreferredEnabled;
         pData.aiCommandMode = getCommandModeUnchecked().getId();
+        pData.customApiFormat = customApiFormat;
         pData.aiTemperature = aiTemperature;
         pData.aiTopP = aiTopP;
         pData.aiMaxOutputTokens = aiMaxOutputTokens;
         pData.nbtStructures = nbtStructures;
+        pData.taskRoutes = copyTaskRoutesForSave();
         try (Writer writer = new OutputStreamWriter(new FileOutputStream(PUBLIC_CONFIG), StandardCharsets.UTF_8)) {
             GSON.toJson(pData, writer);
         }
@@ -759,6 +915,17 @@ public class LLMConfig {
             profilesForSave.put(provider.getId(), copyProfile(provider, getProfile(provider)));
         }
         return profilesForSave;
+    }
+
+    private static Map<String, TaskRoute> copyTaskRoutesForSave() {
+        Map<String, TaskRoute> routesForSave = new LinkedHashMap<>();
+        for (LlmTask task : LlmTask.values()) {
+            TaskRoute route = taskRoutes.get(task);
+            if (route != null && (!route.providerId().isBlank() || !route.fallbackProviderId().isBlank())) {
+                routesForSave.put(task.name(), route);
+            }
+        }
+        return routesForSave.isEmpty() ? null : routesForSave;
     }
 
 
@@ -816,10 +983,17 @@ public class LLMConfig {
     public static EndpointFormat detectEndpointFormat(String endpoint) {
         String normalized = normalizeEndpoint(endpoint).toLowerCase(Locale.ROOT);
         String withoutQuery = removeQueryAndFragment(normalized);
+        if (withoutQuery.contains("generativelanguage.googleapis.com")
+                || withoutQuery.contains("/generativelanguage")) {
+            return EndpointFormat.GEMINI;
+        }
+        if (withoutQuery.endsWith("/v1/responses") || withoutQuery.endsWith("/responses")) {
+            return EndpointFormat.OPENAI_RESPONSES;
+        }
         if (withoutQuery.contains("anthropic.com") || withoutQuery.endsWith("/v1/messages") || withoutQuery.endsWith("/messages")) {
             return EndpointFormat.ANTHROPIC;
         }
-        return EndpointFormat.OPENAI_COMPAT;
+        return EndpointFormat.OPENAI_CHAT;
     }
 
     private static String removeQueryAndFragment(String endpoint) {
@@ -844,13 +1018,19 @@ public class LLMConfig {
         String systemPrompt;
         String aiPrompt;
         Boolean aiStreamingEnabled;
+        Boolean aiConversationSummaryEnabled;
+        Boolean aiWebLookupEnabled;
         Boolean aiComputerControlEnabled;
+        Boolean aiJvmCodeSkillEnabled;
+        Boolean aiJvmPreferredEnabled;
         String aiCommandMode;
         String commandMode;
+        String customApiFormat;
         Double aiTemperature;
         Double aiTopP;
         Integer aiMaxOutputTokens;
         Map<String, String> nbtStructures;
+        Map<String, TaskRoute> taskRoutes;
         Map<String, ProviderProfile> providers;
 
     } private static class SecretData {

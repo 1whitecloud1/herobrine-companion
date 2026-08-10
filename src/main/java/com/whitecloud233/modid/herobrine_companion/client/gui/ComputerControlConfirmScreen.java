@@ -6,9 +6,15 @@ import net.minecraft.network.chat.Component;
 
 import java.util.function.Consumer;
 
+/**
+ * 电脑控制确认屏：向玩家展示将被执行的本机动作并征求确认。
+ * 面板尺寸<b>自适应窗口</b>（宽高均钳制到窗口内），内容区 scissor 裁剪防溢出。
+ */
 public class ComputerControlConfirmScreen extends Screen {
     private static final int PANEL_MAX_WIDTH = 440;
-    private static final int PANEL_HEIGHT = 220;
+    private static final int PANEL_MIN_WIDTH = 240;
+    private static final int PANEL_MAX_HEIGHT = 220;
+    private static final int PANEL_MIN_HEIGHT = 160;
     private static final int BUTTON_WIDTH = 120;
     private static final int BUTTON_HEIGHT = 20;
     private static final int GAP = 10;
@@ -30,14 +36,32 @@ public class ComputerControlConfirmScreen extends Screen {
         this.callback = callback;
     }
 
+    private record Panel(int left, int top, int width, int height) {
+        int contentLeft() {
+            return left + 16;
+        }
+
+        int contentWidth() {
+            return width - 32;
+        }
+
+        int contentBottom() {
+            return top + height - 46;
+        }
+    }
+
+    private Panel panel() {
+        int w = Math.min(PANEL_MAX_WIDTH, Math.max(PANEL_MIN_WIDTH, this.width - 24));
+        int h = Math.min(PANEL_MAX_HEIGHT, Math.max(PANEL_MIN_HEIGHT, this.height - 24));
+        return new Panel((this.width - w) / 2, Math.max(4, (this.height - h) / 2), w, h);
+    }
+
     @Override
     protected void init() {
-        int panelWidth = Math.min(PANEL_MAX_WIDTH, Math.max(280, this.width - 24));
-        int panelLeft = (this.width - panelWidth) / 2;
-        int panelTop = Math.max(8, (this.height - PANEL_HEIGHT) / 2);
-        int buttonY = panelTop + PANEL_HEIGHT - 34;
+        Panel p = panel();
+        int buttonY = p.top() + p.height() - 34;
         int buttonGroupWidth = BUTTON_WIDTH * 2 + GAP;
-        int buttonX = panelLeft + (panelWidth - buttonGroupWidth) / 2;
+        int buttonX = p.left() + (p.width() - buttonGroupWidth) / 2;
 
         this.addRenderableWidget(new HeroScreen.ThemedButton(
                 buttonX, buttonY, BUTTON_WIDTH, BUTTON_HEIGHT,
@@ -57,28 +81,30 @@ public class ComputerControlConfirmScreen extends Screen {
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         this.renderBackground(guiGraphics);
-        int panelWidth = Math.min(PANEL_MAX_WIDTH, Math.max(280, this.width - 24));
-        int panelLeft = (this.width - panelWidth) / 2;
-        int panelTop = Math.max(8, (this.height - PANEL_HEIGHT) / 2);
-        int contentLeft = panelLeft + 16;
-        int contentWidth = panelWidth - 32;
+        Panel p = panel();
+        int contentLeft = p.contentLeft();
+        int contentWidth = p.contentWidth();
 
-        guiGraphics.fill(panelLeft, panelTop, panelLeft + panelWidth, panelTop + PANEL_HEIGHT, PANEL_BACKGROUND);
-        guiGraphics.renderOutline(panelLeft, panelTop, panelWidth, PANEL_HEIGHT, PANEL_BORDER);
-        guiGraphics.drawCenteredString(this.font, this.title, this.width / 2, panelTop + 12, 0xFFFF7777);
+        guiGraphics.fill(p.left(), p.top(), p.left() + p.width(), p.top() + p.height(), PANEL_BACKGROUND);
+        guiGraphics.renderOutline(p.left(), p.top(), p.width(), p.height(), PANEL_BORDER);
+        guiGraphics.drawCenteredString(this.font, this.title, this.width / 2, p.top() + 12, 0xFFFF7777);
+
+        guiGraphics.enableScissor(p.left() + 1, p.top() + 26, p.left() + p.width() - 1, p.contentBottom());
         guiGraphics.drawWordWrap(this.font,
                 Component.translatable("gui.herobrine_companion.computer_control.confirm.warning"),
-                contentLeft, panelTop + 34, contentWidth, 0xFFFFCC66);
+                contentLeft, p.top() + 34, contentWidth, 0xFFFFCC66);
         guiGraphics.drawWordWrap(this.font, this.actionDescription,
-                contentLeft, panelTop + 70, contentWidth, 0xFFFFFFFF);
+                contentLeft, p.top() + 70, contentWidth, 0xFFFFFFFF);
         guiGraphics.drawString(this.font,
                 Component.translatable("gui.herobrine_companion.computer_control.confirm.command"),
-                contentLeft, panelTop + 112, 0xFFAAAAAA, false);
+                contentLeft, p.top() + 112, 0xFFAAAAAA, false);
         guiGraphics.drawWordWrap(this.font, Component.literal(this.commandPreview),
-                contentLeft, panelTop + 126, contentWidth, 0xFF88CCFF);
+                contentLeft, p.top() + 126, contentWidth, 0xFF88CCFF);
+        guiGraphics.disableScissor();
+
         guiGraphics.drawCenteredString(this.font,
                 Component.translatable("gui.herobrine_companion.computer_control.confirm.no_admin"),
-                this.width / 2, panelTop + 166, 0xFF999999);
+                this.width / 2, p.top() + p.height() - 42, 0xFF999999);
 
         super.render(guiGraphics, mouseX, mouseY, partialTick);
     }

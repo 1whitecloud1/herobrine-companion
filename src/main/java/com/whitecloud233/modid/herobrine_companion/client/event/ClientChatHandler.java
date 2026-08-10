@@ -1,12 +1,14 @@
 package com.whitecloud233.modid.herobrine_companion.client.event;
 
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.modid.herobrine_companion.client.network.ClientAiPrompts;
 import com.whitecloud233.modid.herobrine_companion.client.service.AIService;
 import com.whitecloud233.modid.herobrine_companion.client.service.ConversationStore;
 import com.whitecloud233.modid.herobrine_companion.client.service.LLMConfig;
 import com.whitecloud233.modid.herobrine_companion.client.service.LocalChatService;
 import com.whitecloud233.modid.herobrine_companion.client.gui.HeroChatScreen;
 import com.whitecloud233.modid.herobrine_companion.client.gui.crosschat.CrossChatScreen;
+import com.whitecloud233.modid.herobrine_companion.network.AgentChatOutcomePacket;
 import com.whitecloud233.modid.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.modid.herobrine_companion.network.ai.SendCrossChatHbMessagePacket;
 import com.whitecloud233.modid.herobrine_companion.network.ai.SendCrossChatMessagePacket;
@@ -113,15 +115,20 @@ public class ClientChatHandler {
 
                             AIService.chat(message, mc.player.getUUID(), partial ->
                                     updateStreamingOverlay(mc, partial, lastOverlayUpdate, lastOverlayLength)
-                            ).thenAccept(reply -> mc.tell(() -> {
-                                showExitHint();
-                                mc.gui.getChat().addMessage(
-                                        Component.translatable("message.herobrine_companion.chat_hero", Component.literal(reply))
-                                );
-                            }));
+                            ).thenAccept(reply -> {
+                                // M4 Phase 1:对话结果回流给服务端 agent 记忆。
+                                ClientAiPrompts.sendAgentChatOutcome(message, reply, AgentChatOutcomePacket.KIND_PLAYER_CHAT);
+                                mc.tell(() -> {
+                                    showExitHint();
+                                    mc.gui.getChat().addMessage(
+                                            Component.translatable("message.herobrine_companion.chat_hero", Component.literal(reply))
+                                    );
+                                });
+                            });
                         } else {
                             AIService.chat(message, mc.player.getUUID()).thenAccept(reply -> {
-                                // 拿到大模型的回复后，切回主线程将其显示在聊天框
+                                // M4 Phase 1:对话结果回流给服务端 agent 记忆。
+                                ClientAiPrompts.sendAgentChatOutcome(message, reply, AgentChatOutcomePacket.KIND_PLAYER_CHAT);
                                 mc.tell(() -> {
                                     mc.gui.getChat().addMessage(
                                             Component.translatable("message.herobrine_companion.chat_hero", Component.literal(reply))

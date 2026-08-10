@@ -4,15 +4,19 @@ import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroStateManager;
 import com.whitecloud233.modid.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.modid.herobrine_companion.network.SyncHeroCosmeticsPacket;
+import com.whitecloud233.modid.herobrine_companion.util.AiItemNaming;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.fml.ModList;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -57,6 +61,17 @@ public class HeroAccessoriesCompat {
             return;
         }
         AccessoriesSafeInvoker.setAccessoriesDataFromTag(hero, tag);
+    }
+
+    /**
+     * 把当前佩戴的饰品整理成 AI 可读的 "槽位=物品, ..." 字符串（未佩戴任何饰品返回 ""）。
+     * 供 Omniscient Eye / agent 工具做<b>装备感知</b>，外部依赖隔离在本类内部。
+     */
+    public static String describeEquippedItems(HeroEntity hero) {
+        if (!isLoaded() || hero == null) {
+            return "";
+        }
+        return AccessoriesSafeInvoker.describeEquippedItems(hero);
     }
 
     private static class AccessoriesSafeInvoker {
@@ -174,6 +189,27 @@ public class HeroAccessoriesCompat {
                     renderOptionList.add(shouldRender);
                 }
             }
+        }
+
+        static String describeEquippedItems(HeroEntity hero) {
+            var capability = io.wispforest.accessories.api.AccessoriesCapability.getOptionally(hero).orElse(null);
+            if (capability == null) {
+                return "";
+            }
+
+            List<String> parts = new ArrayList<>();
+            for (var entry : capability.getContainers().entrySet()) {
+                var container = entry.getValue();
+                var stacks = container.getAccessories();
+                String slotName = entry.getKey();
+                for (int i = 0; i < stacks.getContainerSize(); i++) {
+                    ItemStack stack = stacks.getItem(i);
+                    if (!stack.isEmpty()) {
+                        parts.add(slotName + "=" + AiItemNaming.describe(stack));
+                    }
+                }
+            }
+            return String.join(", ", parts);
         }
 
         private static class ManagedAccessorySlot extends io.wispforest.accessories.api.menu.AccessoriesBasedSlot {

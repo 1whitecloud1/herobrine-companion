@@ -33,6 +33,31 @@ public class Config {
             .comment("Herobrine是否自动清理地上的掉落物")
             .define("heroCleanItems_v2", false);
 
+    public static final ForgeConfigSpec.BooleanValue HERO_MEMORY_ENABLED = BUILDER
+            .comment("Whether the Herobrine agent long-term memory and reflection learning are enabled")
+            .comment("是否启用 Herobrine 长期记忆与反思学习")
+            .define("heroMemoryEnabled", true);
+
+    public static final ForgeConfigSpec.BooleanValue AGENT_TOOL_RESULT_FEEDBACK = BUILDER
+            .comment("Whether agent tool execution results are fed back to the LLM via a synthesis call")
+            .comment("agent 工具执行结果是否经合成调用回喂给 LLM")
+            .define("agentToolResultFeedback", true);
+
+    public static final ForgeConfigSpec.BooleanValue AGENT_TOOL_CONFIRMATION = BUILDER
+            .comment("Whether agent tools requiring confirmation show an approval screen before executing")
+            .comment("需要确认的 agent 工具是否在执行前弹出确认屏（关闭后视为已确认，回到无 UI 时代）")
+            .define("agentToolConfirmation", true);
+
+    public static final ForgeConfigSpec.BooleanValue HERO_AUTONOMY_ENABLED = BUILDER
+            .comment("Whether the Herobrine agent may autonomously plan and execute real tasks (repair/inspect) on its own initiative")
+            .comment("Herobrine agent 是否可自主规划并执行真实任务（修复/探查）")
+            .define("heroAutonomyEnabled", true);
+
+    public static final ForgeConfigSpec.BooleanValue HERO_SKILL_SESSION = BUILDER
+            .comment("Whether the hero_use_skill tool tracks skill cooldown and auto-exits battle mode after a forced skill ends")
+            .comment("hero_use_skill 工具是否启用技能冷却与强制技能结束后的战斗态退出")
+            .define("heroSkillSession", true);
+
     public static final ForgeConfigSpec.BooleanValue HERO_LEAF_VANISH_ENABLED = BUILDER
             .comment("Whether Herobrine can vanish nearby tree leaves in Prankster state")
             .comment("Herobrine是否允许在恶作剧状态下拔掉附近树叶")
@@ -57,11 +82,6 @@ public class Config {
             .comment("Whether Destruction God Herobrine can break container or block-entity blocks")
             .comment("毁灭之神是否可破坏容器和带方块实体的方块")
             .define("destructionGodBreakContainers", true);
-
-    public static final ForgeConfigSpec.BooleanValue DESTRUCTION_GOD_ARENA_RESTORE = BUILDER
-            .comment("Whether terrain broken by Destruction God Herobrine should restore itself after a while")
-            .comment("毁灭之神造成的地形破坏是否在一段时间后自动恢复")
-            .define("destructionGodArenaRestore", false);
 
     public static final ForgeConfigSpec.IntValue DESTRUCTION_GOD_MAX_BROKEN_BLOCKS_PER_TICK = BUILDER
             .comment("Maximum number of blocks Destruction God Herobrine terrain skills may break per server tick")
@@ -96,7 +116,7 @@ public class Config {
 
     public static final ForgeConfigSpec.BooleanValue AWAKENED_MOB_AI_DIALOGUE_ENABLED = BUILDER
             .comment("Whether awakened monster AI dialogue is enabled")
-            .comment("鏄惁鍚敤瑙夐啋鎬墿鐨凙I瀵硅瘽")
+            .comment("是否启用觉醒怪物AI对话")
             .define("awakenedMobAiDialogueEnabled", true);
 
     public static final ForgeConfigSpec.IntValue AI_VISION_INTERVAL = BUILDER
@@ -120,12 +140,16 @@ public class Config {
     public static boolean heroKingAuraEnabled;
     public static boolean heroBlockRestoration;
     public static boolean heroCleanItems;
+    public static boolean heroMemoryEnabled;
+    public static boolean agentToolResultFeedback;
+    public static boolean agentToolConfirmation;
+    public static boolean heroAutonomyEnabled;
+    public static boolean heroSkillSession;
     public static boolean heroLeafVanishEnabled;
     public static boolean cleaveSkillEnabled;
     public static boolean destructionGodTerrainDamageEnabled;
     public static String destructionGodTerrainDamageMode;
     public static boolean destructionGodBreakContainers;
-    public static boolean destructionGodArenaRestore;
     public static int destructionGodMaxBrokenBlocksPerTick;
     public static boolean destructionGodFinalPhaseWorldCollapse;
 
@@ -148,11 +172,15 @@ public class Config {
         heroBlockRestoration = HERO_BLOCK_RESTORATION.get();
         heroCleanItems = HERO_CLEAN_ITEMS.get();
         heroLeafVanishEnabled = HERO_LEAF_VANISH_ENABLED.get();
+        heroMemoryEnabled = HERO_MEMORY_ENABLED.get();
+        agentToolResultFeedback = AGENT_TOOL_RESULT_FEEDBACK.get();
+        agentToolConfirmation = AGENT_TOOL_CONFIRMATION.get();
+        heroAutonomyEnabled = HERO_AUTONOMY_ENABLED.get();
+        heroSkillSession = HERO_SKILL_SESSION.get();
         cleaveSkillEnabled = CLEAVE_SKILL_ENABLED.get();
         destructionGodTerrainDamageEnabled = DESTRUCTION_GOD_TERRAIN_DAMAGE_ENABLED.get();
         destructionGodTerrainDamageMode = DESTRUCTION_GOD_TERRAIN_DAMAGE_MODE.get();
         destructionGodBreakContainers = DESTRUCTION_GOD_BREAK_CONTAINERS.get();
-        destructionGodArenaRestore = DESTRUCTION_GOD_ARENA_RESTORE.get();
         destructionGodMaxBrokenBlocksPerTick = DESTRUCTION_GOD_MAX_BROKEN_BLOCKS_PER_TICK.get();
         destructionGodFinalPhaseWorldCollapse = DESTRUCTION_GOD_FINAL_PHASE_WORLD_COLLAPSE.get();
 
@@ -168,10 +196,10 @@ public class Config {
         // 【新增】语言风格赋值
         aiLanguageStyle = AI_LANGUAGE_STYLE.get();
 
-        LOGGER.info("Herobrine Companion Config Loaded: Explosion={}, Aura={}, BlockRestoration={}, CleanItems={}, LeafVanish={}, CleaveSkill={}, DGTerrainEnabled={}, DGTerrainMode={}, DGBreakContainers={}, DGArenaRestore={}, DGMaxBreakPerTick={}, DGWorldCollapse={}, Pact={}, Gaze={}, Permit={}, AIVision={}, AwakenedMobAIDialogue={}, AIInterval={}, AIStyle={}",
+        LOGGER.info("Herobrine Companion Config Loaded: Explosion={}, Aura={}, BlockRestoration={}, CleanItems={}, LeafVanish={}, CleaveSkill={}, DGTerrainEnabled={}, DGTerrainMode={}, DGBreakContainers={}, DGMaxBreakPerTick={}, DGWorldCollapse={}, Pact={}, Gaze={}, Permit={}, AIVision={}, AwakenedMobAIDialogue={}, AIInterval={}, AIStyle={}",
                 poemOfTheEndExplosion, heroKingAuraEnabled, heroBlockRestoration, heroCleanItems, heroLeafVanishEnabled, cleaveSkillEnabled,
                 destructionGodTerrainDamageEnabled, destructionGodTerrainDamageMode, destructionGodBreakContainers,
-                destructionGodArenaRestore, destructionGodMaxBrokenBlocksPerTick, destructionGodFinalPhaseWorldCollapse,
+                destructionGodMaxBrokenBlocksPerTick, destructionGodFinalPhaseWorldCollapse,
                 soulBoundPactEnabled, abyssalGazeEnabled, transcendencePermitEnabled, aiVisionEnabled, awakenedMobAiDialogueEnabled, aiVisionInterval, aiLanguageStyle);
     }
 }

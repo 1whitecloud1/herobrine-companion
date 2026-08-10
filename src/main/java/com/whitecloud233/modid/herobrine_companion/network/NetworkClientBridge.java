@@ -1,9 +1,14 @@
 package com.whitecloud233.modid.herobrine_companion.network;
 
+import com.whitecloud233.modid.herobrine_companion.client.network.ClientAgentStatus;
+import com.whitecloud233.modid.herobrine_companion.client.network.ClientAgentToolConfirmation;
+import com.whitecloud233.modid.herobrine_companion.client.network.ClientAgentToolResult;
 import com.whitecloud233.modid.herobrine_companion.client.network.ClientAiPrompts;
 import com.whitecloud233.modid.herobrine_companion.client.network.ClientFxHandler;
+import com.whitecloud233.modid.herobrine_companion.client.network.ClientMemoryDigest;
 import com.whitecloud233.modid.herobrine_companion.client.network.ClientStateSync;
 import com.whitecloud233.modid.herobrine_companion.client.network.ClientUiDispatch;
+import com.whitecloud233.modid.herobrine_companion.entity.ai.agent.AgentStatusSnapshot;
 import com.whitecloud233.modid.herobrine_companion.compat.cooking.HeroCookingCompat;
 import com.whitecloud233.modid.herobrine_companion.destructiongod.client.cinematic.ClientSpatialRendHandler;
 import com.whitecloud233.modid.herobrine_companion.destructiongod.client.network.DestructionGodClientPacketHandler;
@@ -16,10 +21,12 @@ import com.whitecloud233.modid.herobrine_companion.fight.event.ClientCollapseHan
 import com.whitecloud233.modid.herobrine_companion.fight.network.SPacketChallengeArenaSlice;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.fml.DistExecutor;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -67,6 +74,31 @@ public final class NetworkClientBridge {
     public static void openFakeCrash() {
         DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () ->
                 ClientUiDispatch.openFakeCrash());
+    }
+
+    /** Agent 可观测面板快照(M5)。snapshot 为不可变记录,无需防御性拷贝。 */
+    public static void acceptAgentStatus(AgentStatusSnapshot snapshot) {
+        DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () ->
+                ClientAgentStatus.accept(snapshot));
+    }
+
+    /** Agent 长期记忆 digest(M4 Phase 1)。纯字符串,无需防御性拷贝。 */
+    public static void acceptMemoryDigest(String digest) {
+        DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () ->
+                ClientMemoryDigest.accept(digest));
+    }
+
+    /** Agent 工具执行结果(M4 共享基础设施,P2 起注入 LLM / 关联合成)。纯字符串 + UUID,无需防御性拷贝。 */
+    public static void acceptAgentToolResult(UUID requestId, String toolId, boolean ok, String message) {
+        DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () ->
+                ClientAgentToolResult.accept(requestId, toolId, ok, message));
+    }
+
+    /** Agent 工具审批提示(P3)：map 做了防御性拷贝,避免网络线程与渲染线程共享可变状态。 */
+    public static void acceptToolApprovalPrompt(UUID requestId, String toolId, Map<String, String> args, Component description) {
+        Map<String, String> safeArgs = Map.copyOf(args);
+        DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () ->
+                ClientAgentToolConfirmation.accept(requestId, toolId, safeArgs, description));
     }
 
     // ---------- 实体状态同步 ----------

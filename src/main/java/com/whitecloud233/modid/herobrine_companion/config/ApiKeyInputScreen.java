@@ -20,6 +20,8 @@ import java.util.function.Consumer;
 public class ApiKeyInputScreen extends Screen {
     private static final int MODEL_DROPDOWN_ROW_HEIGHT = 18;
     private static final int MODEL_DROPDOWN_MAX_ROWS = 6;
+    private static final int FORMAT_DROPDOWN_ROW_HEIGHT = 18;
+    private static final List<String> FORMAT_OPTIONS = List.of("", "OPENAI_CHAT", "OPENAI_RESPONSES", "ANTHROPIC", "GEMINI");
     private static final int MAX_CONTENT_WIDTH = 300;
     private static final int MIN_CONTENT_WIDTH = 220;
     private static final int MAX_CONTENT_HEIGHT = 330;
@@ -34,8 +36,10 @@ public class ApiKeyInputScreen extends Screen {
     private Button deepseekButton;
     private Button openrouterButton;
     private Button qiniuButton;
+    private Button geminiButton;
     private Button customButton;
     private Button saveButton;
+    private Button routingButton;
     private Button cancelButton;
     private Button fetchModelsButton;
     private EditBox apiKeyBox;
@@ -52,6 +56,11 @@ public class ApiKeyInputScreen extends Screen {
     private String lastModelDiscoveryKey = "";
     private boolean modelDropdownOpen = false;
     private int modelDropdownScrollIndex = 0;
+    private Button formatButton;
+    private boolean formatDropdownOpen = false;
+    private int formatDropdownX;
+    private int formatDropdownY;
+    private int formatDropdownWidth;
     private int scrollOffset = 0;
     private int modelDropdownX;
     private int modelDropdownY;
@@ -80,7 +89,8 @@ public class ApiKeyInputScreen extends Screen {
         this.deepseekButton = this.addRenderableWidget(this.createProviderButton(layout.contentX(), layout.providerButtonY(), layout.providerButtonWidth(), LLMConfig.Provider.DEEPSEEK_OFFICIAL));
         this.openrouterButton = this.addRenderableWidget(this.createProviderButton(layout.contentX() + layout.providerButtonWidth() + CONTROL_GAP, layout.providerButtonY(), layout.providerButtonWidth(), LLMConfig.Provider.OPENROUTER));
         this.qiniuButton = this.addRenderableWidget(this.createProviderButton(layout.contentX() + (layout.providerButtonWidth() + CONTROL_GAP) * 2, layout.providerButtonY(), layout.providerButtonWidth(), LLMConfig.Provider.QINIU_CLOUD));
-        this.customButton = this.addRenderableWidget(this.createProviderButton(layout.contentX() + (layout.providerButtonWidth() + CONTROL_GAP) * 3, layout.providerButtonY(), layout.providerButtonWidth(), LLMConfig.Provider.CUSTOM));
+        this.geminiButton = this.addRenderableWidget(this.createProviderButton(layout.contentX() + (layout.providerButtonWidth() + CONTROL_GAP) * 3, layout.providerButtonY(), layout.providerButtonWidth(), LLMConfig.Provider.GEMINI));
+        this.customButton = this.addRenderableWidget(this.createProviderButton(layout.contentX() + (layout.providerButtonWidth() + CONTROL_GAP) * 4, layout.providerButtonY(), layout.providerButtonWidth(), LLMConfig.Provider.CUSTOM));
 
         // 创建 API Key 输入框，使用翻译键
         this.apiKeyBox = new MouseSelectableEditBox(this.font, layout.contentX(), layout.apiKeyBoxY(), layout.contentWidth(), BUTTON_HEIGHT, Component.translatable("gui.herobrine_companion.api_setup.api_key"));
@@ -142,6 +152,11 @@ public class ApiKeyInputScreen extends Screen {
         });
         this.addRenderableWidget(this.modelNameBox);
 
+        this.formatButton = this.addRenderableWidget(Button.builder(this.getFormatButtonMessage(this.getCustomApiFormatDraft()), button -> {
+            this.formatDropdownOpen = !this.formatDropdownOpen;
+            this.updateSaveButtonState();
+        }).pos(layout.contentX(), layout.formatBoxY()).size(layout.contentWidth(), BUTTON_HEIGHT).build());
+
         this.refreshProviderButtons();
         this.refreshInputMode();
 
@@ -149,9 +164,18 @@ public class ApiKeyInputScreen extends Screen {
         this.saveButton = this.addRenderableWidget(Button.builder(Component.translatable("gui.herobrine_companion.api_setup.confirm_save"), (button) -> {
             this.captureCurrentDraft();
             ProviderDraft draft = this.getSelectedDraft();
+            if (this.selectedProvider == LLMConfig.Provider.CUSTOM) {
+                LLMConfig.customApiFormat = draft.apiFormat;
+            }
             LLMConfig.saveProviderSettings(this.selectedProvider, draft.providerId, draft.apiKey, draft.endpoint, draft.modelId, draft.modelName);
             this.minecraft.setScreen(this.lastScreen);
         }).pos(layout.saveButtonX(), layout.actionButtonY()).size(layout.actionButtonWidth(), BUTTON_HEIGHT).build());
+
+        this.routingButton = this.addRenderableWidget(Button.builder(Component.translatable("gui.herobrine_companion.api_setup.routing_button"), (button) ->
+                this.minecraft.setScreen(new LLMRoutingScreen(this)))
+                .pos(layout.routingButtonX(), layout.actionButtonY())
+                .size(layout.actionButtonWidth(), BUTTON_HEIGHT)
+                .build());
 
         this.cancelButton = this.addRenderableWidget(Button.builder(Component.translatable("gui.herobrine_companion.api_setup.cancel"), (button) ->
                 this.minecraft.setScreen(this.lastScreen))
@@ -190,24 +214,26 @@ public class ApiKeyInputScreen extends Screen {
         int endpointBoxY = providerIdBoxY + fieldGap;
         int modelBoxY = endpointBoxY + fieldGap;
         int modelNameBoxY = modelBoxY + fieldGap - 2;
-        int actionButtonY = modelNameBoxY + (fieldGap < 30 ? 24 : 32);
+        int formatBoxY = modelNameBoxY + fieldGap - 2;
+        int actionButtonY = formatBoxY + (fieldGap < 30 ? 24 : 32);
         int warningY = actionButtonY - 12;
         int infoY = actionButtonY + 28;
 
-        int providerButtonWidth = Math.max(1, (contentWidth - CONTROL_GAP * 3) / 4);
+        int providerButtonWidth = Math.max(1, (contentWidth - CONTROL_GAP * 4) / 5);
         int fetchButtonWidth = Math.min(74, Math.max(60, contentWidth / 4));
         int modelBoxWidth = Math.max(1, contentWidth - fetchButtonWidth - CONTROL_GAP);
         int fetchButtonX = contentX + modelBoxWidth + CONTROL_GAP;
-        int actionButtonWidth = Math.min(130, Math.max(1, (contentWidth - ACTION_GAP) / 2));
-        int actionGroupWidth = actionButtonWidth * 2 + ACTION_GAP;
+        int actionButtonWidth = Math.min(130, Math.max(1, (contentWidth - ACTION_GAP * 2) / 3));
+        int actionGroupWidth = actionButtonWidth * 3 + ACTION_GAP * 2;
         int saveButtonX = contentX + (contentWidth - actionGroupWidth) / 2;
-        int cancelButtonX = saveButtonX + actionButtonWidth + ACTION_GAP;
+        int routingButtonX = saveButtonX + actionButtonWidth + ACTION_GAP;
+        int cancelButtonX = routingButtonX + actionButtonWidth + ACTION_GAP;
 
         return new Layout(contentX, contentTop, contentWidth, contentHeight, centerX,
                 titleY, promptY, providerPromptY, providerButtonY, providerButtonWidth,
                 apiKeyBoxY, providerIdBoxY, endpointBoxY, modelBoxY, modelBoxWidth,
-                fetchButtonX, fetchButtonWidth, modelNameBoxY, actionButtonY, actionButtonWidth,
-                saveButtonX, cancelButtonX, warningY, infoY, modelBoxY + BUTTON_HEIGHT + 2,
+                fetchButtonX, fetchButtonWidth, modelNameBoxY, formatBoxY, actionButtonY, actionButtonWidth,
+                saveButtonX, routingButtonX, cancelButtonX, warningY, infoY, modelBoxY + BUTTON_HEIGHT + 2,
                 viewportTop, contentHeight);
     }
 
@@ -264,8 +290,12 @@ public class ApiKeyInputScreen extends Screen {
             this.qiniuButton.setX(layout.contentX() + (layout.providerButtonWidth() + CONTROL_GAP) * 2);
             this.qiniuButton.setY(layout.providerButtonY());
         }
+        if (this.geminiButton != null) {
+            this.geminiButton.setX(layout.contentX() + (layout.providerButtonWidth() + CONTROL_GAP) * 3);
+            this.geminiButton.setY(layout.providerButtonY());
+        }
         if (this.customButton != null) {
-            this.customButton.setX(layout.contentX() + (layout.providerButtonWidth() + CONTROL_GAP) * 3);
+            this.customButton.setX(layout.contentX() + (layout.providerButtonWidth() + CONTROL_GAP) * 4);
             this.customButton.setY(layout.providerButtonY());
         }
         if (this.apiKeyBox != null) {
@@ -292,9 +322,20 @@ public class ApiKeyInputScreen extends Screen {
             this.modelNameBox.setX(layout.contentX());
             this.modelNameBox.setY(layout.modelNameBoxY());
         }
+        if (this.formatButton != null) {
+            this.formatButton.setX(layout.contentX());
+            this.formatButton.setY(layout.formatBoxY());
+        }
+        this.formatDropdownX = layout.contentX();
+        this.formatDropdownY = layout.formatBoxY() + BUTTON_HEIGHT + 2;
+        this.formatDropdownWidth = layout.contentWidth();
         if (this.saveButton != null) {
             this.saveButton.setX(layout.saveButtonX());
             this.saveButton.setY(layout.actionButtonY());
+        }
+        if (this.routingButton != null) {
+            this.routingButton.setX(layout.routingButtonX());
+            this.routingButton.setY(layout.actionButtonY());
         }
         if (this.cancelButton != null) {
             this.cancelButton.setX(layout.cancelButtonX());
@@ -359,6 +400,7 @@ public class ApiKeyInputScreen extends Screen {
         this.updateProviderButton(this.deepseekButton, LLMConfig.Provider.DEEPSEEK_OFFICIAL);
         this.updateProviderButton(this.openrouterButton, LLMConfig.Provider.OPENROUTER);
         this.updateProviderButton(this.qiniuButton, LLMConfig.Provider.QINIU_CLOUD);
+        this.updateProviderButton(this.geminiButton, LLMConfig.Provider.GEMINI);
         this.updateProviderButton(this.customButton, LLMConfig.Provider.CUSTOM);
     }
 
@@ -375,6 +417,14 @@ public class ApiKeyInputScreen extends Screen {
         if (this.modelNameBox != null) {
             this.modelNameBox.setEditable(true);
             this.modelNameBox.active = true;
+        }
+        if (this.formatButton != null) {
+            this.formatButton.visible = customSelected;
+            this.formatButton.active = customSelected;
+            this.formatButton.setMessage(this.getFormatButtonMessage(this.getCustomApiFormatDraft()));
+        }
+        if (!customSelected) {
+            this.formatDropdownOpen = false;
         }
         this.updateFetchModelsButtonState();
     }
@@ -398,6 +448,7 @@ public class ApiKeyInputScreen extends Screen {
             case OPENROUTER -> Component.translatable("gui.herobrine_companion.api_setup.provider.openrouter");
             case QINIU_CLOUD -> Component.translatable("gui.herobrine_companion.api_setup.provider.qiniu");
             case QINIU_CLOUD_ANTHROPIC -> Component.translatable("gui.herobrine_companion.api_setup.provider.qiniu_anthropic");
+            case GEMINI -> Component.translatable("gui.herobrine_companion.api_setup.provider.gemini");
             case CUSTOM -> Component.translatable("gui.herobrine_companion.api_setup.provider.custom");
         };
     }
@@ -408,6 +459,7 @@ public class ApiKeyInputScreen extends Screen {
             case OPENROUTER -> Component.translatable("gui.herobrine_companion.api_setup.provider_hint.openrouter", this.selectedProvider.getDefaultModel());
             case QINIU_CLOUD -> Component.translatable("gui.herobrine_companion.api_setup.provider_hint.qiniu", this.selectedProvider.getDefaultModel());
             case QINIU_CLOUD_ANTHROPIC -> Component.translatable("gui.herobrine_companion.api_setup.provider_hint.qiniu_anthropic", this.selectedProvider.getDefaultModel());
+            case GEMINI -> Component.translatable("gui.herobrine_companion.api_setup.provider_hint.gemini", this.selectedProvider.getDefaultModel());
             case CUSTOM -> Component.translatable("gui.herobrine_companion.api_setup.provider_hint.custom");
         };
     }
@@ -420,7 +472,8 @@ public class ApiKeyInputScreen extends Screen {
         LLMConfig.Provider normalizedProvider = provider == null ? LLMConfig.Provider.QINIU_CLOUD : provider;
         return this.providerDrafts.computeIfAbsent(normalizedProvider, ignored -> {
             LLMConfig.ProviderSettings settings = LLMConfig.getProviderSettings(normalizedProvider);
-            return new ProviderDraft(settings.providerId(), settings.apiKey(), settings.endpoint(), settings.modelId(), settings.modelName());
+            return new ProviderDraft(settings.providerId(), settings.apiKey(), settings.endpoint(), settings.modelId(), settings.modelName(),
+                    normalizedProvider == LLMConfig.Provider.CUSTOM ? LLMConfig.customApiFormat : "");
         });
     }
 
@@ -472,17 +525,22 @@ public class ApiKeyInputScreen extends Screen {
     }
 
     private void updateSaveButtonState() {
+        boolean anyDropdownOpen = this.modelDropdownOpen || this.formatDropdownOpen;
         if (this.saveButton != null) {
             boolean hasRequiredCoreFields = !this.apiKeyBox.getValue().trim().isEmpty()
                     && !this.endpointBox.getValue().trim().isEmpty()
                     && !this.modelBox.getValue().trim().isEmpty()
                     && !this.providerIdBox.getValue().trim().isEmpty();
             this.saveButton.active = hasRequiredCoreFields;
-            this.saveButton.visible = !this.modelDropdownOpen;
+            this.saveButton.visible = !anyDropdownOpen;
         }
         if (this.cancelButton != null) {
-            this.cancelButton.active = !this.modelDropdownOpen;
-            this.cancelButton.visible = !this.modelDropdownOpen;
+            this.cancelButton.active = !anyDropdownOpen;
+            this.cancelButton.visible = !anyDropdownOpen;
+        }
+        if (this.routingButton != null) {
+            this.routingButton.active = !anyDropdownOpen;
+            this.routingButton.visible = !anyDropdownOpen;
         }
         this.updateFetchModelsButtonState();
     }
@@ -550,7 +608,9 @@ public class ApiKeyInputScreen extends Screen {
         }
 
         LLMConfig.Provider provider = this.selectedProvider == null ? LLMConfig.Provider.QINIU_CLOUD : this.selectedProvider;
-        LLMConfig.EndpointFormat endpointFormat = LLMConfig.detectEndpointFormat(endpoint);
+        LLMConfig.EndpointFormat endpointFormat = provider == LLMConfig.Provider.CUSTOM && LLMConfig.getCustomApiFormat() != null
+                ? LLMConfig.getCustomApiFormat()
+                : LLMConfig.detectEndpointFormat(endpoint);
         this.modelDiscoveryInFlight = true;
         this.modelDiscoveryStatus = Component.translatable("gui.herobrine_companion.api_setup.model_discovery_fetching");
         this.modelDiscoveryStatusColor = 0xAAAAAA;
@@ -794,19 +854,84 @@ public class ApiKeyInputScreen extends Screen {
         return this.selectedProvider == LLMConfig.Provider.CUSTOM;
     }
 
+    private String getCustomApiFormatDraft() {
+        ProviderDraft draft = this.getSelectedDraft();
+        return draft == null ? "" : draft.apiFormat;
+    }
+
+    private void setCustomApiFormatDraft(String format) {
+        this.getSelectedDraft().apiFormat = format == null ? "" : format;
+    }
+
+    private Component getFormatButtonMessage(String format) {
+        return Component.translatable("gui.herobrine_companion.api_setup.format." + formatDisplaySuffix(format));
+    }
+
+    private static String formatDisplaySuffix(String format) {
+        if (format == null || format.isBlank()) {
+            return "auto";
+        }
+        return switch (format) {
+            case "OPENAI_CHAT" -> "openai_chat";
+            case "OPENAI_RESPONSES" -> "openai_responses";
+            case "ANTHROPIC" -> "anthropic";
+            case "GEMINI" -> "gemini";
+            default -> "auto";
+        };
+    }
+
+    private boolean isMouseInsideFormatDropdown(double mouseX, double mouseY) {
+        return this.formatDropdownOpen
+                && mouseX >= this.formatDropdownX
+                && mouseX < this.formatDropdownX + this.formatDropdownWidth
+                && mouseY >= this.formatDropdownY
+                && mouseY < this.formatDropdownY + FORMAT_OPTIONS.size() * FORMAT_DROPDOWN_ROW_HEIGHT;
+    }
+
+    private void renderFormatDropdown(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+        if (!this.formatDropdownOpen) {
+            return;
+        }
+        int dropdownHeight = FORMAT_OPTIONS.size() * FORMAT_DROPDOWN_ROW_HEIGHT;
+        guiGraphics.fill(this.formatDropdownX, this.formatDropdownY,
+                this.formatDropdownX + this.formatDropdownWidth, this.formatDropdownY + dropdownHeight, 0xFF101010);
+        guiGraphics.renderOutline(this.formatDropdownX, this.formatDropdownY, this.formatDropdownWidth, dropdownHeight, 0xFF6C6C6C);
+
+        for (int row = 0; row < FORMAT_OPTIONS.size(); row++) {
+            String format = FORMAT_OPTIONS.get(row);
+            int rowY = this.formatDropdownY + row * FORMAT_DROPDOWN_ROW_HEIGHT;
+            boolean selected = format.equals(this.getCustomApiFormatDraft());
+            boolean hovered = mouseX >= this.formatDropdownX
+                    && mouseX < this.formatDropdownX + this.formatDropdownWidth
+                    && mouseY >= rowY
+                    && mouseY < rowY + FORMAT_DROPDOWN_ROW_HEIGHT;
+            if (selected) {
+                guiGraphics.fill(this.formatDropdownX + 1, rowY,
+                        this.formatDropdownX + this.formatDropdownWidth - 1, rowY + FORMAT_DROPDOWN_ROW_HEIGHT, 0xD0406040);
+            } else if (hovered) {
+                guiGraphics.fill(this.formatDropdownX + 1, rowY,
+                        this.formatDropdownX + this.formatDropdownWidth - 1, rowY + FORMAT_DROPDOWN_ROW_HEIGHT, 0xD0353535);
+            }
+            guiGraphics.drawString(this.font, this.getFormatButtonMessage(format),
+                    this.formatDropdownX + 5, rowY + 4, selected ? 0xB8FFB8 : 0xE6E6E6, false);
+        }
+    }
+
     private static final class ProviderDraft {
         private String providerId;
         private String apiKey;
         private String endpoint;
         private String modelId;
         private String modelName;
+        private String apiFormat;
 
-        private ProviderDraft(String providerId, String apiKey, String endpoint, String modelId, String modelName) {
+        private ProviderDraft(String providerId, String apiKey, String endpoint, String modelId, String modelName, String apiFormat) {
             this.providerId = providerId == null ? "" : providerId;
             this.apiKey = apiKey == null ? "" : apiKey;
             this.endpoint = endpoint == null ? "" : endpoint;
             this.modelId = modelId == null ? "" : modelId;
             this.modelName = modelName == null ? "" : modelName;
+            this.apiFormat = apiFormat == null ? "" : apiFormat;
         }
     }
 
@@ -924,8 +1049,16 @@ public class ApiKeyInputScreen extends Screen {
         guiGraphics.drawString(this.font, Component.translatable("gui.herobrine_companion.api_setup.endpoint_input"), layout.contentX(), layout.endpointBoxY() - 12, 0xFFFFFF);
         guiGraphics.drawString(this.font, Component.translatable("gui.herobrine_companion.api_setup.model_id"), layout.contentX(), layout.modelBoxY() - 12, 0xFFFFFF);
         guiGraphics.drawString(this.font, Component.translatable("gui.herobrine_companion.api_setup.model_name"), layout.contentX(), layout.modelNameBoxY() - 12, 0xFFFFFF);
+        if (this.isCustomProviderSelected()) {
+            guiGraphics.drawString(this.font, Component.translatable("gui.herobrine_companion.api_setup.format"), layout.contentX(), layout.formatBoxY() - 12, 0xFFFFFF);
+        }
 
         super.render(guiGraphics, mouseX, mouseY, partialTick);
+
+        if (this.formatDropdownOpen && this.isCustomProviderSelected()) {
+            this.renderFormatDropdown(guiGraphics, mouseX, mouseY);
+            return;
+        }
 
         if (this.modelDropdownOpen) {
             this.renderModelDropdown(guiGraphics, mouseX, mouseY);
@@ -989,6 +1122,25 @@ public class ApiKeyInputScreen extends Screen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (this.formatDropdownOpen) {
+            if (button == 0 && this.isMouseInsideFormatDropdown(mouseX, mouseY)) {
+                int row = ((int) mouseY - this.formatDropdownY) / FORMAT_DROPDOWN_ROW_HEIGHT;
+                if (row >= 0 && row < FORMAT_OPTIONS.size()) {
+                    String format = FORMAT_OPTIONS.get(row);
+                    this.setCustomApiFormatDraft(format);
+                    if (this.formatButton != null) {
+                        this.formatButton.setMessage(this.getFormatButtonMessage(format));
+                    }
+                    this.formatDropdownOpen = false;
+                    this.updateSaveButtonState();
+                }
+                return true;
+            }
+            this.formatDropdownOpen = false;
+            this.updateSaveButtonState();
+            return super.mouseClicked(mouseX, mouseY, button);
+        }
+
         if (this.modelDropdownOpen) {
             if (button == 0 && this.isMouseInsideModelDropdown(mouseX, mouseY)) {
                 int row = ((int) mouseY - this.modelDropdownY - 1) / MODEL_DROPDOWN_ROW_HEIGHT;
@@ -1042,9 +1194,11 @@ public class ApiKeyInputScreen extends Screen {
             int fetchButtonX,
             int fetchButtonWidth,
             int modelNameBoxY,
+            int formatBoxY,
             int actionButtonY,
             int actionButtonWidth,
             int saveButtonX,
+            int routingButtonX,
             int cancelButtonX,
             int warningY,
             int infoY,

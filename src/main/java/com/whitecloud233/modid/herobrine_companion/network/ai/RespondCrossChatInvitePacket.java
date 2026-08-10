@@ -37,7 +37,7 @@ public class RespondCrossChatInvitePacket {
             }
             ServerPlayer requester = target.server.getPlayerList().getPlayer(this.requesterId);
             if (requester == null) {
-                target.sendSystemMessage(net.minecraft.network.chat.Component.literal("§d[跨HB] §f发起请求的玩家已经离线。"));
+                target.sendSystemMessage(net.minecraft.network.chat.Component.translatable("message.herobrine_companion.cross_chat.requester_offline"));
                 return;
             }
             HeroCrossChatManager.INSTANCE.respondToRequest(target, requester, this.accept);

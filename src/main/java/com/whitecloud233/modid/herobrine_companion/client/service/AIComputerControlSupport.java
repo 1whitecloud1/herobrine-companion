@@ -2,6 +2,7 @@ package com.whitecloud233.modid.herobrine_companion.client.service;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import com.whitecloud233.modid.herobrine_companion.client.llm.LlmToolSpec;
 
 import java.util.Locale;
 import java.util.Set;
@@ -23,24 +24,8 @@ final class AIComputerControlSupport {
         return TOOL_COMPUTER_CONTROL.equals(toolName);
     }
 
-    static JsonObject createOpenAiTool() {
-        JsonObject tool = new JsonObject();
-        tool.addProperty("type", "function");
-
-        JsonObject function = new JsonObject();
-        function.addProperty("name", TOOL_COMPUTER_CONTROL);
-        function.addProperty("description", buildDescription());
-        function.add("parameters", createInputSchema());
-        tool.add("function", function);
-        return tool;
-    }
-
-    static JsonObject createAnthropicTool() {
-        JsonObject tool = new JsonObject();
-        tool.addProperty("name", TOOL_COMPUTER_CONTROL);
-        tool.addProperty("description", buildDescription());
-        tool.add("input_schema", createInputSchema());
-        return tool;
+    static LlmToolSpec toolSpec() {
+        return new LlmToolSpec(TOOL_COMPUTER_CONTROL, buildDescription(), createInputSchema());
     }
 
     static ParseResult parseAction(JsonObject args) {

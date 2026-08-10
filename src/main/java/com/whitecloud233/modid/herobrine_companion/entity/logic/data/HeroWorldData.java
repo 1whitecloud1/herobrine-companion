@@ -37,6 +37,7 @@ public class HeroWorldData {
         public int trust = 0;
         public Set<Integer> claimedRewards = new HashSet<>();
         public CompoundTag brainMemory = new CompoundTag();
+        public CompoundTag heroMemory = new CompoundTag();
         public ListTag armorItems = new ListTag();
         public ListTag handItems = new ListTag();
         public CompoundTag curiosBackItem = new CompoundTag();
@@ -60,6 +61,7 @@ public class HeroWorldData {
             tag.putInt("Trust", trust);
             tag.putIntArray("ClaimedRewards", claimedRewards.stream().mapToInt(i -> i).toArray());
             tag.put("BrainMemory", brainMemory);
+            tag.put("HeroMemory", heroMemory);
             tag.put("ArmorItems", armorItems);
             tag.put("HandItems", handItems);
             tag.put("CuriosBackItem", curiosBackItem);
@@ -86,6 +88,7 @@ public class HeroWorldData {
             int[] rewards = tag.getIntArray("ClaimedRewards");
             for (int id : rewards) profile.claimedRewards.add(id);
             if (tag.contains("BrainMemory")) profile.brainMemory = tag.getCompound("BrainMemory");
+            if (tag.contains("HeroMemory", 10)) profile.heroMemory = tag.getCompound("HeroMemory");
             if (tag.contains("ArmorItems", 9)) profile.armorItems = tag.getList("ArmorItems", 10);
             if (tag.contains("HandItems", 9)) profile.handItems = tag.getList("HandItems", 10);
             if (tag.contains("CuriosBackItem", 10)) profile.curiosBackItem = tag.getCompound("CuriosBackItem");
@@ -292,6 +295,14 @@ public class HeroWorldData {
         if (uuid == null) return;
         PlayerProfile profile = getProfile(uuid);
         profile.brainMemory = memory;
+        profile.setDirty();
+    }
+
+    public CompoundTag getHeroMemory(UUID uuid) { return getProfile(uuid).heroMemory; }
+    public void setHeroMemory(UUID uuid, CompoundTag memory) {
+        if (uuid == null) return;
+        PlayerProfile profile = getProfile(uuid);
+        profile.heroMemory = memory;
         profile.setDirty();
     }
 
