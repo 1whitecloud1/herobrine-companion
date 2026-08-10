@@ -43,6 +43,17 @@ public class HeroSkinScreen extends Screen {
     // 面板尺寸
     private static final int PANEL_WIDTH = 340;
     private static final int PANEL_HEIGHT = 220;
+
+    /** 面板实际尺寸：init/render 时按窗口钳制后写入，供布局使用。 */
+    private int panelW = PANEL_WIDTH;
+    private int panelH = PANEL_HEIGHT;
+
+    /** 面板几何：宽高钳制到窗口内，居中。返回 {startX, startY}，并更新 panelW/panelH。 */
+    private int[] panelDims() {
+        this.panelW = Math.min(PANEL_WIDTH, Math.max(240, this.width - 16));
+        this.panelH = Math.min(PANEL_HEIGHT, Math.max(180, this.height - 16));
+        return new int[]{(this.width - panelW) / 2, Math.max(4, (this.height - panelH) / 2)};
+    }
     
     // 配色
     private static final int COL_BG_MAIN    = 0xFF2B2B2B;
@@ -108,15 +119,16 @@ public class HeroSkinScreen extends Screen {
 
         int centerX = this.width / 2;
         int centerY = this.height / 2;
-        int startX = centerX - PANEL_WIDTH / 2;
-        int startY = centerY - PANEL_HEIGHT / 2;
-        int btnY = startY + PANEL_HEIGHT - 50;
+        int[] dims = panelDims();
+        int startX = dims[0];
+        int startY = dims[1];
+        int btnY = startY + panelH - 50;
 
         // 计算当前页显示的皮肤
         int startIndex = currentPage * ITEMS_PER_PAGE;
         int endIndex = Math.min(startIndex + ITEMS_PER_PAGE, skinOptions.size());
-        
-        int slotWidth = PANEL_WIDTH / ITEMS_PER_PAGE;
+
+        int slotWidth = panelW / ITEMS_PER_PAGE;
         
         for (int i = startIndex; i < endIndex; i++) {
             SkinOption option = skinOptions.get(i);
@@ -197,7 +209,7 @@ public class HeroSkinScreen extends Screen {
             
             if (endIndex < skinOptions.size()) {
                 this.addRenderableWidget(new HeroScreen.ThemedButton(
-                    startX + PANEL_WIDTH - 30, centerY, 20, 20, Component.literal(">"),
+                    startX + panelW - 30, centerY, 20, 20, Component.literal(">"),
                     b -> { currentPage++; rebuildWidgets(); }, null
                 ));
             }
@@ -205,8 +217,8 @@ public class HeroSkinScreen extends Screen {
 
         // 返回按钮
         this.addRenderableWidget(new HeroScreen.ThemedButton(
-            centerX - 40, 
-            startY + PANEL_HEIGHT - 25, 
+            centerX - 40,
+            startY + panelH - 25,
             80, 20,
             Component.translatable("gui.herobrine_companion.back"),
             button -> {
@@ -241,7 +253,7 @@ public class HeroSkinScreen extends Screen {
                     t.printStackTrace();
                     Minecraft.getInstance().execute(() -> {
                         if (Minecraft.getInstance().player != null) {
-                            Minecraft.getInstance().player.displayClientMessage(Component.literal("Error: LWJGL TinyFileDialogs not available. Please paste path manually."), false);
+                            Minecraft.getInstance().player.displayClientMessage(Component.translatable("message.herobrine_companion.skin.file_dialog_unavailable"), false);
                         }
                     });
                 }
@@ -277,7 +289,7 @@ public class HeroSkinScreen extends Screen {
             return Files.readAllBytes(Path.of(this.customSkinName));
         } catch (Exception e) {
             if (this.minecraft != null && this.minecraft.player != null) {
-                this.minecraft.player.displayClientMessage(Component.literal("Failed to read custom skin file: " + e.getMessage()), false);
+                this.minecraft.player.displayClientMessage(Component.translatable("message.herobrine_companion.skin.read_failed", e.getMessage()), false);
             }
             return new byte[0];
         }
@@ -289,12 +301,13 @@ public class HeroSkinScreen extends Screen {
         
         int centerX = this.width / 2;
         int centerY = this.height / 2;
-        int startX = centerX - PANEL_WIDTH / 2;
-        int startY = centerY - PANEL_HEIGHT / 2;
+        int[] dims = panelDims();
+        int startX = dims[0];
+        int startY = dims[1];
 
         // 背景
-        guiGraphics.fill(startX, startY, startX + PANEL_WIDTH, startY + PANEL_HEIGHT, COL_BG_MAIN);
-        guiGraphics.renderOutline(startX, startY, PANEL_WIDTH, PANEL_HEIGHT, COL_BORDER);
+        guiGraphics.fill(startX, startY, startX + panelW, startY + panelH, COL_BG_MAIN);
+        guiGraphics.renderOutline(startX, startY, panelW, panelH, COL_BORDER);
 
         // 标题
         guiGraphics.drawCenteredString(this.font, this.title, centerX, startY + 10, COL_TITLE);
@@ -302,7 +315,7 @@ public class HeroSkinScreen extends Screen {
         // 渲染当前页的皮肤预览
         int startIndex = currentPage * ITEMS_PER_PAGE;
         int endIndex = Math.min(startIndex + ITEMS_PER_PAGE, skinOptions.size());
-        int slotWidth = PANEL_WIDTH / ITEMS_PER_PAGE;
+        int slotWidth = panelW / ITEMS_PER_PAGE;
 
         for (int i = startIndex; i < endIndex; i++) {
             SkinOption option = skinOptions.get(i);

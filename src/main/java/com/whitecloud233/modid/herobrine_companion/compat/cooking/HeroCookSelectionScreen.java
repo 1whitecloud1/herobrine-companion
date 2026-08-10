@@ -39,33 +39,43 @@ public class HeroCookSelectionScreen extends Screen {
         this.previousScreen = previousScreen;
     }
 
+    /** 面板几何：宽高钳制到窗口内，居中。返回 {left, top, w, h}。 */
+    private int[] panelDims() {
+        int w = Math.min(PANEL_WIDTH, Math.max(220, this.width - 16));
+        int h = Math.min(PANEL_HEIGHT, Math.max(180, this.height - 16));
+        return new int[]{(this.width - w) / 2, Math.max(4, (this.height - h) / 2), w, h};
+    }
+
     @Override
     protected void init() {
         super.init();
-        int left = (this.width - PANEL_WIDTH) / 2;
-        int top = (this.height - PANEL_HEIGHT) / 2;
+        int[] dims = panelDims();
+        int left = dims[0];
+        int top = dims[1];
+        int panelW = dims[2];
+        int panelH = dims[3];
 
-        this.optionList = new CookOptionList(this.minecraft, PANEL_WIDTH - 16, PANEL_HEIGHT - 90, top + 34, 28);
+        this.optionList = new CookOptionList(this.minecraft, panelW - 16, panelH - 90, top + 34, 28);
         this.optionList.setLeftPos(left + 8);
         this.addRenderableWidget(this.optionList);
         this.refreshOptionList();
 
         this.addRenderableWidget(new HeroScreen.ThemedButton(
-                left + PANEL_WIDTH - 72, top + PANEL_HEIGHT - 48, 28, 16,
+                left + panelW - 72, top + panelH - 48, 28, 16,
                 Component.literal("-"),
                 button -> this.adjustRepeatCount(-1),
                 null
         ));
 
         this.addRenderableWidget(new HeroScreen.ThemedButton(
-                left + PANEL_WIDTH - 40, top + PANEL_HEIGHT - 48, 28, 16,
+                left + panelW - 40, top + panelH - 48, 28, 16,
                 Component.literal("+"),
                 button -> this.adjustRepeatCount(1),
                 null
         ));
 
         this.addRenderableWidget(new HeroScreen.ThemedButton(
-                left + PANEL_WIDTH - 72, top + PANEL_HEIGHT - 24, 64, 16,
+                left + panelW - 72, top + panelH - 24, 64, 16,
                 Component.translatable("gui.herobrine_companion.back"),
                 button -> this.onClose(),
                 null
@@ -76,23 +86,26 @@ public class HeroCookSelectionScreen extends Screen {
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         this.renderBackground(guiGraphics);
 
-        int left = (this.width - PANEL_WIDTH) / 2;
-        int top = (this.height - PANEL_HEIGHT) / 2;
-        guiGraphics.fill(left, top, left + PANEL_WIDTH, top + PANEL_HEIGHT, COL_BG);
-        guiGraphics.fill(left, top, left + PANEL_WIDTH, top + 1, COL_BORDER);
-        guiGraphics.fill(left, top + PANEL_HEIGHT - 1, left + PANEL_WIDTH, top + PANEL_HEIGHT, COL_BORDER);
-        guiGraphics.fill(left, top, left + 1, top + PANEL_HEIGHT, COL_BORDER);
-        guiGraphics.fill(left + PANEL_WIDTH - 1, top, left + PANEL_WIDTH, top + PANEL_HEIGHT, COL_BORDER);
+        int[] dims = panelDims();
+        int left = dims[0];
+        int top = dims[1];
+        int panelW = dims[2];
+        int panelH = dims[3];
+        guiGraphics.fill(left, top, left + panelW, top + panelH, COL_BG);
+        guiGraphics.fill(left, top, left + panelW, top + 1, COL_BORDER);
+        guiGraphics.fill(left, top + panelH - 1, left + panelW, top + panelH, COL_BORDER);
+        guiGraphics.fill(left, top, left + 1, top + panelH, COL_BORDER);
+        guiGraphics.fill(left + panelW - 1, top, left + panelW, top + panelH, COL_BORDER);
 
         guiGraphics.drawString(this.font, this.title, left + 10, top + 8, COL_TEXT, false);
         guiGraphics.drawString(this.font, Component.translatable("gui.herobrine_companion.cook_select_hint"),
                 left + 10, top + 18, COL_SUBTEXT, false);
         guiGraphics.drawString(this.font,
                 Component.translatable("gui.herobrine_companion.cook_select_count", this.repeatCount),
-                left + 10, top + PANEL_HEIGHT - 44, COL_TEXT, false);
+                left + 10, top + panelH - 44, COL_TEXT, false);
         guiGraphics.drawString(this.font,
                 Component.translatable("gui.herobrine_companion.cook_select_count_hint"),
-                left + 10, top + PANEL_HEIGHT - 32, COL_SUBTEXT, false);
+                left + 10, top + panelH - 32, COL_SUBTEXT, false);
         if (this.optionList != null && this.optionList.isEmpty()) {
             guiGraphics.drawCenteredString(this.font,
                     Component.translatable("gui.herobrine_companion.cook_select_none_for_count", this.repeatCount),

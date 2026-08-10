@@ -13,6 +13,8 @@ public class HeroRequestScreen extends Screen {
     private final int entityId;
     private static final int PANEL_WIDTH = 250;
     private static final int PANEL_HEIGHT = 160;
+    /** 侧箭头需要左右各 25px，钳制宽度时为它们留边距。 */
+    private static final int ARROW_MARGIN = 50;
 
     // Colors
     private static final int COL_BG = 0xFF2B2B2B;
@@ -28,17 +30,27 @@ public class HeroRequestScreen extends Screen {
         this.entityId = entityId;
     }
 
+    /** 面板几何：宽高钳制到窗口（宽度预留侧箭头边距），居中。 */
+    private record Panel(int left, int top, int width, int height) {
+    }
+
+    private Panel panel() {
+        int w = Math.min(PANEL_WIDTH, Math.max(200, this.width - ARROW_MARGIN));
+        int h = Math.min(PANEL_HEIGHT, Math.max(140, this.height - 16));
+        return new Panel((this.width - w) / 2, Math.max(4, (this.height - h) / 2), w, h);
+    }
+
     @Override
     protected void init() {
         super.init();
-        int centerX = this.width / 2;
+        Panel p = panel();
         int centerY = this.height / 2;
-        int startX = centerX - PANEL_WIDTH / 2;
-        int startY = centerY - PANEL_HEIGHT / 2;
+        int startX = p.left();
+        int startY = p.top();
 
         // Accept Button
         this.addRenderableWidget(new HeroScreen.ThemedButton(
-                startX + PANEL_WIDTH - 85, startY + PANEL_HEIGHT - 25, 80, 20,
+                startX + p.width() - 85, startY + p.height() - 25, 80, 20,
                 Component.translatable("gui.herobrine_companion.request_accept"),
                 button -> {
                     // Send packet to accept the quest (ID: currentQuestIndex + 1)
@@ -50,7 +62,7 @@ public class HeroRequestScreen extends Screen {
 
         // Cancel Button
         this.addRenderableWidget(new HeroScreen.ThemedButton(
-                startX + PANEL_WIDTH - 170, startY + PANEL_HEIGHT - 25, 80, 20,
+                startX + p.width() - 170, startY + p.height() - 25, 80, 20,
                 Component.translatable("gui.herobrine_companion.request_cancel"),
                 button -> {
                     // Send packet to cancel the current quest
@@ -62,7 +74,7 @@ public class HeroRequestScreen extends Screen {
 
         // Back Button
         this.addRenderableWidget(new HeroScreen.ThemedButton(
-                startX + 5, startY + PANEL_HEIGHT - 25, 60, 20,
+                startX + 5, startY + p.height() - 25, 60, 20,
                 Component.translatable("gui.herobrine_companion.back"),
                 button -> {
                     this.onClose();
@@ -79,24 +91,27 @@ public class HeroRequestScreen extends Screen {
         // Next Quest Button
         this.addRenderableWidget(new Button.Builder(Component.literal(">"), button -> {
             currentQuestIndex = (currentQuestIndex + 1) % TOTAL_QUESTS;
-        }).bounds(startX + PANEL_WIDTH + 5, centerY - 10, 20, 20).build());
+        }).bounds(startX + p.width() + 5, centerY - 10, 20, 20).build());
     }
 
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         this.renderBackground(guiGraphics);
 
+        Panel p = panel();
         int centerX = this.width / 2;
-        int centerY = this.height / 2;
-        int startX = centerX - PANEL_WIDTH / 2;
-        int startY = centerY - PANEL_HEIGHT / 2;
+        int startX = p.left();
+        int startY = p.top();
 
         // Background
-        guiGraphics.fill(startX, startY, startX + PANEL_WIDTH, startY + PANEL_HEIGHT, COL_BG);
-        guiGraphics.renderOutline(startX, startY, PANEL_WIDTH, PANEL_HEIGHT, COL_BORDER);
+        guiGraphics.fill(startX, startY, startX + p.width(), startY + p.height(), COL_BG);
+        guiGraphics.renderOutline(startX, startY, p.width(), p.height(), COL_BORDER);
 
         // Title
         guiGraphics.drawCenteredString(this.font, this.title, centerX, startY + 10, COL_TITLE);
+
+        // 内容区 scissor：描述换行超出面板时被截断。
+        guiGraphics.enableScissor(startX + 1, startY + 28, startX + p.width() - 1, startY + p.height() - 30);
 
         // Request Details
         int textX = startX + 15;
@@ -109,7 +124,7 @@ public class HeroRequestScreen extends Screen {
         textY += 15;
 
         String desc = Component.translatable(questDescKey).getString();
-        guiGraphics.drawWordWrap(this.font, Component.literal(desc), textX, textY, PANEL_WIDTH - 30, COL_TEXT);
+        guiGraphics.drawWordWrap(this.font, Component.literal(desc), textX, textY, p.width() - 30, COL_TEXT);
 
         textY += 45;
         guiGraphics.drawString(this.font, Component.translatable("gui.herobrine_companion.request_reward"), textX, textY, 0xFF6A8759, false);
@@ -124,6 +139,8 @@ public class HeroRequestScreen extends Screen {
             textY += 10;
             guiGraphics.drawString(this.font, "- Trust +20", textX + 5, textY, COL_TEXT, false);
         }
+
+        guiGraphics.disableScissor();
 
         super.render(guiGraphics, mouseX, mouseY, partialTick);
     }

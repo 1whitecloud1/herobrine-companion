@@ -38,6 +38,13 @@ public class HeroRewardScreen extends Screen {
         this.entityId = entityId;
     }
 
+    /** 面板几何：宽高钳制到窗口内，居中。返回 {startX, startY, w, h}。 */
+    private int[] panelDims() {
+        int w = Math.min(PANEL_WIDTH, Math.max(240, this.width - 16));
+        int h = Math.min(PANEL_HEIGHT, Math.max(160, this.height - 16));
+        return new int[]{(this.width - w) / 2, Math.max(4, (this.height - h) / 2), w, h};
+    }
+
     @Override
     protected void init() {
         super.init();
@@ -48,8 +55,11 @@ public class HeroRewardScreen extends Screen {
             }
         }
 
-        int startX = (this.width - PANEL_WIDTH) / 2;
-        int startY = (this.height - PANEL_HEIGHT) / 2;
+        int[] dims = panelDims();
+        int startX = dims[0];
+        int startY = dims[1];
+        int panelW = dims[2];
+        int panelH = dims[3];
 
         rewardButtons.clear();
 
@@ -62,7 +72,7 @@ public class HeroRewardScreen extends Screen {
             boolean unlocked = hero != null && hero.getTrustLevel() >= reward.requiredTrust;
             boolean claimed = hero != null && hero.hasClaimedReward(reward.id);
 
-            RewardButton btn = new RewardButton(startX + 200, 0, 80, 20,
+            RewardButton btn = new RewardButton(startX + panelW - 100, 0, 80, 20,
                     Component.translatable(claimed ? "gui.herobrine_companion.claimed" : (unlocked ? "gui.herobrine_companion.claim" : "gui.herobrine_companion.locked")),
                     button -> {
                         if (unlocked && !claimed) {
@@ -88,7 +98,7 @@ public class HeroRewardScreen extends Screen {
         this.addRenderableWidget(Button.builder(Component.translatable("gui.back"), button -> {
             this.onClose();
             Minecraft.getInstance().setScreen(new HeroScreen(this.entityId));
-        }).bounds(startX + PANEL_WIDTH / 2 - 40, startY + PANEL_HEIGHT - 25, 80, 20).build());
+        }).bounds(startX + panelW / 2 - 40, startY + panelH - 25, 80, 20).build());
     }
 
     @Override
@@ -102,12 +112,15 @@ public class HeroRewardScreen extends Screen {
 
         RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
 
-        int startX = (this.width - PANEL_WIDTH) / 2;
-        int startY = (this.height - PANEL_HEIGHT) / 2;
+        int[] dims = panelDims();
+        int startX = dims[0];
+        int startY = dims[1];
+        int panelW = dims[2];
+        int panelH = dims[3];
 
         // 绘制背景
-        guiGraphics.fill(startX, startY, startX + PANEL_WIDTH, startY + PANEL_HEIGHT, 0xFF2B2B2B);
-        guiGraphics.renderOutline(startX, startY, PANEL_WIDTH, PANEL_HEIGHT, 0xFF555555);
+        guiGraphics.fill(startX, startY, startX + panelW, startY + panelH, 0xFF2B2B2B);
+        guiGraphics.renderOutline(startX, startY, panelW, panelH, 0xFF555555);
 
         // 标题
         guiGraphics.drawCenteredString(this.font, this.title, this.width / 2, startY + 10, 0xFFFFFF);
@@ -115,8 +128,8 @@ public class HeroRewardScreen extends Screen {
         // --- 滚动列表区域 ---
         int listX = startX + 10;
         int listY = startY + LIST_TOP_MARGIN;
-        int listWidth = PANEL_WIDTH - 20;
-        int listHeight = PANEL_HEIGHT - LIST_TOP_MARGIN - LIST_BOTTOM_MARGIN;
+        int listWidth = panelW - 20;
+        int listHeight = panelH - LIST_TOP_MARGIN - LIST_BOTTOM_MARGIN;
 
         int contentHeight = HeroRewards.REWARDS.size() * ITEM_HEIGHT;
         int maxScroll = Math.max(0, contentHeight - listHeight);
@@ -170,7 +183,7 @@ public class HeroRewardScreen extends Screen {
 
         // --- 绘制滚动条 ---
         if (maxScroll > 0) {
-            int scrollBarX = startX + PANEL_WIDTH - 8;
+            int scrollBarX = startX + panelW - 8;
             int scrollBarY = listY;
             int scrollBarHeight = listHeight;
 
@@ -207,7 +220,7 @@ public class HeroRewardScreen extends Screen {
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollY) {
         int contentHeight = HeroRewards.REWARDS.size() * ITEM_HEIGHT;
-        int listHeight = PANEL_HEIGHT - LIST_TOP_MARGIN - LIST_BOTTOM_MARGIN;
+        int listHeight = panelDims()[3] - LIST_TOP_MARGIN - LIST_BOTTOM_MARGIN;
         int maxScroll = Math.max(0, contentHeight - listHeight);
 
         if (maxScroll > 0) {

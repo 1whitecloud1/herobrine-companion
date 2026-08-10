@@ -61,8 +61,20 @@ public class HeroScreen extends Screen {
     private static final int COL_VALUE      = 0xFF9876AA;
     private static final int COL_INFO       = 0xFF6A8759;
 
-    private static final int PANEL_WIDTH = 340;
-    private static final int PANEL_HEIGHT = 210;
+    /** 设计尺寸（未钳制）。运行期按窗口钳制后写入 panelW/panelH。 */
+    private static final int PANEL_BASE_WIDTH = 340;
+    private static final int PANEL_BASE_HEIGHT = 210;
+
+    /** 面板实际尺寸：init/render 时按窗口钳制后写入，供布局使用。 */
+    private int panelW = PANEL_BASE_WIDTH;
+    private int panelH = PANEL_BASE_HEIGHT;
+
+    /** 面板几何：宽高钳制到窗口内，居中。返回 {startX, startY}，并更新 panelW/panelH。 */
+    private int[] panelDims() {
+        this.panelW = Math.min(PANEL_BASE_WIDTH, Math.max(260, this.width - 16));
+        this.panelH = Math.min(PANEL_BASE_HEIGHT, Math.max(170, this.height - 16));
+        return new int[]{(this.width - panelW) / 2, Math.max(4, (this.height - panelH) / 2)};
+    }
 
     public HeroScreen(int entityId) {
         super(Component.translatable("gui.herobrine_companion.title"));
@@ -96,16 +108,17 @@ public class HeroScreen extends Screen {
 
         int centerX = this.width / 2;
         int centerY = this.height / 2;
-        int startX = centerX - PANEL_WIDTH / 2;
-        int startY = centerY - PANEL_HEIGHT / 2;
+        int[] dims = panelDims();
+        int startX = dims[0];
+        int startY = dims[1];
 
         int sideBarWidth = 100;
         int editorX = startX + sideBarWidth;
-        int editorWidth = PANEL_WIDTH - sideBarWidth;
+        int editorWidth = panelW - sideBarWidth;
         int topBarHeight = 25;
         int bottomBarHeight = 20;
 
-        int btnX = startX + PANEL_WIDTH - 50;
+        int btnX = startX + panelW - 50;
         int btnY = startY + 4;
 
         Button apiBtn = new ThemedButton(
@@ -135,14 +148,14 @@ public class HeroScreen extends Screen {
         this.addRenderableWidget(skinBtn);
 
 
-        this.actionList = new HeroActionList(this.minecraft, editorWidth - 10, PANEL_HEIGHT - topBarHeight - bottomBarHeight - 10, startY + topBarHeight + 5, 24);
+        this.actionList = new HeroActionList(this.minecraft, editorWidth - 10, panelH - topBarHeight - bottomBarHeight - 10, startY + topBarHeight + 5, 24);
         this.actionList.setLeftPos(editorX + 5);
 
         populateActionList();
         this.addRenderableWidget(this.actionList);
 
         this.addRenderableWidget(new ThemedButton(
-                editorX + editorWidth - 85, startY + PANEL_HEIGHT - 18, 80, 16,
+                editorX + editorWidth - 85, startY + panelH - 18, 80, 16,
                 Component.translatable("gui.herobrine_companion.leave"),
                 button -> this.onClose(),
                 null
@@ -386,21 +399,22 @@ public class HeroScreen extends Screen {
 
         int centerX = this.width / 2;
         int centerY = this.height / 2;
-        int startX = centerX - PANEL_WIDTH / 2;
-        int startY = centerY - PANEL_HEIGHT / 2;
+        int[] dims = panelDims();
+        int startX = dims[0];
+        int startY = dims[1];
 
         int sideBarWidth = 100;
         int topBarHeight = 25;
         int bottomBarHeight = 20;
 
         // --- 背景绘制 ---
-        guiGraphics.fill(startX + sideBarWidth, startY + topBarHeight, startX + PANEL_WIDTH, startY + PANEL_HEIGHT - bottomBarHeight, COL_BG_MAIN);
-        guiGraphics.fill(startX, startY + topBarHeight, startX + sideBarWidth, startY + PANEL_HEIGHT - bottomBarHeight, COL_BG_SIDE);
-        guiGraphics.fill(startX, startY, startX + PANEL_WIDTH, startY + topBarHeight, COL_BG_SIDE);
-        guiGraphics.fill(startX, startY + PANEL_HEIGHT - bottomBarHeight, startX + PANEL_WIDTH, startY + PANEL_HEIGHT, COL_BG_SIDE);
+        guiGraphics.fill(startX + sideBarWidth, startY + topBarHeight, startX + panelW, startY + panelH - bottomBarHeight, COL_BG_MAIN);
+        guiGraphics.fill(startX, startY + topBarHeight, startX + sideBarWidth, startY + panelH - bottomBarHeight, COL_BG_SIDE);
+        guiGraphics.fill(startX, startY, startX + panelW, startY + topBarHeight, COL_BG_SIDE);
+        guiGraphics.fill(startX, startY + panelH - bottomBarHeight, startX + panelW, startY + panelH, COL_BG_SIDE);
 
-        guiGraphics.renderOutline(startX, startY, PANEL_WIDTH, PANEL_HEIGHT, COL_BORDER);
-        guiGraphics.fill(startX + sideBarWidth, startY + topBarHeight, startX + sideBarWidth + 1, startY + PANEL_HEIGHT - bottomBarHeight, COL_BORDER);
+        guiGraphics.renderOutline(startX, startY, panelW, panelH, COL_BORDER);
+        guiGraphics.fill(startX + sideBarWidth, startY + topBarHeight, startX + sideBarWidth + 1, startY + panelH - bottomBarHeight, COL_BORDER);
 
         // --- 顶部标题栏 ---
         int tabWidth = 140;
@@ -471,7 +485,7 @@ public class HeroScreen extends Screen {
         int mainAreaY = startY + topBarHeight + 5;
 
         guiGraphics.drawString(this.font, Component.translatable("gui.herobrine_companion.available_actions"), mainAreaX, mainAreaY, COL_LABEL, false);
-        guiGraphics.fill(mainAreaX, mainAreaY + 10, startX + PANEL_WIDTH - 5, mainAreaY + 11, COL_BORDER);
+        guiGraphics.fill(mainAreaX, mainAreaY + 10, startX + panelW - 5, mainAreaY + 11, COL_BORDER);
 
         // --- 实体模型渲染 ---
         if (this.dummyHero != null) {
