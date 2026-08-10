@@ -41,7 +41,7 @@ public class KeyBindingHandler {
     @SubscribeEvent
     public static void onClientTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
-        
+
         Minecraft mc = Minecraft.getInstance();
         Player player = mc.player;
         if (player == null) return;
@@ -60,7 +60,7 @@ public class KeyBindingHandler {
             // 20 Ticks = 1 秒
             if (chargeTicks == 20) {
                 // 【加入 Debug 提示】
-                player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§e[Debug] 客户端：R键蓄力1秒完成，正在向服务端发送数据包..."));
+                player.sendSystemMessage(net.minecraft.network.chat.Component.translatable("message.herobrine_companion.debug.r_charge_send"));
                 // 蓄力完成！发送数据包给服务端触发技能
                 PacketHandler.sendToServer(new CleaveSkillPacket());
                 

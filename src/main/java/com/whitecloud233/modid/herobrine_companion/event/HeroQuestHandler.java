@@ -110,7 +110,7 @@ public class HeroQuestHandler {
                 int progress = data.getInt(TAG_QUEST_PROGRESS) + 1;
                 data.putInt(TAG_QUEST_PROGRESS, progress);
 
-                player.displayClientMessage(Component.literal("Progress: " + progress + "/" + TARGET_KILLS), true);
+                player.displayClientMessage(Component.translatable("message.herobrine_companion.quest.kill_progress", progress, TARGET_KILLS), true);
 
                 if (progress >= TARGET_KILLS) {
                     completeQuest(player, questId);
@@ -180,7 +180,7 @@ public class HeroQuestHandler {
         CompoundTag data = player.getPersistentData();
         if (progress > target) progress = target;
         data.putInt(TAG_QUEST_PROGRESS, progress);
-        player.displayClientMessage(Component.literal("Pacify Progress: " + progress + "/" + target), true);
+        player.displayClientMessage(Component.translatable("message.herobrine_companion.quest.pacify_progress", progress, target), true);
 
         if (progress >= target) {
             completeQuest(player, questId);

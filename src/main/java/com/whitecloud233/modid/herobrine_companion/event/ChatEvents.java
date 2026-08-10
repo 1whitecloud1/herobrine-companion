@@ -27,12 +27,18 @@ public class ChatEvents {
                 HeroWorldData worldData = HeroWorldData.get(serverLevel);
                 UUID playerUUID = event.getPlayer().getUUID();
 
-                event.getPlayer().sendSystemMessage(Component.literal("§e[Debug] 收到召唤指令，您的 UUID: " + playerUUID));
+                event.getPlayer().sendSystemMessage(Component.translatable("message.herobrine_companion.chat_summon.debug.uuid", playerUUID));
 
                 HeroEntity existingHero = HeroSummonItem.findHeroInAnyDimension(serverLevel.getServer(), playerUUID);
 
-                event.getPlayer().sendSystemMessage(Component.literal("§e[Debug] 查找已存在 Hero: " + (existingHero != null ? "是 (" + existingHero.getUUID() + ")" : "否")));
-                event.getPlayer().sendSystemMessage(Component.literal("§e[Debug] 是否已通过指令召唤过: " + worldData.hasSpawnedFromChat(playerUUID)));
+                event.getPlayer().sendSystemMessage(Component.translatable("message.herobrine_companion.chat_summon.debug.existing",
+                        existingHero != null
+                                ? Component.translatable("message.herobrine_companion.debug.found", existingHero.getUUID().toString())
+                                : Component.translatable("message.herobrine_companion.debug.not_found")));
+                event.getPlayer().sendSystemMessage(Component.translatable("message.herobrine_companion.chat_summon.debug.spawned",
+                        worldData.hasSpawnedFromChat(playerUUID)
+                                ? Component.translatable("message.herobrine_companion.debug.yes")
+                                : Component.translatable("message.herobrine_companion.debug.no")));
 
                 if (existingHero == null && !worldData.hasSpawnedFromChat(playerUUID)) {
                     HeroEntity hero = ModEntities.HERO.get().create(serverLevel);
@@ -51,20 +57,20 @@ public class ChatEvents {
                         // 3. 强制提前将它的 UUID 写入世界
                         worldData.setActiveHeroUUID(playerUUID, hero.getUUID());
 
-                        event.getPlayer().sendSystemMessage(Component.literal("§e[Debug] 准备加入世界，新 Hero UUID: " + newHeroUUID));
+                        event.getPlayer().sendSystemMessage(Component.translatable("message.herobrine_companion.chat_summon.debug.preparing", newHeroUUID));
 
                         // 4. 正式加入世界
                         if (serverLevel.addFreshEntity(hero)) {
                             worldData.setSpawnedFromChat(playerUUID, true);
-                            event.getPlayer().sendSystemMessage(Component.literal("§a[System] 成功召唤专属 Hero！实体已锁定在安全坐标。"));
+                            event.getPlayer().sendSystemMessage(Component.translatable("message.herobrine_companion.chat_summon.success"));
                         } else {
-                            event.getPlayer().sendSystemMessage(Component.literal("§c[Debug] 实体加入世界失败 (addFreshEntity = false)。请检查服务端日志是否存在UUID冲突。新UUID: " + newHeroUUID));
+                            event.getPlayer().sendSystemMessage(Component.translatable("message.herobrine_companion.chat_summon.debug.add_fresh_fail", newHeroUUID));
                         }
                     } else {
-                        event.getPlayer().sendSystemMessage(Component.literal("§c[Debug] 创建实体失败 (ModEvents.HERO.get().create = null)"));
+                        event.getPlayer().sendSystemMessage(Component.translatable("message.herobrine_companion.chat_summon.debug.create_fail"));
                     }
                 } else {
-                    event.getPlayer().sendSystemMessage(Component.literal("§c[System] 你已经召唤过 Hero 了，请使用源流（SourceFlowItem）或者庇护所寻找。"));
+                    event.getPlayer().sendSystemMessage(Component.translatable("message.herobrine_companion.chat_summon.already"));
                 }
             }
         }

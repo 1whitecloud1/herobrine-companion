@@ -26,7 +26,7 @@ public class CleaveSkillPacket {
                     // 【加入 Debug 提示 2】
                     poemItem.triggerWorldCleave(player.serverLevel(), player);
                 } else {
-                    player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§c[Debug] 服务端错误：你主手里拿的不是镰刀！"));
+                    player.sendSystemMessage(net.minecraft.network.chat.Component.translatable("message.herobrine_companion.cleave.not_scythe"));
                 }
             }
         });

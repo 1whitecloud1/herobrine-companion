@@ -86,7 +86,7 @@ public class LoreHandbookScreen extends Screen {
             boolean unlocked = unlockedFragments.contains(id);
 
             String titleKey = "lore.herobrine_companion." + id + ".title";
-            Component btnText = unlocked ? Component.translatable(titleKey) : Component.literal("??? (未解锁)");
+            Component btnText = unlocked ? Component.translatable(titleKey) : Component.translatable("gui.herobrine_companion.lore_handbook.locked");
 
             // 截断过长的标题
             if (unlocked && btnText.getString().length() > 15) {

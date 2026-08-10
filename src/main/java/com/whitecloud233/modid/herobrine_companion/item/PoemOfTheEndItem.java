@@ -449,13 +449,13 @@ public class PoemOfTheEndItem extends DiggerItem {
         // 【新增】：检查配置，如果关闭则直接取消技能
         // ==========================================
         if (!com.whitecloud233.modid.herobrine_companion.config.Config.cleaveSkillEnabled) {
-            player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§c[系统] 服务器已禁用此终极技能！"));
+            player.sendSystemMessage(net.minecraft.network.chat.Component.translatable("message.herobrine_companion.poem.disabled_by_server"));
             return;
         }
 
         if (player.getCooldowns().isOnCooldown(this)) {
             // 【提示：如果按了没反应，可能是这里被拦截了】
-            player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§c[提示] 技能正在冷却中！"));
+            player.sendSystemMessage(net.minecraft.network.chat.Component.translatable("message.herobrine_companion.poem.cooldown"));
             return;
         }
 
