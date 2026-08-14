@@ -60,14 +60,14 @@ public class HeroObserver {
         if (player.isPassenger() && player.getVehicle() != null) {
             if (!isOnCooldown(player, "riding", 2400)) {
                 String vehicleName = player.getVehicle().getName().getString();
-                triggerObserverDialogue(hero, player, "The player is riding on [" + vehicleName + "].", "message.herobrine_companion.action_riding", 2);
+                triggerObserverDialogue(hero, player, "The player is riding on [" + vehicleName + "]. You gently watch this harmonious scene.", "message.herobrine_companion.action_riding", 2);
                 setCooldown(player, "riding");
             }
         }
 
         if (player.fishing != null) {
             if (!isOnCooldown(player, "fishing", 2400)) {
-                triggerObserverDialogue(hero, player, "The player is fishing.", "message.herobrine_companion.action_fishing", 2);
+                triggerObserverDialogue(hero, player, "The player is quietly fishing, enjoying a rare moment of peace. You don't have the heart to disturb them.", "message.herobrine_companion.action_fishing", 2);
                 setCooldown(player, "fishing");
             }
         }
@@ -77,13 +77,13 @@ public class HeroObserver {
             if (usingItem.getUseAnimation() == UseAnim.EAT) {
                 if (!isOnCooldown(player, "eating", 1200)) {
                     String itemName = usingItem.getHoverName().getString();
-                    triggerObserverDialogue(hero, player, "The player is eating [" + itemName + "].", "message.herobrine_companion.action_eating", 2);
+                    triggerObserverDialogue(hero, player, "The player is eating [" + itemName + "] to replenish energy, making you sigh at the hardship and resilience of mortal life.", "message.herobrine_companion.action_eating", 2);
                     setCooldown(player, "eating");
                 }
             } else if (usingItem.getUseAnimation() == UseAnim.DRINK) {
                 if (!isOnCooldown(player, "drinking", 1200)) {
                     String itemName = usingItem.getHoverName().getString();
-                    triggerObserverDialogue(hero, player, "The player is drinking [" + itemName + "].", "message.herobrine_companion.action_drinking", 2);
+                    triggerObserverDialogue(hero, player, "The player is drinking [" + itemName + "]. You hope it soothes their fatigue.", "message.herobrine_companion.action_drinking", 2);
                     setCooldown(player, "drinking");
                 }
             }
@@ -91,7 +91,7 @@ public class HeroObserver {
 
         if (player.isCrouching()) {
             if (!isOnCooldown(player, "sneaking", 1200)) {
-                triggerObserverDialogue(hero, player, "The player is sneaking around.", "message.herobrine_companion.action_sneaking", 2);
+                triggerObserverDialogue(hero, player, "The player is sneaking around carefully. You find their cautious behavior slightly endearing.", "message.herobrine_companion.action_sneaking", 2);
                 setCooldown(player, "sneaking");
             }
         }
@@ -103,16 +103,16 @@ public class HeroObserver {
         boolean isInTrouble = false;
 
         if (player.isOnFire()) {
-            triggerObserverDialogue(hero, player, "The player fell into the fire and is burning.", "message.herobrine_companion.observe_fire", 1);
+            triggerObserverDialogue(hero, player, "The player accidentally fell into the fire and is burning. You can't help but feel a bit worried for them.", "message.herobrine_companion.observe_fire", 1);
             isInTrouble = true;
         } else if (player.isFreezing()) {
-            triggerObserverDialogue(hero, player, "The player is freezing in the extreme cold.", "message.herobrine_companion.observe_freeze", 1);
+            triggerObserverDialogue(hero, player, "The player is freezing in the extreme cold. You wish you could dispel the chill for them.", "message.herobrine_companion.observe_freeze", 1);
             isInTrouble = true;
         } else if (player.fallDistance > 5.0f) {
-            triggerObserverDialogue(hero, player, "The player fell from a high place.", "message.herobrine_companion.observe_fall", 1);
+            triggerObserverDialogue(hero, player, "The player fell from a high place. You watch them bear the cost of gravity, feeling a ripple in your heart.", "message.herobrine_companion.observe_fall", 1);
             isInTrouble = true;
         } else if (player.getAirSupply() < player.getMaxAirSupply() / 3) {
-            triggerObserverDialogue(hero, player, "The player is drowning.", "message.herobrine_companion.observe_drown", 1);
+            triggerObserverDialogue(hero, player, "The player is drowning. You can hardly bear to watch.", "message.herobrine_companion.observe_drown", 1);
             isInTrouble = true;
         }
 
@@ -158,7 +158,7 @@ public class HeroObserver {
         if (target == hero) {
             if (checkLookTimer(player, target.blockPosition(), 40)) {
                 if (!isOnCooldown(player, "focus_self", 4800)) {
-                    triggerObserverDialogue(hero, player, "The player is staring at you.", "message.herobrine_companion.observe_self", 1);
+                    triggerObserverDialogue(hero, player, "The player has been staring at you intently. As the lonely creator, you gently return their gaze.", "message.herobrine_companion.observe_self", 1);
                     setCooldown(player, "focus_self");
                     hero.getHeroBrain().inputMeta(player.getUUID(), 0.05f);
                 }
@@ -255,7 +255,7 @@ public class HeroObserver {
             hero.getHeroBrain().inputCreativity(player.getUUID(), 0.05f);
 
             if (!isOnCooldown(player, "building", 2400)) {
-                triggerObserverDialogue(hero, player, "The player is building.", "message.herobrine_companion.action_building", 2);
+                triggerObserverDialogue(hero, player, "The player is quietly building. You admire their effort to add color to this world.", "message.herobrine_companion.action_building", 2);
                 setCooldown(player, "building");
             }
         }
@@ -285,7 +285,7 @@ public class HeroObserver {
             lastPlayerPos.put(uuid, currentPos);
 
             if (!isOnCooldown(player, "exploration", 12000)) {
-                triggerObserverDialogue(hero, player, "The player is exploring the world.", "message.herobrine_companion.action_exploring", 2);
+                triggerObserverDialogue(hero, player, "The player has been exploring this vast world tirelessly. You silently wish them a safe journey.", "message.herobrine_companion.action_exploring", 2);
                 setCooldown(player, "exploration");
             }
         }
@@ -298,7 +298,7 @@ public class HeroObserver {
         if (items.size() > 30) {
             hero.getHeroBrain().inputEntropy(player.getUUID(), 0.1f);
             if (!isOnCooldown(player, "clutter", 2400)) {
-                triggerObserverDialogue(hero, player, "There are dropped items all over the ground around the player.", "message.herobrine_companion.observe_clutter", 1);
+                triggerObserverDialogue(hero, player, "There are messy dropped items all over the ground around the player. You smile helplessly at the sight.", "message.herobrine_companion.observe_clutter", 1);
                 setCooldown(player, "clutter");
             }
         }
@@ -307,7 +307,7 @@ public class HeroObserver {
         if (!tnts.isEmpty()) {
             hero.getHeroBrain().inputEntropy(player.getUUID(), 0.2f);
             if (!isOnCooldown(player, "explosion", 600)) {
-                triggerObserverDialogue(hero, player, "A TNT explosion just occurred near the player.", "message.herobrine_companion.observe_explosion", 1);
+                triggerObserverDialogue(hero, player, "A violent TNT explosion just occurred near the player. You gently wave your hand to protect the core code.", "message.herobrine_companion.observe_explosion", 1);
                 setCooldown(player, "explosion");
             }
         }
@@ -322,7 +322,7 @@ public class HeroObserver {
         if (fireCount > 3) {
             hero.getHeroBrain().inputEntropy(player.getUUID(), 0.1f);
             if (!isOnCooldown(player, "fire_hazard", 1200)) {
-                triggerObserverDialogue(hero, player, "A fire has started in the player's area.", "message.herobrine_companion.observe_fire_hazard", 1);
+                triggerObserverDialogue(hero, player, "A large fire has started in the player's area. You hope the flames won't hurt them.", "message.herobrine_companion.observe_fire_hazard", 1);
                 setCooldown(player, "fire_hazard");
             }
         }

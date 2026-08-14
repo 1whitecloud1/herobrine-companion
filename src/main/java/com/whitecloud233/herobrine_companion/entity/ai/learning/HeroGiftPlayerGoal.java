@@ -38,11 +38,8 @@ public class HeroGiftPlayerGoal extends Goal {
 
         // [深度学习] 根据心智状态调整频率
         SimpleNeuralNetwork.MindState state = this.hero.getHeroBrain().getState();
-        
-        if (state == SimpleNeuralNetwork.MindState.JUDGE) {
-            return false; // 审判者不送礼
-        }
-        
+        if (!canGiftInState(state)) return false;
+
         int chance = 10; // 默认 1/10 (在冷却结束后)
         if (state == SimpleNeuralNetwork.MindState.PROTECTOR) {
             chance = 3; // 守护者：非常频繁
@@ -106,7 +103,7 @@ public class HeroGiftPlayerGoal extends Goal {
     private ItemStack selectGift() {
         // [深度学习] 根据心智状态决定礼物类型
         SimpleNeuralNetwork.MindState state = this.hero.getHeroBrain().getState();
-        int trust = this.hero.getTrustLevel();
+        if (!canGiftInState(state)) return ItemStack.EMPTY;
         double roll = this.hero.getRandom().nextDouble();
 
         // 1. 怪物之王：只送怪物掉落物
@@ -123,28 +120,7 @@ public class HeroGiftPlayerGoal extends Goal {
             if (roll < 0.5) return new ItemStack(Items.DIAMOND, 2);
             return new ItemStack(Items.GOLDEN_APPLE, 1);
         }
-        
-        // 3. 代码之神：送红石相关
-        if (state == SimpleNeuralNetwork.MindState.GLITCH_LORD) {
-            if (roll < 0.3) return new ItemStack(Items.REDSTONE, 16);
-            if (roll < 0.6) return new ItemStack(Items.OBSERVER, 2);
-            return new ItemStack(Items.COMMAND_BLOCK, 1); // 极其稀有，或者只是展示一下
-        }
-
-        // 4. 默认逻辑 (基于信任度)
-        if (trust > 70 && roll < 0.1) {
-            return new ItemStack(ModItems.VOID_MARROW.get(), 1);
-        } else if (trust > 50 && roll < 0.2) {
-            return new ItemStack(Items.DIAMOND);
-        } else if (trust > 20 && roll < 0.4) {
-            return new ItemStack(Items.GOLD_INGOT, 2);
-        } else {
-            if (roll < 0.3) return new ItemStack(Items.ROTTEN_FLESH, 4);
-            if (roll < 0.5) return new ItemStack(Items.BONE, 2);
-            if (roll < 0.7) return new ItemStack(Items.GUNPOWDER, 2);
-            if (roll < 0.85) return new ItemStack(Items.SPIDER_EYE, 2);
-            return new ItemStack(Items.ENDER_PEARL);
-        }
+        return ItemStack.EMPTY;
     }
 
     @Override
@@ -157,5 +133,10 @@ public class HeroGiftPlayerGoal extends Goal {
         } else {
             this.cooldown = 12000 + this.hero.getRandom().nextInt(12000); // 10-20分钟
         }
+    }
+
+    private boolean canGiftInState(SimpleNeuralNetwork.MindState state) {
+        return state == SimpleNeuralNetwork.MindState.PROTECTOR
+                || state == SimpleNeuralNetwork.MindState.MONSTER_KING;
     }
 }

@@ -13,9 +13,9 @@ public class HeroDomesticActivityGoal extends Goal {
     private static final int REST_SEARCH_RADIUS = 10;
     private static final int COOK_SEARCH_RADIUS = 12;
     private static final int MAX_VERTICAL_OFFSET = 3;
-    private static final int START_CHANCE = 320;
-    private static final int MIN_COOLDOWN = 240;
-    private static final int MAX_COOLDOWN = 520;
+    private static final int START_CHANCE = 600;
+    private static final int MIN_COOLDOWN = 600;
+    private static final int MAX_COOLDOWN = 1200;
     private static final int REST_DURATION_MIN = 20 * 30;
     private static final int REST_DURATION_MAX = 20 * 60;
 

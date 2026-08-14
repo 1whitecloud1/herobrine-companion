@@ -48,6 +48,14 @@ public class HeroLogic {
         } else {
             hero.clientFloatingAmount = Math.max(0.0F, hero.clientFloatingAmount - 0.05F);
         }
+
+        hero.clientImportedWalkTicksO = hero.clientImportedWalkTicks;
+        if (hero.isGroundWalking() && !hero.isFloating()) {
+            hero.clientImportedWalkTicks += 1.0F;
+        } else {
+            hero.clientImportedWalkTicks = 0.0F;
+            hero.clientImportedWalkTicksO = 0.0F;
+        }
     }
 
     private static void serverTick(HeroEntity hero) {
@@ -208,6 +216,9 @@ public class HeroLogic {
                 return;
             }
 
+            if (hero.getInvitedAction() == HeroCookingCompat.INVITED_ACTION_COOK) {
+                HeroCookingCompat.endCookChunkTicket(hero);
+            }
             hero.setInvitedPos(null);
             hero.setInvitedAction(0);
 

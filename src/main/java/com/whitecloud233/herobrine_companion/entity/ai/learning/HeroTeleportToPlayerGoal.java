@@ -31,26 +31,25 @@ public class HeroTeleportToPlayerGoal extends Goal {
     }
 
     /**
-     * 【重写】精准判断玩家是否处于战斗状态
+     * 判断玩家是否处于战斗状态
      */
     private boolean isInCombat(Player player) {
-        // 1. 放宽伤害时间戳判定
-        // 只要近期 (5秒内) 造成或受到过伤害，就算战斗状态缓冲期。
-        // 【核心修复】：移除了对“攻击者必须还活着”的死板检测，防止秒杀怪物后立刻判定脱战。
         int currentTick = player.tickCount;
-        if (player.getLastHurtByMobTimestamp() > 0 && (currentTick - player.getLastHurtByMobTimestamp()) < COMBAT_TIMEOUT) return true;
-        if (player.getLastHurtMobTimestamp() > 0 && (currentTick - player.getLastHurtMobTimestamp()) < COMBAT_TIMEOUT) return true;
+        int lastHurtByMobTime = player.getLastHurtByMobTimestamp();
+        int lastHurtMobTime = player.getLastHurtMobTimestamp();
 
-        // 2. 增加“仇恨感知”（主动预判）
-        // 不要等挨打了才算战斗！扫描周围 16 格，只要有怪物把仇恨目标(Target)锁定为你，神明就会立刻察觉并避让。
-        net.minecraft.world.phys.AABB searchBox = player.getBoundingBox().inflate(16.0D, 8.0D, 16.0D);
-        java.util.List<net.minecraft.world.entity.Mob> threats = player.level().getEntitiesOfClass(
-                net.minecraft.world.entity.Mob.class,
-                searchBox,
-                mob -> mob.getTarget() != null && mob.getTarget().getUUID().equals(player.getUUID())
-        );
+        boolean recentlyHurt = lastHurtByMobTime > 0 && (currentTick - lastHurtByMobTime) < COMBAT_TIMEOUT;
+        boolean recentlyAttacked = lastHurtMobTime > 0 && (currentTick - lastHurtMobTime) < COMBAT_TIMEOUT;
 
-        return !threats.isEmpty();
+        if (!recentlyHurt && !recentlyAttacked) return false;
+
+        LivingEntity attacker = player.getLastHurtByMob();
+        LivingEntity target = player.getLastHurtMob();
+
+        boolean hasValidAttacker = attacker != null && attacker.isAlive() && attacker.distanceToSqr(player) < 900.0D;
+        boolean hasValidTarget = target != null && target.isAlive() && target.distanceToSqr(player) < 900.0D;
+
+        return hasValidAttacker || hasValidTarget;
     }
 
     @Override
@@ -219,6 +218,6 @@ public class HeroTeleportToPlayerGoal extends Goal {
     public void stop() {
         this.isStaring = false;
         // 增加冷却时间，从 40 ticks (2s) 增加到 200 ticks (10s)
-        this.cooldown = 200;
+        this.cooldown = 1000;
     }
 }

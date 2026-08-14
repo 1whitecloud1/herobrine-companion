@@ -102,15 +102,17 @@ public final class ObserverStateDefinition implements HeroMindStateDefinition {
         if (focus == null) return;
 
         recordObservedLocation(hero, focus);
-        HeroStateBehaviorSupport.ensureFloating(hero);
         HeroStateBehaviorSupport.clearAggro(hero);
         double distSqr = hero.distanceToSqr(focus);
 
         if (distSqr < 36.0D) {
-            HeroStateBehaviorSupport.driftAway(hero, focus, 4.5D, 1.05D);
+            HeroStateBehaviorSupport.ensureGrounded(hero);
+            HeroStateBehaviorSupport.walkAway(hero, focus, 4.5D, 1.05D);
             HeroStateBehaviorSupport.alignHeadToBody(hero);
             return;
         }
+
+        HeroStateBehaviorSupport.ensureFloating(hero);
 
         if (HeroStateBehaviorSupport.shouldStareTeleport(hero, focus, distSqr)
                 && HeroStateBehaviorSupport.teleportToPatrolPoint(hero, focus, 8.0D, 20.0D)) {

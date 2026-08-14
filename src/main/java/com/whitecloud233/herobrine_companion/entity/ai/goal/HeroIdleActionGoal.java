@@ -1,11 +1,13 @@
 package com.whitecloud233.herobrine_companion.entity.ai.goal;
 
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.herobrine_companion.entity.ai.learning.SimpleNeuralNetwork;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.entity.ai.goal.Goal;
+import net.minecraft.world.entity.player.Player;
 
 import java.util.EnumSet;
 
@@ -46,11 +48,15 @@ public class HeroIdleActionGoal extends Goal {
         if (this.hero.isBattleModeActive()) {
             return false;
         }
+        // 观察者状态：俯瞰全局，不执行待机小动作
+        if (this.hero.getMindState() == SimpleNeuralNetwork.MindState.OBSERVER) {
+            return false;
+        }
         // 1. 如果有攻击目标，绝对不执行
         if (this.hero.getTarget() != null) {
             return false;
         }
-        
+
         // 2. 如果在水中，不执行
         if (this.hero.isInWater()) {
             return false;
@@ -66,6 +72,11 @@ public class HeroIdleActionGoal extends Goal {
                  if (this.hero.getDeltaMovement().horizontalDistanceSqr() > 0.02) {
                      return false;
                  }
+                 // 主人离得太远（超过 5 格）优先跟随，不演待机
+                 Player owner = this.hero.level().getPlayerByUUID(this.hero.getOwnerUUID());
+                 if (owner != null && this.hero.distanceToSqr(owner) > 25.0D) {
+                     return false;
+                 }
              }
         }
 
@@ -73,7 +84,11 @@ public class HeroIdleActionGoal extends Goal {
         if (this.hero.getInvitedPos() != null) {
             return false;
         }
-        
+        // 交易中不演待机
+        if (this.hero.getTradingPlayer() != null) {
+            return false;
+        }
+
         // 触发概率：
         return this.hero.getRandom().nextInt(1500) == 0;
     }
@@ -146,6 +161,17 @@ public class HeroIdleActionGoal extends Goal {
         if (this.hero.getInvitedPos() != null) {
             return false;
         }
+        // 交易中停止待机
+        if (this.hero.getTradingPlayer() != null) {
+            return false;
+        }
+        // 陪伴模式下主人跑远（超过 6 格滞后）就中断待机去追
+        if (this.hero.isCompanionMode() && this.hero.getOwnerUUID() != null) {
+            Player owner = this.hero.level().getPlayerByUUID(this.hero.getOwnerUUID());
+            if (owner != null && this.hero.distanceToSqr(owner) > 36.0D) {
+                return false;
+            }
+        }
         return this.idleTime > 0;
     }
 
@@ -172,7 +198,7 @@ public class HeroIdleActionGoal extends Goal {
                 // 动画逻辑由 Entity/Model 处理
                 break;
             case THUNDER_CAST:
-                // 动画逻辑由 Entity/Model 处理
+                tickStaticCharge();
                 break;
         }
     }
@@ -318,6 +344,32 @@ public class HeroIdleActionGoal extends Goal {
             this.hero.setInvisible(!this.hero.isInvisible());
         } else if (this.glitchBurstTimer == 0) {
             this.hero.setInvisible(false);
+        }
+    }
+
+    private void tickStaticCharge() {
+        if (this.hero.level() instanceof ServerLevel serverLevel) {
+            if (this.hero.tickCount % 2 == 0) {
+                serverLevel.sendParticles(ParticleTypes.ELECTRIC_SPARK,
+                        this.hero.getX(),
+                        this.hero.getY() + 1.0,
+                        this.hero.getZ(),
+                        3, 0.5, 1.0, 0.5, 0.1
+                );
+
+                if (this.hero.getRandom().nextBoolean()) {
+                    serverLevel.sendParticles(ParticleTypes.SMOKE,
+                            this.hero.getX(),
+                            this.hero.getY() + 1.0,
+                            this.hero.getZ(),
+                            1, 0.3, 0.5, 0.3, 0.05
+                    );
+                }
+            }
+        }
+
+        if (this.hero.tickCount % 20 == 0) {
+            this.hero.playSound(SoundEvents.CREEPER_PRIMED, 0.5f, 0.5f);
         }
     }
 }

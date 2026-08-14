@@ -69,20 +69,6 @@ public class GlitchVillagerEntity extends Villager {
     }
 
     @Override
-    public void addAdditionalSaveData(CompoundTag compound) {
-        super.addAdditionalSaveData(compound);
-        compound.remove("Offers");
-    }
-
-    @Override
-    public void readAdditionalSaveData(CompoundTag compound) {
-        CompoundTag sanitized = compound.copy();
-        sanitized.remove("Offers");
-        super.readAdditionalSaveData(sanitized);
-        this.offers = null;
-    }
-
-    @Override
     public void tick() {
         super.tick();
         if (this.level().isClientSide) {

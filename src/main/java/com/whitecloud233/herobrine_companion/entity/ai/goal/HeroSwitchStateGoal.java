@@ -15,16 +15,21 @@ public class HeroSwitchStateGoal extends Goal {
     @Override
     public boolean canUse() {
         if (this.hero.isCompanionMode()) return false;
+        // 战斗态 / 交易中不切换状态
+        if (this.hero.isBattleModeActive()) return false;
+        if (this.hero.getTradingPlayer() != null) return false;
 
         if (this.cooldown > 0) {
             this.cooldown--;
             return false;
         }
-        return hero.getTarget() == null; 
+        return hero.getTarget() == null;
     }
-    
+
     @Override
     public boolean canContinueToUse() {
+        if (this.hero.isBattleModeActive()) return false;
+        if (this.hero.getTradingPlayer() != null) return false;
         return !this.hero.isCompanionMode() && super.canContinueToUse();
     }
     

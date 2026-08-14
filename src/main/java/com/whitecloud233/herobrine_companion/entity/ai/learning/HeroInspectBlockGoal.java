@@ -106,15 +106,7 @@ public class HeroInspectBlockGoal extends Goal {
                 double y = this.targetPos.getY() + 0.5 + (this.hero.getRandom().nextDouble() - 0.5);
                 double z = this.targetPos.getZ() + 0.5 + (this.hero.getRandom().nextDouble() - 0.5);
                 
-                // [深度学习] 根据状态改变粒子效果
-                SimpleNeuralNetwork.MindState state = this.hero.getHeroBrain().getState();
-                if (state == SimpleNeuralNetwork.MindState.GLITCH_LORD) {
-                    // 代码之神：使用反转传送门粒子，更有“故障”感
-                    this.hero.level().addParticle(ParticleTypes.REVERSE_PORTAL, x, y, z, 0, 0, 0);
-                } else {
-                    // 默认：附魔符文
-                    this.hero.level().addParticle(ParticleTypes.ENCHANT, x, y, z, 0, 0, 0);
-                }
+                this.hero.level().addParticle(ParticleTypes.ENCHANT, x, y, z, 0, 0, 0);
             }
         }
     }
@@ -165,10 +157,6 @@ public class HeroInspectBlockGoal extends Goal {
     }
 
     private boolean isInteresting(BlockState state) {
-        // [深度学习] 代码之神对更多方块感兴趣
-        SimpleNeuralNetwork.MindState mindState = this.hero.getHeroBrain().getState();
-        boolean isGlitchLord = mindState == SimpleNeuralNetwork.MindState.GLITCH_LORD;
-
         if (state.is(Blocks.SPAWNER)) return true;
         if (state.is(Blocks.COMMAND_BLOCK) || state.is(Blocks.CHAIN_COMMAND_BLOCK) || state.is(Blocks.REPEATING_COMMAND_BLOCK)) return true;
         if (state.is(Blocks.DIAMOND_ORE) || state.is(Blocks.DEEPSLATE_DIAMOND_ORE)) return true;
@@ -177,17 +165,9 @@ public class HeroInspectBlockGoal extends Goal {
         if (state.is(Blocks.BEACON)) return true;
         if (state.is(Blocks.CONDUIT)) return true;
         if (state.is(Blocks.ENCHANTING_TABLE)) return true;
-        
+
         // 也可以检查一些红石元件
         if (state.is(Blocks.OBSERVER) || state.is(Blocks.COMPARATOR)) return true;
-
-        // [新增] 代码之神对基岩和屏障也感兴趣
-        if (isGlitchLord) {
-            if (state.is(Blocks.BEDROCK)) return true;
-            if (state.is(Blocks.BARRIER)) return true;
-            if (state.is(Blocks.STRUCTURE_BLOCK)) return true;
-            if (state.is(Blocks.JIGSAW)) return true;
-        }
 
         return false;
     }

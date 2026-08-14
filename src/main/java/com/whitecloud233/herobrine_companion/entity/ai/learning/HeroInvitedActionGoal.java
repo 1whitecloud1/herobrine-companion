@@ -69,6 +69,9 @@ public class HeroInvitedActionGoal extends Goal {
         BlockPos pos = this.hero.getInvitedPos();
         if (pos == null) return false;
 
+        // [新增] 如果正在交易，暂时不执行邀请动作
+        if (this.hero.getTradingPlayer() != null) return false;
+
         SimpleNeuralNetwork.MindState state = this.hero.getHeroBrain().getState();
         if (state == SimpleNeuralNetwork.MindState.JUDGE && this.hero.getRandom().nextFloat() < 0.7f) {
             this.hero.setInvitedPos(null);
@@ -97,6 +100,10 @@ public class HeroInvitedActionGoal extends Goal {
     @Override
     public boolean canContinueToUse() {
         if (this.hero.isBattleModeActive()) return false;
+
+        // [新增] 如果正在交易，立即停止
+        if (this.hero.getTradingPlayer() != null) return false;
+
         BlockPos currentInvitedPos = this.hero.getInvitedPos();
         if (currentInvitedPos == null || !currentInvitedPos.equals(this.targetPos)) {
             return false;
@@ -162,12 +169,6 @@ public class HeroInvitedActionGoal extends Goal {
     @Override
     public void tick() {
         if (this.targetPos == null) return;
-        if (this.actionType == HeroCookingCompat.INVITED_ACTION_COOK
-                && !HeroCookingCompat.isCookwareStation(this.hero.level(), this.targetPos)) {
-            this.hero.setInvitedPos(null);
-            this.hero.setInvitedAction(0);
-            return;
-        }
 
         Vec3 destination;
         if (this.actionType == ACTION_GUARD && this.isGuardingDoor) {
@@ -230,11 +231,7 @@ public class HeroInvitedActionGoal extends Goal {
             } else if (this.actionType == ACTION_COOK) {
                 this.hero.setNoGravity(false);
                 performCookPresentation(destination);
-                if (HeroCookingCompat.isAutonomousCookingActive(this.hero, this.targetPos)) {
-                    HeroCookingCompat.tickAutonomousCooking(this.hero, this.targetPos);
-                } else {
-                    HeroCookingCompat.tickCookware(this.hero, this.targetPos);
-                }
+                HeroCookingCompat.tickCookware(this.hero, this.targetPos);
             } else if (this.actionType != ACTION_REST) {
                 this.hero.getLookControl().setLookAt(destination);
             }

@@ -42,10 +42,10 @@ public class HeroOtherProtection {
     // [新增方法] 检测脚底是否悬空并自动切换飞行状态
     private static void checkAutoFly(HeroEntity hero, Level level) {
         if (hero.isBattleModeActive()) {
-            if (hero.isFloating()) {
-                hero.setFloating(false);
-                hero.setNoGravity(false);
-            }
+            // 战斗模式浮空由 HeroCombatPursuit 的飞行追击统一管理（startFlight 起飞 / land 落地、
+            // aiStep 水里浮空）。这里不再每 tick 强制取消浮空，否则 Hero 在水里 / 高位追击中
+            // 永远保持不了浮空，飞不起来（只会泡在水面被 FloatGoal 跳来跳去）。
+            // 陪伴模式的"脚下悬空自动飞"判断也跳过，避免战斗中被击飞/跳跃时误触发悬空。
             return;
         }      // 获取脚下1格和2格的方块位置
         BlockPos posBelow = hero.blockPosition().below();

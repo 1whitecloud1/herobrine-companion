@@ -71,12 +71,11 @@ public class HeroFixAnomalyGoal extends Goal {
             return false;
         }
 
-        // [修改] 3. 优先检查方块
-        // 维护者 (MAINTAINER) 状态下，扫描频率加快 (每 10 tick)
-        // 其他状态下，每 20 tick
-        int scanInterval = (state == SimpleNeuralNetwork.MindState.MAINTAINER) ? 10 : 20;
-
-        if (this.hero.tickCount - this.lastScanTick > scanInterval) {
+        // [修改] 3. 优先检查方块 (每20tick检查一次)
+        // 之前的问题是：如果一直有怪物，tickCount % 20 的时机可能刚好被怪物战斗占用了，
+        // 导致 Hero 永远没机会进入找方块的逻辑。
+        // 现在改为：只要距离上次扫描超过 20 tick，就优先尝试扫描方块。
+        if (this.hero.tickCount - this.lastScanTick > 10) {
             this.lastScanTick = this.hero.tickCount;
             BlockPos pos = findGlitchBlock();
             if (pos != null) {
@@ -87,12 +86,7 @@ public class HeroFixAnomalyGoal extends Goal {
         }
 
         // 4. 其次检查实体
-        // 代码之神 (GLITCH_LORD) 可能会忽略实体异常，觉得那是“特性”
-        if (state == SimpleNeuralNetwork.MindState.GLITCH_LORD && this.hero.getRandom().nextBoolean()) {
-            return false;
-        }
-
-        List<LivingEntity> list = this.hero.level().getEntitiesOfClass(LivingEntity.class, this.hero.getBoundingBox().inflate(24.0D), 
+        List<LivingEntity> list = this.hero.level().getEntitiesOfClass(LivingEntity.class, this.hero.getBoundingBox().inflate(24.0D),
             e -> (e instanceof GhostZombieEntity || e instanceof GhostCreeperEntity || e instanceof GhostSkeletonEntity) && e.isAlive());
         
         if (!list.isEmpty()) {
@@ -234,6 +228,8 @@ public class HeroFixAnomalyGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
+        if (this.hero.isBattleModeActive()) return false;
+
         if (this.targetAnomaly != null) {
             return this.targetAnomaly.isAlive();
         }

@@ -107,8 +107,14 @@ public class HeroObserveAndRescueGoal extends Goal {
     @Override
     public void start() {
         this.hero.getNavigation().stop();
-        this.hero.setFloating(true);
-        this.hero.setNoGravity(true);
+        if (this.targetPlayer != null && isOwner(this.targetPlayer)) {
+            this.hero.noPhysics = false;
+            this.hero.setFloating(false);
+            this.hero.setNoGravity(false);
+        } else {
+            this.hero.setFloating(true);
+            this.hero.setNoGravity(true);
+        }
     }
 
     @Override
@@ -128,10 +134,10 @@ public class HeroObserveAndRescueGoal extends Goal {
             return;
         }
 
-        // 2. 【绝对实时的平滑排斥系统】
+        // 非陪伴观察时保留距离感；绑定主人可以自由靠近，不再触发排斥。
         double distanceSq = this.hero.distanceToSqr(this.targetPlayer);
 
-        if (distanceSq < 144.0D) {
+        if (!isCompanionOwner && distanceSq < 144.0D) {
             Vec3 dir = this.hero.position().subtract(this.targetPlayer.position());
 
             if (dir.lengthSqr() < 0.001) {

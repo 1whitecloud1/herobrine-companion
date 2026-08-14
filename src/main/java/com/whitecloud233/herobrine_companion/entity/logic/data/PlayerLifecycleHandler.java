@@ -35,7 +35,7 @@ public class PlayerLifecycleHandler {
 
                     // 将逃兵强行流放回主世界出生点
                     player.teleportTo(overworld, spawnPos.getX(), spawnPos.getY(), spawnPos.getZ(), player.getYRot(), player.getXRot());
-                    player.sendSystemMessage(Component.literal("§c[系统] 侦测到你在试炼中途退出，已被强制判定为失败并流放回主世界！"));
+                    player.sendSystemMessage(Component.translatable("message.herobrine_companion.challenge.abandoned"));
 
                     // 清除原有的普通战败提示标记，防止重复发消息
                     data.remove("ChallengeFailedMessagePending");

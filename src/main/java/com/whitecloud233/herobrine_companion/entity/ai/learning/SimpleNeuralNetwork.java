@@ -212,34 +212,29 @@ public class SimpleNeuralNetwork {
     // --- NBT Persistence ---
 
     public void save(CompoundTag tag) {
-        CompoundTag brain = new CompoundTag();
-        brain.putFloat("Violence", violenceScore);
-        brain.putFloat("Creativity", creativityScore);
-        brain.putFloat("Exploration", explorationScore);
-        brain.putFloat("Failure", failureScore);
+        tag.putFloat("Violence", violenceScore);
+        tag.putFloat("Creativity", creativityScore);
+        tag.putFloat("Exploration", explorationScore);
+        tag.putFloat("Failure", failureScore);
         tag.putFloat("DirectAttack", directAttackScore);
+        tag.putFloat("Entropy", entropyScore);
+        tag.putFloat("Meta", metaScore);
+        tag.putFloat("Nostalgia", nostalgiaScore);
+        tag.putFloat("MonsterEmpathy", monsterEmpathyScore);
 
-        brain.putFloat("Entropy", entropyScore);
-        brain.putFloat("Meta", metaScore);
-        brain.putFloat("Nostalgia", nostalgiaScore);
-        brain.putFloat("MonsterEmpathy", monsterEmpathyScore);
+        tag.putFloat("Respect", respectWeight);
+        tag.putFloat("Annoyance", annoyanceWeight);
+        tag.putFloat("Curiosity", curiosityWeight);
+        tag.putFloat("Arrogance", arroganceWeight);
+        tag.putFloat("Sorrow", sorrowWeight);
         tag.putFloat("StabilityObsession", stabilityObsession);
 
-        brain.putFloat("Respect", respectWeight);
-        brain.putFloat("Annoyance", annoyanceWeight);
-        brain.putFloat("Curiosity", curiosityWeight);
-        brain.putFloat("Arrogance", arroganceWeight);
-        brain.putFloat("Sorrow", sorrowWeight);
-        
-        brain.putString("State", currentState.name());
+        tag.putString("State", currentState.name());
         tag.putLong("StateEnteredTick", stateEnteredTick);
 
-        // Save Memory
         CompoundTag memory = new CompoundTag();
         actionFeedback.forEach(memory::putFloat);
-        brain.put("Memory", memory);
-        
-        tag.put("HeroNeuralNetwork", brain);
+        tag.put("Memory", memory);
     }
 
     public void load(CompoundTag tag) {

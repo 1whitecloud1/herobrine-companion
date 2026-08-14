@@ -724,26 +724,28 @@ public final class HeroCrossChatManager {
     }
 
     private static String buildPlayerToHbPrompt(String speakerName, String ownerName, String message) {
-        return "You are roleplaying as the Herobrine bound to player " + ownerName + ". "
-                + "This is a private cross-player session accepted by both players. "
-                + "Do not claim to see private history that was not directly mentioned in this session, and do not reveal other conversations. "
-                + "The other player " + speakerName + " just said to you: \"" + message + "\". "
-                + "Reply naturally as Herobrine, keep it concise, and output only your line.";
+        return "你现在扮演玩家 " + ownerName + " 绑定的 Herobrine。"
+                + " 这是一个已经经过双方玩家同意的、保密的跨玩家会话。"
+                + " 你不能声称看到了任何未被当前会话直接提到的私密历史，也不要泄露别的会话内容。"
+                + " 对方玩家 " + speakerName + " 刚刚对你说：\"" + message + "\"。"
+                + " 请直接以 Herobrine 的身份自然回复，简洁一些，只输出你的台词。";
     }
+
     private static String buildHbOpeningPrompt(String ownerName, String targetOwnerName, String message) {
-        return "You are roleplaying as the Herobrine bound to player " + ownerName + ". "
-                + "This is a private cross-Herobrine session accepted by both sides. "
-                + "Only speak as " + ownerName + "'s Herobrine; do not impersonate " + targetOwnerName + " or the other Herobrine. "
-                + "You are speaking to the Herobrine bound to " + targetOwnerName + ". "
-                + "The player wants you to express this opening idea: \"" + message + "\". "
-                + "Turn it into your own Herobrine voice and output only the dialogue.";
+        return "你现在扮演玩家 " + ownerName + " 绑定的 Herobrine。"
+                + " 当前是一个双方同意的保密跨 HB 会话。"
+                + " 你只能代表 " + ownerName + " 的 Herobrine 发言，不能扮演 " + targetOwnerName + "、不能扮演对方 Herobrine、也不能把双方的人设、记忆、语气、立场混在一起。"
+                + " 你要对玩家 " + targetOwnerName + " 的 Herobrine 说一句话。"
+                + " 玩家希望你向对方 Herobrine 表达的开场话是：\"" + message + "\"。"
+                + " 请把这句话转化成你自己的口吻，直接输出台词本身，不要解释规则。";
     }
+
     private static String buildHbReplyPrompt(String ownerName, String peerOwnerName, String hbLine) {
-        return "You are roleplaying as the Herobrine bound to player " + ownerName + ". "
-                + "This is a private cross-Herobrine session accepted by both sides. "
-                + "Only answer as " + ownerName + "'s Herobrine; do not speak for " + peerOwnerName + ", either player, or merge their memories/settings. "
-                + "The other Herobrine, bound to " + peerOwnerName + ", just said: \"" + hbLine + "\". "
-                + "Respond directly as Herobrine and output only your line.";
+        return "你现在扮演玩家 " + ownerName + " 绑定的 Herobrine。"
+                + " 当前是一个双方同意的保密跨 HB 会话。"
+                + " 你只能代表 " + ownerName + " 的 Herobrine 回答，不能代替 " + peerOwnerName + "、不能代替双方玩家本人、也不能把双方的人设、记忆、语气、经历或设定混在同一句回复里。"
+                + " 对方 Herobrine（属于 " + peerOwnerName + "）刚刚对你说：\"" + hbLine + "\"。"
+                + " 请直接以 Herobrine 的身份作出回应，只输出你的台词。";
     }
     private static Component system(String key, Object... args) {
         return Component.translatable(key, args);

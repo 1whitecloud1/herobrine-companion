@@ -97,6 +97,16 @@ final class HeroStateBehaviorSupport {
         }
     }
 
+    static void ensureGrounded(HeroEntity hero) {
+        hero.noPhysics = false;
+        if (hero.isFloating()) {
+            hero.setFloating(false);
+        }
+        if (hero.isNoGravity()) {
+            hero.setNoGravity(false);
+        }
+    }
+
     static void clearAggro(HeroEntity hero) {
         hero.setTarget(null);
     }
@@ -104,21 +114,31 @@ final class HeroStateBehaviorSupport {
     static void stopAndLookAt(HeroEntity hero, Entity target) {
         hero.setTarget(null);
         hero.getNavigation().stop();
-        hero.lookAtEntityIfStable(target, 30.0F, 30.0F);
+        if (hero.getDeltaMovement().horizontalDistanceSqr() > 0.02D) {
+            alignHeadToBody(hero);
+            return;
+        }
+        hero.getLookControl().setLookAt(target, 30.0F, 30.0F);
     }
 
     static void clearAggroAndLookAt(HeroEntity hero, Entity target) {
         hero.setTarget(null);
-        hero.lookAtEntityIfStable(target, 20.0F, 20.0F);
+        if (hero.getDeltaMovement().horizontalDistanceSqr() > 0.02D) {
+            alignHeadToBody(hero);
+            return;
+        }
+        hero.getLookControl().setLookAt(target, 20.0F, 20.0F);
     }
 
     static void alignHeadToBody(HeroEntity hero) {
         hero.setTarget(null);
-        hero.alignHeadToBody();
+        float bodyYaw = hero.getYRot();
+        hero.setYHeadRot(bodyYaw);
+        hero.yHeadRotO = bodyYaw;
     }
 
     static void lookAtPos(HeroEntity hero, Vec3 pos) {
-        hero.lookAtPositionIfStable(pos.x, pos.y, pos.z, 30.0F, 30.0F);
+        hero.getLookControl().setLookAt(pos.x, pos.y, pos.z, 30.0F, 30.0F);
     }
 
     static void driftAway(HeroEntity hero, Entity target, double distance, double speed) {
@@ -128,6 +148,21 @@ final class HeroStateBehaviorSupport {
         }
         Vec3 goal = hero.position().add(away.normalize().scale(distance)).add(0.0D, 0.8D, 0.0D);
         hero.getMoveControl().setWantedPosition(goal.x, goal.y, goal.z, speed);
+    }
+
+    static void walkAway(HeroEntity hero, Entity target, double distance, double speed) {
+        Vec3 away = hero.position().subtract(target.position());
+        away = new Vec3(away.x, 0.0D, away.z);
+        if (away.lengthSqr() < 0.001D) {
+            away = new Vec3(hero.getRandom().nextDouble() - 0.5D, 0.0D,
+                    hero.getRandom().nextDouble() - 0.5D);
+        }
+
+        Vec3 goal = hero.position().add(away.normalize().scale(distance));
+        boolean pathStarted = hero.getNavigation().moveTo(goal.x, hero.getY(), goal.z, speed);
+        if (!pathStarted) {
+            hero.getMoveControl().setWantedPosition(goal.x, hero.getY(), goal.z, speed);
+        }
     }
 
     static void moveToOrbit(HeroEntity hero, Entity target, double radius, double speed, float baseOffset) {
