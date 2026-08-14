@@ -47,35 +47,6 @@ public final class HerobrineFamilyMembers {
         return null;
     }
 
-    public static boolean ensureAwakenedIdentity(Mob mob) {
-        HerobrineFamilyMemberType type = getType(mob);
-        if (mob == null || type == null) {
-            return false;
-        }
-
-        mob.setPersistenceRequired();
-        mob.setCustomName(Component.literal(type.id()));
-
-        if (mob instanceof AwakenedMobAccessor accessor) {
-            accessor.herobrineCompanion$setAwakeningInitialized(true);
-            accessor.herobrineCompanion$setAwakenedMob(true);
-            accessor.herobrineCompanion$setAwakenedMobName(type.id());
-
-            long now = mob.level().getGameTime();
-            if (accessor.herobrineCompanion$getNextAmbientSpeechGameTime() <= now) {
-                accessor.herobrineCompanion$setNextAmbientSpeechGameTime(now + 160L);
-            }
-            if (accessor.herobrineCompanion$getNextHeroInteractionGameTime() <= now) {
-                accessor.herobrineCompanion$setNextHeroInteractionGameTime(now + 220L);
-            }
-            if (accessor.herobrineCompanion$getNextPlayerInteractionGameTime() <= now) {
-                accessor.herobrineCompanion$setNextPlayerInteractionGameTime(now + 80L);
-            }
-        }
-
-        return true;
-    }
-
     public static void assignSummonedIdentity(Mob mob, HerobrineFamilyMemberType type) {
         if (mob == null || type == null) {
             return;
@@ -83,7 +54,20 @@ public final class HerobrineFamilyMembers {
 
         mob.getPersistentData().putString(FAMILY_MEMBER_ID_TAG, type.id());
         mob.setPersistenceRequired();
+        mob.setCustomName(Component.literal(type.id()));
         mob.setTarget(null);
-        ensureAwakenedIdentity(mob);
+
+        if (!(mob instanceof AwakenedMobAccessor accessor)) {
+            return;
+        }
+
+        accessor.herobrineCompanion$setAwakeningInitialized(true);
+        accessor.herobrineCompanion$setAwakenedMob(true);
+        accessor.herobrineCompanion$setAwakenedMobName(type.id());
+
+        long now = mob.level().getGameTime();
+        accessor.herobrineCompanion$setNextAmbientSpeechGameTime(now + 160L);
+        accessor.herobrineCompanion$setNextHeroInteractionGameTime(now + 220L);
+        accessor.herobrineCompanion$setNextPlayerInteractionGameTime(now + 80L);
     }
 }

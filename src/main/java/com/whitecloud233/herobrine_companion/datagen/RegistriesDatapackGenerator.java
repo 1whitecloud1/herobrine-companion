@@ -1,6 +1,5 @@
 package com.whitecloud233.herobrine_companion.datagen;
 
-import com.whitecloud233.herobrine_companion.world.structure.EndRingStructure;
 import com.whitecloud233.herobrine_companion.world.structure.UnstableZoneStructure;
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import net.minecraft.core.HolderGetter;
@@ -45,18 +44,6 @@ public class RegistriesDatapackGenerator extends DatapackBuiltinEntriesProvider 
     private static void bootstrapStructures(BootstrapContext<Structure> context) {
         HolderGetter<Biome> biomes = context.lookup(Registries.BIOME);
 
-        // Register End Ring Structure
-        context.register(ResourceKey.create(Registries.STRUCTURE, ResourceLocation.fromNamespaceAndPath(HerobrineCompanion.MODID, "end_ring")),
-                new EndRingStructure(
-                        new Structure.StructureSettings(
-                                biomes.getOrThrow(BiomeTags.IS_END), // Allowed biomes
-                                Map.of(), // Spawn overrides
-                                GenerationStep.Decoration.SURFACE_STRUCTURES,
-                                TerrainAdjustment.NONE
-                        )
-                )
-        );
-
         // Register Unstable Zone Structure
         context.register(ResourceKey.create(Registries.STRUCTURE, ResourceLocation.fromNamespaceAndPath(HerobrineCompanion.MODID, "unstable_zone")),
                 new UnstableZoneStructure(
@@ -73,28 +60,15 @@ public class RegistriesDatapackGenerator extends DatapackBuiltinEntriesProvider 
     private static void bootstrapStructureSets(BootstrapContext<StructureSet> context) {
         HolderGetter<Structure> structures = context.lookup(Registries.STRUCTURE);
 
-        // End Ring Structure Set
-        context.register(ResourceKey.create(Registries.STRUCTURE_SET, ResourceLocation.fromNamespaceAndPath(HerobrineCompanion.MODID, "end_ring")),
+        // Unstable Zone Structure Set
+        context.register(ResourceKey.create(Registries.STRUCTURE_SET, ResourceLocation.fromNamespaceAndPath(HerobrineCompanion.MODID, "unstable_zones")),
                 new StructureSet(
-                        structures.getOrThrow(ResourceKey.create(Registries.STRUCTURE, ResourceLocation.fromNamespaceAndPath(HerobrineCompanion.MODID, "end_ring"))),
+                        structures.getOrThrow(ResourceKey.create(Registries.STRUCTURE, ResourceLocation.fromNamespaceAndPath(HerobrineCompanion.MODID, "unstable_zone"))),
                         new RandomSpreadStructurePlacement(
                                 32, // Spacing
                                 8, // Separation
                                 RandomSpreadType.LINEAR,
-                                14357619 // Salt
-                        )
-                )
-        );
-
-        // Unstable Zone Structure Set
-        context.register(ResourceKey.create(Registries.STRUCTURE_SET, ResourceLocation.fromNamespaceAndPath(HerobrineCompanion.MODID, "unstable_zone")),
-                new StructureSet(
-                        structures.getOrThrow(ResourceKey.create(Registries.STRUCTURE, ResourceLocation.fromNamespaceAndPath(HerobrineCompanion.MODID, "unstable_zone"))),
-                        new RandomSpreadStructurePlacement(
-                                40, // Spacing
-                                20, // Separation
-                                RandomSpreadType.LINEAR,
-                                16432345 // Salt
+                                12345678 // Salt
                         )
                 )
         );

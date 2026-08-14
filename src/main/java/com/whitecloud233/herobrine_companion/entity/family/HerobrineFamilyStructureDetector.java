@@ -85,45 +85,35 @@ public final class HerobrineFamilyStructureDetector {
             }
         }
 
+        BlockPos northSkull = center.north(2).above();
+        BlockPos southSkull = center.south(2).above();
+        BlockPos eastSkull = center.east(2).above();
+        if (!level.getBlockState(northSkull).is(Blocks.WITHER_SKELETON_SKULL)
+                || !level.getBlockState(southSkull).is(Blocks.WITHER_SKELETON_SKULL)
+                || !level.getBlockState(eastSkull).is(Blocks.WITHER_SKELETON_SKULL)) {
+            return null;
+        }
+
         if (!hasClearVerticalSpace(level, center.above(), REQUIRED_OPEN_HEIGHT)) {
             return null;
         }
 
-        for (Direction standDirection : Direction.Plane.HORIZONTAL) {
-            List<BlockPos> skulls = new ArrayList<>();
-            boolean hasSkulls = true;
-            for (Direction direction : Direction.Plane.HORIZONTAL) {
-                if (direction == standDirection) {
-                    continue;
-                }
-                BlockPos skullPos = center.relative(direction, 2).above();
-                if (!level.getBlockState(skullPos).is(Blocks.WITHER_SKELETON_SKULL)) {
-                    hasSkulls = false;
-                    break;
-                }
-                skulls.add(skullPos);
-            }
+        List<BlockPos> consumeBlocks = new ArrayList<>();
+        consumeBlocks.add(northSkull);
+        consumeBlocks.add(southSkull);
+        consumeBlocks.add(eastSkull);
+        consumeBlocks.add(center.offset(1, 0, 1));
+        consumeBlocks.add(center.offset(1, 0, -1));
+        consumeBlocks.add(center.offset(-1, 0, 1));
+        consumeBlocks.add(center.offset(-1, 0, -1));
 
-            if (!hasSkulls) {
-                continue;
-            }
-
-            List<BlockPos> consumeBlocks = new ArrayList<>(skulls);
-            consumeBlocks.add(center.offset(1, 0, 1));
-            consumeBlocks.add(center.offset(1, 0, -1));
-            consumeBlocks.add(center.offset(-1, 0, 1));
-            consumeBlocks.add(center.offset(-1, 0, -1));
-
-            return new HerobrineFamilySummonStructure(
-                    HerobrineFamilyMemberType.SIMMONS,
-                    center.immutable(),
-                    center.relative(standDirection, 3).immutable(),
-                    consumeBlocks,
-                    List.of()
-            );
-        }
-
-        return null;
+        return new HerobrineFamilySummonStructure(
+                HerobrineFamilyMemberType.SIMMONS,
+                center.immutable(),
+                center.west(3).immutable(),
+                consumeBlocks,
+                List.of()
+        );
     }
 
     private static HerobrineFamilySummonStructure detectJean(ServerLevel level, BlockPos center) {
