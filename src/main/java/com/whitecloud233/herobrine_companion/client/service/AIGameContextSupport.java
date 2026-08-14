@@ -1,12 +1,20 @@
 package com.whitecloud233.herobrine_companion.client.service;
 
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.herobrine_companion.compat.accessories.HeroAccessoriesCompat;
+import com.whitecloud233.herobrine_companion.compat.curios.HeroCuriosCompat;
+import com.whitecloud233.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.herobrine_companion.util.AiItemNaming;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.neoforged.fml.ModList;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -17,6 +25,12 @@ final class AIGameContextSupport {
     private static final int MAX_SERVER_PLAYERS_IN_PROMPT = 12;
     private static final int MAX_NEARBY_PLAYERS_IN_PROMPT = 6;
     private static final double NEARBY_PLAYER_DETAIL_RADIUS = 96.0D;
+    private static final double HERO_PERCEPTION_RADIUS = 256.0D;
+    private static final List<EquipmentSlot> PLAYER_EQUIPMENT_SLOTS = List.of(
+            EquipmentSlot.MAINHAND, EquipmentSlot.OFFHAND,
+            EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET);
+    private static final List<EquipmentSlot> HERO_ARMOR_SLOTS = List.of(
+            EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET);
 
     private AIGameContextSupport() {}
 
@@ -48,7 +62,8 @@ final class AIGameContextSupport {
         } else data.append("  * (None configured)\n");
         appendOtherPlayerAwareness(data, mc);
         data.append("\n- [Omniscient Eye] Current Environment:\n");
-        if (!mc.player.getMainHandItem().isEmpty()) data.append("  * Player Mainhand: ").append(net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(mc.player.getMainHandItem().getItem())).append("\n");
+        appendPlayerEquipment(data, mc.player);
+        appendHeroOutfit(data, mc);
         data.append("  * Entities within 20 blocks (You pity monsters): ");
         if (mc.level != null) {
             int entityCount = 0;
@@ -61,6 +76,87 @@ final class AIGameContextSupport {
             if (entityCount == 0) data.append("Peaceful, no entities.");
         }
         return data.append("\n").toString();
+    }
+
+    /** 玩家当前穿戴/持有的装备（主手+副手+护甲），只列非空槽位。 */
+    private static void appendPlayerEquipment(StringBuilder data, Player player) {
+        data.append("  * Player Equipment: ");
+        List<String> parts = new ArrayList<>();
+        for (EquipmentSlot slot : PLAYER_EQUIPMENT_SLOTS) {
+            ItemStack stack = player.getItemBySlot(slot);
+            if (!stack.isEmpty()) {
+                parts.add(slot.getName() + "=" + AiItemNaming.describe(stack));
+            }
+        }
+        if (parts.isEmpty()) {
+            data.append("(none — barehanded, no armor)\n");
+        } else {
+            data.append(String.join(", ", parts)).append("\n");
+        }
+    }
+
+    /** Herobrine 自己的装扮感知：护甲+双手+背部(Curios)+饰品(Accessories)。 */
+    private static void appendHeroOutfit(StringBuilder data, Minecraft mc) {
+        data.append("- [Omniscient Eye] Your current outfit:\n");
+        if (mc.level == null) {
+            return;
+        }
+        HeroEntity hero = findPerceivedHero(mc);
+        if (hero == null) {
+            data.append("  * (Your physical body is not loaded in the current area — you can only feel your attire when it is near.)\n");
+            return;
+        }
+
+        List<String> parts = new ArrayList<>();
+        for (EquipmentSlot slot : HERO_ARMOR_SLOTS) {
+            ItemStack stack = hero.getItemBySlot(slot);
+            if (!stack.isEmpty()) {
+                parts.add(slot.getName() + "=" + AiItemNaming.describe(stack));
+            }
+        }
+        if (!hero.getMainHandItem().isEmpty()) {
+            parts.add("mainhand=" + AiItemNaming.describe(hero.getMainHandItem()));
+        }
+        if (!hero.getOffhandItem().isEmpty()) {
+            parts.add("offhand=" + AiItemNaming.describe(hero.getOffhandItem()));
+        }
+        if (ModList.get().isLoaded("curios")) {
+            ItemStack back = HeroCuriosCompat.getBackSlotItem(hero);
+            if (!back.isEmpty()) {
+                parts.add("back=" + AiItemNaming.describe(back));
+            }
+        }
+        String accessories = HeroAccessoriesCompat.describeEquippedItems(hero);
+        if (!accessories.isEmpty()) {
+            parts.add(accessories);
+        }
+
+        if (parts.isEmpty()) {
+            data.append("  * (You are wearing nothing — bare and unadorned.)\n");
+        } else {
+            data.append("  * ").append(String.join(", ", parts)).append("\n");
+        }
+    }
+
+    /** 优先返回本玩家结伴的 Hero，否则取最近一只已加载的 Hero。 */
+    private static HeroEntity findPerceivedHero(Minecraft mc) {
+        if (mc.level == null) {
+            return null;
+        }
+        HeroEntity fallback = null;
+        for (HeroEntity hero : mc.level.getEntitiesOfClass(HeroEntity.class, mc.player.getBoundingBox().inflate(HERO_PERCEPTION_RADIUS))) {
+            if (hero.isRemoved()) {
+                continue;
+            }
+            if (fallback == null) {
+                fallback = hero;
+            }
+            UUID owner = hero.getOwnerUUID();
+            if (owner != null && owner.equals(mc.player.getUUID())) {
+                return hero;
+            }
+        }
+        return fallback;
     }
 
     private static void appendOtherPlayerAwareness(StringBuilder data, Minecraft mc) {

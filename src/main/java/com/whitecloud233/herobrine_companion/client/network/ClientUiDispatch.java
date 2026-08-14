@@ -1,0 +1,47 @@
+package com.whitecloud233.herobrine_companion.client.network;
+
+import com.whitecloud233.herobrine_companion.client.event.ClientHooks;
+import com.whitecloud233.herobrine_companion.client.gui.FakeCrashScreen;
+import com.whitecloud233.herobrine_companion.compat.cooking.HeroCookSelectionScreen;
+import com.whitecloud233.herobrine_companion.compat.cooking.HeroCookingCompat;
+import net.minecraft.client.Minecraft;
+import net.minecraft.core.BlockPos;
+
+import java.util.List;
+import java.util.UUID;
+
+/**
+ * 收包后需要在客户端打开 UI 的处理入口。
+ *
+ * <p>NeoForge 下 playToClient 的 payload handler 只在客户端执行,各包的 {@code handle}
+ * 直接调用这里的静态方法即可,无需反射桥。
+ */
+public final class ClientUiDispatch {
+    private ClientUiDispatch() {
+    }
+
+    public static void openCookSelection(int heroId, BlockPos cookwarePos, List<HeroCookingCompat.CookOptionView> options) {
+        Minecraft minecraft = Minecraft.getInstance();
+        minecraft.setScreen(new HeroCookSelectionScreen(heroId, cookwarePos, options, minecraft.screen));
+    }
+
+    public static void openHeroChat(boolean hbInputMode) {
+        ClientHooks.openHeroChatFromCommand(hbInputMode);
+    }
+
+    public static void openCrossChatInvite(UUID requesterId, String requesterName) {
+        ClientHooks.openCrossChatInvite(requesterId, requesterName);
+    }
+
+    public static void openCrossSessionHub(int entityId) {
+        ClientHooks.openCrossSessionHub(entityId);
+    }
+
+    public static void openFakeCrash() {
+        FakeCrashScreen.open();
+    }
+
+    public static void triggerEternalOath() {
+        ClientHooks.triggerEternalOath();
+    }
+}

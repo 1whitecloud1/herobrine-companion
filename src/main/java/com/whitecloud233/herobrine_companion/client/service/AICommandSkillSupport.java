@@ -4,6 +4,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.whitecloud233.herobrine_companion.client.llm.LlmToolSpec;
 import com.whitecloud233.herobrine_companion.network.HeroAIActionPacket;
 
 import java.util.List;
@@ -14,6 +15,28 @@ import java.util.Set;
 final class AICommandSkillSupport {
     static final String TOOL_MANIFEST_DIVINE_POWER = "manifest_divine_power";
     static final String TOOL_MINECRAFT_COMMAND_SKILL = "minecraft_command_skill";
+
+    /** 提供给 LLM 工具清单（provider 无关）；由 AIService/AIPromptAssembler 注入，适配器负责包装成各供应商格式。 */
+    static List<LlmToolSpec> toolSpecs() {
+        return List.of(
+                new LlmToolSpec(TOOL_MINECRAFT_COMMAND_SKILL, buildMinecraftCommandSkillDescription(), createMinecraftCommandSkillInputSchema()),
+                new LlmToolSpec(TOOL_MANIFEST_DIVINE_POWER, buildDivineSpellbookDescription(), createManifestDivinePowerInputSchema())
+        );
+    }
+
+    private static JsonObject createManifestDivinePowerInputSchema() {
+        JsonObject parameters = new JsonObject();
+        parameters.addProperty("type", "object");
+        JsonObject properties = new JsonObject();
+        addStringProperty(properties, "command", "The raw command/action code to execute, without '/'. Use only when minecraft_command_skill cannot express the request.");
+        addStringProperty(properties, "dialogue", "Your dialogue while casting this power.");
+        parameters.add("properties", properties);
+        JsonArray required = new JsonArray();
+        required.add("command");
+        required.add("dialogue");
+        parameters.add("required", required);
+        return parameters;
+    }
 
     private static final int MAX_SKILL_GIVE_COUNT = 64;
     private static final int MAX_SKILL_SUMMON_DISTANCE = 20;
@@ -38,9 +61,8 @@ final class AICommandSkillSupport {
             "setblock", "setworldspawn", "spawnpoint", "spreadplayers", "stop", "stopsound",
             "summon", "tag", "msg", "tell", "w", "tellraw", "time", "title", "teleport",
             "tp", "transfer", "weather", "whitelist",
-            "summon_hero_to_player", "teleport_player_to_hero", "toggle_companion_follow",
+            "teleport_player_to_hero",
             "massive_lightning", "discard_nearby_entities", "discard_nearby_world",
-            "accept_challenge", "hero_fly_up", "hero_land",
             "kill_player", "kick_player",
             "set_time", "set_weather", "set_difficulty", "set_gamemode", "set_gamerule",
             "default_gamemode", "seed", "set_idle_timeout",
@@ -95,67 +117,7 @@ final class AICommandSkillSupport {
         return TOOL_MANIFEST_DIVINE_POWER.equals(toolName) || TOOL_MINECRAFT_COMMAND_SKILL.equals(toolName);
     }
 
-    static JsonObject createOpenAiMinecraftCommandSkillTool() {
-        JsonObject tool = new JsonObject();
-        tool.addProperty("type", "function");
-
-        JsonObject function = new JsonObject();
-        function.addProperty("name", TOOL_MINECRAFT_COMMAND_SKILL);
-        function.addProperty("description", buildMinecraftCommandSkillDescription());
-        function.add("parameters", createMinecraftCommandSkillInputSchema());
-        tool.add("function", function);
-        return tool;
-    }
-
-    static JsonObject createOpenAiManifestDivinePowerTool() {
-        JsonObject tool = new JsonObject();
-        tool.addProperty("type", "function");
-
-        JsonObject function = new JsonObject();
-        function.addProperty("name", TOOL_MANIFEST_DIVINE_POWER);
-        function.addProperty("description", buildDivineSpellbookDescription());
-        JsonObject parameters = new JsonObject();
-        parameters.addProperty("type", "object");
-        JsonObject properties = new JsonObject();
-        addStringProperty(properties, "command", "The raw command/action code to execute, without '/'. Use only when minecraft_command_skill cannot express the request.");
-        addStringProperty(properties, "dialogue", "Your dialogue while casting this power.");
-        parameters.add("properties", properties);
-        JsonArray required = new JsonArray();
-        required.add("command");
-        required.add("dialogue");
-        parameters.add("required", required);
-        function.add("parameters", parameters);
-        tool.add("function", function);
-        return tool;
-    }
-
-    static JsonObject createAnthropicMinecraftCommandSkillTool() {
-        JsonObject tool = new JsonObject();
-        tool.addProperty("name", TOOL_MINECRAFT_COMMAND_SKILL);
-        tool.addProperty("description", buildMinecraftCommandSkillDescription());
-        tool.add("input_schema", createMinecraftCommandSkillInputSchema());
-        return tool;
-    }
-
-    static JsonObject createAnthropicManifestDivinePowerTool() {
-        JsonObject tool = new JsonObject();
-        tool.addProperty("name", TOOL_MANIFEST_DIVINE_POWER);
-        tool.addProperty("description", buildDivineSpellbookDescription());
-        JsonObject inputSchema = new JsonObject();
-        inputSchema.addProperty("type", "object");
-        JsonObject properties = new JsonObject();
-        addStringProperty(properties, "command", "The raw command/action code to execute, without '/'. Use only when minecraft_command_skill cannot express the request.");
-        addStringProperty(properties, "dialogue", "Your dialogue while casting this power.");
-        inputSchema.add("properties", properties);
-        JsonArray required = new JsonArray();
-        required.add("command");
-        required.add("dialogue");
-        inputSchema.add("required", required);
-        tool.add("input_schema", inputSchema);
-        return tool;
-    }
-
-    static String buildMinecraftSkillCommand(JsonObject args, String actionSummonToPlayer, String actionTeleportToHero, String actionToggleCompanion, String actionMassiveLightning) {
+    static String buildMinecraftSkillCommand(JsonObject args, String actionTeleportToHero, String actionMassiveLightning) {
         String action = getOptionalString(args, "action", "").trim().toLowerCase(Locale.ROOT);
         return switch (action) {
             case "clear" -> buildClearInventoryCommand(args);
@@ -205,15 +167,10 @@ final class AICommandSkillSupport {
             case "transfer" -> buildTransferCommand(args);
             case "weather" -> buildSetWeatherCommand(args);
             case "whitelist" -> buildWhitelistCommand(args);
-            case "summon_hero_to_player" -> actionSummonToPlayer;
             case "teleport_player_to_hero" -> actionTeleportToHero;
-            case "toggle_companion_follow" -> actionToggleCompanion;
             case "massive_lightning" -> actionMassiveLightning;
             case "discard_nearby_entities" -> HeroAIActionPacket.ACTION_DISCARD_ENTITIES;
             case "discard_nearby_world" -> HeroAIActionPacket.ACTION_DISCARD;
-            case "accept_challenge" -> HeroAIActionPacket.ACTION_CHALLENGE_ACCEPT;
-            case "hero_fly_up" -> HeroAIActionPacket.ACTION_HERO_FLY_UP;
-            case "hero_land" -> HeroAIActionPacket.ACTION_HERO_LAND;
             case "kill_player" -> com.whitecloud233.herobrine_companion.network.HeroPunishmentPacket.ACTION_KILL_PLAYER;
             case "kick_player" -> com.whitecloud233.herobrine_companion.network.HeroPunishmentPacket.ACTION_KICK_PLAYER;
             case "set_time" -> buildSetTimeCommand(args);
@@ -490,12 +447,11 @@ final class AICommandSkillSupport {
 
     private static String buildDivineSpellbookDescription() {
         return "Low-level fallback only. Alter Minecraft 1.21.1 underlying code by generating vanilla commands or action codes (NO '/' prefix). "
-                + "Prefer minecraft_command_skill for: teleport/follow, lightning, time/weather/difficulty/gamemode/gamerule, give/clear/enchant/xp, summon, tp coordinates/dimensions, spawnpoint, setblock/fill, effects, particles, sounds, locate/place, challenge/fly/land, entity/world discard, kill/kick. "
-                + "If forced to use this fallback: [Follow/Summon/Teleport] use 'action:summon_to_player', 'action:teleport_to_hero', or 'action:toggle_companion'. "
+                + "Prefer minecraft_command_skill for: teleport/follow, lightning, time/weather/difficulty/gamemode/gamerule, give/clear/enchant/xp, summon, tp coordinates/dimensions, spawnpoint, setblock/fill, effects, particles, sounds, locate/place, entity/world discard, kill/kick. "
+                + "If forced to use this fallback: [Teleport] use 'action:teleport_to_hero'. "
                 + "[Punishment] use 'action:massive_lightning', 'action:punishment_kill_player', or 'action:punishment_kick_player' only when explicitly justified. "
                 + "[Entity Annihilation] use '" + HeroAIActionPacket.ACTION_DISCARD_ENTITIES + "' for creature-only erasure. "
-                + "[World Erasure] use '" + HeroAIActionPacket.ACTION_DISCARD + "' only for explicit terrain/world deletion. "
-                + "[Dialogue-to-Effect Sync] use '" + HeroAIActionPacket.ACTION_CHALLENGE_ACCEPT + "', '" + HeroAIActionPacket.ACTION_HERO_FLY_UP + "', or '" + HeroAIActionPacket.ACTION_HERO_LAND + "' when your spoken line claims that visible action happened.";
+                + "[World Erasure] use '" + HeroAIActionPacket.ACTION_DISCARD + "' only for explicit terrain/world deletion. ";
     }
 
     private static void addStringProperty(JsonObject properties, String name, String description) {

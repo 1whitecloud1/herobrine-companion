@@ -1,25 +1,13 @@
 package com.whitecloud233.herobrine_companion.client.network;
 
-import com.whitecloud233.herobrine_companion.client.event.ClientHooks;
-import com.whitecloud233.herobrine_companion.client.fight.event.ClientCollapseHandler;
-import com.whitecloud233.herobrine_companion.client.gui.FakeCrashScreen;
-import com.whitecloud233.herobrine_companion.client.render.HeroClientSkinCache;
-import com.whitecloud233.herobrine_companion.client.service.AIService;
 import com.whitecloud233.herobrine_companion.client.service.ActorDialogueRequest;
 import com.whitecloud233.herobrine_companion.client.service.ActorDialogueService;
+import com.whitecloud233.herobrine_companion.client.service.AIService;
 import com.whitecloud233.herobrine_companion.client.service.CrossChatHistoryStore;
 import com.whitecloud233.herobrine_companion.client.service.LLMConfig;
 import com.whitecloud233.herobrine_companion.client.service.LocalChatService;
-import com.whitecloud233.herobrine_companion.compat.cooking.HeroCookSelectionScreen;
-import com.whitecloud233.herobrine_companion.compat.cooking.HeroCookingCompat;
 import com.whitecloud233.herobrine_companion.config.Config;
-import com.whitecloud233.herobrine_companion.destructiongod.client.cinematic.ClientSpatialRendHandler;
-import com.whitecloud233.herobrine_companion.destructiongod.network.*;
-import com.whitecloud233.herobrine_companion.entity.HeroEntity;
-import com.whitecloud233.herobrine_companion.network.ClientPacketHandler;
 import com.whitecloud233.herobrine_companion.network.PacketHandler;
-import com.whitecloud233.herobrine_companion.network.PaleLightningArcPacket;
-import com.whitecloud233.herobrine_companion.network.PaleLightningPacket;
 import com.whitecloud233.herobrine_companion.network.ai.ActorDialogueResultPacket;
 import com.whitecloud233.herobrine_companion.network.ai.HeroCrossChatPromptPacket;
 import com.whitecloud233.herobrine_companion.network.ai.HeroCrossChatResultPacket;
@@ -27,30 +15,30 @@ import com.whitecloud233.herobrine_companion.util.LegacyFormattingComponents;
 import com.whitecloud233.herobrine_companion.util.LegacyFormattingText;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
-import net.minecraft.core.BlockPos;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.Entity;
 
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
-public final class NetworkClientBridgeClient {
+/**
+ * 收包后触发客户端 LLM 编排的处理入口。各包的 {@code handle} 直接调用。
+ *
+ * <p>LLM 的 API Key 只存在客户端配置里,所以"服务器发 prompt 包 → 客户端调用 LLM →
+ * 结果包回发服务器"这条回环是架构使然,不能搬去服务端。
+ */
+public final class ClientAiPrompts {
     private static final Map<String, Long> RECENT_OBSERVATIONS = new ConcurrentHashMap<>();
     private static final long DUPLICATE_SUPPRESS_WINDOW_MS = 5_000L;
     private static final String AUTONOMOUS_REST_FALLBACK_KEY = "message.herobrine_companion.autonomous_rest";
     private static final String AUTONOMOUS_COOK_FALLBACK_KEY = "message.herobrine_companion.autonomous_cook";
-    private static final int MIN_BUBBLE_TICKS = 45;
-    private static final int MAX_BUBBLE_TICKS = 180;
 
-    private NetworkClientBridgeClient() {
-    }
-
-    public static void openCookSelection(int heroId, BlockPos cookwarePos, List<HeroCookingCompat.CookOptionView> options) {
-        Minecraft minecraft = Minecraft.getInstance();
-        minecraft.setScreen(new HeroCookSelectionScreen(heroId, cookwarePos, options, minecraft.screen));
+    private ClientAiPrompts() {
     }
 
     public static void handleAIObservation(int heroId, String observationDesc, String fallbackKey, int fallbackVariants,
@@ -90,74 +78,6 @@ public final class NetworkClientBridgeClient {
         showFallbackDialogue(mc, heroId, fallbackKey, fallbackVariants, resolvedContextName);
     }
 
-    public static void applySavePose(int entityId, boolean isPosing, float[][] angles) {
-        Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.level == null) {
-            return;
-        }
-
-        Entity entity = minecraft.level.getEntity(entityId);
-        if (entity instanceof HeroEntity hero) {
-            hero.isPoseEditing = isPosing;
-            hero.customPoseAngles = copyAngles(angles);
-        }
-    }
-
-    public static void applySyncRewards(int entityId, Set<Integer> claimedRewards) {
-        Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.level == null) {
-            return;
-        }
-
-        Entity entity = minecraft.level.getEntity(entityId);
-        if (entity instanceof HeroEntity hero) {
-            for (int rewardId : claimedRewards) {
-                hero.claimReward(rewardId);
-            }
-        }
-    }
-
-    public static void applySyncHeroCosmetics(int entityId, int skinVariant, String customSkinName,
-                                              byte[] customSkinData, CompoundTag curiosBackItem,
-                                              CompoundTag accessoriesData) {
-        Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.level == null) {
-            return;
-        }
-
-        Entity entity = minecraft.level.getEntity(entityId);
-        if (!(entity instanceof HeroEntity hero)) {
-            return;
-        }
-
-        hero.setSkinVariant(skinVariant);
-        hero.setCustomSkinName(customSkinName);
-        hero.setCuriosBackItemFromTag(curiosBackItem);
-        hero.setAccessoriesDataFromTag(accessoriesData);
-
-        if (skinVariant == HeroEntity.SKIN_CUSTOM && customSkinData.length > 0) {
-            HeroClientSkinCache.put(hero.getUUID(), customSkinData);
-        } else {
-            HeroClientSkinCache.clear(hero.getUUID());
-        }
-    }
-
-    public static void openHeroChat(boolean hbInputMode) {
-        ClientHooks.openHeroChatFromCommand(hbInputMode);
-    }
-
-    public static void openCrossChatInvite(UUID requesterId, String requesterName) {
-        ClientHooks.openCrossChatInvite(requesterId, requesterName);
-    }
-
-    public static void openCrossSessionHub(int entityId) {
-        ClientHooks.openCrossSessionHub(entityId);
-    }
-
-    public static void appendCrossChatHistory(String peerName, boolean hbMode, String speaker, String content, String kind) {
-        CrossChatHistoryStore.getInstance().appendEntry(peerName, hbMode, speaker, content, kind);
-    }
-
     public static void presentCrossChatAiLine(String peerName, boolean hbMode, String speaker, String content,
                                               String kind, byte displayType, String primaryName,
                                               String secondaryName, boolean translateForViewer) {
@@ -174,19 +94,6 @@ public final class NetworkClientBridgeClient {
                 .exceptionally(ignored -> content)
                 .thenAccept(localizedContent -> mc.tell(() ->
                         applyPresentedLine(mc, peerName, hbMode, speaker, content, kind, displayType, primaryName, secondaryName, localizedContent)));
-    }
-
-    public static void syncCrossChatState(boolean allowIncoming, boolean activeSession, String peerName,
-                                          boolean autoChatEnabled, int autoHbTurnLimit) {
-        ClientHooks.syncCrossChatState(allowIncoming, activeSession, peerName, autoChatEnabled, autoHbTurnLimit);
-    }
-
-    public static void setVisitedHeroDimension(boolean visited) {
-        ClientHooks.setVisitedHeroDimension(visited);
-    }
-
-    public static void triggerEternalOath() {
-        ClientHooks.triggerEternalOath();
     }
 
     public static void handleHeroCrossChatPrompt(UUID jobId, UUID sessionId, byte kind, String prompt,
@@ -237,46 +144,6 @@ public final class NetworkClientBridgeClient {
                 .thenAccept(reply -> PacketHandler.sendToServer(new ActorDialogueResultPacket(jobId, reply)));
     }
 
-    public static void startCollapse() {
-        ClientCollapseHandler.startCollapse();
-    }
-
-    public static void openFakeCrash() {
-        FakeCrashScreen.open();
-    }
-
-    public static void handleWorldRendCinematic(double x, double y, double z) {
-        ClientSpatialRendHandler.startWorldRendCinematic(x, y, z);
-    }
-
-    public static void handlePaleLightning(PaleLightningPacket packet) {
-        ClientPacketHandler.handlePaleLightning(packet, null);
-    }
-
-    public static void handlePaleLightningArc(PaleLightningArcPacket packet) {
-        ClientPacketHandler.handlePaleLightningArc(packet);
-    }
-
-    public static void handleDestructionGodLightning(DestructionGodLightningPacket packet) {
-        DestructionGodClientPacketHandler.handleLightning(packet);
-    }
-
-    public static void handleDestructionGodLightningArc(DestructionGodLightningArcPacket packet) {
-        DestructionGodClientPacketHandler.handleLightningArc(packet);
-    }
-
-    public static void handleDestructionGodOrb(DestructionGodOrbPacket packet) {
-        DestructionGodClientPacketHandler.handleOrb(packet);
-    }
-
-    public static void handleDestructionGodThunderSkyNet(DestructionGodThunderSkyNetPacket packet) {
-        DestructionGodClientPacketHandler.handleThunderSkyNet(packet);
-    }
-
-    public static void handleDestructionGodFaultSplit(DestructionGodFaultSplitPacket packet) {
-        DestructionGodClientPacketHandler.handleFaultSplit(packet);
-    }
-
     private static boolean shouldSuppressDuplicate(UUID playerUUID, int heroId, String observationDesc) {
         if (playerUUID == null) {
             return false;
@@ -299,7 +166,7 @@ public final class NetworkClientBridgeClient {
         if (normalizedReply.isEmpty()) {
             return false;
         }
-        return !normalizedReply.startsWith("\u00A7c");
+        return !normalizedReply.startsWith("§c");
     }
 
     private static void showFallbackDialogue(Minecraft mc, int heroId, String fallbackKey, int fallbackVariants,
@@ -342,21 +209,21 @@ public final class NetworkClientBridgeClient {
         boolean chinese = isChineseLocale(languageCode);
         String subject = sanitize(restTargetName);
         if (subject.isEmpty()) {
-            subject = chinese ? "\u8fd9\u91cc" : "this place";
+            subject = chinese ? "这里" : "this place";
         }
 
         String line = switch (variant) {
             case 2 -> chinese
-                    ? "\u5c31\u5728" + subject + "\u6b47\u4e00\u4f1a\u513f\u3002"
+                    ? "就在" + subject + "歇一会儿。"
                     : "I'll rest on " + subject + " for a while.";
             case 3 -> chinese
-                    ? subject + "\u770b\u7740\u8fd8\u7b97\u5b89\u9759\u3002"
+                    ? subject + "看着还算安静。"
                     : subject + " looks quiet enough for a short rest.";
             case 4 -> chinese
-                    ? "\u8fd9\u5730\u65b9\u4e0d\u9519\uff0c" + subject + "\u6b63\u5408\u9002\u3002"
+                    ? "这地方不错，" + subject + "正合适。"
                     : "This will do. " + subject + " feels right.";
             default -> chinese
-                    ? "\u5148\u5728" + subject + "\u4e0a\u5750\u4e00\u4e0b\u3002"
+                    ? "先在" + subject + "上坐一下。"
                     : "I'll sit by " + subject + " and rest a moment.";
         };
         return Component.literal(line);
@@ -366,21 +233,21 @@ public final class NetworkClientBridgeClient {
         boolean chinese = isChineseLocale(languageCode);
         String subject = sanitize(dishName);
         if (subject.isEmpty()) {
-            subject = chinese ? "\u8fd9\u9053\u83dc" : "this dish";
+            subject = chinese ? "这道菜" : "this dish";
         }
 
         String line = switch (variant) {
             case 2 -> chinese
-                    ? "\u60f3\u8bd5\u8bd5" + subject + "\u4f1a\u662f\u4ec0\u4e48\u5473\u9053\u3002"
+                    ? "想试试" + subject + "会是什么味道。"
                     : "I want to see how " + subject + " turns out.";
             case 3 -> chinese
-                    ? subject + "\u95fb\u8d77\u6765\u5e94\u8be5\u4e0d\u9519\u3002"
+                    ? subject + "闻起来应该不错。"
                     : subject + " sounds worth making.";
             case 4 -> chinese
-                    ? "\u5148\u505a\u4e2a" + subject + "\uff0c\u522b\u6253\u6270\u6211\u3002"
+                    ? "先做个" + subject + "，别打扰我。"
                     : "I'll make " + subject + ". Don't interrupt.";
             default -> chinese
-                    ? "\u8ba9\u6211\u505a\u4e00\u9053" + subject + "\u3002"
+                    ? "让我做一道" + subject + "。"
                     : "Let me cook some " + subject + ".";
         };
         return Component.literal(line);
@@ -427,13 +294,8 @@ public final class NetworkClientBridgeClient {
             return;
         }
 
-        Entity entity = mc.level.getEntity(heroId);
-        // Speech bubbles are optional on the client; chat output remains the fallback.
-    }
-
-    private static int computeBubbleDuration(Component line) {
-        int duration = MIN_BUBBLE_TICKS + line.getString().length() * 2;
-        return Math.max(MIN_BUBBLE_TICKS, Math.min(MAX_BUBBLE_TICKS, duration));
+        // 气泡交给 SyncSpeechBubblePacket,这里只保留聊天输出作为兜底。
+        mc.level.getEntity(heroId);
     }
 
     private static void applyPresentedLine(Minecraft mc, String peerName, boolean hbMode, String speaker,
@@ -478,7 +340,7 @@ public final class NetworkClientBridgeClient {
         }
 
         String lowered = normalized.toLowerCase(Locale.ROOT);
-        if (normalized.startsWith("\u00A7c")
+        if (normalized.startsWith("§c")
                 || lowered.contains("network error")
                 || lowered.contains("api error")
                 || lowered.contains("connection to reality fading")) {
@@ -498,8 +360,8 @@ public final class NetworkClientBridgeClient {
 
         boolean chinese = isChineseLocale(outputLanguageCode);
         return switch (kind) {
-            case HeroCrossChatPromptPacket.KIND_HB_OPENING -> chinese ? "\u2026\u2026\u6211\u5728\u542c\u3002" : "...I'm listening.";
-            case HeroCrossChatPromptPacket.KIND_HB_REPLY -> chinese ? "\u2026\u2026\u90a3\u5c31\u7ee7\u7eed\u8bf4\u3002" : "...Then keep speaking.";
+            case HeroCrossChatPromptPacket.KIND_HB_OPENING -> chinese ? "……我在听。" : "...I'm listening.";
+            case HeroCrossChatPromptPacket.KIND_HB_REPLY -> chinese ? "……那就继续说。" : "...Then keep speaking.";
             default -> "...";
         };
     }
@@ -532,13 +394,5 @@ public final class NetworkClientBridgeClient {
 
     private static String sanitize(String content) {
         return LegacyFormattingText.normalize(content == null ? "" : content.replace('\r', ' ').replace('\n', ' ').trim());
-    }
-
-    private static float[][] copyAngles(float[][] source) {
-        float[][] dest = new float[10][3];
-        for (int i = 0; i < 10; i++) {
-            System.arraycopy(source[i], 0, dest[i], 0, 3);
-        }
-        return dest;
     }
 }

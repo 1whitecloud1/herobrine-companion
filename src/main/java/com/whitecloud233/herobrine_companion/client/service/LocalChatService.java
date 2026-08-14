@@ -2,6 +2,7 @@ package com.whitecloud233.herobrine_companion.client.service;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.annotations.SerializedName;
 import com.google.gson.reflect.TypeToken;
 import net.minecraft.client.resources.language.I18n;
 import net.neoforged.fml.loading.FMLPaths;
@@ -105,6 +106,10 @@ public class LocalChatService {
         List<RuleData> matches = new ArrayList<>();
 
         for (RuleData rule : rulesData) {
+            // 0. 【防御】：pattern 为 null/空 时跳过该规则，避免 I18n.exists(null) 崩溃
+            if (rule.pattern == null || rule.pattern.trim().isEmpty()) {
+                continue;
+            }
             // 1. 【核心逻辑】：如果存在该翻译键，就提取翻译后的文本；如果不存在，就原样使用 json 里的文字 (支持玩家乱写)
             String actualPattern = I18n.exists(rule.pattern) ? I18n.get(rule.pattern) : rule.pattern;
 
@@ -128,7 +133,10 @@ public class LocalChatService {
             RuleData chosen = matches.get(random.nextInt(matches.size()));
 
             // 4. 【核心逻辑】：同样处理回复内容，支持返回翻译键或普通文本
-            String finalResponse = I18n.exists(chosen.response) ? I18n.get(chosen.response) : chosen.response;
+            //    【修复】response 可能为 null（旧词库用 reply 字段、或词条残缺），此时回退到翻译键兜底，避免 I18n.exists(null) 崩溃
+            String finalResponse = chosen.response == null
+                    ? "chat.herobrine_companion.rule." + chosen.id
+                    : (I18n.exists(chosen.response) ? I18n.get(chosen.response) : chosen.response);
 
             return new CachedRule(chosen.id, chosen.compiledRegex, finalResponse);
         }
@@ -160,6 +168,8 @@ public class LocalChatService {
     public static class RuleData {
         public int id;
         public String pattern;
+        // 【兼容】同时接受 JSON 里的 "response" 与旧词库的 "reply" 字段（防止 response 为 null）
+        @SerializedName(value = "response", alternate = {"reply"})
         public String response;
         public int weight;
 

@@ -1,10 +1,12 @@
 package com.whitecloud233.herobrine_companion.config;
 
+import com.whitecloud233.herobrine_companion.client.gui.AIDebugScreen;
 import com.whitecloud233.herobrine_companion.client.gui.HeroScreen;
 import com.whitecloud233.herobrine_companion.client.service.LLMConfig;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
@@ -26,8 +28,6 @@ public class LLMSettingsScreen extends Screen {
     private EditBox topPBox;
     private EditBox maxOutputTokensBox;
     private HeroScreen.ThemedButton saveButton;
-    private boolean streamingEnabled;
-    private LLMConfig.CommandMode commandMode;
     private Component validationMessage;
     private boolean settingsLoaded;
     private String systemPromptDraft;
@@ -47,16 +47,11 @@ public class LLMSettingsScreen extends Screen {
         super.init();
         LLMConfig.ensureLoaded();
         if (!this.settingsLoaded) {
-            this.streamingEnabled = LLMConfig.isStreamingEnabled();
-            this.commandMode = LLMConfig.getCommandMode();
             this.systemPromptDraft = LLMConfig.getSystemPrompt();
             this.temperatureDraft = Double.toString(LLMConfig.getConfiguredTemperature());
             this.topPDraft = Double.toString(LLMConfig.getConfiguredTopP());
             this.maxOutputTokensDraft = Integer.toString(LLMConfig.getConfiguredMaxOutputTokens());
             this.settingsLoaded = true;
-        }
-        if (this.commandMode == null) {
-            this.commandMode = LLMConfig.CommandMode.NORMAL;
         }
 
         Layout layout = this.createLayout();
@@ -71,26 +66,6 @@ public class LLMSettingsScreen extends Screen {
             this.updateSaveState();
         });
 
-        this.addRenderableWidget(new HeroScreen.ThemedButton(
-                layout.streamingButtonX(), layout.toggleButtonY(), layout.toggleButtonWidth(), BUTTON_HEIGHT,
-                this.getStreamingButtonMessage(),
-                button -> {
-                    this.streamingEnabled = !this.streamingEnabled;
-                    button.setMessage(this.getStreamingButtonMessage());
-                },
-                null
-        ));
-
-        this.addRenderableWidget(new HeroScreen.ThemedButton(
-                layout.commandButtonX(), layout.toggleButtonY(), layout.toggleButtonWidth(), BUTTON_HEIGHT,
-                this.getCommandModeButtonMessage(),
-                button -> {
-                    this.commandMode = this.commandMode.next();
-                    button.setMessage(this.getCommandModeButtonMessage());
-                },
-                null
-        ));
-
         this.temperatureBox = this.createNumberBox(layout.temperatureBoxX(), layout.numberBoxY(), layout.numberBoxWidth(),
                 "gui.herobrine_companion.llm_settings.temperature", this.temperatureDraft);
         this.topPBox = this.createNumberBox(layout.topPBoxX(), layout.numberBoxY(), layout.numberBoxWidth(),
@@ -103,6 +78,27 @@ public class LLMSettingsScreen extends Screen {
                 Component.translatable("gui.herobrine_companion.api_setup.confirm_save"),
                 button -> this.saveAndClose(),
                 null
+        ));
+
+        this.addRenderableWidget(new HeroScreen.ThemedButton(
+                layout.toolTogglesButtonX(), layout.actionButtonY(), layout.actionButtonWidth(), BUTTON_HEIGHT,
+                Component.translatable("gui.herobrine_companion.llm_settings.tool_toggles_button"),
+                button -> Minecraft.getInstance().setScreen(new LLMToolTogglesScreen(this)),
+                null
+        ));
+
+        this.addRenderableWidget(new HeroScreen.ThemedButton(
+                layout.agentStatusButtonX(), layout.actionButtonY(), layout.actionButtonWidth(), BUTTON_HEIGHT,
+                Component.translatable("gui.herobrine_companion.llm_settings.agent_status"),
+                button -> com.whitecloud233.herobrine_companion.client.gui.AgentStatusScreen.open(),
+                Tooltip.create(Component.translatable("gui.herobrine_companion.llm_settings.agent_status_tooltip"))
+        ));
+
+        this.addRenderableWidget(new HeroScreen.ThemedButton(
+                layout.debugButtonX(), layout.actionButtonY(), layout.actionButtonWidth(), BUTTON_HEIGHT,
+                Component.translatable("gui.herobrine_companion.llm_settings.ai_debug"),
+                button -> Minecraft.getInstance().setScreen(new AIDebugScreen(this)),
+                Tooltip.create(Component.translatable("gui.herobrine_companion.llm_settings.ai_debug_tooltip"))
         ));
 
         this.addRenderableWidget(new HeroScreen.ThemedButton(
@@ -148,6 +144,10 @@ public class LLMSettingsScreen extends Screen {
         return box;
     }
 
+    /**
+     * 自适应布局：提示词编辑框占顶部弹性空间，提示文字/数值框/校验/底部按钮为底部固定块。
+     * 面板过矮时收紧固定块间距，把更多空间留给编辑框，避免文字与按钮挤在一起。
+     */
     private Layout createLayout() {
         int screenMargin = (this.width < 340 || this.height < 280) ? 6 : 10;
         int panelWidth = Math.max(1, Math.min(MAX_PANEL_WIDTH, this.width - screenMargin * 2));
@@ -158,42 +158,36 @@ public class LLMSettingsScreen extends Screen {
         int contentWidth = Math.max(1, panelWidth - contentMargin * 2);
         int editorX = startX + contentMargin;
         int editorY = startY + 50;
-        int bottomMargin = panelHeight < 300 ? 8 : 12;
+
+        boolean compact = panelHeight < 300;
+        int hintToLabel = compact ? 10 : 14;     // 编辑框提示 -> 数值标签
+        int labelToBox = compact ? 10 : 12;      // 数值标签 -> 数值框
+        int boxToHint = compact ? 24 : 30;       // 数值框 -> 数值范围提示
+        int hintToValidation = compact ? 10 : 12; // 数值范围提示 -> 校验信息
+        int validationToAction = compact ? 10 : 14;
+        int bottomMargin = compact ? 6 : (panelHeight < 300 ? 8 : 12);
+
         int actionButtonY = startY + panelHeight - bottomMargin - BUTTON_HEIGHT;
-        int validationY = actionButtonY - 14;
-        int numericHintY = validationY - 12;
-        int numberBoxY = numericHintY - 30;
-        int numberLabelY = numberBoxY - 12;
-        int editorHintY = numberLabelY - 14;
-        int toggleButtonY = editorHintY - 26;
-        int toggleLabelY = toggleButtonY - 12;
-        int editorHeight = Math.max(42, toggleLabelY - editorY - 8);
-        int toggleButtonWidth = Math.max(1, (contentWidth - CONTROL_GAP) / 2);
-        int commandButtonX = editorX + toggleButtonWidth + CONTROL_GAP;
+        int validationY = actionButtonY - validationToAction;
+        int numericHintY = validationY - hintToValidation;
+        int numberBoxY = numericHintY - boxToHint;
+        int numberLabelY = numberBoxY - labelToBox;
+        int editorHintY = numberLabelY - hintToLabel;
+        int editorHeight = Math.max(42, editorHintY - editorY - 8);
         int numberBoxWidth = Math.max(1, (contentWidth - CONTROL_GAP * 2) / 3);
         int topPBoxX = editorX + numberBoxWidth + CONTROL_GAP;
         int maxOutputTokensBoxX = topPBoxX + numberBoxWidth + CONTROL_GAP;
-        int actionButtonWidth = Math.min(120, Math.max(1, (contentWidth - CONTROL_GAP) / 2));
-        int actionGroupWidth = actionButtonWidth * 2 + CONTROL_GAP;
+        int actionButtonWidth = Math.min(120, Math.max(1, (contentWidth - CONTROL_GAP * 4) / 5));
+        int actionGroupWidth = actionButtonWidth * 5 + CONTROL_GAP * 4;
         int saveButtonX = startX + (panelWidth - actionGroupWidth) / 2;
-        int backButtonX = saveButtonX + actionButtonWidth + CONTROL_GAP;
+        int toolTogglesButtonX = saveButtonX + actionButtonWidth + CONTROL_GAP;
+        int agentStatusButtonX = toolTogglesButtonX + actionButtonWidth + CONTROL_GAP;
+        int debugButtonX = agentStatusButtonX + actionButtonWidth + CONTROL_GAP;
+        int backButtonX = debugButtonX + actionButtonWidth + CONTROL_GAP;
         return new Layout(startX, startY, panelWidth, panelHeight, editorX, editorY, contentWidth, editorHeight,
-                toggleLabelY, toggleButtonY, toggleButtonWidth, commandButtonX, editorHintY, numberLabelY, numberBoxY,
-                numberBoxWidth, topPBoxX, maxOutputTokensBoxX, numericHintY, validationY, saveButtonX, backButtonX,
+                editorHintY, numberLabelY, numberBoxY, numberBoxWidth, topPBoxX, maxOutputTokensBoxX,
+                numericHintY, validationY, saveButtonX, toolTogglesButtonX, agentStatusButtonX, debugButtonX, backButtonX,
                 actionButtonY, actionButtonWidth);
-    }
-
-    private Component getStreamingButtonMessage() {
-        return Component.translatable("gui.herobrine_companion.llm_settings.streaming",
-                Component.translatable(this.streamingEnabled ? "options.on" : "options.off"));
-    }
-
-    private Component getCommandModeButtonMessage() {
-        String modeKey = this.commandMode == LLMConfig.CommandMode.EAGER
-                ? "gui.herobrine_companion.llm_settings.command_mode.eager"
-                : "gui.herobrine_companion.llm_settings.command_mode.normal";
-        return Component.translatable("gui.herobrine_companion.llm_settings.command_mode",
-                Component.translatable(modeKey));
     }
 
     private void updateSaveState() {
@@ -245,8 +239,6 @@ public class LLMSettingsScreen extends Screen {
 
     private void saveAndClose() {
         LLMConfig.aiSystemPrompt = this.systemPromptBox.getValue();
-        LLMConfig.aiStreamingEnabled = this.streamingEnabled;
-        LLMConfig.aiCommandMode = this.commandMode == null ? LLMConfig.CommandMode.NORMAL : this.commandMode;
         LLMConfig.aiTemperature = Double.parseDouble(this.temperatureBox.getValue().trim());
         LLMConfig.aiTopP = Double.parseDouble(this.topPBox.getValue().trim());
         LLMConfig.aiMaxOutputTokens = Integer.parseInt(this.maxOutputTokensBox.getValue().trim());
@@ -258,7 +250,12 @@ public class LLMSettingsScreen extends Screen {
     public void tick() {
         super.tick();
         if (this.systemPromptBox != null) {
-            this.systemPromptBox.tick();
+        }
+        if (this.temperatureBox != null) {
+        }
+        if (this.topPBox != null) {
+        }
+        if (this.maxOutputTokensBox != null) {
         }
     }
 
@@ -279,12 +276,6 @@ public class LLMSettingsScreen extends Screen {
         guiGraphics.drawString(this.font,
                 Component.translatable("gui.herobrine_companion.llm_settings.system_prompt"),
                 layout.editorX(), layout.editorY() - 12, 0xFFFFFF, false);
-        guiGraphics.drawString(this.font,
-                Component.translatable("gui.herobrine_companion.llm_settings.streaming_label"),
-                layout.editorX(), layout.toggleLabelY(), 0xFFFFFF, false);
-        guiGraphics.drawString(this.font,
-                Component.translatable("gui.herobrine_companion.llm_settings.command_mode_label"),
-                layout.commandButtonX(), layout.toggleLabelY(), 0xFFFFFF, false);
         guiGraphics.drawString(this.font,
                 Component.translatable("gui.herobrine_companion.llm_settings.temperature"),
                 layout.editorX(), layout.numberLabelY(), 0xFFFFFF, false);
@@ -326,10 +317,6 @@ public class LLMSettingsScreen extends Screen {
             int editorY,
             int editorWidth,
             int editorHeight,
-            int toggleLabelY,
-            int toggleButtonY,
-            int toggleButtonWidth,
-            int commandButtonX,
             int editorHintY,
             int numberLabelY,
             int numberBoxY,
@@ -339,18 +326,15 @@ public class LLMSettingsScreen extends Screen {
             int numericHintY,
             int validationY,
             int saveButtonX,
+            int toolTogglesButtonX,
+            int agentStatusButtonX,
+            int debugButtonX,
             int backButtonX,
             int actionButtonY,
             int actionButtonWidth
     ) {
-        int streamingButtonX() {
-            return this.editorX;
-        }
-
         int temperatureBoxX() {
             return this.editorX;
         }
     }
 }
-
-

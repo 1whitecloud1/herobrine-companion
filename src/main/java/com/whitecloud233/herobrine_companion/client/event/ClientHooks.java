@@ -73,6 +73,10 @@ public class ClientHooks {
         apiEnabled = !apiEnabled;
     }
 
+    public static void setApiEnabled(boolean enabled) {
+        apiEnabled = enabled;
+    }
+
     public static void syncCrossChatState(boolean allowIncoming, boolean sessionActive, String peerName, boolean autoChatEnabled, int autoHbTurnLimit) {
         allowIncomingCrossChat = allowIncoming;
         crossChatSessionActive = sessionActive;

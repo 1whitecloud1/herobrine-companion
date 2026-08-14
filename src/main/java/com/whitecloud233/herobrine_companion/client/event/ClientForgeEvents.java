@@ -2,6 +2,7 @@ package com.whitecloud233.herobrine_companion.client.event;
 
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.client.service.ConversationStore;
+import com.whitecloud233.herobrine_companion.client.service.LLMConfig;
 import com.whitecloud233.herobrine_companion.client.service.LocalChatService;
 import com.whitecloud233.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.herobrine_companion.network.ai.UpdateClientLanguagePacket;
@@ -25,6 +26,11 @@ public class ClientForgeEvents {
         LocalChatService.getInstance().loadChatRules();
         ConversationStore.getInstance().loadForCurrentSession();
         lastSyncedLanguageCode = null;
+
+        // 玩家已链接 AI（Key 有效、模型/端点配置完整）时，每次打开存档自动切到云端网络模式
+        if (!LLMConfig.isSetupIncompleteOrInvalid()) {
+            ClientHooks.setApiEnabled(true);
+        }
     }
 
     @SubscribeEvent

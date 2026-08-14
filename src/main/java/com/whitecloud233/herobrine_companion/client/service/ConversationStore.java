@@ -205,6 +205,44 @@ public class ConversationStore {
         }
     }
 
+    /** 当前 active 会话的滚动摘要(无则返回空串)。 */
+    public String getActiveConversationSummary(UUID playerUUID) {
+        synchronized (this.lock) {
+            PlayerConversationState state = this.ensurePlayerStateLocked(playerUUID);
+            ConversationThread active = this.getActiveConversationLocked(state);
+            return active.summary == null ? "" : active.summary;
+        }
+    }
+
+    /** 当前 active 会话的消息条数(摘要触发阈值判断用)。 */
+    public int getActiveConversationMessageCount(UUID playerUUID) {
+        synchronized (this.lock) {
+            PlayerConversationState state = this.ensurePlayerStateLocked(playerUUID);
+            ConversationThread active = this.getActiveConversationLocked(state);
+            return active.messages.size();
+        }
+    }
+
+    /** 上次摘要已涵盖的消息条数。 */
+    public int getActiveConversationSummaryMessageCount(UUID playerUUID) {
+        synchronized (this.lock) {
+            PlayerConversationState state = this.ensurePlayerStateLocked(playerUUID);
+            ConversationThread active = this.getActiveConversationLocked(state);
+            return active.summaryMessageCount;
+        }
+    }
+
+    /** 写入滚动摘要并推进已归纳基线(立即落盘)。 */
+    public void setActiveConversationSummary(UUID playerUUID, String summary) {
+        synchronized (this.lock) {
+            PlayerConversationState state = this.ensurePlayerStateLocked(playerUUID);
+            ConversationThread active = this.getActiveConversationLocked(state);
+            active.summary = summary == null || summary.isBlank() ? null : summary.trim();
+            active.summaryMessageCount = active.messages.size();
+            this.saveLocked();
+        }
+    }
+
     public void clearActiveConversation(UUID playerUUID) {
         synchronized (this.lock) {
             PlayerConversationState state = this.ensurePlayerStateLocked(playerUUID);
@@ -264,6 +302,11 @@ public class ConversationStore {
             }
             if (conversation.title == null || conversation.title.isBlank()) {
                 conversation.title = this.fallbackConversationPrefix();
+            }
+            // 旧存档平滑:尚无摘要且未归纳过时,把基线对齐到当前条数,
+            // 避免"resume 一条旧会话后立刻对全部历史做一次全量摘要"的意外 LLM 开销。
+            if (conversation.summary == null && conversation.summaryMessageCount == 0) {
+                conversation.summaryMessageCount = conversation.messages.size();
             }
         }
 
@@ -603,6 +646,10 @@ public class ConversationStore {
         long createdAt;
         long updatedAt;
         List<ConversationMessage> messages = new ArrayList<>();
+        /** 滚动摘要:最近一次已生成/注入的会话要点(空 = 尚无摘要)。 */
+        String summary;
+        /** 上次摘要已涵盖的条数(用于决定何时再触发一次滚动摘要)。缺省 0 = 尚未归纳。 */
+        int summaryMessageCount;
     }
 
     private static class ConversationMessage {

@@ -1,6 +1,7 @@
 package com.whitecloud233.herobrine_companion.network;
 
 import io.netty.buffer.ByteBuf;
+import com.whitecloud233.herobrine_companion.client.network.ClientAiPrompts;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -9,6 +10,18 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 public record AIObservationPacket(int heroId, String observationDesc, String fallbackKey, int fallbackVariants,
                                   String contextTranslationKey, String contextFallbackName) implements CustomPacketPayload {
+
+    public AIObservationPacket(int heroId, String observationDesc, String fallbackKey, int fallbackVariants) {
+        this(heroId, observationDesc, fallbackKey, fallbackVariants, "", "");
+    }
+
+    public AIObservationPacket {
+        observationDesc = observationDesc == null ? "" : observationDesc;
+        fallbackKey = fallbackKey == null ? "" : fallbackKey;
+        contextTranslationKey = contextTranslationKey == null ? "" : contextTranslationKey;
+        contextFallbackName = contextFallbackName == null ? "" : contextFallbackName;
+    }
+
     public static final Type<AIObservationPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath("herobrine_companion", "ai_observation"));
 
@@ -28,7 +41,7 @@ public record AIObservationPacket(int heroId, String observationDesc, String fal
     }
 
     public void handle(IPayloadContext context) {
-        context.enqueueWork(() -> NetworkClientBridge.handleAIObservation(
+        context.enqueueWork(() -> ClientAiPrompts.handleAIObservation(
                 this.heroId,
                 this.observationDesc,
                 this.fallbackKey,

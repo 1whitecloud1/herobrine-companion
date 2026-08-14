@@ -21,6 +21,34 @@ public class Config {
     public static final ModConfigSpec.BooleanValue TRANSCENDENCE_PERMIT_ENABLED = BUILDER.comment("是否启用凌越之允物品").define("transcendencePermitEnabled", true);
 
     // ==========================================
+    // Herobrine agent：长期记忆 / 自主行为 / 工具确认
+    // ==========================================
+    public static final ModConfigSpec.BooleanValue HERO_MEMORY_ENABLED = BUILDER
+            .comment("Whether the Herobrine agent long-term memory and reflection learning are enabled")
+            .comment("是否启用 Herobrine 长期记忆与反思学习")
+            .define("heroMemoryEnabled", true);
+
+    public static final ModConfigSpec.BooleanValue HERO_AUTONOMY_ENABLED = BUILDER
+            .comment("Whether the Herobrine agent may autonomously plan and execute real tasks (repair/inspect) on its own initiative")
+            .comment("Herobrine agent 是否可自主规划并执行真实任务（修复/探查）")
+            .define("heroAutonomyEnabled", true);
+
+    public static final ModConfigSpec.BooleanValue AGENT_TOOL_CONFIRMATION = BUILDER
+            .comment("Whether agent tools requiring confirmation show an approval screen before executing")
+            .comment("需要确认的 agent 工具是否在执行前弹出确认屏（关闭后视为已确认，回到无 UI 时代）")
+            .define("agentToolConfirmation", true);
+
+    public static final ModConfigSpec.BooleanValue AGENT_TOOL_RESULT_FEEDBACK = BUILDER
+            .comment("Whether agent tool execution results are fed back to the LLM via a synthesis call")
+            .comment("agent 工具执行结果是否经合成调用回喂给 LLM")
+            .define("agentToolResultFeedback", true);
+
+    public static final ModConfigSpec.BooleanValue HERO_SKILL_SESSION = BUILDER
+            .comment("Whether the hero_use_skill tool tracks skill cooldown and auto-exits battle mode after a forced skill ends")
+            .comment("hero_use_skill 工具是否启用技能冷却与强制技能结束后的战斗态退出")
+            .define("heroSkillSession", true);
+
+    // ==========================================
     // 全知视觉 (AI环境感知) 的开关与间隔
     // ==========================================
     public static final ModConfigSpec.BooleanValue AI_VISION_ENABLED = BUILDER
@@ -94,6 +122,12 @@ public class Config {
     public static int destructionGodMaxBrokenBlocksPerTick;
     public static boolean destructionGodFinalPhaseWorldCollapse;
 
+    public static boolean heroMemoryEnabled;
+    public static boolean heroAutonomyEnabled;
+    public static boolean agentToolConfirmation;
+    public static boolean agentToolResultFeedback;
+    public static boolean heroSkillSession;
+
     public static boolean aiVisionEnabled;
     public static int aiVisionInterval;
     public static String aiLanguageStyle;
@@ -112,6 +146,12 @@ public class Config {
         soulBoundPactEnabled = SOUL_BOUND_PACT_ENABLED.get();
         abyssalGazeEnabled = ABYSSAL_GAZE_ENABLED.get();
         transcendencePermitEnabled = TRANSCENDENCE_PERMIT_ENABLED.get();
+
+        heroMemoryEnabled = HERO_MEMORY_ENABLED.get();
+        heroAutonomyEnabled = HERO_AUTONOMY_ENABLED.get();
+        agentToolConfirmation = AGENT_TOOL_CONFIRMATION.get();
+        agentToolResultFeedback = AGENT_TOOL_RESULT_FEEDBACK.get();
+        heroSkillSession = HERO_SKILL_SESSION.get();
 
         aiVisionEnabled = AI_VISION_ENABLED.get();
         aiVisionInterval = AI_VISION_INTERVAL.get();

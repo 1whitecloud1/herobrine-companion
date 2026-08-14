@@ -221,15 +221,17 @@ public record ClearAreaPacket() implements CustomPacketPayload {
                 SectionPos sectionPos = SectionPos.of(chunkPos, sectionY);
 
                 var skyListener = lightEngine.getLayerListener(LightLayer.SKY);
-                DataLayer dataLayer = skyListener.getDataLayerData(sectionPos);
+                if (skyListener != null) {
+                    DataLayer dataLayer = skyListener.getDataLayerData(sectionPos);
 
-                if (dataLayer == null) {
-                    lightEngine.checkBlock(sectionPos.origin().offset(8, 8, 8));
-                    dataLayer = skyListener.getDataLayerData(sectionPos);
-                }
+                    if (dataLayer == null) {
+                        lightEngine.checkBlock(sectionPos.origin().offset(8, 8, 8));
+                        dataLayer = skyListener.getDataLayerData(sectionPos);
+                    }
 
-                if (dataLayer != null) {
-                    Arrays.fill(dataLayer.getData(), (byte) 0xFF);
+                    if (dataLayer != null) {
+                        Arrays.fill(dataLayer.getData(), (byte) 0xFF);
+                    }
                 }
             }
         }
