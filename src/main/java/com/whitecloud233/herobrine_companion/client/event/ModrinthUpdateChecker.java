@@ -23,7 +23,7 @@ import java.util.concurrent.CompletableFuture;
 public class ModrinthUpdateChecker {
 
     private static boolean hasChecked = false;
-    private static final String PROJECT_SLUG = "herobrine-companion"; // 请确保使用的是连字符而不是下划线
+    private static final String PROJECT_SLUG = "herobrine_companion"; // 例如你的网页是 https://modrinth.com/mod/herobrine_companion，这里就填 "herobrine_companion"
 
     public static void onPlayerJoinWorld(EntityJoinLevelEvent event) {
         if (event.getLevel().isClientSide() && event.getEntity() instanceof LocalPlayer player) {
@@ -82,7 +82,8 @@ public class ModrinthUpdateChecker {
                 }
             }
         } catch (Exception e) {
-            // 静默失败
+            // 如果没网或请求失败，我们选择静默失败，不要在后台疯狂报错打扰玩家
+            e.printStackTrace();
         }
     }
 

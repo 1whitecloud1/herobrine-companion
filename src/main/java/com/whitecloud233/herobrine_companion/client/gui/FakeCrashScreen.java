@@ -7,7 +7,7 @@ import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.whitecloud233.herobrine_companion.client.fight.event.ClientCollapseHandler;
-import com.whitecloud233.herobrine_companion.client.fight.network.CPacketCollapseFinished;
+import com.whitecloud233.herobrine_companion.fight.network.CPacketCollapseFinished;
 import com.whitecloud233.herobrine_companion.network.PacketHandler;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;

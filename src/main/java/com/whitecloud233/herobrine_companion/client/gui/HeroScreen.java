@@ -259,6 +259,7 @@ public class HeroScreen extends Screen {
                 confirmTime = System.currentTimeMillis();
             }
         }, Tooltip.create(Component.translatable(visited ? "gui.herobrine_companion.void_warning" : "gui.herobrine_companion.void_locked_tooltip"))).active = visited;
+        // 战斗模式按钮：不受 Epic Fight 是否加载限制（未装时装时也可见，tooltip 提示去时装）。
         this.actionList.addDynamicAction(() -> {
             boolean currentState = false;
             boolean challengeActive = false;
@@ -290,8 +291,7 @@ public class HeroScreen extends Screen {
         }, Tooltip.create(Component.translatable(
                 HeroEpicFightCompat.isLoaded()
                         ? "gui.herobrine_companion.battle_mode_tooltip"
-                        : HeroEpicFightCompat.getInstallHintKey()
-        )));
+                        : HeroEpicFightCompat.getInstallHintKey())));
 
         // 清除障碍按钮
         boolean desolateUnlocked = currentTrust >= 70;

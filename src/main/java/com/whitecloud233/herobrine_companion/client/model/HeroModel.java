@@ -7,6 +7,7 @@ import com.whitecloud233.herobrine_companion.compat.epicfight.HeroEpicFightCompa
 import com.whitecloud233.herobrine_companion.compat.kaleidoscope.HeroKaleidoscopeCompat;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.ai.HeroCombatWeaponHelper;
+import com.whitecloud233.herobrine_companion.entity.ai.learning.SimpleNeuralNetwork;
 import com.whitecloud233.herobrine_companion.item.PoemOfTheEndItem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.PlayerModel;
@@ -51,6 +52,19 @@ public class HeroModel extends PlayerModel<HeroEntity> {
             {0.30854928F, -0.28049934F, 0.0F},
             {-0.028049935F, 0.0F, 0.0F}
     };
+
+    // Converted from E:\java\hb动作\herobrine.geo (3).animation.json.
+    // Values are the original 0.0/0.5/1.0/1.5/2.0 second Bedrock keyframes.
+    private static final float[] WALK_ROOT_Y = {0.0F, -1.0F, -1.0F, -1.0F, 0.0F};
+    private static final float[] WALK_LEFT_LEG_X = {0.0F, 15.0F, -10.0F, 15.0F, 0.0F};
+    private static final float[] WALK_LEFT_LEG_LOWER_X = {0.0F, 2.5F, 10.0F, 2.5F, 0.0F};
+    private static final float[] WALK_RIGHT_LEG_X = {0.0F, -10.0F, 15.0F, -10.0F, 0.0F};
+    private static final float[] WALK_RIGHT_LEG_LOWER_X = {0.0F, 10.0F, 2.5F, 10.0F, 0.0F};
+    private static final float[] WALK_LOWER_LEG_Y = {0.0F, 1.0F, 1.0F, 1.0F, 0.0F};
+    private static final float[] WALK_LEFT_ARM_X = {0.0F, -7.5F, 12.5F, -7.5F, 0.0F};
+    private static final float[] WALK_LEFT_ARM_LOWER_X = {0.0F, -12.5F, -7.5F, -12.5F, 0.0F};
+    private static final float[] WALK_RIGHT_ARM_X = {0.0F, 12.5F, -7.5F, 12.5F, 0.0F};
+    private static final float[] WALK_RIGHT_ARM_LOWER_X = {0.0F, -7.5F, -12.5F, -7.5F, 0.0F};
 
     public HeroModel(ModelPart root, boolean slim) {
         super(root, slim);
@@ -111,6 +125,10 @@ public class HeroModel extends PlayerModel<HeroEntity> {
         this.leftArm.setPos(5.0F, 2.0F, 0.0F);
         this.rightLeg.setPos(-1.9F, 12.0F, 0.0F);
         this.leftLeg.setPos(1.9F, 12.0F, 0.0F);
+        this.rightArmLower.setPos(0.0F, 4.0F, 0.0F);
+        this.leftArmLower.setPos(0.0F, 4.0F, 0.0F);
+        this.rightLegLower.setPos(0.0F, 6.0F, 0.0F);
+        this.leftLegLower.setPos(0.0F, 6.0F, 0.0F);
 
         // 强行清零上半身的绝对旋转
         this.head.xRot = 0; this.head.yRot = 0; this.head.zRot = 0;
@@ -230,8 +248,34 @@ public class HeroModel extends PlayerModel<HeroEntity> {
             setupCookAnim(entity, ageInTicks);
             return;
         }
-        float headTilt = Mth.sin(ageInTicks * 0.05f) * 0.05f;
-        headTilt += (netHeadYaw * 0.01f) * 0.2f;
+
+        float horizontalSpeed = (float) entity.getDeltaMovement().horizontalDistance();
+        float frameDisplacement = Mth.sqrt(
+                Mth.square((float) (entity.getX() - entity.xOld))
+                        + Mth.square((float) (entity.getZ() - entity.zOld)));
+        float vanillaWalkSpeed = entity.walkAnimation.speed(partialTick);
+        float walkIntensity = Math.max(limbSwingAmount,
+                Math.max(vanillaWalkSpeed, Mth.clamp(Math.max(horizontalSpeed, frameDisplacement) * 4.0F, 0.0F, 1.0F)));
+        if (entity.isGroundWalking()) {
+            walkIntensity = Math.max(walkIntensity, 0.35F);
+        }
+        if (!entity.isFloating()
+                && !entity.isBattleModeActive()
+                && !entity.isPassenger()
+                && !entity.isCrouching()
+                && !entity.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE)
+                && (entity.isGroundWalking() || walkIntensity > 0.001F)) {
+            applyImportedWalkAnimation(entity, walkIntensity, partialTick);
+            copyAllModelProperties();
+            return;
+        }
+
+        // 观察者状态：头部保持静止，不随呼吸/朝向倾斜（俯瞰全局）
+        boolean observerState = entity.getMindState() == SimpleNeuralNetwork.MindState.OBSERVER;
+        float headTilt = observerState ? 0.0F : Mth.sin(ageInTicks * 0.05f) * 0.05f;
+        if (!observerState) {
+            headTilt += (netHeadYaw * 0.01f) * 0.2f;
+        }
         this.head.zRot = headTilt;
         this.hat.zRot = this.head.zRot;
 
@@ -260,6 +304,58 @@ public class HeroModel extends PlayerModel<HeroEntity> {
         com.whitecloud233.herobrine_companion.client.fight.animation.HeroChallengeAnimations.setupChallengeAnims(this, entity, ageInTicks);
 
         copyAllModelProperties();
+    }
+
+    private void applyImportedWalkAnimation(HeroEntity entity, float limbSwingAmount, float partialTick) {
+        float blend = Mth.clamp(limbSwingAmount * 4.0F, 0.0F, 1.0F);
+        float animationTime = positiveModulo(entity.getImportedWalkAnimationTime(partialTick), 2.0F);
+
+        float rootOffsetY = -sampleWalkKeyframes(WALK_ROOT_Y, animationTime) * blend;
+        this.body.y += rootOffsetY;
+        this.head.y += rootOffsetY;
+        this.rightArm.y += rootOffsetY;
+        this.leftArm.y += rootOffsetY;
+        this.rightLeg.y += rootOffsetY;
+        this.leftLeg.y += rootOffsetY;
+
+        this.leftLeg.xRot = blendDegrees(this.leftLeg.xRot, sampleWalkKeyframes(WALK_LEFT_LEG_X, animationTime), blend);
+        this.leftLegLower.xRot = blendDegrees(this.leftLegLower.xRot, sampleWalkKeyframes(WALK_LEFT_LEG_LOWER_X, animationTime), blend);
+        this.rightLeg.xRot = blendDegrees(this.rightLeg.xRot, sampleWalkKeyframes(WALK_RIGHT_LEG_X, animationTime), blend);
+        this.rightLegLower.xRot = blendDegrees(this.rightLegLower.xRot, sampleWalkKeyframes(WALK_RIGHT_LEG_LOWER_X, animationTime), blend);
+
+        float lowerLegOffset = sampleWalkKeyframes(WALK_LOWER_LEG_Y, animationTime) * blend;
+        this.leftLegLower.y = 6.0F - lowerLegOffset;
+        this.rightLegLower.y = 6.0F - lowerLegOffset;
+
+        this.leftArm.xRot = blendDegrees(this.leftArm.xRot, sampleWalkKeyframes(WALK_LEFT_ARM_X, animationTime), blend);
+        this.leftArmLower.xRot = blendDegrees(this.leftArmLower.xRot, sampleWalkKeyframes(WALK_LEFT_ARM_LOWER_X, animationTime), blend);
+        this.rightArm.xRot = blendDegrees(this.rightArm.xRot, sampleWalkKeyframes(WALK_RIGHT_ARM_X, animationTime), blend);
+        this.rightArmLower.xRot = blendDegrees(this.rightArmLower.xRot, sampleWalkKeyframes(WALK_RIGHT_ARM_LOWER_X, animationTime), blend);
+    }
+
+    private static float sampleWalkKeyframes(float[] values, float animationTime) {
+        float scaledTime = Mth.clamp(animationTime * 2.0F, 0.0F, 3.9999F);
+        int segment = Mth.floor(scaledTime);
+        float progress = scaledTime - segment;
+        float p0 = values[Math.max(0, segment - 1)];
+        float p1 = values[segment];
+        float p2 = values[Math.min(values.length - 1, segment + 1)];
+        float p3 = values[Math.min(values.length - 1, segment + 2)];
+        float progressSquared = progress * progress;
+        float progressCubed = progressSquared * progress;
+        return 0.5F * ((2.0F * p1)
+                + (-p0 + p2) * progress
+                + (2.0F * p0 - 5.0F * p1 + 4.0F * p2 - p3) * progressSquared
+                + (-p0 + 3.0F * p1 - 3.0F * p2 + p3) * progressCubed);
+    }
+
+    private static float blendDegrees(float currentRadians, float targetDegrees, float blend) {
+        return Mth.lerp(blend, currentRadians, targetDegrees * Mth.DEG_TO_RAD);
+    }
+
+    private static float positiveModulo(float value, float modulus) {
+        float result = value % modulus;
+        return result < 0.0F ? result + modulus : result;
     }
 
     private void applyFlyingPresetPose(float floatAmount) {

@@ -2,7 +2,6 @@ package com.whitecloud233.herobrine_companion.client.render;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import net.minecraft.client.model.PlayerModel;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -13,7 +12,6 @@ import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
 
 public class HeroEyesLayer extends RenderLayer<HeroEntity, PlayerModel<HeroEntity>> {
-    private static final ResourceLocation EYES = ResourceLocation.fromNamespaceAndPath(HerobrineCompanion.MODID, "textures/entity/hero_eyes.png");
 
     public HeroEyesLayer(RenderLayerParent<HeroEntity, PlayerModel<HeroEntity>> renderer) {
         super(renderer);
@@ -21,17 +19,13 @@ public class HeroEyesLayer extends RenderLayer<HeroEntity, PlayerModel<HeroEntit
 
     @Override
     public void render(PoseStack poseStack, MultiBufferSource buffer, int packedLight, HeroEntity livingEntity, float limbSwing, float limbSwingAmount, float partialTick, float ageInTicks, float netHeadYaw, float headPitch) {
-        // Use RenderType.eyes() which is standard for glowing eyes.
-        // It uses additive blending or standard alpha blending depending on implementation.
-        // To make it "glow" onto the face, the texture itself needs to have semi-transparent pixels around the eyes.
-        
-        // If you want a stronger "bloom" effect without shaders, you can try rendering it slightly offset or scaled,
-        // but texture modification is the best way.
-        
-        VertexConsumer vertexConsumer = buffer.getBuffer(RenderType.eyes(EYES));
-        
-        // Render the model with the eyes texture
-        // 15728880 is full light (Sky 15, Block 15)
+        // 动态选择眼睛发光贴图:内置皮肤用固定图;自定义皮肤用从其像素自动识别生成的对齐叠加图;无白眼则不渲染
+        ResourceLocation eyes = HeroRenderer.getEyesTexture(livingEntity);
+        if (eyes == null) {
+            return;
+        }
+        VertexConsumer vertexConsumer = buffer.getBuffer(RenderType.eyes(eyes));
+        // RenderType.eyes 全亮发光(忽略光照)。15728880 = 满亮度;0xFFFFFFFF = 白色不透明
         this.getParentModel().renderToBuffer(poseStack, vertexConsumer, 15728880, OverlayTexture.NO_OVERLAY, 0xFFFFFFFF);
     }
 }

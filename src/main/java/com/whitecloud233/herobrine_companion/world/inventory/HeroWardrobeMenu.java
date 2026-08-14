@@ -19,7 +19,8 @@ import net.neoforged.neoforge.items.wrapper.EntityHandsInvWrapper;
 
 public class HeroWardrobeMenu extends AbstractContainerMenu {
     private static final int ACCESSORY_COLUMNS = 4;
-    private static final int BASE_SCREEN_WIDTH = 248;
+    private static final int BASE_SCREEN_WIDTH = 176;
+    private static final int ACCESSORY_SCREEN_WIDTH = 248;
     private static final int BASE_SCREEN_HEIGHT = 166;
     private static final int ACCESSORY_START_X = 154;
     private static final int ACCESSORY_START_Y = 8;
@@ -87,13 +88,27 @@ public class HeroWardrobeMenu extends AbstractContainerMenu {
     public int getCurioBackSlotIndex() { return this.curioBackSlotIndex; }
     public int getMainHandSlotIndex() { return this.mainHandSlotIndex; }
     public int getOffHandSlotIndex() { return this.offHandSlotIndex; }
-    public int getScreenWidth() { return BASE_SCREEN_WIDTH; }
+    public int getScreenWidth() {
+        return this.accessorySlotCount > 0 ? ACCESSORY_SCREEN_WIDTH : BASE_SCREEN_WIDTH;
+    }
     public int getScreenHeight() { return BASE_SCREEN_HEIGHT + this.inventoryOffsetY; }
 
     @Override
     public boolean stillValid(Player player) {
         return this.hero != null && this.hero.isAlive() && this.hero.distanceTo(player) < 8.0F;
     }
+
+    @Override
+    public void removed(Player player) {
+        super.removed(player);
+        if (this.hero != null) {
+            this.hero.isStateDirty = true;
+            if (!this.hero.level().isClientSide) {
+                HeroStateManager.backupToGlobal(this.hero);
+            }
+        }
+    }
+
     private static Slot createHandSlot(HeroEntity hero, EquipmentSlot equipmentSlot, int x, int y) {
         return new SlotItemHandler(new HeroHandItemHandler(hero, equipmentSlot), 0, x, y) {
             @Override public int getMaxStackSize() { return 1; }

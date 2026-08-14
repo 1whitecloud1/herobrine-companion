@@ -8,7 +8,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
@@ -257,7 +256,7 @@ public class ConversationManagerScreen extends Screen {
         this.conversationStore.ensureActiveConversation(playerUUID);
         String activeTitle = this.conversationStore.getActiveConversationTitle(playerUUID);
         ClientHooks.enableChat();
-        mc.setScreen(new ChatScreen(""));
+        mc.setScreen(new HeroChatScreen(""));
 
         String modeKey = ClientHooks.isApiEnabled()
                 ? "message.herobrine_companion.system_cloud_connected"

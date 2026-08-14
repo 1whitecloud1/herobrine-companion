@@ -144,7 +144,8 @@ public class HeroSkinScreen extends Screen {
                         80, 20,
                         Component.translatable("gui.herobrine_companion.confirm"),
                         button -> {
-                            PacketHandler.sendToServer(new ToggleSkinPacket(this.entityId, HeroEntity.SKIN_CUSTOM, this.customSkinName));
+                            // 自定义皮肤确认：把本地文件字节上传到服务端，让其他玩家可见
+                            PacketHandler.sendToServer(new ToggleSkinPacket(this.entityId, HeroEntity.SKIN_CUSTOM, this.customSkinName, readCustomSkinBytes()));
                         },
                         null
                 );
@@ -159,7 +160,8 @@ public class HeroSkinScreen extends Screen {
                             if (this.selectedSkinId != option.variantId) {
                                 this.selectedSkinId = option.variantId;
                                 if (option.variantId != HeroEntity.SKIN_CUSTOM) {
-                                    PacketHandler.sendToServer(new ToggleSkinPacket(this.entityId, HeroEntity.SKIN_CUSTOM, this.customSkinName, readCustomSkinBytes()));
+                                    // 切换到内置皮肤变体：直接发送该变体 ID
+                                    PacketHandler.sendToServer(new ToggleSkinPacket(this.entityId, option.variantId));
                                 }
                                 this.rebuildWidgets();
                             }
@@ -221,7 +223,7 @@ public class HeroSkinScreen extends Screen {
                     t.printStackTrace();
                     Minecraft.getInstance().execute(() -> {
                         if (Minecraft.getInstance().player != null) {
-                            Minecraft.getInstance().player.displayClientMessage(Component.literal("Error: LWJGL TinyFileDialogs not available. Please paste path manually."), false);
+                            Minecraft.getInstance().player.displayClientMessage(Component.translatable("message.herobrine_companion.skin.file_dialog_unavailable"), false);
                         }
                     });
                 }
@@ -254,7 +256,7 @@ public class HeroSkinScreen extends Screen {
             return Files.readAllBytes(Path.of(this.customSkinName));
         } catch (Exception e) {
             if (this.minecraft != null && this.minecraft.player != null) {
-                this.minecraft.player.displayClientMessage(Component.literal("Failed to read custom skin file: " + e.getMessage()), false);
+                this.minecraft.player.displayClientMessage(Component.translatable("message.herobrine_companion.skin.read_failed", e.getMessage()), false);
             }
             return new byte[0];
         }
