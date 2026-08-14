@@ -102,6 +102,33 @@ public final class HeroEpicFightCompat {
         return getBridgeStatus() == BridgeStatus.READY;
     }
 
+    /** Hero 是否正处在 Epic Fight 攻击/动作状态（飞行追击据此让出空中连段、不落地打断）。 */
+    public static boolean isHeroMidAttack(HeroEntity hero) {
+        if (!isRuntimeBridgeReady() || hero == null) {
+            return false;
+        }
+        try {
+            Object result = invokeStatic(BRIDGE_CLASS, "isHeroMidAttack", new Class<?>[]{HeroEntity.class}, hero);
+            return result instanceof Boolean midAttack && midAttack;
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            return false;
+        }
+    }
+
+    /** 让 Hero 立即施放一个夜幕技能（agent 工具 {@code hero_use_skill} 的桥接实现）。返回 {@code "OK|…"} / {@code "FAIL|…"}。 */
+    public static String triggerSkill(HeroEntity hero, String skillName) {
+        if (!isRuntimeBridgeReady() || hero == null) {
+            return "FAIL|夜幕技能桥未就绪";
+        }
+        try {
+            Object result = invokeStatic(BRIDGE_CLASS, "triggerSkill", new Class<?>[]{HeroEntity.class, String.class}, hero, skillName);
+            return result instanceof String str ? str : "FAIL|未知结果";
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            LOGGER.warn("Epic Fight nightfall skill trigger failed", exception);
+            return "FAIL|夜幕技能桥调用失败";
+        }
+    }
+
     public static String getCurrentBattleStateKey(HeroEntity hero) {
         return HeroEpicFightStateMapper.mapHeroBattleState(hero);
     }

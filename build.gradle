@@ -193,6 +193,14 @@ dependencies {
     compileOnly "curse.maven:epic-fight-mod-405076:8080214"
     runtimeOnly "curse.maven:epic-fight-mod-405076:8080214"
     //https://www.curseforge.com/minecraft/mc-mods/epic-fight-mod/download/8080214
+
+    // Epic Fight Nightfall(夜幕) —— 夜幕技能系统运行时依赖(代码仅反射调用,编译期不需要)
+    // https://www.curseforge.com/minecraft/mc-mods/epicfight-nightfall/download/8573921
+    runtimeOnly "curse.maven:epicfight-nightfall-1307848:8573921"
+
+    // Epic Fight Invincible(无敌) —— 无敌技能系统运行时依赖(代码仅反射调用,编译期不需要)
+    // https://www.curseforge.com/minecraft/mc-mods/epic-fight-invincible/download/8390375
+    runtimeOnly "curse.maven:epicfight-invincible-1184379:8390375"
 }
 
 

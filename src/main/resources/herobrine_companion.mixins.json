@@ -18,7 +18,10 @@
     "JeanSubmissionStationaryMixin",
     "MobSubmissionMixin",
     "LevelMixin",
-    "MixinModEntityProfiles"
+    "MixinModEntityProfiles",
+    "epicfight.AnimationClipMixin",
+    "epicfight.JsonAssetLoaderMixin",
+    "epicfight.RenderAnimationItemMixin"
   ],
   "client": [
   ],
