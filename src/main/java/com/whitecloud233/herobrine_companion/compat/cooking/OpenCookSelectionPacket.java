@@ -1,7 +1,7 @@
 package com.whitecloud233.herobrine_companion.compat.cooking;
 
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
-import com.whitecloud233.herobrine_companion.network.ClientOnlyExecutor;
+import com.whitecloud233.herobrine_companion.client.network.ClientUiDispatch;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -60,18 +60,6 @@ public class OpenCookSelectionPacket implements CustomPacketPayload {
     }
 
     public static void handle(OpenCookSelectionPacket packet, IPayloadContext context) {
-        context.enqueueWork(() -> ClientOnlyExecutor.invoke(
-                OpenCookSelectionPacket.ClientHandler.class.getName(),
-                "handle",
-                new Class<?>[]{OpenCookSelectionPacket.class},
-                packet
-        ));
-    }
-
-    private static final class ClientHandler {
-        private static void handle(OpenCookSelectionPacket packet) {
-            net.minecraft.client.Minecraft minecraft = net.minecraft.client.Minecraft.getInstance();
-            minecraft.setScreen(new HeroCookSelectionScreen(packet.heroId, packet.cookwarePos, packet.options, minecraft.screen));
-        }
+        context.enqueueWork(() -> ClientUiDispatch.openCookSelection(packet.heroId, packet.cookwarePos, packet.options));
     }
 }

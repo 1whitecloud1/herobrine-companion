@@ -39,7 +39,7 @@ public final class HeroCookingCompat {
     private static final String AUTO_COOK_RECIPE_ID_KEY = "HeroAutoCookRecipeId";
     private static final String AUTO_COOK_KALEIDOSCOPE_SNAPSHOT_KEY = "HeroAutoCookKaleidoscopeSnapshot";
     private static final String AUTO_EAT_TICKS_KEY = "HeroAutoEatTicks";
-    private static final int AUTO_EAT_DURATION_TICKS = 32;
+    private static final int AUTO_EAT_DURATION_TICKS = 36;
 
     private HeroCookingCompat() {
     }

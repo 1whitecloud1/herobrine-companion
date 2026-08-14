@@ -10,7 +10,6 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.level.TicketType;
-import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -31,6 +30,7 @@ import net.neoforged.neoforge.items.ItemHandlerHelper;
 import javax.annotation.Nullable;
 import java.lang.reflect.Field;
 import java.util.*;
+import java.util.function.BooleanSupplier;
 
 public final class HeroKaleidoscopeCompat {
     public static final int INVITED_ACTION_COOK = 4;
@@ -348,10 +348,6 @@ public final class HeroKaleidoscopeCompat {
 
     private interface StackAction {
         boolean apply(ItemStack stack);
-    }
-
-    private interface StackMatcher {
-        boolean test(ItemStack stack);
     }
 
     private static final class SafeInvoker {
@@ -758,41 +754,37 @@ public final class HeroKaleidoscopeCompat {
                 return false;
             }
 
-            if (status == com.github.ysbbbbbb.kaleidoscopecookery.api.blockentity.IPot.PUT_INGREDIENT) {
-                if (pot.getCurrentTick() <= 0) {
-                    if (tryAccessibleStacks(owner, stack -> pot.onPlaceOil(level, owner, stack))) {
-                        owner.getInventory().setChanged();
-                        return true;
-                    }
-                    return false;
-                }
+            List<PotPlan> plans = collectPotPlans(level, owner, pot);
+            if (plans.isEmpty()) {
+                return false;
+            }
 
-                List<PotPlan> plans = collectPotPlans(level, owner, pot);
-                if (plans.isEmpty()) {
-                    return false;
-                }
+            int selectedIndex = resolveSelectedRecipeIndex(hero, pot.getBlockPos(), plans);
+            if (selectedIndex < 0) {
+                return false;
+            }
 
-                int selectedIndex = resolvePotPlanIndex(hero, pot, plans);
-                if (selectedIndex < 0) {
-                    return false;
+            PotPlan plan = plans.get(selectedIndex);
+            if (pot.getCurrentTick() <= 0) {
+                if (tryAccessibleStacks(owner, stack -> pot.onPlaceOil(level, owner, stack))) {
+                    return true;
                 }
+                return false;
+            }
 
-                PotPlan plan = plans.get(selectedIndex);
-                ItemStack nextIngredient = plan.ingredientPlan().nextIngredient();
-                if (nextIngredient != null && !nextIngredient.isEmpty()) {
-                    if (pot.addIngredient(level, owner, nextIngredient)) {
-                        owner.getInventory().setChanged();
-                        return true;
-                    }
-                    return false;
-                }
-
-                if (level.getGameTime() % 20L == 0L) {
-                    pot.onShovelHit(level, owner, ItemStack.EMPTY);
+            ItemStack nextIngredient = plan.ingredientPlan().nextIngredient();
+            if (nextIngredient != null && !nextIngredient.isEmpty()) {
+                if (pot.addIngredient(level, owner, nextIngredient)) {
                     owner.getInventory().setChanged();
                     return true;
                 }
                 return false;
+            }
+
+            if (level.getGameTime() % 20L == 0L) {
+                pot.onShovelHit(level, owner, ItemStack.EMPTY);
+                owner.getInventory().setChanged();
+                return true;
             }
             return false;
         }
@@ -891,7 +883,7 @@ public final class HeroKaleidoscopeCompat {
         private static boolean tickSteamer(HeroEntity hero, ServerLevel level, ServerPlayer owner,
                                            com.github.ysbbbbbb.kaleidoscopecookery.api.blockentity.ISteamer steamer) {
             if (steamer instanceof com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.SteamerBlockEntity steamerBlockEntity
-                    && hasTakeableSteamerOutput(steamerBlockEntity)) {
+                    && hasReadySteamerOutput(steamerBlockEntity)) {
                 if (steamer.takeFood(level, owner)) {
                     owner.getInventory().setChanged();
                     consumeCookRepeat(hero, steamerBlockEntity.getBlockPos());
@@ -923,58 +915,27 @@ public final class HeroKaleidoscopeCompat {
             return false;
         }
 
-        private static boolean hasTakeableSteamerOutput(com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.SteamerBlockEntity steamer) {
+        private static boolean hasReadySteamerOutput(com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.SteamerBlockEntity steamer) {
             List<ItemStack> items = steamer.getItems();
             int[] cookingTime = steamer.getCookingTime();
-            boolean hasFood = false;
             for (int i = 0; i < items.size() && i < cookingTime.length; i++) {
-                if (items.get(i).isEmpty()) {
-                    continue;
-                }
-                hasFood = true;
-                if (cookingTime[i] != -1) {
-                    return false;
+                if (!items.get(i).isEmpty() && cookingTime[i] == -1) {
+                    return true;
                 }
             }
-            return hasFood;
+            return false;
         }
 
         private static boolean tryTakeOutPot(HeroEntity hero, ServerLevel level, ServerPlayer owner,
                                              com.github.ysbbbbbb.kaleidoscopecookery.api.blockentity.IPot pot) {
-            if (pot instanceof com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.PotBlockEntity potBlockEntity) {
-                Ingredient carrier = resolvePotCarrierIngredient(hero, level, owner, potBlockEntity);
-                if (carrier != null) {
-                    boolean success = carrier.isEmpty()
-                            ? tryTakeOutPotWithHeroTool(hero, level, owner, potBlockEntity, getVirtualKitchenShovel())
-                            : tryTakeOutPotWithStack(hero, level, owner, potBlockEntity, getVirtualCarrierStack(carrier));
-                    if (success) {
-                        consumeCookRepeat(hero, potBlockEntity.getBlockPos());
-                        return true;
-                    }
-
-                    success = carrier.isEmpty()
-                            ? tryAccessibleMatchingStacks(owner,
-                            stack -> stack.is(com.github.ysbbbbbb.kaleidoscopecookery.init.tag.TagMod.KITCHEN_SHOVEL),
-                            stack -> pot.takeOutProduct(level, hero, stack))
-                            : tryAccessibleMatchingStacks(owner, carrier::test, stack -> pot.takeOutProduct(level, owner, stack));
-                    if (success) {
-                        if (carrier.isEmpty()) {
-                            transferHeroTakeoutToOwner(hero, owner, potBlockEntity.getBlockPos(), potBlockEntity.getResult());
-                        }
-                        consumeCookRepeat(hero, potBlockEntity.getBlockPos());
-                        return true;
-                    }
-                }
-            }
-
-            if (pot.takeOutProduct(level, owner, ItemStack.EMPTY)) {
+            if (withTemporaryShift(owner, () -> pot.takeOutProduct(level, owner, ItemStack.EMPTY))) {
                 owner.getInventory().setChanged();
                 if (pot instanceof BlockEntity blockEntity) {
                     consumeCookRepeat(hero, blockEntity.getBlockPos());
                 }
                 return true;
             }
-            boolean success = tryAccessibleStacks(owner, stack -> pot.takeOutProduct(level, owner, stack));
+            boolean success = tryAccessibleStacks(owner, stack -> withTemporaryShift(owner, () -> pot.takeOutProduct(level, owner, stack)));
             if (success && pot instanceof BlockEntity blockEntity) {
                 consumeCookRepeat(hero, blockEntity.getBlockPos());
             }
@@ -983,26 +944,6 @@ public final class HeroKaleidoscopeCompat {
 
         private static boolean tryTakeOutStockpot(HeroEntity hero, ServerLevel level, ServerPlayer owner,
                                                   com.github.ysbbbbbb.kaleidoscopecookery.api.blockentity.IStockpot stockpot) {
-            if (stockpot instanceof com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.StockpotBlockEntity stockpotBlockEntity) {
-                Ingredient carrier = resolveStockpotCarrierIngredient(hero, level, owner, stockpotBlockEntity);
-                if (carrier != null && !carrier.isEmpty()) {
-                    if (tryTakeOutStockpotWithStack(hero, level, owner, stockpotBlockEntity, getVirtualCarrierStack(carrier))) {
-                        if (shouldConsumeStockpotRepeat(stockpotBlockEntity)) {
-                            consumeCookRepeat(hero, stockpotBlockEntity.getBlockPos());
-                        }
-                        return true;
-                    }
-                    boolean success = tryAccessibleMatchingStacks(owner, carrier::test,
-                            stack -> stockpot.takeOutProduct(level, owner, stack));
-                    if (success) {
-                        if (shouldConsumeStockpotRepeat(stockpotBlockEntity)) {
-                            consumeCookRepeat(hero, stockpotBlockEntity.getBlockPos());
-                        }
-                        return true;
-                    }
-                }
-            }
-
             if (stockpot.takeOutProduct(level, owner, ItemStack.EMPTY)) {
                 owner.getInventory().setChanged();
                 if (shouldConsumeStockpotRepeat(stockpot) && stockpot instanceof BlockEntity blockEntity) {
@@ -1027,242 +968,6 @@ public final class HeroKaleidoscopeCompat {
         private static ItemStack getVirtualKitchenKnife() {
             return com.github.ysbbbbbb.kaleidoscopecookery.init.ModItems.IRON_KITCHEN_KNIFE.get().getDefaultInstance();
         }
-
-        private static ItemStack getVirtualKitchenShovel() {
-            return com.github.ysbbbbbb.kaleidoscopecookery.init.ModItems.KITCHEN_SHOVEL.get().getDefaultInstance();
-        }
-
-        private static int resolvePotPlanIndex(HeroEntity hero,
-                                               com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.PotBlockEntity pot,
-                                               List<PotPlan> plans) {
-            int selectedIndex = resolveSelectedRecipeIndex(hero, pot.getBlockPos(), plans);
-            if (selectedIndex >= 0 && selectedIndex < plans.size()) {
-                return selectedIndex;
-            }
-            if (pot.isEmpty()) {
-                return -1;
-            }
-
-            int bestIndex = -1;
-            for (int i = 0; i < plans.size(); i++) {
-                if (bestIndex < 0 || isBetterPotPlan(plans.get(i), plans.get(bestIndex))) {
-                    bestIndex = i;
-                }
-            }
-            return bestIndex;
-        }
-
-        private static boolean isBetterPotPlan(PotPlan candidate, PotPlan currentBest) {
-            if (candidate.ingredientPlan().matchedCount() != currentBest.ingredientPlan().matchedCount()) {
-                return candidate.ingredientPlan().matchedCount() > currentBest.ingredientPlan().matchedCount();
-            }
-            if (candidate.ingredientPlan().missingCount() != currentBest.ingredientPlan().missingCount()) {
-                return candidate.ingredientPlan().missingCount() < currentBest.ingredientPlan().missingCount();
-            }
-            if (candidate.maxRepeatCount() != currentBest.maxRepeatCount()) {
-                return candidate.maxRepeatCount() > currentBest.maxRepeatCount();
-            }
-            return candidate.recipeId().toString().compareTo(currentBest.recipeId().toString()) < 0;
-        }
-
-        @Nullable
-        private static RecipeHolder<com.github.ysbbbbbb.kaleidoscopecookery.crafting.recipe.PotRecipe> findPotRecipeHolder(ServerLevel level,
-                                                                                                                             ResourceLocation recipeId) {
-            for (RecipeHolder<com.github.ysbbbbbb.kaleidoscopecookery.crafting.recipe.PotRecipe> holder
-                    : level.getRecipeManager().getAllRecipesFor(com.github.ysbbbbbb.kaleidoscopecookery.init.ModRecipes.POT_RECIPE)) {
-                if (holder.id().equals(recipeId)) {
-                    return holder;
-                }
-            }
-            return null;
-        }
-
-        @Nullable
-        private static RecipeHolder<com.github.ysbbbbbb.kaleidoscopecookery.crafting.recipe.PotRecipe> resolveSelectedPotRecipeHolder(HeroEntity hero,
-                                                                                                                                       ServerLevel level,
-                                                                                                                                       ServerPlayer owner,
-                                                                                                                                       com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.PotBlockEntity pot) {
-            ResourceLocation selectedRecipeId = getCookSelectionRecipeId(hero, pot.getBlockPos());
-            if (selectedRecipeId != null) {
-                return findPotRecipeHolder(level, selectedRecipeId);
-            }
-
-            ResourceLocation recipeId = resolvePotRecipeId(hero, level, owner, pot);
-            if (recipeId == null) {
-                return null;
-            }
-            return findPotRecipeHolder(level, recipeId);
-        }
-
-        @Nullable
-        private static Ingredient resolvePotCarrierIngredient(HeroEntity hero, ServerLevel level, ServerPlayer owner,
-                                                              com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.PotBlockEntity pot) {
-            if (!pot.hasCarrier()) {
-                return Ingredient.EMPTY;
-            }
-
-            ResourceLocation recipeId = resolvePotRecipeId(hero, level, owner, pot);
-            if (recipeId == null) {
-                return null;
-            }
-
-            for (RecipeHolder<com.github.ysbbbbbb.kaleidoscopecookery.crafting.recipe.PotRecipe> holder
-                    : level.getRecipeManager().getAllRecipesFor(com.github.ysbbbbbb.kaleidoscopecookery.init.ModRecipes.POT_RECIPE)) {
-                if (holder.id().equals(recipeId)) {
-                    return holder.value().carrier();
-                }
-            }
-            return null;
-        }
-
-        @Nullable
-        private static Ingredient resolveStockpotCarrierIngredient(HeroEntity hero, ServerLevel level, ServerPlayer owner,
-                                                                   com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.StockpotBlockEntity stockpot) {
-            ResourceLocation recipeId = resolveStockpotRecipeId(hero, level, owner, stockpot);
-            if (recipeId == null) {
-                return null;
-            }
-
-            for (RecipeHolder<com.github.ysbbbbbb.kaleidoscopecookery.crafting.recipe.StockpotRecipe> holder
-                    : level.getRecipeManager().getAllRecipesFor(com.github.ysbbbbbb.kaleidoscopecookery.init.ModRecipes.STOCKPOT_RECIPE)) {
-                if (holder.id().equals(recipeId)) {
-                    return holder.value().carrier();
-                }
-            }
-            return null;
-        }
-
-        @Nullable
-        private static ResourceLocation resolvePotRecipeId(HeroEntity hero, ServerLevel level, ServerPlayer owner,
-                                                           com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.PotBlockEntity pot) {
-            List<PotPlan> plans = collectPotPlans(level, owner, pot);
-            if (plans.isEmpty()) {
-                return null;
-            }
-
-            int selectedIndex = resolveSelectedRecipeIndex(hero, pot.getBlockPos(), plans);
-            if (selectedIndex >= 0 && selectedIndex < plans.size()) {
-                return plans.get(selectedIndex).recipeId();
-            }
-
-            ItemStack currentResult = pot.getResult();
-            if (!currentResult.isEmpty()) {
-                for (PotPlan plan : plans) {
-                    if (ItemStack.isSameItemSameComponents(plan.result(), currentResult)) {
-                        return plan.recipeId();
-                    }
-                }
-            }
-
-            return plans.size() == 1 ? plans.get(0).recipeId() : null;
-        }
-
-        @Nullable
-        private static ResourceLocation resolveStockpotRecipeId(HeroEntity hero, ServerLevel level, ServerPlayer owner,
-                                                                com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.StockpotBlockEntity stockpot) {
-            List<StockpotPlan> plans = collectStockpotPlans(level, owner, stockpot);
-            if (plans.isEmpty()) {
-                return null;
-            }
-
-            int selectedIndex = resolveSelectedRecipeIndex(hero, stockpot.getBlockPos(), plans);
-            if (selectedIndex >= 0 && selectedIndex < plans.size()) {
-                return plans.get(selectedIndex).recipeId();
-            }
-
-            ItemStack currentResult = stockpot.getResult();
-            if (!currentResult.isEmpty()) {
-                for (StockpotPlan plan : plans) {
-                    if (ItemStack.isSameItemSameComponents(plan.result(), currentResult)) {
-                        return plan.recipeId();
-                    }
-                }
-            }
-
-            return plans.size() == 1 ? plans.get(0).recipeId() : null;
-        }
-
-        private static ItemStack getVirtualCarrierStack(Ingredient carrier) {
-            if (carrier.isEmpty()) {
-                return ItemStack.EMPTY;
-            }
-
-            ItemStack[] carrierItems = carrier.getItems();
-            if (carrierItems.length <= 0) {
-                return ItemStack.EMPTY;
-            }
-            return carrierItems[0].copyWithCount(1);
-        }
-
-        private static boolean tryTakeOutPotWithHeroTool(HeroEntity hero, ServerLevel level, ServerPlayer owner,
-                                                         com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.PotBlockEntity pot,
-                                                         ItemStack toolStack) {
-            if (toolStack.isEmpty()) {
-                return false;
-            }
-
-            ItemStack originalMainHand = hero.getMainHandItem().copy();
-            ItemStack expectedResult = pot.getResult().copy();
-            if (!originalMainHand.isEmpty()) {
-                hero.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
-            }
-
-            boolean success = pot.takeOutProduct(level, hero, toolStack);
-            if (success) {
-                transferHeroTakeoutToOwner(hero, owner, pot.getBlockPos(), expectedResult);
-            }
-
-            if (!originalMainHand.isEmpty() && hero.getMainHandItem().isEmpty()) {
-                hero.setItemInHand(InteractionHand.MAIN_HAND, originalMainHand);
-            }
-            return success;
-        }
-
-        private static boolean tryTakeOutPotWithStack(HeroEntity hero, ServerLevel level, ServerPlayer owner,
-                                                      com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.PotBlockEntity pot,
-                                                      ItemStack stack) {
-            if (stack.isEmpty()) {
-                return false;
-            }
-            boolean success = pot.takeOutProduct(level, owner, stack);
-            if (success) {
-                owner.getInventory().setChanged();
-            }
-            return success;
-        }
-
-        private static boolean tryTakeOutStockpotWithStack(HeroEntity hero, ServerLevel level, ServerPlayer owner,
-                                                           com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.StockpotBlockEntity stockpot,
-                                                           ItemStack stack) {
-            if (stack.isEmpty()) {
-                return false;
-            }
-            boolean success = stockpot.takeOutProduct(level, owner, stack);
-            if (success) {
-                owner.getInventory().setChanged();
-            }
-            return success;
-        }
-
-        private static void transferHeroTakeoutToOwner(HeroEntity hero, ServerPlayer owner, BlockPos pos, ItemStack expectedResult) {
-            ItemStack mainHand = hero.getMainHandItem();
-            if (!mainHand.isEmpty() && ItemStack.isSameItemSameComponents(mainHand, expectedResult)) {
-                ItemHandlerHelper.giveItemToPlayer(owner, mainHand.copy());
-                hero.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
-            }
-
-            net.minecraft.world.phys.AABB searchBox = new net.minecraft.world.phys.AABB(pos).inflate(1.5D);
-            for (net.minecraft.world.entity.item.ItemEntity itemEntity : hero.level().getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, searchBox)) {
-                ItemStack stack = itemEntity.getItem();
-                if (!ItemStack.isSameItemSameComponents(stack, expectedResult)) {
-                    continue;
-                }
-                ItemHandlerHelper.giveItemToPlayer(owner, stack.copy());
-                itemEntity.discard();
-            }
-            owner.getInventory().setChanged();
-        }
-
 
         private static Set<UUID> snapshotChoppingBoardDropIds(ServerLevel level, BlockPos pos, ItemStack expectedResult) {
             Set<UUID> dropIds = new HashSet<>();
@@ -2082,35 +1787,34 @@ public final class HeroKaleidoscopeCompat {
             }
         }
 
-        private static boolean tryAccessibleMatchingStacks(ServerPlayer owner, StackMatcher matcher, StackAction action) {
+        private static boolean tryAccessibleStacks(ServerPlayer owner, StackAction action) {
             for (ItemStack stack : owner.getInventory().items) {
-                if (!stack.isEmpty() && matcher.test(stack) && action.apply(stack)) {
+                if (!stack.isEmpty() && action.apply(stack)) {
                     owner.getInventory().setChanged();
                     return true;
                 }
             }
             for (ItemStack stack : owner.getInventory().offhand) {
-                if (!stack.isEmpty() && matcher.test(stack) && action.apply(stack)) {
+                if (!stack.isEmpty() && action.apply(stack)) {
                     owner.getInventory().setChanged();
                     return true;
                 }
             }
             return false;
         }
-    }
-    private static boolean tryAccessibleStacks(ServerPlayer owner, StackAction action) {
-        for (ItemStack stack : owner.getInventory().items) {
-            if (!stack.isEmpty() && action.apply(stack)) {
-                owner.getInventory().setChanged();
-                return true;
+
+        private static boolean withTemporaryShift(ServerPlayer owner, BooleanSupplier action) {
+            boolean wasShiftDown = owner.isShiftKeyDown();
+            if (!wasShiftDown) {
+                owner.setShiftKeyDown(true);
+            }
+            try {
+                return action.getAsBoolean();
+            } finally {
+                if (!wasShiftDown) {
+                    owner.setShiftKeyDown(false);
+                }
             }
         }
-        for (ItemStack stack : owner.getInventory().offhand) {
-            if (!stack.isEmpty() && action.apply(stack)) {
-                owner.getInventory().setChanged();
-                return true;
-            }
-        }
-        return false;
     }
 }
