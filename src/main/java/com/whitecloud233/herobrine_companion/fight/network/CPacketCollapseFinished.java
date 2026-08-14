@@ -1,4 +1,4 @@
-package com.whitecloud233.herobrine_companion.client.fight.network;
+package com.whitecloud233.herobrine_companion.fight.network;
 
 import com.whitecloud233.herobrine_companion.client.fight.HeroChallengeManager;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
@@ -16,7 +16,7 @@ public record CPacketCollapseFinished() implements CustomPacketPayload {
     public static final Type<CPacketCollapseFinished> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath("herobrine_companion", "collapse_finished"));
 
     // 使用 StreamCodec.unit() 完美处理无需传输数据的空数据包
-    public static final StreamCodec<FriendlyByteBuf, CPacketCollapseFinished> CODEC = StreamCodec.unit(new CPacketCollapseFinished());
+    public static final StreamCodec<FriendlyByteBuf, CPacketCollapseFinished> STREAM_CODEC = StreamCodec.unit(new CPacketCollapseFinished());
 
     @Override
     public Type<? extends CustomPacketPayload> type() {

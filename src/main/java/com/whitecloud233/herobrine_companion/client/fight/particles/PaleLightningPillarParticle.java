@@ -107,7 +107,7 @@ public class PaleLightningPillarParticle extends Particle {
 
         float currentTime = this.age + partialTicks;
 
-        int delayDuration = 25;
+        int delayDuration = 30;
         int fallDuration = 5;
 
         float fallProgress;

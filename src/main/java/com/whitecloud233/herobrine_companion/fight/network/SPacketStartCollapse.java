@@ -1,6 +1,6 @@
-package com.whitecloud233.herobrine_companion.client.fight.network;
+package com.whitecloud233.herobrine_companion.fight.network;
 
-import com.whitecloud233.herobrine_companion.network.ClientOnlyExecutor;
+import com.whitecloud233.herobrine_companion.client.fight.event.ClientCollapseHandler;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -11,7 +11,7 @@ public record SPacketStartCollapse() implements CustomPacketPayload {
 
     public static final Type<SPacketStartCollapse> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath("herobrine_companion", "start_collapse"));
-    public static final StreamCodec<FriendlyByteBuf, SPacketStartCollapse> CODEC =
+    public static final StreamCodec<FriendlyByteBuf, SPacketStartCollapse> STREAM_CODEC =
             StreamCodec.unit(new SPacketStartCollapse());
 
     @Override
@@ -20,16 +20,6 @@ public record SPacketStartCollapse() implements CustomPacketPayload {
     }
 
     public void handle(IPayloadContext context) {
-        context.enqueueWork(() -> ClientOnlyExecutor.invoke(
-                SPacketStartCollapse.ClientHandler.class.getName(),
-                "handle",
-                new Class<?>[0]
-        ));
-    }
-
-    private static final class ClientHandler {
-        private static void handle() {
-            com.whitecloud233.herobrine_companion.client.fight.event.ClientCollapseHandler.startCollapse();
-        }
+        context.enqueueWork(ClientCollapseHandler::startCollapse);
     }
 }

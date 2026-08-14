@@ -75,7 +75,7 @@ public class HeroChallengeState {
                 for (ServerPlayer player : level.players()) {
                     if (player.getPersistentData().getBoolean("HeroFakeOutPhase")) {
                         com.whitecloud233.herobrine_companion.network.PacketHandler.sendToPlayer(
-                                new com.whitecloud233.herobrine_companion.client.fight.network.SPacketFakeCrash(),
+                                new com.whitecloud233.herobrine_companion.fight.network.SPacketFakeCrash(),
                                 player
                         );
                     }
@@ -110,7 +110,7 @@ public class HeroChallengeState {
 
         // 3. 强制劫持移动控制器
         if (!(hero.getMoveControl() instanceof ChallengeMoveControl)) {
-            hero.moveControl = new ChallengeMoveControl(hero);
+            hero.setMoveControl(new ChallengeMoveControl(hero));
         }
 
         // 4. 禁空领域 - 持续压制玩家飞行
@@ -153,7 +153,7 @@ public class HeroChallengeState {
             hero.targetSelector.removeAllGoals(goal -> true);
             hero.setTarget(null);
             hero.getNavigation().stop();
-            hero.moveControl = new ChallengeMoveControl(hero);
+            hero.setMoveControl(new ChallengeMoveControl(hero));
             hero.goalSelector.addGoal(1, new com.whitecloud233.herobrine_companion.client.fight.goal.HeroPhase1Goal(hero));
         }
     }

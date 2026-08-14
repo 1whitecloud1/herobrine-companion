@@ -16,10 +16,10 @@ import org.lwjgl.glfw.GLFW;
 
 public class KeyBindingHandler {
 
-    // 注册 5 键 (主键盘)
+    // 注册 5 键 (小键盘)
     public static final KeyMapping SKILL_KEY = new KeyMapping(
             "key.herobrine_companion.cleave_skill", // 语言文件中的本地化键值
-            GLFW.GLFW_KEY_5,                        // [修改] 默认按键 主键盘5
+            GLFW.GLFW_KEY_KP_5,                     // 默认按键 小键盘5
             "key.categories.herobrine_companion"    // 按键设置里的分类名
     );
 
@@ -51,8 +51,8 @@ public class KeyBindingHandler {
 
             // 20 Ticks = 1 秒
             if (chargeTicks == 20) {
-                // [修改] 修正错误的调试信息
-                player.sendSystemMessage(Component.literal("§e[Debug] 客户端：技能键蓄力1秒完成，正在向服务端发送数据包..."));
+                // [修改] 使用翻译键输出调试信息
+                player.sendSystemMessage(Component.translatable("message.herobrine_companion.debug.r_charge_send"));
                 // 蓄力完成！发送数据包给服务端触发技能
                 PacketHandler.sendToServer(new CleaveSkillPacket());
 

@@ -14,7 +14,6 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
 import net.minecraft.world.damagesource.DamageSource;
-import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LightningBolt;
@@ -112,9 +111,8 @@ public class RealmBreakerLightningEntity extends Projectile {
     protected void onHitEntity(EntityHitResult result) {
         super.onHitEntity(result);
         Entity target = result.getEntity();
-        // 使用魔法伤害以绕过护甲，并防止被免疫雷电的生物（如女巫）免疫
-        DamageSource damageSource = this.damageSources().source(DamageTypes.MAGIC, this.getOwner());
-        target.hurt(damageSource, this.getDamage());
+        // 修改：使用 magic() 伤害源，避免被雷电免疫
+        target.hurt(this.damageSources().magic(), this.getDamage());
         this.impact(target.blockPosition());
     }
 
@@ -136,77 +134,60 @@ public class RealmBreakerLightningEntity extends Projectile {
                 serverLevel.addFreshEntity(lightning);
             }
 
-            // 【核心修改】手动实现爆炸伤害，以排除 HeroEntity 和 玩家
+            // 1. 计算爆炸参数
             float radius = this.getExplosionRadius();
+            DamageSource damageSource = this.damageSources().explosion(this, this.getOwner());
+            Vec3 center = Vec3.atCenterOf(pos);
+
+            // 2. 手动伤害处理 (排除 Owner 和 HeroEntity)
             AABB aabb = new AABB(pos).inflate(radius);
             List<LivingEntity> entities = serverLevel.getEntitiesOfClass(LivingEntity.class, aabb);
-            DamageSource damageSource = this.damageSources().explosion(this, this.getOwner());
 
             for (LivingEntity entity : entities) {
-                // 如果是 HeroEntity，则跳过，不造成伤害
-                if (entity instanceof HeroEntity) {
-                    continue;
-                }
-                
-                // 【新增】：如果 entity 是发射者 (玩家)，也跳过
-                if (this.getOwner() != null && entity.is(this.getOwner())) {
+                // 排除 HeroEntity 和 射击者(玩家)
+                if (entity instanceof HeroEntity || (this.getOwner() != null && entity.is(this.getOwner()))) {
                     continue;
                 }
 
-                // 计算伤害衰减
-                double distance = entity.position().distanceTo(Vec3.atCenterOf(pos));
+                double distance = entity.position().distanceTo(center);
                 if (distance < radius) {
+                    // 伤害衰减
                     float damage = this.getDamage() * (1.0F - (float)(distance / radius));
                     entity.hurt(damageSource, damage);
-                    
-                    // 【新增】手动添加击退效果 (模拟爆炸击退)
-                    double dX = entity.getX() - this.getX();
-                    // 这里 entity 是 LivingEntity 类型，不可能是 PrimedTnt 类型，
-                    // 所以这里的 instanceof 检查是多余且导致错误的。
-                    // 实际上我们也不需要针对 TNT 做特殊处理，因为 entities 列表里只有 LivingEntity。
-                    double dY = entity.getEyeY() - this.getY();
-                    double dZ = entity.getZ() - this.getZ();
-                    double dist = Math.sqrt(dX * dX + dY * dY + dZ * dZ);
-                    if (dist != 0.0) {
-                        dX /= dist;
-                        dY /= dist;
-                        dZ /= dist;
-                        double density = (1.0 - distance / radius);
-                        // 添加击退，力度稍微调小一点，模拟爆炸击飞
-                        entity.push(dX * density * 2.0, dY * density * 2.0, dZ * density * 2.0);
-                        entity.hurtMarked = true;
-                    }
+
+                    // 击退效果 (模拟爆炸推力)
+                    double kbStrength = 1.0 - distance / radius;
+                    Vec3 dir = entity.position().subtract(center).normalize();
+                    if (dir.lengthSqr() < 1.0E-4) dir = new Vec3(0, 1, 0); // 避免零向量
+                    entity.push(dir.x * kbStrength, dir.y * kbStrength, dir.z * kbStrength);
                 }
             }
 
-            // 【核心修改】移除 serverLevel.explode，改为手动处理方块破坏和粒子
-            // 这样可以彻底避免 explode 方法对玩家造成的二次伤害
-            
-            // 1. 粒子效果
-            serverLevel.sendParticles(ParticleTypes.EXPLOSION, this.getX(), this.getY(), this.getZ(), 1, 0.0, 0.0, 0.0, 0.0);
+            // 3. 视觉效果 (粒子 & 声音) - 替代 serverLevel.explode 以避免误伤
+            serverLevel.sendParticles(ParticleTypes.EXPLOSION_EMITTER, this.getX(), this.getY(), this.getZ(), 1, 0, 0, 0, 0);
+            serverLevel.playSound(null, pos, SoundEvents.GENERIC_EXPLODE.value(), SoundSource.BLOCKS, 4.0F, (1.0F + (serverLevel.random.nextFloat() - serverLevel.random.nextFloat()) * 0.2F) * 0.7F);
+            serverLevel.playSound(null, pos, SoundEvents.TRIDENT_THUNDER.value(), SoundSource.WEATHER, 5.0F, 1.0F);
 
-            // 2. 方块破坏 (如果配置启用)
+            // 4. 方块破坏 (如果配置启用)
             if (Config.poemOfTheEndExplosion) {
                 int r = (int) Math.ceil(radius);
-                BlockPos center = pos;
                 for (int x = -r; x <= r; x++) {
                     for (int y = -r; y <= r; y++) {
                         for (int z = -r; z <= r; z++) {
-                            if (x*x + y*y + z*z <= radius*radius) {
-                                BlockPos p = center.offset(x, y, z);
+                            double distSqr = x*x + y*y + z*z;
+                            if (distSqr <= radius * radius) {
+                                BlockPos p = pos.offset(x, y, z);
                                 BlockState state = serverLevel.getBlockState(p);
-                                // 限制只能破坏可破坏方块，并排除基岩等
+
+                                // 不破坏空气、基岩等不可破坏方块
                                 if (!state.isAir() && state.getDestroySpeed(serverLevel, p) >= 0) {
-                                     serverLevel.destroyBlock(p, true);
+                                    serverLevel.destroyBlock(p, true);
                                 }
                             }
                         }
                     }
                 }
             }
-
-            // 播放声音
-            serverLevel.playSound(null, pos, SoundEvents.TRIDENT_THUNDER.value(), SoundSource.WEATHER, 5.0F, 1.0F);
 
             this.discard();
         }

@@ -19,6 +19,8 @@ import com.whitecloud233.herobrine_companion.entity.logic.data.HeroTradeHandler;
 import com.whitecloud233.herobrine_companion.entity.logic.HeroGunAdapter;
 import com.whitecloud233.herobrine_companion.event.HeroTrades;
 import com.whitecloud233.herobrine_companion.event.HeroVisuals;
+import com.whitecloud233.herobrine_companion.fight.HeroAfterimage;
+import com.whitecloud233.herobrine_companion.network.ChallengeAfterimagePacket;
 import com.whitecloud233.herobrine_companion.world.structure.ModStructures;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -67,6 +69,7 @@ public class HeroEntity extends PathfinderMob implements Merchant {
             "bullet", "ammo", "round", "cartridge", "shell", "slug", "musket_ball", "musketball"
     };
     public static final EntityDataAccessor<Boolean> IS_FLOATING = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.BOOLEAN);
+    public static final EntityDataAccessor<Boolean> IS_GROUND_WALKING = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.BOOLEAN);
     public static final EntityDataAccessor<Integer> TRUST_LEVEL = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.INT);
     public static final EntityDataAccessor<Boolean> IS_COMPANION_MODE = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.BOOLEAN);
     public static final EntityDataAccessor<Integer> SKIN_VARIANT = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.INT);
@@ -107,11 +110,13 @@ public class HeroEntity extends PathfinderMob implements Merchant {
 
     public boolean isStateDirty = true;
     private final Set<Integer> claimedRewards = new HashSet<>();
+    private final java.util.List<HeroAfterimage> challengeAfterimages = new java.util.ArrayList<>();
     public float clientFloatingAmount;
     public float clientFloatingAmountO;
+    public float clientImportedWalkTicks;
+    public float clientImportedWalkTicksO;
     public boolean clientSideSetupDone = false;
     public int patrolTimer = 2400;
-    public MoveControl moveControl;
     private int outOfWaterTimer = 0;
     private long lastSummonedTime = 0;
     private boolean isLoadedFromDisk = false;
@@ -136,6 +141,7 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     private final HeroTradeHandler tradeHandler = new HeroTradeHandler();
     private final FlyingPathNavigation flyingNavigation;
     private final HeroBrain brain;
+    private final com.whitecloud233.herobrine_companion.entity.ai.agent.HeroAgent agent;
     private final GroundPathNavigation groundNavigation;
 
     public int scytheAnimTick = 0;
@@ -156,6 +162,7 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         this.setPersistenceRequired();
         this.moveControl = new HeroMoveControl(this);
         this.brain = new HeroBrain(this);
+        this.agent = new com.whitecloud233.herobrine_companion.entity.ai.agent.HeroAgent();
         this.flyingNavigation = this.navigation instanceof FlyingPathNavigation flying ? flying : new FlyingPathNavigation(this, level);
         this.groundNavigation = new GroundPathNavigation(this, level);
         this.groundNavigation.setCanFloat(false);
@@ -218,6 +225,18 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     @Override
     public void tick() {
         super.tick();
+        this.challengeAfterimages.removeIf(HeroAfterimage::tick);
+        if (!this.level().isClientSide) {
+            double movedX = this.getX() - this.xOld;
+            double movedZ = this.getZ() - this.zOld;
+            boolean groundWalking = !this.isFloating()
+                    && (movedX * movedX + movedZ * movedZ > 1.0E-5D
+                        || this.getDeltaMovement().horizontalDistanceSqr() > 1.0E-5D
+                        || !this.getNavigation().isDone());
+            if (groundWalking != this.entityData.get(IS_GROUND_WALKING)) {
+                this.entityData.set(IS_GROUND_WALKING, groundWalking);
+            }
+        }
 // 👇 【核心修改】：强制清空受伤无敌时间渲染，取消挑战模式下的闪红效果
         if (this.getEntityData().get(IS_CHALLENGE_ACTIVE)) {
             this.hurtTime = 0;
@@ -258,6 +277,8 @@ public class HeroEntity extends PathfinderMob implements Merchant {
                 HeroLogic.tick(this);
                 if (this.isAlive()) {
                     this.brain.tick();
+                    this.agent.tick(this);
+                    this.agent.tickTasks(this);
                     if (this.getMindState() != this.brain.getState()) this.setMindState(this.brain.getState());
 
                     if (this.level() instanceof ServerLevel serverLevel) {
@@ -277,7 +298,7 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         }
 
         if (!this.level().isClientSide && this.isCompanionMode() && !this.isBattleModeActive()) {
-            maintainCompanionFlightState();
+            maintainCompanionMovementState();
         }
 
         if (this.level().isClientSide) {
@@ -290,7 +311,7 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     public void aiStep() {
         super.aiStep();
         if (this.isCompanionMode() && !this.isBattleModeActive()) {
-            maintainCompanionFlightState();
+            maintainCompanionMovementState();
         } else {
             if (this.noPhysics) {
                 this.noPhysics = false;
@@ -315,8 +336,26 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         }
     }
 
-    private void maintainCompanionFlightState() {
-        if (!this.isFloating()) this.setFloating(true);
+    private void maintainCompanionMovementState() {
+        if (this.isFloating() && this.getOwnerUUID() != null) {
+            Player owner = this.level().getPlayerByUUID(this.getOwnerUUID());
+            if (owner != null && owner.isAlive()
+                    && !owner.getAbilities().flying
+                    && !owner.isFallFlying()
+                    && Math.abs(owner.getY() - this.getY()) <= 3.0D
+                    && HeroGodlyCompanionGoal.horizontalDistanceToOwnerSqr(this, owner) <= 64.0D) {
+                this.noPhysics = false;
+                this.setFloating(false);
+                this.setNoGravity(false);
+            }
+        }
+
+        if (!this.isFloating()) {
+            this.noPhysics = false;
+            if (this.isNoGravity()) this.setNoGravity(false);
+            return;
+        }
+
         if (!this.isNoGravity()) this.setNoGravity(true);
         this.fallDistance = 0.0F;
 
@@ -570,7 +609,8 @@ public class HeroEntity extends PathfinderMob implements Merchant {
                 .add(Attributes.MAX_HEALTH, 20.0D)
                 .add(Attributes.MOVEMENT_SPEED, 0.30D)
                 .add(Attributes.FLYING_SPEED, 0.10D)
-                .add(Attributes.ATTACK_SPEED, 5.0D)
+                // 攻速对齐 1.20.1（未设置=默认 4.0）：5.0 会让 EFN auto 动画播放更快、压缩连段窗口
+                .add(Attributes.ATTACK_SPEED, 4.0D)
                 .add(Attributes.ATTACK_DAMAGE, 6.0D)
                 .add(Attributes.FOLLOW_RANGE, 32.0D);
     }
@@ -579,7 +619,8 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     @Override
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         super.defineSynchedData(builder);
-        builder.define(IS_FLOATING, true);
+        builder.define(IS_FLOATING, false);
+        builder.define(IS_GROUND_WALKING, false);
         builder.define(TRUST_LEVEL, 0);
         builder.define(IS_COMPANION_MODE, false);
         builder.define(SKIN_VARIANT, SKIN_HEROBRINE);
@@ -620,6 +661,8 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         }
         // 👇 [新增] 保存姿势编辑器数据
         HeroDataHandler.savePoseData(this, compound);
+        // 👇 [新增] 保存 Agent 任务队列（断线 / 重进恢复）
+        this.agent.saveTasks(compound);
     }
 
     // 移除 HolderLookup.Provider 参数，恢复为 1 个参数
@@ -657,6 +700,8 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         if (ownerUUID != null) setOwnerUUID(ownerUUID);
         // 👇 [新增] 读取姿势编辑器数据
         HeroDataHandler.loadPoseData(this, compound);
+        // 👇 [新增] 恢复 Agent 任务队列
+        this.agent.loadTasks(compound);
     }
 
     // 委托装备与NBT处理
@@ -673,6 +718,10 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     // Getters & Setters
     public boolean isLoadedFromDisk() { return this.isLoadedFromDisk; }
     public boolean isFloating() { return entityData.get(IS_FLOATING); }
+    public boolean isGroundWalking() { return entityData.get(IS_GROUND_WALKING); }
+    public float getImportedWalkAnimationTime(float partialTick) {
+        return Mth.lerp(partialTick, this.clientImportedWalkTicksO, this.clientImportedWalkTicks) / 20.0F;
+    }
     public void setFloating(boolean floating) {
         entityData.set(IS_FLOATING, floating);
         this.refreshNavigationMode();
@@ -689,6 +738,11 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     public void setCompanionMode(boolean active) {
         boolean previous = this.isCompanionMode();
         entityData.set(IS_COMPANION_MODE, active);
+        if (!previous && active && !this.isBattleModeActive()) {
+            this.noPhysics = false;
+            if (this.isFloating()) this.setFloating(false);
+            if (this.isNoGravity()) this.setNoGravity(false);
+        }
         if (previous && !active) {
             cleanupCompanionMovementState();
         }
@@ -894,8 +948,33 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     public void setLastSummonedTime(long time) { this.lastSummonedTime = time; }
     public long getLastSummonedTime() { return this.lastSummonedTime; }
     public GoalSelector getGoalSelector() { return this.goalSelector; }
+
+    /**
+     * 替换实际参与 {@code Mob.aiStep} 的 MoveControl（继承自 {@code Mob.moveControl}）。
+     * <p><b>关键</b>：切勿在子类里重声明同名字段去"覆盖"它——Java 字段是隐藏而非重写，
+     * {@code Mob.aiStep()} 直接访问 {@code this.moveControl}（Mob 的字段），重声明的字段永远不会被 tick。
+     * 需要替换移动控制时一律走本方法。</p>
+     */
+    public void setMoveControl(MoveControl control) { this.moveControl = control; }
     public void setFallDistance(float distance) { this.fallDistance = distance; }
     public HeroBrain getHeroBrain() { return this.brain; }
+    public com.whitecloud233.herobrine_companion.entity.ai.agent.HeroAgent getHeroAgent() { return this.agent; }
+
+    public void addChallengeAfterimage(HeroAfterimage afterimage) {
+        if (!this.level().isClientSide) {
+            com.whitecloud233.herobrine_companion.network.PacketHandler.sendToTracking(
+                    new ChallengeAfterimagePacket(this.getId(), afterimage), this);
+        }
+        this.challengeAfterimages.add(afterimage);
+    }
+
+    public java.util.List<HeroAfterimage> getChallengeAfterimages() {
+        return this.challengeAfterimages;
+    }
+
+    public void clearChallengeAfterimages() {
+        this.challengeAfterimages.clear();
+    }
 
     public SimpleNeuralNetwork.MindState getMindState() {
         int index = this.entityData.get(MIND_STATE);

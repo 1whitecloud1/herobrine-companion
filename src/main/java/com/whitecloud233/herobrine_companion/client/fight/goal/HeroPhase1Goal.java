@@ -1,7 +1,7 @@
 package com.whitecloud233.herobrine_companion.client.fight.goal;
 
-
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.herobrine_companion.fight.HeroAfterimage;
 import com.whitecloud233.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.herobrine_companion.network.PaleLightningArcPacket;
 import com.whitecloud233.herobrine_companion.network.PaleLightningPacket;
@@ -9,8 +9,6 @@ import com.whitecloud233.herobrine_companion.util.EndRingContext;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
@@ -25,18 +23,31 @@ import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.List;
 
+/**
+ * 挑战模式第一阶段战斗目标,与 1.20.1 行为对齐:
+ * Hero 悬停施法,风暴期用"冲刺移动"切入侧翼/后方(velocity 冲刺 + 残影拖尾),
+ * 不再使用 1.21.1 重写版的"瞬移"。
+ */
 public class HeroPhase1Goal extends Goal {
-    private static final double TELEPORT_PRESSURE_DISTANCE_SQR = 8.0D * 8.0D;
-    private static final double TELEPORT_MIN_DISTANCE = 6.0D;
-    private static final double TELEPORT_MAX_DISTANCE = 10.5D;
-    private static final double TELEPORT_ARENA_RADIUS = 42.0D;
-    private static final int TELEPORT_BASE_COOLDOWN = 18;
-    private static final int TELEPORT_PRESSURE_COOLDOWN = 10;
+    private static final double MOVE_PRESSURE_DISTANCE_SQR = 8.0D * 8.0D;
+    private static final double MOVE_MIN_DISTANCE = 6.0D;
+    private static final double MOVE_MAX_DISTANCE = 10.5D;
+    private static final double MOVE_ARENA_RADIUS = 42.0D;
+    private static final int AFTERIMAGE_MAX_TICKS = 10;
+    private static final int AFTERIMAGE_INTERVAL = 1;
+
+    private static final int[] MOVE_DURATIONS = {26, 20, 14};
+    private static final int[] MOVE_COOLDOWNS = {120, 80, 52};
+    private static final int[] MOVE_PRESSURE_COOLDOWNS = {80, 52, 36};
 
     private final HeroEntity hero;
     private LivingEntity target;
     private int phaseTicks;
-    private int teleportCooldown;
+    private int movementCooldown;
+    private Vec3 moveTarget;
+    private int moveTicks;
+    private int moveDuration;
+    private int afterimageIntervalTicks;
     private double targetHoverY = 112.0D;
 
     private final List<PendingStrike> pendingStrikes = new ArrayList<>();
@@ -70,7 +81,12 @@ public class HeroPhase1Goal extends Goal {
     @Override
     public void start() {
         this.phaseTicks = this.hero.getPersistentData().getInt("ChallengePhaseTicks");
-        this.teleportCooldown = 0;
+        this.movementCooldown = 0;
+        this.moveTarget = null;
+        this.moveTicks = 0;
+        this.moveDuration = 0;
+        this.afterimageIntervalTicks = 0;
+        this.hero.clearChallengeAfterimages();
     }
 
     @Override
@@ -103,19 +119,28 @@ public class HeroPhase1Goal extends Goal {
         this.hero.getLookControl().setLookAt(this.target, 30.0F, 30.0F);
 
         if (this.hero.level() instanceof ServerLevel serverLevel) {
-            maybeTeleportDuringStorm(serverLevel);
+            if (this.moveTarget != null) {
+                tickCombatMove(serverLevel);
+            } else {
+                maybeStartMovementDuringStorm(serverLevel);
+                if (this.moveTarget != null) {
+                    tickCombatMove(serverLevel);
+                }
+            }
         }
 
-        double currentY = this.hero.getY();
-        double dy;
-        if (currentY < this.targetHoverY) {
-            dy = 0.08D;
-        } else if (currentY > this.targetHoverY + 0.2D) {
-            dy = -0.04D;
-        } else {
-            dy = Math.sin(this.phaseTicks * 0.05D) * 0.02D;
+        if (this.moveTarget == null) {
+            double currentY = this.hero.getY();
+            double dy;
+            if (currentY < this.targetHoverY) {
+                dy = 0.08D;
+            } else if (currentY > this.targetHoverY + 0.2D) {
+                dy = -0.04D;
+            } else {
+                dy = Math.sin(this.phaseTicks * 0.05D) * 0.02D;
+            }
+            this.hero.setDeltaMovement(0.0D, dy, 0.0D);
         }
-        this.hero.setDeltaMovement(0.0D, dy, 0.0D);
 
         if (this.hero.level() instanceof ServerLevel serverLevel) {
             if (this.phaseTicks > 30 && this.phaseTicks % 6 == 0) {
@@ -141,27 +166,27 @@ public class HeroPhase1Goal extends Goal {
         this.hero.setDeltaMovement(0.0D, dy, 0.0D);
     }
 
-    private void maybeTeleportDuringStorm(ServerLevel level) {
-        if (this.teleportCooldown > 0) {
-            this.teleportCooldown--;
+    private void maybeStartMovementDuringStorm(ServerLevel level) {
+        if (this.movementCooldown > 0) {
+            this.movementCooldown--;
         }
-        if (this.target == null || this.phaseTicks <= 30 || this.teleportCooldown > 0) {
+        if (this.target == null || this.phaseTicks <= 30 || this.movementCooldown > 0) {
             return;
         }
 
-        boolean pressuredByMelee = horizontalDistanceSqr(this.hero.position(), this.target.position()) <= TELEPORT_PRESSURE_DISTANCE_SQR;
+        boolean pressuredByMelee = horizontalDistanceSqr(this.hero.position(), this.target.position()) <= MOVE_PRESSURE_DISTANCE_SQR;
         boolean stormReposition = this.phaseTicks >= 42
                 && (this.phaseTicks % 18 == 0 || (this.pendingStrikes.size() >= 3 && this.phaseTicks % 12 == 0));
         if (!pressuredByMelee && !stormReposition) {
             return;
         }
 
-        if (tryCombatTeleport(level, pressuredByMelee)) {
-            this.teleportCooldown = pressuredByMelee ? TELEPORT_PRESSURE_COOLDOWN : TELEPORT_BASE_COOLDOWN;
+        if (tryStartCombatMove(level, pressuredByMelee)) {
+            this.movementCooldown = difficultyMoveCooldown(pressuredByMelee);
         }
     }
 
-    private boolean tryCombatTeleport(ServerLevel level, boolean pressuredByMelee) {
+    private boolean tryStartCombatMove(ServerLevel level, boolean pressuredByMelee) {
         float baseYaw = this.target.getYRot();
         float[] angleCandidates = pressuredByMelee
                 ? new float[]{160.0F, -160.0F, 125.0F, -125.0F, 180.0F, 95.0F, -95.0F}
@@ -169,35 +194,35 @@ public class HeroPhase1Goal extends Goal {
 
         for (float angleOffset : angleCandidates) {
             double distance = pressuredByMelee
-                    ? TELEPORT_MAX_DISTANCE - level.random.nextDouble() * 1.5D
-                    : TELEPORT_MIN_DISTANCE + level.random.nextDouble() * (TELEPORT_MAX_DISTANCE - TELEPORT_MIN_DISTANCE);
+                    ? MOVE_MAX_DISTANCE - level.random.nextDouble() * 1.5D
+                    : MOVE_MIN_DISTANCE + level.random.nextDouble() * (MOVE_MAX_DISTANCE - MOVE_MIN_DISTANCE);
             float jitter = (level.random.nextFloat() - 0.5F) * 18.0F;
             Vec3 offset = Vec3.directionFromRotation(0.0F, baseYaw + angleOffset + jitter).scale(distance);
             Vec3 targetPos = clampToArena(this.target.getX() + offset.x, this.target.getZ() + offset.z);
-            double y = desiredTeleportY(level, targetPos.x, targetPos.z);
-            if (canTeleportTo(level, targetPos.x, y, targetPos.z)) {
-                doCombatTeleport(level, targetPos.x, y, targetPos.z);
+            double y = desiredMoveY(level, targetPos.x, targetPos.z);
+            if (canMoveTo(level, targetPos.x, y, targetPos.z)) {
+                startCombatMove(level, targetPos.x, y, targetPos.z);
                 return true;
             }
         }
 
         for (int i = 0; i < 6; i++) {
             double angle = level.random.nextDouble() * Math.PI * 2.0D;
-            double distance = Mth.lerp(level.random.nextDouble(), TELEPORT_MIN_DISTANCE, TELEPORT_MAX_DISTANCE);
+            double distance = Mth.lerp(level.random.nextDouble(), MOVE_MIN_DISTANCE, MOVE_MAX_DISTANCE);
             Vec3 targetPos = clampToArena(
                     this.target.getX() + Math.cos(angle) * distance,
                     this.target.getZ() + Math.sin(angle) * distance
             );
-            double y = desiredTeleportY(level, targetPos.x, targetPos.z);
-            if (canTeleportTo(level, targetPos.x, y, targetPos.z)) {
-                doCombatTeleport(level, targetPos.x, y, targetPos.z);
+            double y = desiredMoveY(level, targetPos.x, targetPos.z);
+            if (canMoveTo(level, targetPos.x, y, targetPos.z)) {
+                startCombatMove(level, targetPos.x, y, targetPos.z);
                 return true;
             }
         }
         return false;
     }
 
-    private double desiredTeleportY(ServerLevel level, double x, double z) {
+    private double desiredMoveY(ServerLevel level, double x, double z) {
         int arenaFloor = level.getHeight(Heightmap.Types.MOTION_BLOCKING, Mth.floor(x), Mth.floor(z));
         double hoverBase = Math.max(this.targetHoverY - 1.0D, arenaFloor + 4.0D);
         double relativeBase = this.target != null ? Math.max(hoverBase, this.target.getY() + 3.0D) : hoverBase;
@@ -208,11 +233,11 @@ public class HeroPhase1Goal extends Goal {
         double dx = x - EndRingContext.CENTER_X;
         double dz = z - EndRingContext.CENTER_Z;
         double distanceSq = dx * dx + dz * dz;
-        if (distanceSq <= TELEPORT_ARENA_RADIUS * TELEPORT_ARENA_RADIUS) {
+        if (distanceSq <= MOVE_ARENA_RADIUS * MOVE_ARENA_RADIUS) {
             return new Vec3(x, this.targetHoverY, z);
         }
 
-        double scale = TELEPORT_ARENA_RADIUS / Math.sqrt(distanceSq);
+        double scale = MOVE_ARENA_RADIUS / Math.sqrt(distanceSq);
         return new Vec3(
                 EndRingContext.CENTER_X + dx * scale,
                 this.targetHoverY,
@@ -220,7 +245,25 @@ public class HeroPhase1Goal extends Goal {
         );
     }
 
-    private boolean canTeleportTo(ServerLevel level, double x, double y, double z) {
+    private boolean canMoveTo(ServerLevel level, double x, double y, double z) {
+        if (!canStandAt(level, x, y, z)) {
+            return false;
+        }
+
+        Vec3 start = this.hero.position();
+        Vec3 end = new Vec3(x, y, z);
+        double distance = start.distanceTo(end);
+        int samples = Math.max(2, Mth.ceil(distance / 2.0D));
+        for (int i = 1; i < samples; i++) {
+            Vec3 sample = start.lerp(end, i / (double) samples);
+            if (!canStandAt(level, sample.x, sample.y, sample.z)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean canStandAt(ServerLevel level, double x, double y, double z) {
         BlockPos feetPos = BlockPos.containing(x, y, z);
         if (!level.getWorldBorder().isWithinBounds(feetPos)) {
             return false;
@@ -233,19 +276,82 @@ public class HeroPhase1Goal extends Goal {
         return level.noCollision(this.hero, movedBox);
     }
 
-    private void doCombatTeleport(ServerLevel level, double x, double y, double z) {
+    private void startCombatMove(ServerLevel level, double x, double y, double z) {
         Vec3 oldPos = this.hero.position();
-        level.sendParticles(ParticleTypes.REVERSE_PORTAL, oldPos.x, oldPos.y + 1.2D, oldPos.z, 18, 0.45D, 0.8D, 0.45D, 0.04D);
-        level.sendParticles(ParticleTypes.ELECTRIC_SPARK, oldPos.x, oldPos.y + 1.3D, oldPos.z, 12, 0.35D, 0.6D, 0.35D, 0.08D);
+        level.sendParticles(ParticleTypes.REVERSE_PORTAL, oldPos.x, oldPos.y + 1.2D, oldPos.z, 14, 0.45D, 0.8D, 0.45D, 0.04D);
+        level.sendParticles(ParticleTypes.ELECTRIC_SPARK, oldPos.x, oldPos.y + 1.3D, oldPos.z, 10, 0.35D, 0.6D, 0.35D, 0.08D);
 
-        this.hero.teleportTo(x, y, z);
+        this.moveTarget = new Vec3(x, y, z);
+        this.moveTicks = 0;
+        this.moveDuration = difficultyMoveDuration();
+        this.afterimageIntervalTicks = AFTERIMAGE_INTERVAL - 1;
+        this.hero.getNavigation().stop();
+        this.hero.setDeltaMovement(Vec3.ZERO);
+        this.hero.lookAt(this.target, 180.0F, 180.0F);
+    }
+
+    private void tickCombatMove(ServerLevel level) {
+        if (this.moveTarget == null) {
+            return;
+        }
+
+        this.moveTicks++;
+        Vec3 remaining = this.moveTarget.subtract(this.hero.position());
+        if (this.moveTicks >= this.moveDuration || remaining.lengthSqr() <= 0.01D) {
+            finishCombatMove(level);
+            return;
+        }
+
+        int ticksLeft = Math.max(1, this.moveDuration - this.moveTicks + 1);
+        Vec3 step = remaining.scale(1.0D / ticksLeft);
+        this.hero.setDeltaMovement(step);
+        this.hero.getNavigation().stop();
+        if (this.target != null) {
+            this.hero.lookAt(this.target, 45.0F, 45.0F);
+        }
+
+        this.afterimageIntervalTicks++;
+        if (this.afterimageIntervalTicks >= AFTERIMAGE_INTERVAL) {
+            this.afterimageIntervalTicks = 0;
+            this.hero.addChallengeAfterimage(HeroAfterimage.of(this.hero, AFTERIMAGE_MAX_TICKS));
+        }
+    }
+
+    private void finishCombatMove(ServerLevel level) {
+        Vec3 endPos = this.hero.position();
+        level.sendParticles(ParticleTypes.ELECTRIC_SPARK, endPos.x, endPos.y + 1.3D, endPos.z, 14, 0.45D, 0.8D, 0.45D, 0.10D);
+
+        this.hero.addChallengeAfterimage(HeroAfterimage.of(this.hero, AFTERIMAGE_MAX_TICKS));
         this.hero.getNavigation().stop();
         this.hero.setDeltaMovement(0.0D, 0.02D, 0.0D);
-        this.hero.lookAt(this.target, 180.0F, 180.0F);
+        if (this.target != null) {
+            this.hero.lookAt(this.target, 180.0F, 180.0F);
+        }
 
-        level.sendParticles(ParticleTypes.REVERSE_PORTAL, x, y + 1.2D, z, 24, 0.55D, 0.9D, 0.55D, 0.05D);
-        level.sendParticles(ParticleTypes.ELECTRIC_SPARK, x, y + 1.3D, z, 18, 0.45D, 0.8D, 0.45D, 0.10D);
-        level.playSound(null, x, y, z, SoundEvents.ENDERMAN_TELEPORT, SoundSource.HOSTILE, 1.6F, 0.65F + level.random.nextFloat() * 0.15F);
+        this.moveTarget = null;
+        this.moveTicks = 0;
+        this.moveDuration = 0;
+        this.afterimageIntervalTicks = 0;
+    }
+
+    private int challengeMode() {
+        if (this.hero.getPersistentData().contains("ChallengeMode")) {
+            return Math.max(0, Math.min(2, this.hero.getPersistentData().getInt("ChallengeMode")));
+        }
+
+        float multiplier = this.hero.getPersistentData().contains("ChallengeDamageMultiplier")
+                ? this.hero.getPersistentData().getFloat("ChallengeDamageMultiplier")
+                : 1.0F;
+        return multiplier >= 1.8F ? 2 : multiplier <= 0.6F ? 0 : 1;
+    }
+
+    private int difficultyMoveDuration() {
+        return MOVE_DURATIONS[challengeMode()];
+    }
+
+    private int difficultyMoveCooldown(boolean pressuredByMelee) {
+        int mode = challengeMode();
+        return pressuredByMelee ? MOVE_PRESSURE_COOLDOWNS[mode] : MOVE_COOLDOWNS[mode];
     }
 
     private double horizontalDistanceSqr(Vec3 a, Vec3 b) {
@@ -301,8 +407,8 @@ public class HeroPhase1Goal extends Goal {
 
             double dx = entity.getX() - strikePos.x;
             double dz = entity.getZ() - strikePos.z;
-            double distanceSq = dx * dx + dz * dz;
-            if (distanceSq > radius * radius) {
+            double distanceTo = dx * dx + dz * dz;
+            if (distanceTo > radius * radius) {
                 continue;
             }
 
@@ -347,6 +453,11 @@ public class HeroPhase1Goal extends Goal {
     @Override
     public void stop() {
         this.target = null;
-        this.teleportCooldown = 0;
+        this.movementCooldown = 0;
+        this.moveTarget = null;
+        this.moveTicks = 0;
+        this.moveDuration = 0;
+        this.afterimageIntervalTicks = 0;
+        this.hero.clearChallengeAfterimages();
     }
 }

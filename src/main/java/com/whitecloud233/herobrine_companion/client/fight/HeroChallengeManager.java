@@ -47,7 +47,7 @@ public class HeroChallengeManager {
         ServerLevel endRingLevel = server.getLevel(ModStructures.END_RING_DIMENSION_KEY);
 
         if (endRingLevel == null) {
-            player.sendSystemMessage(Component.literal("§c[系统] 无法连接到试炼维度，挑战失败！"));
+            player.sendSystemMessage(Component.translatable("message.herobrine_companion.challenge.dimension_unreachable"));
             return;
         }
 
@@ -59,7 +59,7 @@ public class HeroChallengeManager {
             ServerPlayer challenger = server.getPlayerList().getPlayer(currentChallenger);
             // 如果锁定的玩家在线，且真的在挑战中，则拦截当前玩家
             if (challenger != null && challenger.getPersistentData().getBoolean("IsChallengeActive")) {
-                player.sendSystemMessage(Component.literal("§c[系统] 试炼场地已被玩家 §e" + challenger.getName().getString() + " §c占用，请稍后再试！"));
+                player.sendSystemMessage(Component.translatable("message.herobrine_companion.challenge.occupied", challenger.getName()));
                 return;
             } else {
                 // 如果锁定的玩家已经离线或者状态异常，说明是死锁，强行解开
@@ -126,8 +126,10 @@ public class HeroChallengeManager {
         hero.setTarget(null);
         hero.getNavigation().stop();
 
-        hero.moveControl = new HeroMoveControl(hero);
+        hero.setMoveControl(new HeroMoveControl(hero));
 
+        hero.clearChallengeAfterimages();
+        hero.getPersistentData().putInt("ChallengeMode", challengeMode);
         float damageMultiplier = DIFFICULTY_DAMAGE_MULTIPLIER.getOrDefault(challengeMode, 1.0f);
         float maxHealth = DIFFICULTY_MAX_HEALTH.getOrDefault(challengeMode, 1000.0f);
 
@@ -143,7 +145,7 @@ public class HeroChallengeManager {
         hero.goalSelector.addGoal(1, new HeroPhase1Goal(hero));
 
         if (target != null) {
-            target.sendSystemMessage(Component.literal("§c[系统] 试炼已启动，目标锁定！").withStyle(ChatFormatting.BOLD));
+            target.sendSystemMessage(Component.translatable("message.herobrine_companion.challenge.started").withStyle(ChatFormatting.BOLD));
             // 缓慢下落防止网络延迟时掉虚空
             target.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.SLOW_FALLING, 100, 0, false, false));
 
@@ -162,6 +164,7 @@ public class HeroChallengeManager {
         hero.getEntityData().set(HeroEntity.CHALLENGE_TICKS, 0);
         hero.getPersistentData().putBoolean("IsChallengeActive", false);
         hero.getPersistentData().remove("ChallengePhaseTicks");
+        hero.clearChallengeAfterimages();
         // 【新增】：结束时清空假死标记
         hero.getPersistentData().remove("IsFakeOutPhase");
         hero.goalSelector.removeAllGoals(goal -> true);
@@ -169,7 +172,7 @@ public class HeroChallengeManager {
         hero.setTarget(null);
         hero.getNavigation().stop();
 
-        hero.moveControl = new HeroMoveControl(hero);
+        hero.setMoveControl(new HeroMoveControl(hero));
         HeroAI.registerGoals(hero);
 
         hero.getAttribute(Attributes.MAX_HEALTH).setBaseValue(20.0D);
@@ -274,7 +277,7 @@ public class HeroChallengeManager {
                         newHero.goalSelector.removeAllGoals(goal -> true);
                         newHero.targetSelector.removeAllGoals(goal -> true);
                         newHero.setTarget(null);
-                        newHero.moveControl = new HeroMoveControl(newHero);
+                        newHero.setMoveControl(new HeroMoveControl(newHero));
                         HeroAI.registerGoals(newHero);
                     }
                 }
@@ -329,6 +332,7 @@ public class HeroChallengeManager {
             activeHero.getEntityData().set(HeroEntity.IS_CHALLENGE_ACTIVE, false);
             activeHero.getEntityData().set(HeroEntity.CHALLENGE_TICKS, 0);
             activeHero.getPersistentData().putBoolean("IsChallengeActive", false);
+            activeHero.clearChallengeAfterimages();
 
             // 【核心修复】：在这里使用 activeHero 清除存档的进度！
             activeHero.getPersistentData().remove("ChallengePhaseTicks");
@@ -433,21 +437,9 @@ public class HeroChallengeManager {
                     // 给玩家打上标记，用于稍后在事件中锁血（保持半颗心不死）
                     player.getPersistentData().putBoolean("HeroFakeOutPhase", true);
 
-                    // ==========================================
-                    // 【终极修复核心】：赋予电影级失重感，防止 Boss 被冻结！
-                    // 给玩家施加 20 秒的缓慢下落，10 秒内只会下坠 16 格！
-                    // 彻底避免低模拟距离导致 Boss 停止 Tick！
-                    // ==========================================
-                    player.addEffect(new net.minecraft.world.effect.MobEffectInstance(
-                            net.minecraft.world.effect.MobEffects.SLOW_FALLING, 400, 0, false, false));
-
-                    // 清空玩家动量，防止带着极快的初速度被甩下去
-                    player.setDeltaMovement(0, 0, 0);
-                    player.hurtMarked = true; // 强制立刻向客户端同步清零的速度
-
                     // 发送崩坏数据包开始黑屏和隐藏UI
                     com.whitecloud233.herobrine_companion.network.PacketHandler.sendToPlayer(
-                            new com.whitecloud233.herobrine_companion.client.fight.network.SPacketStartCollapse(),
+                            new com.whitecloud233.herobrine_companion.fight.network.SPacketStartCollapse(),
                             player
                     );
                 }
