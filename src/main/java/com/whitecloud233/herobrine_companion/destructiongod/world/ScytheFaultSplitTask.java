@@ -135,9 +135,12 @@ final class ScytheFaultSplitTask extends TerrainTask {
         if (!this.finalSolidified && this.animationAge >= DISPLAY_MOVE_TICKS) {
             if (this.restoreSourcePlateGroups(budget)) {
                 this.finalSolidified = true;
-                this.discardDisplays();
-                return true;
             }
+            return false;
+        }
+        if (this.animationAge >= DISPLAY_MOVE_TICKS + DISPLAY_HOLD_TICKS) {
+            this.discardDisplays();
+            return true;
         }
         return false;
     }
@@ -247,7 +250,7 @@ final class ScytheFaultSplitTask extends TerrainTask {
             List<FaultDisplayBlock> groupBlocks = new ArrayList<>();
             for (FaultPaletteEntry entry : visualSnapshot.entries()) {
                 BlockState state = visualSnapshot.palette().get(entry.paletteIndex());
-                Display.BlockDisplay display = createFaultBlockDisplay(this.level, entry.pos(), state, Vec3.ZERO, new Vec3(1.0D, 1.0D, 1.0D));
+                Display.BlockDisplay display = createFaultBlockDisplay(this.level, entry.pos(), state, snapshot.translation(), new Vec3(1.0D, 1.0D, 1.0D));
                 if (display != null) {
                     groupBlocks.add(new FaultDisplayBlock(display, state));
                 }
@@ -273,7 +276,7 @@ final class ScytheFaultSplitTask extends TerrainTask {
                 if (block.display().isRemoved()) {
                     continue;
                 }
-                applyFaultDisplayState(block.display(), block.state(), Vec3.ZERO, new Vec3(1.0D, 1.0D, 1.0D), 0);
+                applyFaultDisplayState(block.display(), block.state(), group.translation(), new Vec3(1.0D, 1.0D, 1.0D), 0);
             }
         }
     }
@@ -295,7 +298,7 @@ final class ScytheFaultSplitTask extends TerrainTask {
         for (FaultPlateSnapshot group : snapshots) {
             FaultPaletteSnapshot snapshot = group.fullSnapshot();
             for (FaultPaletteEntry entry : snapshot.entries()) {
-                BlockPos target = entry.pos().offset(group.blockOffset());
+                BlockPos target = entry.pos();
                 if (placedKeys.add(target.asLong())) {
                     placements.add(new FaultPlacement(target, snapshot.palette().get(entry.paletteIndex())));
                 }
@@ -529,7 +532,7 @@ final class ScytheFaultSplitTask extends TerrainTask {
 
         Set<Long> visited = new HashSet<>();
         List<FaultPlateGroup> groups = new ArrayList<>();
-        BlockPos blockOffset = this.sideBlockOffset(positiveSide);
+        BlockPos blockOffset = BlockPos.ZERO;
         Vec3 translation = this.sideDisplayTranslation(positiveSide);
 
         for (FaultColumnSample column : columns) {
@@ -580,31 +583,7 @@ final class ScytheFaultSplitTask extends TerrainTask {
     }
 
     private Vec3 sideDisplayTranslation(boolean positiveSide) {
-        return this.perpendicular.scale(positiveSide ? this.displayShift : -this.displayShift);
-    }
-
-    private BlockPos sideBlockOffset(boolean positiveSide) {
-        int sideSign = positiveSide ? 1 : -1;
-        int x = quantizeBlockOffset(this.perpendicular.x * sideSign * this.shiftDistance);
-        int z = quantizeBlockOffset(this.perpendicular.z * sideSign * this.shiftDistance);
-        if (x == 0 && z == 0) {
-            if (Math.abs(this.perpendicular.x) >= Math.abs(this.perpendicular.z)) {
-                x = this.perpendicular.x * sideSign >= 0.0D ? 1 : -1;
-            } else {
-                z = this.perpendicular.z * sideSign >= 0.0D ? 1 : -1;
-            }
-        }
-        return new BlockPos(x, 0, z);
-    }
-
-    private static int quantizeBlockOffset(double value) {
-        if (value > 0.0D) {
-            return Mth.floor(value + 0.5D);
-        }
-        if (value < 0.0D) {
-            return -Mth.floor(-value + 0.5D);
-        }
-        return 0;
+        return this.perpendicular.scale(positiveSide ? -this.displayShift : this.displayShift);
     }
 
     private boolean componentTouchesCorridor(List<FaultColumnSample> component, Set<Long> corridorColumnKeys) {
@@ -715,7 +694,7 @@ final class ScytheFaultSplitTask extends TerrainTask {
                 if (block.display().isRemoved()) {
                     continue;
                 }
-                applyFaultDisplayState(block.display(), block.state(), group.translation(), new Vec3(1.0D, 1.0D, 1.0D), DISPLAY_MOVE_TICKS);
+                applyFaultDisplayState(block.display(), block.state(), Vec3.ZERO, new Vec3(1.0D, 1.0D, 1.0D), DISPLAY_MOVE_TICKS);
             }
         }
     }
@@ -816,8 +795,6 @@ final class ScytheFaultSplitTask extends TerrainTask {
 
     private static void applyFaultDisplayState(Display.BlockDisplay display, BlockState state, Vec3 translation, Vec3 scale, int interpolationDuration) {
         boolean synced = invokePrivateMethod(BLOCK_DISPLAY_SET_BLOCK_STATE, display, state);
-        synced |= invokePrivateMethod(DISPLAY_SET_INTERPOLATION_DURATION, display, Math.max(0, interpolationDuration));
-        synced |= invokePrivateMethod(DISPLAY_SET_INTERPOLATION_DELAY, display, 0);
 
         Transformation transformation = new Transformation(
                 new Vector3f((float) translation.x, (float) translation.y, (float) translation.z),
@@ -826,6 +803,8 @@ final class ScytheFaultSplitTask extends TerrainTask {
                 new Quaternionf()
         );
         synced |= invokePrivateMethod(DISPLAY_SET_TRANSFORMATION, display, transformation);
+        synced |= invokePrivateMethod(DISPLAY_SET_INTERPOLATION_DURATION, display, Math.max(0, interpolationDuration));
+        synced |= invokePrivateMethod(DISPLAY_SET_INTERPOLATION_DELAY, display, 0);
         synced |= invokePrivateMethod(DISPLAY_SET_VIEW_RANGE, display, 256.0F);
         synced |= invokePrivateMethod(DISPLAY_SET_WIDTH, display, 1.15F);
         synced |= invokePrivateMethod(DISPLAY_SET_HEIGHT, display, 1.15F);

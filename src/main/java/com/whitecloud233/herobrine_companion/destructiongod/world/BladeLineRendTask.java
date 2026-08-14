@@ -162,16 +162,9 @@ final class BladeLineRendTask extends TerrainTask {
             return;
         }
 
-        int batchSize = Math.min(64, this.pendingBlocks.size() - this.pendingBlockIndex);
-        List<BlockPos> batch = new ArrayList<>(batchSize);
-        int endIndex = Math.min(this.pendingBlocks.size(), this.pendingBlockIndex + batchSize);
-        while (this.pendingBlockIndex < endIndex && budget.hasBudget()) {
+        while (budget.hasBudget() && this.pendingBlockIndex < this.pendingBlocks.size()) {
             BlockPos pos = this.pendingBlocks.get(this.pendingBlockIndex++);
-            batch.add(pos);
-            budget.consume();
-        }
-        if (!batch.isEmpty()) {
-            DestructionTerrainManager.clearBlocksInstant(this.level, batch, mode, true);
+            DestructionTerrainManager.destroyBlock(this.level, pos, budget, mode, false, true);
         }
 
         if (this.pendingBlockIndex >= this.pendingBlocks.size()) {

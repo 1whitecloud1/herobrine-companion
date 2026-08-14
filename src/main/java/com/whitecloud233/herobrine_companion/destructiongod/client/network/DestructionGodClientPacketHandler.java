@@ -1,12 +1,20 @@
-package com.whitecloud233.herobrine_companion.destructiongod.network;
+package com.whitecloud233.herobrine_companion.destructiongod.client.network;
 
 import com.whitecloud233.herobrine_companion.client.fight.particles.PaleLightningArcParticle;
 import com.whitecloud233.herobrine_companion.destructiongod.client.particle.DestructionGodFaultSplitParticle;
 import com.whitecloud233.herobrine_companion.destructiongod.client.particle.DestructionGodLightningBeamParticle;
 import com.whitecloud233.herobrine_companion.destructiongod.client.particle.DestructionGodOrbParticle;
 import com.whitecloud233.herobrine_companion.destructiongod.client.particle.DestructionGodThunderSkyNetParticle;
+import com.whitecloud233.herobrine_companion.destructiongod.network.DestructionGodFaultSplitPacket;
+import com.whitecloud233.herobrine_companion.destructiongod.network.DestructionGodLightningArcPacket;
+import com.whitecloud233.herobrine_companion.destructiongod.network.DestructionGodLightningPacket;
+import com.whitecloud233.herobrine_companion.destructiongod.network.DestructionGodOrbPacket;
+import com.whitecloud233.herobrine_companion.destructiongod.network.DestructionGodThunderSkyNetPacket;
 import net.minecraft.client.Minecraft;
 
+/**
+ * 灭世神的粒子演出客户端处理入口。各包的 {@code handle} 直接调用。
+ */
 public final class DestructionGodClientPacketHandler {
     private DestructionGodClientPacketHandler() {
     }

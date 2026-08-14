@@ -428,11 +428,11 @@ public class DestructionGodCombatGoal extends Goal {
         boolean hasLineOfSight = this.boss.hasLineOfSight(target);
         List<WeightedSkill> candidates = new ArrayList<>();
 
-        this.addSkillCandidate(candidates, DestructionGodHerobrineEntity.SKILL_WORLD_REND, 10, distance >= 6.0D);
-        this.addSkillCandidate(candidates, DestructionGodHerobrineEntity.SKILL_SCYTHE_FAULT_SPLIT, 10, distance >= 6.0D);
-        this.addSkillCandidate(candidates, DestructionGodHerobrineEntity.SKILL_DESTRUCTION_LIGHTNING, 10, distance >= 6.0D);
-        this.addSkillCandidate(candidates, DestructionGodHerobrineEntity.SKILL_DESTRUCTION_GOD_ORB, 10, distance >= 6.0D);
-        this.addSkillCandidate(candidates, DestructionGodHerobrineEntity.SKILL_THUNDER_SKYNET, 10, distance >= 6.0D);
+        this.addSkillCandidate(candidates, DestructionGodHerobrineEntity.SKILL_WORLD_REND, 10, hasLineOfSight && distance >= 8.0D && distance <= 56.0D);
+        this.addSkillCandidate(candidates, DestructionGodHerobrineEntity.SKILL_SCYTHE_FAULT_SPLIT, 10, distance >= 6.0D && distance <= 42.0D);
+        this.addSkillCandidate(candidates, DestructionGodHerobrineEntity.SKILL_DESTRUCTION_LIGHTNING, 10, distance >= 12.0D);
+        this.addSkillCandidate(candidates, DestructionGodHerobrineEntity.SKILL_DESTRUCTION_GOD_ORB, 10, distance >= 10.0D && distance <= 56.0D);
+        this.addSkillCandidate(candidates, DestructionGodHerobrineEntity.SKILL_THUNDER_SKYNET, 10, distance >= 12.0D && distance <= 72.0D);
 
         WeightedSkill choice = this.pickWeightedSkill(serverLevel, candidates);
         if (choice == null) {
