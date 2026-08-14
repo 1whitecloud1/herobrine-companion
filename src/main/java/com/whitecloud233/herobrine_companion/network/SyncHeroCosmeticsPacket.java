@@ -1,6 +1,7 @@
 package com.whitecloud233.herobrine_companion.network;
 
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.herobrine_companion.client.network.ClientStateSync;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.logic.data.HeroWorldData;
 import net.minecraft.nbt.CompoundTag;
@@ -9,7 +10,6 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.entity.Entity;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 public class SyncHeroCosmeticsPacket implements CustomPacketPayload {
@@ -72,12 +72,13 @@ public class SyncHeroCosmeticsPacket implements CustomPacketPayload {
     }
 
     public static void handle(SyncHeroCosmeticsPacket packet, IPayloadContext context) {
-        context.enqueueWork(() -> ClientOnlyExecutor.invoke(
-                SyncHeroCosmeticsPacket.ClientHandler.class.getName(),
-                "handle",
-                new Class<?>[]{SyncHeroCosmeticsPacket.class},
-                packet
-        ));
+        context.enqueueWork(() -> ClientStateSync.applySyncHeroCosmetics(
+                packet.entityId,
+                packet.skinVariant,
+                packet.customSkinName,
+                packet.customSkinData,
+                packet.curiosBackItem,
+                packet.accessoriesData));
     }
 
     private static byte[] getCustomSkinData(HeroEntity hero) {
@@ -85,30 +86,5 @@ public class SyncHeroCosmeticsPacket implements CustomPacketPayload {
             return HeroWorldData.get(serverLevel).getCustomSkinData(hero.getOwnerUUID());
         }
         return new byte[0];
-    }
-
-    private static final class ClientHandler {
-        private static void handle(SyncHeroCosmeticsPacket packet) {
-            net.minecraft.client.Minecraft minecraft = net.minecraft.client.Minecraft.getInstance();
-            if (minecraft.level == null) {
-                return;
-            }
-
-            Entity entity = minecraft.level.getEntity(packet.entityId);
-            if (!(entity instanceof HeroEntity hero)) {
-                return;
-            }
-
-            hero.setSkinVariant(packet.skinVariant);
-            hero.setCustomSkinName(packet.customSkinName);
-            hero.setCuriosBackItemFromTag(packet.curiosBackItem);
-            hero.setAccessoriesDataFromTag(packet.accessoriesData);
-
-            if (packet.skinVariant == HeroEntity.SKIN_CUSTOM && packet.customSkinData.length > 0) {
-                com.whitecloud233.herobrine_companion.client.render.HeroClientSkinCache.put(hero.getUUID(), packet.customSkinData);
-            } else {
-                com.whitecloud233.herobrine_companion.client.render.HeroClientSkinCache.clear(hero.getUUID());
-            }
-        }
     }
 }

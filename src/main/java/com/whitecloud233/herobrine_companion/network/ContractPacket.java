@@ -44,8 +44,8 @@ public record ContractPacket() implements CustomPacketPayload {
                         // Find the Hero Summon Item in player's hand
                         ItemStack heldItem = serverPlayer.getMainHandItem();
                         if (heldItem.getItem() instanceof HeroSummonItem) {
-                            // Bind item
-                            CompoundTag tag = new CompoundTag();
+                            // Bind item (merge into existing custom data, preserving any pre-existing keys)
+                            CompoundTag tag = heldItem.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
                             tag.putBoolean("BoundHero", true);
                             tag.putString("OwnerName", serverPlayer.getName().getString());
                             if (serverPlayer.getUUID() != null) {

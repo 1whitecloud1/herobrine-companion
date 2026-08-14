@@ -55,15 +55,6 @@ public class ModEvents {
     }
 
     public static void registerSpawnPlacements(RegisterSpawnPlacementsEvent event) {
-        event.register(ModEntities.GHOST_CREEPER.get(), SpawnPlacementTypes.ON_GROUND, Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
-                Monster::checkMonsterSpawnRules, RegisterSpawnPlacementsEvent.Operation.REPLACE);
-        
-        event.register(ModEntities.GHOST_ZOMBIE.get(), SpawnPlacementTypes.ON_GROUND, Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
-                Zombie::checkMonsterSpawnRules, RegisterSpawnPlacementsEvent.Operation.REPLACE);
-        
-        event.register(ModEntities.GHOST_SKELETON.get(), SpawnPlacementTypes.ON_GROUND, Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
-                Skeleton::checkMonsterSpawnRules, RegisterSpawnPlacementsEvent.Operation.REPLACE);
-
         // [修改] 使用 WORLD_SURFACE 而不是 MOTION_BLOCKING_NO_LEAVES，以确保在地面生成
         event.register(ModEntities.GHOST_STEVE.get(), SpawnPlacementTypes.ON_GROUND, Heightmap.Types.WORLD_SURFACE,
                 GhostSteveEntity::checkGhostSteveSpawnRules, RegisterSpawnPlacementsEvent.Operation.REPLACE);

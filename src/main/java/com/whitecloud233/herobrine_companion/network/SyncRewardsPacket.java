@@ -1,5 +1,6 @@
 package com.whitecloud233.herobrine_companion.network;
 
+import com.whitecloud233.herobrine_companion.client.network.ClientStateSync;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -49,27 +50,6 @@ public class SyncRewardsPacket implements CustomPacketPayload {
     }
 
     public void handle(IPayloadContext context) {
-        context.enqueueWork(() -> ClientOnlyExecutor.invoke(
-                SyncRewardsPacket.ClientHandler.class.getName(),
-                "handle",
-                new Class<?>[]{SyncRewardsPacket.class},
-                this
-        ));
-    }
-
-    private static final class ClientHandler {
-        private static void handle(SyncRewardsPacket packet) {
-            net.minecraft.client.Minecraft minecraft = net.minecraft.client.Minecraft.getInstance();
-            if (minecraft.level == null) {
-                return;
-            }
-
-            Entity entity = minecraft.level.getEntity(packet.entityId);
-            if (entity instanceof HeroEntity hero) {
-                for (int id : packet.claimedRewards) {
-                    hero.claimReward(id);
-                }
-            }
-        }
+        context.enqueueWork(() -> ClientStateSync.applySyncRewards(this.entityId, this.claimedRewards));
     }
 }

@@ -1,7 +1,7 @@
 package com.whitecloud233.herobrine_companion.network.ai;
 
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
-import com.whitecloud233.herobrine_companion.network.ClientOnlyExecutor;
+import com.whitecloud233.herobrine_companion.client.network.ClientStateSync;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -50,18 +50,7 @@ public class AppendCrossChatHistoryPacket implements CustomPacketPayload {
     }
 
     public static void handle(AppendCrossChatHistoryPacket packet, IPayloadContext context) {
-        context.enqueueWork(() -> ClientOnlyExecutor.invoke(
-                AppendCrossChatHistoryPacket.ClientHandler.class.getName(),
-                "handle",
-                new Class<?>[]{AppendCrossChatHistoryPacket.class},
-                packet
-        ));
-    }
-
-    private static final class ClientHandler {
-        private static void handle(AppendCrossChatHistoryPacket packet) {
-            com.whitecloud233.herobrine_companion.client.service.CrossChatHistoryStore.getInstance()
-                    .appendEntry(packet.peerName, packet.hbMode, packet.speaker, packet.content, packet.kind);
-        }
+        context.enqueueWork(() -> ClientStateSync.appendCrossChatHistory(
+                packet.peerName, packet.hbMode, packet.speaker, packet.content, packet.kind));
     }
 }

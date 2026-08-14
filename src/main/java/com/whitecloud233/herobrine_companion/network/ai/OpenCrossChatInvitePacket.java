@@ -1,7 +1,7 @@
 package com.whitecloud233.herobrine_companion.network.ai;
 
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
-import com.whitecloud233.herobrine_companion.network.ClientOnlyExecutor;
+import com.whitecloud233.herobrine_companion.client.network.ClientUiDispatch;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -40,17 +40,6 @@ public class OpenCrossChatInvitePacket implements CustomPacketPayload {
     }
 
     public static void handle(OpenCrossChatInvitePacket packet, IPayloadContext context) {
-        context.enqueueWork(() -> ClientOnlyExecutor.invoke(
-                OpenCrossChatInvitePacket.ClientHandler.class.getName(),
-                "handle",
-                new Class<?>[]{OpenCrossChatInvitePacket.class},
-                packet
-        ));
-    }
-
-    private static final class ClientHandler {
-        private static void handle(OpenCrossChatInvitePacket packet) {
-            com.whitecloud233.herobrine_companion.client.event.ClientHooks.openCrossChatInvite(packet.requesterId, packet.requesterName);
-        }
+        context.enqueueWork(() -> ClientUiDispatch.openCrossChatInvite(packet.requesterId, packet.requesterName));
     }
 }

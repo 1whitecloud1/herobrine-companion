@@ -1,7 +1,7 @@
 package com.whitecloud233.herobrine_companion.network.ai;
 
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
-import com.whitecloud233.herobrine_companion.network.ClientOnlyExecutor;
+import com.whitecloud233.herobrine_companion.client.network.ClientUiDispatch;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -34,17 +34,6 @@ public class OpenCrossSessionHubPacket implements CustomPacketPayload {
     }
 
     public static void handle(OpenCrossSessionHubPacket packet, IPayloadContext context) {
-        context.enqueueWork(() -> ClientOnlyExecutor.invoke(
-                OpenCrossSessionHubPacket.ClientHandler.class.getName(),
-                "handle",
-                new Class<?>[]{OpenCrossSessionHubPacket.class},
-                packet
-        ));
-    }
-
-    private static final class ClientHandler {
-        private static void handle(OpenCrossSessionHubPacket packet) {
-            com.whitecloud233.herobrine_companion.client.event.ClientHooks.openCrossSessionHub(packet.entityId);
-        }
+        context.enqueueWork(() -> ClientUiDispatch.openCrossSessionHub(packet.entityId));
     }
 }

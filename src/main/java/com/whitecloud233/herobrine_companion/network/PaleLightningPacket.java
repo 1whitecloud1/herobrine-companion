@@ -1,5 +1,6 @@
 package com.whitecloud233.herobrine_companion.network;
 
+import com.whitecloud233.herobrine_companion.client.network.ClientFxHandler;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
@@ -27,6 +28,6 @@ public record PaleLightningPacket(double x, double y, double z, float width) imp
 
     // [新增] 添加 handle 方法，将调用隔离在方法体内
     public void handle(IPayloadContext context) {
-        ClientPacketHandler.handlePaleLightning(this, context);
+        context.enqueueWork(() -> ClientFxHandler.handlePaleLightning(this));
     }
 }

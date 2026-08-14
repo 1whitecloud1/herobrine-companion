@@ -1,7 +1,7 @@
 package com.whitecloud233.herobrine_companion.network.ai;
 
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
-import com.whitecloud233.herobrine_companion.network.NetworkClientBridge;
+import com.whitecloud233.herobrine_companion.client.network.ClientAiPrompts;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -77,7 +77,7 @@ public class ActorDialoguePromptPacket implements CustomPacketPayload {
     }
 
     public static void handle(ActorDialoguePromptPacket packet, IPayloadContext context) {
-        context.enqueueWork(() -> NetworkClientBridge.handleActorDialoguePrompt(
+        context.enqueueWork(() -> ClientAiPrompts.handleActorDialoguePrompt(
                 packet.jobId,
                 packet.conversationScopeId,
                 packet.systemPrompt,

@@ -1,5 +1,6 @@
 package com.whitecloud233.herobrine_companion.network;
 
+import com.whitecloud233.herobrine_companion.client.network.ClientFxHandler;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -43,9 +44,6 @@ public class PaleLightningArcPacket implements CustomPacketPayload {
 
     // 1.21.1 标准的包处理方法
     public void handle(IPayloadContext context) {
-        context.enqueueWork(() -> {
-            // 安全投递给纯客户端处理器，防止物理服务端崩溃
-            ClientPacketHandler.handlePaleLightningArc(this);
-        });
+        context.enqueueWork(() -> ClientFxHandler.handlePaleLightningArc(this));
     }
 }

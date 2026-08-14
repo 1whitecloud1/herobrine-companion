@@ -1,6 +1,7 @@
 package com.whitecloud233.herobrine_companion.network;
 
 import io.netty.buffer.ByteBuf;
+import com.whitecloud233.herobrine_companion.client.network.ClientUiDispatch;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
@@ -19,17 +20,6 @@ public record TriggerEternalOathPacket() implements CustomPacketPayload {
     }
 
     public static void handle(TriggerEternalOathPacket packet, IPayloadContext context) {
-        context.enqueueWork(() -> ClientOnlyExecutor.invoke(
-                TriggerEternalOathPacket.ClientHandler.class.getName(),
-                "handle",
-                new Class<?>[]{TriggerEternalOathPacket.class},
-                packet
-        ));
-    }
-
-    private static final class ClientHandler {
-        private static void handle(TriggerEternalOathPacket packet) {
-            com.whitecloud233.herobrine_companion.client.event.ClientHooks.triggerEternalOath();
-        }
+        context.enqueueWork(ClientUiDispatch::triggerEternalOath);
     }
 }

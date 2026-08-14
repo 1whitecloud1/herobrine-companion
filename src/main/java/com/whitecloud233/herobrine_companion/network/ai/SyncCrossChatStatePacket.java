@@ -1,7 +1,7 @@
 package com.whitecloud233.herobrine_companion.network.ai;
 
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
-import com.whitecloud233.herobrine_companion.network.ClientOnlyExecutor;
+import com.whitecloud233.herobrine_companion.client.network.ClientStateSync;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -50,23 +50,12 @@ public class SyncCrossChatStatePacket implements CustomPacketPayload {
     }
 
     public static void handle(SyncCrossChatStatePacket packet, IPayloadContext context) {
-        context.enqueueWork(() -> ClientOnlyExecutor.invoke(
-                SyncCrossChatStatePacket.ClientHandler.class.getName(),
-                "handle",
-                new Class<?>[]{SyncCrossChatStatePacket.class},
-                packet
+        context.enqueueWork(() -> ClientStateSync.syncCrossChatState(
+                packet.allowIncoming,
+                packet.activeSession,
+                packet.peerName,
+                packet.autoChatEnabled,
+                packet.autoHbTurnLimit
         ));
-    }
-
-    private static final class ClientHandler {
-        private static void handle(SyncCrossChatStatePacket packet) {
-            com.whitecloud233.herobrine_companion.client.event.ClientHooks.syncCrossChatState(
-                    packet.allowIncoming,
-                    packet.activeSession,
-                    packet.peerName,
-                    packet.autoChatEnabled,
-                    packet.autoHbTurnLimit
-            );
-        }
     }
 }

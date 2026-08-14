@@ -1,7 +1,7 @@
 package com.whitecloud233.herobrine_companion.network.ai;
 
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
-import com.whitecloud233.herobrine_companion.network.ClientOnlyExecutor;
+import com.whitecloud233.herobrine_companion.client.network.ClientUiDispatch;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -38,17 +38,6 @@ public class OpenHeroChatPacket implements CustomPacketPayload {
     }
 
     public static void handle(OpenHeroChatPacket packet, IPayloadContext context) {
-        context.enqueueWork(() -> ClientOnlyExecutor.invoke(
-                OpenHeroChatPacket.ClientHandler.class.getName(),
-                "handle",
-                new Class<?>[]{OpenHeroChatPacket.class},
-                packet
-        ));
-    }
-
-    private static final class ClientHandler {
-        private static void handle(OpenHeroChatPacket packet) {
-            com.whitecloud233.herobrine_companion.client.event.ClientHooks.openHeroChatFromCommand(packet.hbInputMode);
-        }
+        context.enqueueWork(() -> ClientUiDispatch.openHeroChat(packet.hbInputMode));
     }
 }

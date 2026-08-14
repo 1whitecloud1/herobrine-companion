@@ -1,6 +1,7 @@
 package com.whitecloud233.herobrine_companion.network;
 
 import io.netty.buffer.ByteBuf;
+import com.whitecloud233.herobrine_companion.client.network.ClientStateSync;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -33,17 +34,6 @@ public class SyncHeroVisitPacket implements CustomPacketPayload {
     }
 
     public static void handle(SyncHeroVisitPacket packet, IPayloadContext context) {
-        context.enqueueWork(() -> ClientOnlyExecutor.invoke(
-                SyncHeroVisitPacket.ClientHandler.class.getName(),
-                "handle",
-                new Class<?>[]{SyncHeroVisitPacket.class},
-                packet
-        ));
-    }
-
-    private static final class ClientHandler {
-        private static void handle(SyncHeroVisitPacket packet) {
-            com.whitecloud233.herobrine_companion.client.event.ClientHooks.setVisitedHeroDimension(packet.visited);
-        }
+        context.enqueueWork(() -> ClientStateSync.setVisitedHeroDimension(packet.visited));
     }
 }

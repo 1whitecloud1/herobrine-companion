@@ -18,7 +18,7 @@ public class SavePosePacket implements CustomPacketPayload {
     public static final CustomPacketPayload.Type<SavePosePacket> TYPE = new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath(HerobrineCompanion.MODID, "save_pose"));
 
     // 1.21.1: 使用 StreamCodec 进行编解码
-    public static final StreamCodec<FriendlyByteBuf, SavePosePacket> STREAM_CODEC = StreamCodec.ofMember(SavePosePacket::write, SavePosePacket::new);
+    public static final StreamCodec<FriendlyByteBuf, SavePosePacket> STREAM_CODEC = StreamCodec.ofMember(SavePosePacket::encode, SavePosePacket::new);
 
     public final int entityId;
     public final boolean isPosing;
@@ -44,7 +44,7 @@ public class SavePosePacket implements CustomPacketPayload {
     }
 
     // 编码器：将数据写入网络字节流
-    public void write(FriendlyByteBuf buf) {
+    public void encode(FriendlyByteBuf buf) {
         buf.writeInt(this.entityId);
         buf.writeBoolean(this.isPosing);
 
@@ -83,7 +83,8 @@ public class SavePosePacket implements CustomPacketPayload {
             } else if (context.flow().isClientbound()) {
                 // --- 2. 客户端收到服务端的广播发包 ---
                 // 因为处于 isClientbound 分支内，服务端不会执行这里，也就不会引发 Minecraft.getInstance() 的类加载崩溃
-                ClientHandler.handleOnClient(this);
+                com.whitecloud233.herobrine_companion.client.network.ClientStateSync.applySavePose(
+                        this.entityId, this.isPosing, copyAngles(this.angles));
             }
         });
     }
@@ -95,18 +96,5 @@ public class SavePosePacket implements CustomPacketPayload {
             System.arraycopy(source[i], 0, dest[i], 0, 3);
         }
         return dest;
-    }
-
-    // 隔离纯客户端端代码，依然推荐放在静态内部类（或单独的包中）
-    public static class ClientHandler {
-        public static void handleOnClient(SavePosePacket msg) {
-            if (net.minecraft.client.Minecraft.getInstance().level != null) {
-                Entity entity = net.minecraft.client.Minecraft.getInstance().level.getEntity(msg.entityId);
-                if (entity instanceof HeroEntity hero) {
-                    hero.isPoseEditing = msg.isPosing;
-                    hero.customPoseAngles = copyAngles(msg.angles);
-                }
-            }
-        }
     }
 }

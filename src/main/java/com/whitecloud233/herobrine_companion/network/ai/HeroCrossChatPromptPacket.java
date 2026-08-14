@@ -1,29 +1,31 @@
 package com.whitecloud233.herobrine_companion.network.ai;
+
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
-import com.whitecloud233.herobrine_companion.client.service.AIService;
-import com.whitecloud233.herobrine_companion.client.service.LLMConfig;
-import com.whitecloud233.herobrine_companion.client.service.LocalChatService;
-import com.whitecloud233.herobrine_companion.network.PacketHandler;
+import com.whitecloud233.herobrine_companion.client.network.ClientAiPrompts;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
-import java.nio.charset.StandardCharsets;
+
 import java.util.Locale;
 import java.util.UUID;
+
 public class HeroCrossChatPromptPacket implements CustomPacketPayload {
     public static final byte KIND_REMOTE_HB_REPLY = 0;
     public static final byte KIND_HB_OPENING = 1;
     public static final byte KIND_HB_REPLY = 2;
+
     public static final Type<HeroCrossChatPromptPacket> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(HerobrineCompanion.MODID, "hero_cross_chat_prompt"));
     public static final StreamCodec<FriendlyByteBuf, HeroCrossChatPromptPacket> STREAM_CODEC = StreamCodec.ofMember(HeroCrossChatPromptPacket::encode, HeroCrossChatPromptPacket::new);
+
     private final UUID jobId;
     private final UUID sessionId;
     private final byte kind;
     private final String prompt;
     private final String seedText;
     private final String outputLanguageCode;
+
     public HeroCrossChatPromptPacket(UUID jobId, UUID sessionId, byte kind, String prompt, String seedText, String outputLanguageCode) {
         this.jobId = jobId == null ? new UUID(0L, 0L) : jobId;
         this.sessionId = sessionId == null ? new UUID(0L, 0L) : sessionId;
@@ -32,6 +34,7 @@ public class HeroCrossChatPromptPacket implements CustomPacketPayload {
         this.seedText = seedText == null ? "" : seedText;
         this.outputLanguageCode = normalizeLanguageCode(outputLanguageCode);
     }
+
     public HeroCrossChatPromptPacket(FriendlyByteBuf buf) {
         this.jobId = buf.readUUID();
         this.sessionId = buf.readUUID();
@@ -40,6 +43,7 @@ public class HeroCrossChatPromptPacket implements CustomPacketPayload {
         this.seedText = buf.readUtf(2048);
         this.outputLanguageCode = normalizeLanguageCode(buf.readUtf(32));
     }
+
     public void encode(FriendlyByteBuf buf) {
         buf.writeUUID(this.jobId);
         buf.writeUUID(this.sessionId);
@@ -48,61 +52,17 @@ public class HeroCrossChatPromptPacket implements CustomPacketPayload {
         buf.writeUtf(this.seedText, 2048);
         buf.writeUtf(this.outputLanguageCode, 32);
     }
+
     @Override
     public Type<? extends CustomPacketPayload> type() {
         return TYPE;
     }
+
     public static void handle(HeroCrossChatPromptPacket packet, IPayloadContext context) {
-        context.enqueueWork(() -> handleOnClient(packet));
+        context.enqueueWork(() -> ClientAiPrompts.handleHeroCrossChatPrompt(
+                packet.jobId, packet.sessionId, packet.kind, packet.prompt, packet.seedText, packet.outputLanguageCode));
     }
-    private static void handleOnClient(HeroCrossChatPromptPacket packet) {
-        var mc = net.minecraft.client.Minecraft.getInstance();
-        if (mc.player == null) {
-            return;
-        }
-        UUID scopeId = UUID.nameUUIDFromBytes(("hb-cross-session:" + packet.sessionId).getBytes(StandardCharsets.UTF_8));
-        String fallback = buildFallbackReply(packet.seedText, packet.kind, packet.outputLanguageCode);
-        if (LLMConfig.isKeyMissingOrInvalid()) {
-            PacketHandler.sendToServer(new HeroCrossChatResultPacket(packet.jobId, fallback));
-            return;
-        }
-        AIService.chatForCrossSession(packet.prompt, packet.seedText, scopeId, mc.player.getUUID(), packet.outputLanguageCode)
-                .thenApply(reply -> normalizeReply(reply, fallback))
-                .exceptionally(ignored -> fallback)
-                .thenAccept(reply -> PacketHandler.sendToServer(new HeroCrossChatResultPacket(packet.jobId, reply)));
-    }
-    private static String normalizeReply(String reply, String fallback) {
-        if (reply == null) {
-            return fallback;
-        }
-        String normalized = reply.trim();
-        if (normalized.isEmpty()) {
-            return fallback;
-        }
-        String lowered = normalized.toLowerCase(Locale.ROOT);
-        if (normalized.startsWith("§c") || lowered.contains("network error") || lowered.contains("api error") || lowered.contains("connection to reality fading")) {
-            return fallback;
-        }
-        return normalized;
-    }
-    private static String buildFallbackReply(String seedText, byte kind, String outputLanguageCode) {
-        try {
-            LocalChatService.CachedRule rule = LocalChatService.getInstance().getChatResponse(seedText == null ? "" : seedText);
-            if (rule != null && rule.response() != null && !rule.response().isBlank()) {
-                return rule.response().trim();
-            }
-        } catch (Exception ignored) {
-        }
-        boolean chinese = isChineseLocale(outputLanguageCode);
-        return switch (kind) {
-            case KIND_HB_OPENING -> chinese ? "...I'm listening." : "...I'm listening.";
-            case KIND_HB_REPLY -> chinese ? "...Then keep speaking." : "...Then keep speaking.";
-            default -> "...";
-        };
-    }
-    private static boolean isChineseLocale(String languageCode) {
-        return normalizeLanguageCode(languageCode).startsWith("zh");
-    }
+
     private static String normalizeLanguageCode(String rawLanguageCode) {
         if (rawLanguageCode == null) {
             return "en_us";

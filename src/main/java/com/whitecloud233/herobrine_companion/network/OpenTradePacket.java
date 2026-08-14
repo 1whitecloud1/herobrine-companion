@@ -51,7 +51,7 @@ public record OpenTradePacket(int entityId) implements CustomPacketPayload {
                         // 3. 菜单成功分配 ID 后，再绑定玩家！这样就不会被覆盖了
                         if (containerId.isPresent()) {
                             hero.setTradingPlayer(player); // 【核心修复】时机挪到这里
-                            player.sendMerchantOffers(containerId.getAsInt(), offers, 0, hero.getVillagerXp(), hero.showProgressBar(), false);
+                            player.sendMerchantOffers(containerId.getAsInt(), offers, 1, hero.getVillagerXp(), hero.showProgressBar(), hero.canRestock());
                         } else {
                             hero.setTradingPlayer(null);
                         }

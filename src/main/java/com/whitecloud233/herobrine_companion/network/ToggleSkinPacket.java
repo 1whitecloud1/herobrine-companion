@@ -61,7 +61,7 @@ public class ToggleSkinPacket implements CustomPacketPayload {
         context.enqueueWork(() -> {
             if (context.player() instanceof ServerPlayer player) {
                 Entity entity = player.level().getEntity(packet.entityId);
-                if (entity instanceof HeroEntity hero && player.getUUID().equals(hero.getOwnerUUID())) {
+                if (entity instanceof HeroEntity hero) {
                     hero.setSkinVariant(packet.skinVariant);
                     if (hero.getOwnerUUID() != null) {
                         HeroWorldData data = HeroWorldData.get(player.serverLevel());
