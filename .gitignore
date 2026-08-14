@@ -32,3 +32,10 @@ gradle.properties
 /libs/kaleidoscope_compat-2.7.2-neoforge+mc1.21.1.jar
 /runserver.log
 /libs/waveycapes-neoforge-1.9.2-mc1.21.1.jar
+
+# 构建产物与本地工具（不提交）
+versions/
+libraries/
+.vscode/
+.workbuddy/
+/libs/Herobrine Companion-*.jar
