@@ -32,6 +32,7 @@ import com.whitecloud233.modid.herobrine_companion.network.ai.SetCrossChatAutoTu
 import com.whitecloud233.modid.herobrine_companion.network.ai.SetCrossChatPermissionPacket;
 import com.whitecloud233.modid.herobrine_companion.network.ai.SyncCrossChatStatePacket;
 import com.whitecloud233.modid.herobrine_companion.network.ai.UpdateClientLanguagePacket;
+import com.whitecloud233.modid.herobrine_companion.network.SyncServerConfigPacket;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
@@ -166,6 +167,12 @@ public class PacketHandler {
         reg(id, ToolApprovalPromptPacket.class, ToolApprovalPromptPacket::encode, ToolApprovalPromptPacket::new, ToolApprovalPromptPacket::handle);
         reg(id, ApproveToolPacket.class, ApproveToolPacket::encode, ApproveToolPacket::new, ApproveToolPacket::handle);
         reg(id, RejectToolPacket.class, RejectToolPacket::encode, RejectToolPacket::new, RejectToolPacket::handle);
+
+        // ---------- 客户端设置实时同步到服务端 ----------
+        reg(id, SyncServerConfigPacket.class, SyncServerConfigPacket::encode, SyncServerConfigPacket::new, SyncServerConfigPacket::handle);
+
+        // ---------- 结构清单同步(C→S 请求 / S→C 响应, 服务端权威) ----------
+        reg(id, StructureIndexPacket.class, StructureIndexPacket::encode, StructureIndexPacket::new, StructureIndexPacket::handle);
     }
 
     /**

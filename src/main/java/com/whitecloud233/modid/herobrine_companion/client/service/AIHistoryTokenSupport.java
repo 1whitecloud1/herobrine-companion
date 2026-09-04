@@ -42,12 +42,13 @@ final class AIHistoryTokenSupport {
         return selected;
     }
 
-    static int calculateHistoryTokenBudget(String forcedPrompt, String currentPrompt, String originalUserMessage) {
-        int contextWindow = LLMConfig.getEstimatedContextWindowTokens();
-        int reserve = LLMConfig.getSuggestedCompletionReserveTokens();
+    static int calculateHistoryTokenBudget(String forcedPrompt, String currentPrompt, String originalUserMessage,
+                                               com.whitecloud233.modid.herobrine_companion.client.llm.LlmSettings settings) {
+        int contextWindow = LLMConfig.getContextWindowForSettings(settings);
+        int reserve = LLMConfig.getSuggestedCompletionReserveTokens(contextWindow);
         int systemTokens = estimateTextTokens(forcedPrompt);
         int latestPromptTokens = estimateTextTokens(currentPrompt) + estimateTextTokens(originalUserMessage);
-        int targetHistoryBudget = LLMConfig.getEffectiveConversationHistoryTokenBudget();
+        int targetHistoryBudget = LLMConfig.getEffectiveConversationHistoryTokenBudget(contextWindow);
         int available = Math.max(0, contextWindow - reserve - systemTokens - latestPromptTokens);
         return Math.max(0, Math.min(targetHistoryBudget, available));
     }

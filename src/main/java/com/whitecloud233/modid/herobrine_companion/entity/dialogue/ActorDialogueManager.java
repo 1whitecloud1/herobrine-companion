@@ -25,7 +25,12 @@ public final class ActorDialogueManager {
     private static final int MAX_TEXT_LENGTH = 160;
     private static final long JOB_TIMEOUT_MS = 60_000L;
 
+    /** 所有觉醒对话共享的全局最小间隔（毫秒）；实际值来自 Config.awakenedDialogueMinIntervalSeconds。 */
+    private static final long FALLBACK_MIN_DIALOGUE_INTERVAL_MS = 30_000L;
+
     private final Map<UUID, PendingJob> jobsById = new HashMap<>();
+    /** 上一次发起觉醒 LLM 对话的时刻（毫秒）——所有说话者共享一个全局间隔。 */
+    private long lastDialogueAtMillis = Long.MIN_VALUE;
 
     private ActorDialogueManager() {
     }
@@ -40,6 +45,17 @@ public final class ActorDialogueManager {
         }
 
         String fallbackText = buildFallbackText(spec);
+
+        // 全局频率闸：所有觉醒对话（任意说话者）共享一个最小间隔，防止触发 API 频率限制。
+        // 冷却期间改用预设台词（不调 API、不触发 followUp 链）。
+        long now = System.currentTimeMillis();
+        long minIntervalMs = minDialogueIntervalMs();
+        if (now - lastDialogueAtMillis < minIntervalMs) {
+            deliverLine(spec.speaker(), fallbackText);
+            return;
+        }
+        lastDialogueAtMillis = now;
+
         ServerPlayer generator = selectGenerator(serverLevel, spec.speaker(), spec.preferredAudience());
         if (generator == null) {
             deliverLine(spec.speaker(), fallbackText);
@@ -49,7 +65,7 @@ public final class ActorDialogueManager {
 
         String outputLanguageCode = resolveLanguageCode(generator);
         UUID jobId = UUID.randomUUID();
-        jobsById.put(jobId, new PendingJob(jobId, generator.getUUID(), spec, System.currentTimeMillis()));
+        jobsById.put(jobId, new PendingJob(jobId, generator.getUUID(), spec, now));
         PacketHandler.sendToPlayer(new ActorDialoguePromptPacket(
                 jobId,
                 spec.conversationScopeId(),
@@ -60,6 +76,14 @@ public final class ActorDialogueManager {
                 spec.fallbackArgs(),
                 outputLanguageCode
         ), generator);
+    }
+
+    private long minDialogueIntervalMs() {
+        int seconds = com.whitecloud233.modid.herobrine_companion.config.Config.awakenedDialogueMinIntervalSeconds;
+        if (seconds <= 0) {
+            seconds = (int) (FALLBACK_MIN_DIALOGUE_INTERVAL_MS / 1000L);
+        }
+        return seconds * 1000L;
     }
 
     public synchronized void handleGeneratedReply(ServerPlayer generator, UUID jobId, String rawReply) {

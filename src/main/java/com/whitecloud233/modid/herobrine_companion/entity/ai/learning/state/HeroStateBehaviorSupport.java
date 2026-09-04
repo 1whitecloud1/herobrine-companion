@@ -110,31 +110,47 @@ final class HeroStateBehaviorSupport {
     static void stopAndLookAt(HeroEntity hero, Entity target) {
         hero.setTarget(null);
         hero.getNavigation().stop();
-        if (hero.getDeltaMovement().horizontalDistanceSqr() > 0.02D) {
-            alignHeadToBody(hero);
-            return;
-        }
-        hero.getLookControl().setLookAt(target, 30.0F, 30.0F);
+        lookAtEntity(hero, target);
     }
 
     static void clearAggroAndLookAt(HeroEntity hero, Entity target) {
         hero.setTarget(null);
-        if (hero.getDeltaMovement().horizontalDistanceSqr() > 0.02D) {
-            alignHeadToBody(hero);
-            return;
-        }
-        hero.getLookControl().setLookAt(target, 20.0F, 20.0F);
+        lookAtEntity(hero, target);
     }
 
+    /**
+     * 统一注视入口：以 10°/tick（与原版 LookControl 回摆速度一致）瞄准并记录目标，
+     * 由 {@code HeroStateGoals} 每 tick 续瞄，避免 2 tick 快甩 + 8 tick 慢回的锯齿摆动。
+     */
+    private static void lookAtEntity(HeroEntity hero, Entity target) {
+        recordLookTarget(hero, target.getX(), target.getEyeY(), target.getZ());
+        hero.getLookControl().setLookAt(target.getX(), target.getEyeY(), target.getZ(), 10.0F, 10.0F);
+    }
+
+    /**
+     * 记录心智状态最近一次指定的注视目标（运行时字段），供续瞄使用。
+     */
+    static void recordLookTarget(HeroEntity hero, double x, double y, double z) {
+        hero.mindLookTarget = new Vec3(x, y, z);
+        hero.mindLookTargetTick = hero.tickCount;
+    }
+
+    /**
+     * 取消续瞄，让头部平滑回正。不再硬写 yHeadRot/yHeadRotO：
+     * 原版每 tick 以 yHeadRotO = yHeadRot 捕获旧值，客户端对两者做插值，
+     * 硬写两者会导致头部瞬间"瞬移"，视觉上就是快速左右甩动。
+     */
     static void alignHeadToBody(HeroEntity hero) {
         hero.setTarget(null);
+        hero.mindLookTarget = null;
+        hero.mindLookTargetTick = 0;
         float bodyYaw = hero.getYRot();
-        hero.setYHeadRot(bodyYaw);
-        hero.yHeadRotO = bodyYaw;
+        hero.setYHeadRot(Mth.rotateIfNecessary(hero.yHeadRot, bodyYaw, 10.0F));
     }
 
     static void lookAtPos(HeroEntity hero, Vec3 pos) {
-        hero.getLookControl().setLookAt(pos.x, pos.y, pos.z, 30.0F, 30.0F);
+        recordLookTarget(hero, pos.x, pos.y, pos.z);
+        hero.getLookControl().setLookAt(pos.x, pos.y, pos.z, 10.0F, 10.0F);
     }
 
     static void driftAway(HeroEntity hero, Entity target, double distance, double speed) {
@@ -211,6 +227,8 @@ final class HeroStateBehaviorSupport {
         hero.teleportTo(landing.getX() + 0.5D, landing.getY(), landing.getZ() + 0.5D);
         stopAndLookAt(hero, focus);
         hero.setDeltaMovement(Vec3.ZERO);
+        // 观察者背后现身传送后抑制跟随，防止被立即拉回（对应基岩版 _observerTpHoldUntilTick）
+        hero.markTeleportFollowHold();
         spawnParticles(level, ParticleTypes.SMOKE, hero.position().add(0.0D, 1.0D, 0.0D), 8, 0.2D);
         level.playSound(null, hero.blockPosition(), SoundEvents.ENDERMAN_TELEPORT, SoundSource.HOSTILE, 0.6F, 0.6F);
         return true;
@@ -226,6 +244,8 @@ final class HeroStateBehaviorSupport {
         hero.teleportTo(patrol.x, patrol.y, patrol.z);
         hero.setDeltaMovement(Vec3.ZERO);
         stopAndLookAt(hero, focus);
+        // 巡视现身传送后抑制跟随，防止被立即拉回
+        hero.markTeleportFollowHold();
         spawnParticles(level, ParticleTypes.SMOKE, hero.position().add(0.0D, 1.0D, 0.0D), 8, 0.2D);
         level.playSound(null, hero.blockPosition(), SoundEvents.ENDERMAN_TELEPORT, SoundSource.HOSTILE, 0.55F, 0.75F);
         return true;
@@ -436,6 +456,9 @@ final class HeroStateBehaviorSupport {
     }
 
     static void stareAtSky(HeroEntity hero) {
+        // 清除续瞄目标，防止 HeroStateGoals 的每 tick 续瞄把头部从仰望姿势拽回玩家方向
+        hero.mindLookTarget = null;
+        hero.mindLookTargetTick = 0;
         hero.setXRot(-80.0F);
         hero.yHeadRot = hero.getYRot();
     }

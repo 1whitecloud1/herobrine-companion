@@ -5,10 +5,12 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
+import org.lwjgl.glfw.GLFW;
 
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -40,6 +42,11 @@ public class AIDebugScreen extends Screen {
     private int listScroll = 0;
     private int detailScroll = 0;
     private int detailContentHeight = 0;
+
+    private final List<SelectableLine> selectableLines = new ArrayList<>();
+    private boolean selecting;
+    private SelectablePoint selectStart;
+    private SelectablePoint selectEnd;
 
     public AIDebugScreen(Screen lastScreen) {
         super(Component.literal("AI Debug"));
@@ -124,6 +131,7 @@ public class AIDebugScreen extends Screen {
         if (e == null) {
             guiGraphics.drawString(this.font, Component.translatable("gui.herobrine_companion.ai_debug.empty"), detailX + 6, TOP + 6, COL_INFO);
         } else {
+            selectableLines.clear();
             cursorY = this.drawWrapped(guiGraphics,
                     Component.translatable("gui.herobrine_companion.ai_debug.http_line",
                             nvl(e.task()), e.statusCode(), nvl(e.model())),
@@ -162,7 +170,61 @@ public class AIDebugScreen extends Screen {
             g.drawString(this.font, Component.translatable("gui.herobrine_companion.ai_debug.empty_section"), x, y, COL_INFO);
             return y + 10;
         }
-        return this.drawWrapped(g, Component.literal(text), x, y, maxW, COL_TEXT);
+        return this.drawSelectableText(g, text, x, y, maxW, COL_TEXT);
+    }
+
+    private int drawSelectableText(GuiGraphics g, String text, int x, int y, int maxW, int color) {
+        for (String line : wrapText(text, maxW)) {
+            int lineIndex = selectableLines.size();
+            SelectableLine selectableLine = new SelectableLine(line, x, y);
+            selectableLines.add(selectableLine);
+            drawSelectableLine(g, selectableLine, lineIndex, color);
+            y += 10;
+        }
+        return y;
+    }
+
+    private void drawSelectableLine(GuiGraphics g, SelectableLine line, int lineIndex, int color) {
+        if (selectStart != null && selectEnd != null) {
+            int minLine = Math.min(selectStart.line(), selectEnd.line());
+            int maxLine = Math.max(selectStart.line(), selectEnd.line());
+            if (lineIndex >= minLine && lineIndex <= maxLine) {
+                int startCol = lineIndex == minLine ? Math.min(selectStart.col(), selectEnd.col()) : 0;
+                int endCol = lineIndex == maxLine ? Math.max(selectStart.col(), selectEnd.col()) : line.text().length();
+                if (lineIndex == minLine && lineIndex == maxLine && selectStart.col() > selectEnd.col()) {
+                    startCol = selectEnd.col();
+                    endCol = selectStart.col();
+                }
+                if (startCol < endCol) {
+                    int x1 = line.x() + this.font.width(line.text().substring(0, startCol));
+                    int x2 = line.x() + this.font.width(line.text().substring(0, endCol));
+                    g.fill(x1, line.y(), x2, line.y() + 10, 0x804A90D9);
+                }
+            }
+        }
+        g.drawString(this.font, line.text(), line.x(), line.y(), color);
+    }
+
+    private List<String> wrapText(String text, int maxW) {
+        List<String> lines = new ArrayList<>();
+        String remaining = text;
+        while (!remaining.isEmpty()) {
+            if (this.font.width(remaining) <= maxW) {
+                lines.add(remaining);
+                break;
+            }
+            String sub = this.font.plainSubstrByWidth(remaining, maxW);
+            int cut = sub.length();
+            if (cut <= 0) {
+                cut = Math.max(1, remaining.length());
+            }
+            lines.add(remaining.substring(0, cut));
+            remaining = remaining.substring(cut);
+            if (remaining.startsWith(" ")) {
+                remaining = remaining.substring(1);
+            }
+        }
+        return lines;
     }
 
     private int drawWrapped(GuiGraphics g, Component text, int x, int y, int maxW, int color) {
@@ -209,9 +271,109 @@ public class AIDebugScreen extends Screen {
                     this.detailScroll = 0;
                     return true;
                 }
+            } else if (mouseX > listRight) {
+                SelectablePoint point = pointAt(mouseX, mouseY);
+                if (point != null) {
+                    this.selectStart = point;
+                    this.selectEnd = point;
+                    this.selecting = true;
+                    return true;
+                }
             }
         }
         return false;
+    }
+
+    @Override
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        if (button == 0 && this.selecting) {
+            SelectablePoint point = pointAt(mouseX, mouseY);
+            if (point != null) {
+                this.selectEnd = point;
+            }
+            return true;
+        }
+        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+    }
+
+    @Override
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (button == 0 && this.selecting) {
+            this.selecting = false;
+            return true;
+        }
+        return super.mouseReleased(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (Screen.hasControlDown() && keyCode == GLFW.GLFW_KEY_C) {
+            this.copySelection();
+            return true;
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    private SelectablePoint pointAt(double mouseX, double mouseY) {
+        if (selectableLines.isEmpty()) {
+            return null;
+        }
+        SelectableLine line = null;
+        int lineIndex = -1;
+        for (int i = 0; i < selectableLines.size(); i++) {
+            SelectableLine candidate = selectableLines.get(i);
+            if (mouseY >= candidate.y() && mouseY < candidate.y() + 10) {
+                line = candidate;
+                lineIndex = i;
+                break;
+            }
+        }
+        if (line == null) {
+            if (mouseY < selectableLines.get(0).y()) {
+                line = selectableLines.get(0);
+                lineIndex = 0;
+            } else {
+                line = selectableLines.get(selectableLines.size() - 1);
+                lineIndex = selectableLines.size() - 1;
+            }
+        }
+        String text = line.text();
+        int col = text.length();
+        for (int i = 0; i <= text.length(); i++) {
+            if (mouseX <= line.x() + this.font.width(text.substring(0, i))) {
+                col = i;
+                break;
+            }
+        }
+        return new SelectablePoint(lineIndex, col);
+    }
+
+    private void copySelection() {
+        if (selectStart == null || selectEnd == null || selectableLines.isEmpty()) {
+            return;
+        }
+        SelectablePoint start = selectStart.line() < selectEnd.line()
+                || (selectStart.line() == selectEnd.line() && selectStart.col() <= selectEnd.col())
+                ? selectStart : selectEnd;
+        SelectablePoint end = start == selectStart ? selectEnd : selectStart;
+        StringBuilder sb = new StringBuilder();
+        for (int i = start.line(); i <= end.line(); i++) {
+            if (i < 0 || i >= selectableLines.size()) {
+                continue;
+            }
+            String line = selectableLines.get(i).text();
+            int from = i == start.line() ? Math.min(start.col(), line.length()) : 0;
+            int to = i == end.line() ? Math.min(end.col(), line.length()) : line.length();
+            if (from < to) {
+                sb.append(line, from, to);
+            }
+            if (i < end.line()) {
+                sb.append('\n');
+            }
+        }
+        if (sb.length() > 0) {
+            this.minecraft.keyboardHandler.setClipboard(sb.toString());
+        }
     }
 
     @Override
@@ -234,5 +396,11 @@ public class AIDebugScreen extends Screen {
     @Override
     public void onClose() {
         this.minecraft.setScreen(this.lastScreen);
+    }
+
+    private record SelectableLine(String text, int x, int y) {
+    }
+
+    private record SelectablePoint(int line, int col) {
     }
 }

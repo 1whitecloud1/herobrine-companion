@@ -2,6 +2,7 @@ package com.whitecloud233.modid.herobrine_companion.item;
 
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Multimap;
+import com.whitecloud233.modid.herobrine_companion.client.render.PoemOfTheEndGeoCompat;
 import com.whitecloud233.modid.herobrine_companion.compat.epicfight.HeroEpicFightStateMapper;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.projectile.CleaveBladeEntity;
@@ -9,6 +10,7 @@ import com.whitecloud233.modid.herobrine_companion.entity.projectile.VoidRiftEnt
 import com.whitecloud233.modid.herobrine_companion.entity.projectile.RealmBreakerLightningEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroWorldData;
 import net.minecraft.ChatFormatting;
+import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -40,6 +42,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.client.extensions.common.IClientItemExtensions;
 import net.minecraftforge.common.ToolAction;
 import net.minecraftforge.common.ToolActions;
 import org.jetbrains.annotations.Nullable;
@@ -47,6 +50,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 import java.util.Random;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 public class PoemOfTheEndItem extends DiggerItem {
 
@@ -65,6 +69,25 @@ public class PoemOfTheEndItem extends DiggerItem {
 
     public PoemOfTheEndItem(Tier tier, float attackDamageModifier, float attackSpeedModifier, Properties properties) {
         super(attackDamageModifier, attackSpeedModifier, tier, BlockTags.MINEABLE_WITH_PICKAXE, properties.durability(-1));
+    }
+
+    /**
+     * 客户端物品扩展：按是否安装 GeckoLib 提供 3D 或回退渲染器。
+     * 服务器不会触达该渲染器，未装 GeckoLib 时也不会加载任何 GeckoLib 类。
+     */
+    @Override
+    public void initializeClient(Consumer<IClientItemExtensions> consumer) {
+        consumer.accept(new IClientItemExtensions() {
+            private BlockEntityWithoutLevelRenderer renderer;
+
+            @Override
+            public BlockEntityWithoutLevelRenderer getCustomRenderer() {
+                if (renderer == null) {
+                    renderer = PoemOfTheEndGeoCompat.createRenderer();
+                }
+                return renderer;
+            }
+        });
     }
 
     // 获取当前模式

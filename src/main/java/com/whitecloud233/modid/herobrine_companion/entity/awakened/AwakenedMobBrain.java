@@ -7,6 +7,7 @@ import com.whitecloud233.modid.herobrine_companion.entity.dialogue.ActorDialogue
 import com.whitecloud233.modid.herobrine_companion.entity.dialogue.ActorDialogueSpec;
 import com.whitecloud233.modid.herobrine_companion.entity.dialogue.SpeechBubbleAccessor;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.phys.AABB;
@@ -24,14 +25,12 @@ public final class AwakenedMobBrain {
     private static final double HERO_INFLUENCE_RANGE = 18.0D;
     private static final double AUDIENCE_RANGE = 10.0D;
     private static final double WARNING_RANGE = 8.0D;
-    private static final double AWAKENED_POPULATION_RADIUS = 96.0D;
     private static final double PACK_CEASEFIRE_RANGE = 16.0D;
     private static final int MIN_SPEECH_TICKS = 60;
     private static final int MAX_SPEECH_TICKS = 120;
     private static final int FIRST_SIGHT_CEASEFIRE_TICKS = 100;
     private static final int INTERACTION_CEASEFIRE_TICKS = 180;
     private static final int GIFT_CEASEFIRE_TICKS = 2400;
-    private static final int MAX_AWAKENED_IN_LOADED_AREA = 6;
     private static final int HERO_AI_MIN_COOLDOWN = 520;
     private static final int HERO_AI_MAX_COOLDOWN = 860;
     private static final List<String> HERO_REPLY_KEYS = List.of(
@@ -69,11 +68,6 @@ public final class AwakenedMobBrain {
         }
 
         if (!access.herobrineCompanion$isAwakenedMob() || mob.tickCount % 20 != 0) {
-            return;
-        }
-
-        if (hasPreferredAwakenedPeerOfSameFamilyInChunk(mob)) {
-            clearAwakening(mob, access);
             return;
         }
 
@@ -236,10 +230,6 @@ public final class AwakenedMobBrain {
     private static void initializeAwakening(Mob mob, AwakenedMobAccessor access, AwakenedMobProfile profile) {
         access.herobrineCompanion$setAwakeningInitialized(true);
 
-        if (hasReachedLoadedAreaAwakenedCap(mob)) {
-            return;
-        }
-
         if (hasAnyAwakenedPeerOfSameFamilyInChunk(mob)) {
             return;
         }
@@ -250,6 +240,17 @@ public final class AwakenedMobBrain {
         }
 
         if (mob.getRandom().nextFloat() > chance) {
+            return;
+        }
+
+        if (hasReachedPlayerNearbyAwakenedCap(mob)) {
+            return;
+        }
+
+        if (!(mob.level() instanceof ServerLevel serverLevel)) {
+            return;
+        }
+        if (!AwakenedMobWorldData.get(serverLevel).register(mob.getUUID(), Config.awakenedWorldCap)) {
             return;
         }
 
@@ -287,29 +288,29 @@ public final class AwakenedMobBrain {
         }
     }
 
-    private static boolean hasReachedLoadedAreaAwakenedCap(Mob mob) {
-        AABB searchBox = mob.getBoundingBox().inflate(AWAKENED_POPULATION_RADIUS);
-        int awakenedCount = mob.level().getEntitiesOfClass(Mob.class, searchBox, candidate -> {
-            if (candidate == mob || !candidate.isAlive()) {
-                return false;
+    private static boolean hasReachedPlayerNearbyAwakenedCap(Mob mob) {
+        double radius = Config.awakenedPlayerNearRadius;
+        int cap = Config.awakenedPlayerNearCap;
+        List<Player> players = mob.level().getEntitiesOfClass(Player.class, mob.getBoundingBox().inflate(radius),
+                player -> player.isAlive() && !player.isSpectator());
+        for (Player player : players) {
+            int awakenedCount = mob.level().getEntitiesOfClass(Mob.class, player.getBoundingBox().inflate(radius), candidate -> {
+                if (candidate == mob || !candidate.isAlive()) {
+                    return false;
+                }
+                if (!AwakenedMobProfiles.supports(candidate)) {
+                    return false;
+                }
+                return candidate instanceof AwakenedMobAccessor accessor && accessor.herobrineCompanion$isAwakenedMob();
+            }).size();
+            if (awakenedCount >= cap) {
+                return true;
             }
-            if (!AwakenedMobProfiles.supports(candidate)) {
-                return false;
-            }
-            return candidate instanceof AwakenedMobAccessor accessor && accessor.herobrineCompanion$isAwakenedMob();
-        }).size();
-        return awakenedCount >= MAX_AWAKENED_IN_LOADED_AREA;
+        }
+        return false;
     }
 
     private static boolean hasAnyAwakenedPeerOfSameFamilyInChunk(Mob mob) {
-        return hasAwakenedPeerOfSameFamilyInChunk(mob, false);
-    }
-
-    private static boolean hasPreferredAwakenedPeerOfSameFamilyInChunk(Mob mob) {
-        return hasAwakenedPeerOfSameFamilyInChunk(mob, true);
-    }
-
-    private static boolean hasAwakenedPeerOfSameFamilyInChunk(Mob mob, boolean requirePreferredPeer) {
         ChunkPos chunkPos = mob.chunkPosition();
         double minX = chunkPos.getMinBlockX();
         double minZ = chunkPos.getMinBlockZ();
@@ -331,16 +332,8 @@ public final class AwakenedMobBrain {
             if (!AwakenedMobProfiles.sharesFamily(mob, candidate)) {
                 return false;
             }
-            if (!(candidate instanceof AwakenedMobAccessor accessor) || !accessor.herobrineCompanion$isAwakenedMob()) {
-                return false;
-            }
-            return !requirePreferredPeer || candidate.getUUID().compareTo(mob.getUUID()) < 0;
+            return candidate instanceof AwakenedMobAccessor accessor && accessor.herobrineCompanion$isAwakenedMob();
         }).isEmpty();
-    }
-
-    private static void clearAwakening(Mob mob, AwakenedMobAccessor access) {
-        access.herobrineCompanion$setAwakenedMob(false);
-        access.herobrineCompanion$setAwakenedMobName("");
     }
 
     private static void rememberNearbyPlayers(Mob mob, AwakenedMobProfile profile, AwakenedMobAccessor access, long now) {

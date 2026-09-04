@@ -303,6 +303,18 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
         }
 
         CapabilityItem capability = HeroEpicFightWeaponProfiles.resolveCapability(this.getOriginal());
+
+        // WOM 武器优先使用 WOM 原生连招动画（含 WOM 命中判定与特效），而非 Epic Fight 通用类别动作
+        CombatBehaviors.Builder<HumanoidMobPatch<?>> womBuilder = HeroWomCombatBehaviors.build(this, capability, stack);
+        if (womBuilder != null) {
+            return womBuilder;
+        }
+
+        CombatBehaviors.Builder<HumanoidMobPatch<?>> epicFightBuilder = this.getWeaponMotionBuilder(capability, stack);
+        if (epicFightBuilder != null) {
+            return epicFightBuilder;
+        }
+
         CombatBehaviors.Builder<HumanoidMobPatch<?>> playerLikeBuilder = this.getPlayerLikeAttackMotionBuilder(capability);
         if (playerLikeBuilder != null) {
             return playerLikeBuilder;
@@ -338,6 +350,9 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
         if (builder != null) {
             ItemStack stack = hero.getMainHandItem();
             double attackRadius = HeroNightfallMovesets.getAttackRadius(stack, 0.0D);
+            if (attackRadius <= 0.0D) {
+                attackRadius = HeroWomWeaponCompat.getAttackRadius(stack, 0.0D);
+            }
             if (attackRadius <= 0.0D) {
                 attackRadius = this.getPlayerLikeChaseRadius(HeroEpicFightWeaponProfiles.resolveCapability(hero));
             }
@@ -814,6 +829,71 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
 
             mobPatch.playAnimationSynchronized(animation, 0.0F);
         });
+    }
+
+    /**
+     * WOM 兼容层专用：用玩家式动作状态机包装一条 WOM 连招动画。
+     * 复用 {@link #createTrackedAttackBehavior} 的战斗动作管线，WOM 侧不重复实现。
+     */
+    CombatBehaviors.Behavior.Builder<HumanoidMobPatch<?>> createWomComboAttackBehavior(
+            AnimationManager.AnimationAccessor<? extends StaticAnimation> animation, int comboIndex, int comboSize) {
+        return this.createTrackedAttackBehavior(animation, HeroEpicFightPatch::resolveNextTapActionState,
+                hero -> this.advancePlayerLikeComboStep(hero, comboSize, comboIndex));
+    }
+
+    /** WOM 连招按序执行的门槛：仅允许当前应打的连段序号通过。 */
+    boolean canStartWomCombo(HumanoidMobPatch<?> mobPatch, int comboIndex, int comboSize) {
+        HeroEntity hero = this.getTrackedHero(mobPatch);
+        if (hero == null) {
+            return true;
+        }
+        LivingEntity target = this.getTrackedTarget(hero);
+        return target != null
+                && this.isPlayerLikeGroundState(hero)
+                && !HeroCombatPlanner.isAttackReplayLocked(hero, 6)
+                && this.getExpectedPlayerLikeComboIndex(hero, comboSize) == comboIndex;
+    }
+
+    /**
+     * WOM 连段续接门槛（行为 1..N，经 {@code tryProceed} 的推进路径）。
+     *
+     * <p>刻意不含地面/浮空判定与 8 tick 回放锁：WOM 连招动画自带位移/跳跃，
+     * {@code tryProceed} 在上一段动画的恢复尾帧切入下一段时英雄常常还在空中，
+     * 用 {@code onGround()} 做闸门会把链式推进卡死——续接判定失败时
+     * {@code tryProceed} 会直接摧毁整条链（指针复位、系列归零），无法"等几 tick 再试"，
+     * 表现为永远只打出第一段动作。此处只保留按序推进与战斗状态检查。</p>
+     */
+    boolean canContinueWomCombo(HumanoidMobPatch<?> mobPatch, int comboIndex, int comboSize) {
+        HeroEntity hero = this.getTrackedHero(mobPatch);
+        if (hero == null) {
+            return true;
+        }
+        LivingEntity target = this.getTrackedTarget(hero);
+        if (target == null
+                || !hero.isBattleModeActive()
+                || hero.isBattleHoldAction()
+                || hero.isBattleReleaseAction()
+                || HeroCombatPlanner.isAttackReplayLocked(hero, 6)) {
+            return false;
+        }
+        return this.getExpectedPlayerLikeComboIndex(hero, comboSize) == comboIndex;
+    }
+
+    /**
+     * WOM 连招被打断后的重起手门槛：comboStep 停在中间段（换目标/受击打断）时，
+     * 允许起手段（comboIndex 0）被选中，由行为执行时的 {@code advancePlayerLikeComboStep}
+     * 把 comboStep 归位，从第一段重新开始。纯判断、无副作用。
+     */
+    boolean canRestartWomCombo(HumanoidMobPatch<?> mobPatch, int comboSize) {
+        HeroEntity hero = this.getTrackedHero(mobPatch);
+        if (hero == null) {
+            return true;
+        }
+        LivingEntity target = this.getTrackedTarget(hero);
+        return target != null
+                && this.isPlayerLikeGroundState(hero)
+                && comboSize > 0
+                && hero.getBattleComboStep() % comboSize != 0;
     }
 
     private boolean isPlayableAttackAnimation(AnimationManager.AnimationAccessor<? extends StaticAnimation> animation) {

@@ -2,14 +2,12 @@ package com.whitecloud233.modid.herobrine_companion.world.structure;
 
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
 import net.minecraft.core.HolderGetter;
-import net.minecraft.core.HolderSet;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.data.worldgen.BootstapContext;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.BiomeTags;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.levelgen.GenerationStep;
 import net.minecraft.world.level.levelgen.structure.Structure;
 import net.minecraft.world.level.levelgen.structure.StructureSet;
@@ -37,11 +35,9 @@ public class ModStructures {
 
     // 结构配置 (Structure) Key
     public static final ResourceKey<Structure> UNSTABLE_ZONE_KEY = ResourceKey.create(Registries.STRUCTURE, new ResourceLocation(HerobrineCompanion.MODID, "unstable_zone"));
-    public static final ResourceKey<Structure> END_RING_KEY = ResourceKey.create(Registries.STRUCTURE, new ResourceLocation(HerobrineCompanion.MODID, "end_ring"));
 
     // 结构集分布 (StructureSet) Key
     public static final ResourceKey<StructureSet> UNSTABLE_ZONE_SET_KEY = ResourceKey.create(Registries.STRUCTURE_SET, new ResourceLocation(HerobrineCompanion.MODID, "unstable_zones"));
-    public static final ResourceKey<StructureSet> END_RING_SET_KEY = ResourceKey.create(Registries.STRUCTURE_SET, new ResourceLocation(HerobrineCompanion.MODID, "end_rings"));
 
 
     // ================= 3. 数据生成：配置结构 (Datagen - Structure) =================
@@ -54,15 +50,6 @@ public class ModStructures {
                         Map.of(),
                         GenerationStep.Decoration.SURFACE_STRUCTURES,
                         TerrainAdjustment.BEARD_THIN
-                )
-        ));
-
-        context.register(END_RING_KEY, new EndRingStructure(
-                new Structure.StructureSettings(
-                        HolderSet.direct(biomes.getOrThrow(Biomes.THE_VOID)),
-                        Map.of(),
-                        GenerationStep.Decoration.SURFACE_STRUCTURES,
-                        TerrainAdjustment.NONE
                 )
         ));
     }
@@ -79,17 +66,6 @@ public class ModStructures {
                         8,
                         RandomSpreadType.LINEAR,
                         12345678
-                )
-        ));
-
-        // 注册 End Ring 的生成分布 (从 ModStructureSets 搬过来的)
-        context.register(END_RING_SET_KEY, new StructureSet(
-                structureGetter.getOrThrow(END_RING_KEY),
-                new RandomSpreadStructurePlacement(
-                        32,
-                        8,
-                        RandomSpreadType.LINEAR,
-                        87654321
                 )
         ));
     }

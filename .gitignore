@@ -66,3 +66,10 @@ hs_err_pid*
 /src/main/resources/assets/herobrine_companion/shaders/core/void_rift_distortion.vsh
 /src/main/resources/assets/herobrine_companion/shaders/core/void_rift_distortion.json
 /src/main/resources/assets/herobrine_companion/shaders/core/void_rift_distortion.fsh
+/lang-work
+/gradle-out.txt
+/hc-gradle.bat
+
+/.llm-work/
+/docs/
+/unsloth_compiled_cache/

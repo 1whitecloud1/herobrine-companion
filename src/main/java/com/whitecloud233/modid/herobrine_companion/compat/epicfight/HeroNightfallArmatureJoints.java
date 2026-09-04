@@ -29,18 +29,24 @@ final class HeroNightfallArmatureJoints {
 
     static void addNightfallWeaponJoints(Armature armature) {
         if (armature == null) {
-            LOGGER.warn("[HeroEFDebug] addNightfallWeaponJoints skipped: armature is null");
+            if (HeroEpicFightDebugLog.enabled()) {
+                LOGGER.warn("[HeroEFDebug] addNightfallWeaponJoints skipped: armature is null");
+            }
             return;
         }
         if (armature.hasJoint("Claw_R")) {
-            LOGGER.info("[HeroEFDebug] addNightfallWeaponJoints skipped: Claw_R already present");
+            if (HeroEpicFightDebugLog.enabled()) {
+                LOGGER.info("[HeroEFDebug] addNightfallWeaponJoints skipped: Claw_R already present");
+            }
             return;
         }
         Joint toolR = armature.searchJointByName("Tool_R");
         Joint toolL = armature.searchJointByName("Tool_L");
         if (toolR == null || toolL == null) {
-            LOGGER.warn("[HeroEFDebug] addNightfallWeaponJoints skipped: Tool_R/L not found (toolR={},toolL={})",
-                    toolR != null, toolL != null);
+            if (HeroEpicFightDebugLog.enabled()) {
+                LOGGER.warn("[HeroEFDebug] addNightfallWeaponJoints skipped: Tool_R/L not found (toolR={},toolL={})",
+                        toolR != null, toolL != null);
+            }
             return;
         }
 
@@ -70,7 +76,9 @@ final class HeroNightfallArmatureJoints {
             // 渲染矩阵缓存按 jointCount 分配，随新增关节扩容，否则按 id 索引越界
             field("poseMatrices").set(armature, OpenMatrix4f.allocateMatrixArray(oldCount + 3));
 
-            LOGGER.info("[HeroEFDebug] Added Claw_R/Claw_L/wheel joints to Hero nightfall armature (oldCount={})", oldCount);
+            if (HeroEpicFightDebugLog.enabled()) {
+                LOGGER.info("[HeroEFDebug] Added Claw_R/Claw_L/wheel joints to Hero nightfall armature (oldCount={})", oldCount);
+            }
         } catch (ReflectiveOperationException | RuntimeException exception) {
             LOGGER.warn("Failed to add nightfall weapon joints to Hero armature", exception);
         }

@@ -1,9 +1,10 @@
 package com.whitecloud233.modid.herobrine_companion.config;
 
+import com.whitecloud233.modid.herobrine_companion.network.PacketHandler;
+import com.whitecloud233.modid.herobrine_companion.network.SyncServerConfigPacket;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -11,8 +12,6 @@ import org.jetbrains.annotations.NotNull;
 
 public class ConfigScreen extends Screen {
     private final Screen lastScreen;
-    // 【新增】保存当前输入框的Y坐标，供 render 方法精准绘制标题使用
-    private int currentEditBoxY;
 
     public ConfigScreen(Screen lastScreen) {
         super(Component.translatable("gui.herobrine_companion.config.title"));
@@ -43,6 +42,7 @@ public class ConfigScreen extends Screen {
                             Config.POEM_OF_THE_END_EXPLOSION.set(newValue);
                             Config.poemOfTheEndExplosion = newValue;
                             Config.SPEC.save();
+                            sendServerConfigSync();
                             button.setMessage(Component.translatable("gui.herobrine_companion.config.poem_explosion", newValue));
                         })
                 .pos(col1X, startY)
@@ -53,12 +53,14 @@ public class ConfigScreen extends Screen {
 
         // 2. Hero King Aura
         this.addRenderableWidget(Button.builder(
-                        Component.translatable("gui.herobrine_companion.config.hero_aura", Config.HERO_KING_AURA_ENABLED.get()).append(Component.literal(" *").withStyle(ChatFormatting.RED)),
+                        Component.translatable("gui.herobrine_companion.config.hero_aura", Config.HERO_KING_AURA_ENABLED.get()),
                         button -> {
                             boolean newValue = !Config.HERO_KING_AURA_ENABLED.get();
                             Config.HERO_KING_AURA_ENABLED.set(newValue);
+                            Config.heroKingAuraEnabled = newValue;
                             Config.SPEC.save();
-                            button.setMessage(Component.translatable("gui.herobrine_companion.config.hero_aura", newValue).append(Component.literal(" *").withStyle(ChatFormatting.RED)));
+                            sendServerConfigSync();
+                            button.setMessage(Component.translatable("gui.herobrine_companion.config.hero_aura", newValue));
                         })
                 .pos(col2X, startY)
                 .size(buttonWidth, buttonHeight)
@@ -74,6 +76,7 @@ public class ConfigScreen extends Screen {
                             Config.HERO_BLOCK_RESTORATION.set(newValue);
                             Config.heroBlockRestoration = newValue;
                             Config.SPEC.save();
+                            sendServerConfigSync();
                             button.setMessage(Component.translatable("gui.herobrine_companion.config.block_restoration", newValue));
                         })
                 .pos(col1X, startY + spacingY)
@@ -90,6 +93,7 @@ public class ConfigScreen extends Screen {
                             Config.HERO_CLEAN_ITEMS.set(newValue);
                             Config.heroCleanItems = newValue;
                             Config.SPEC.save();
+                            sendServerConfigSync();
                             button.setMessage(Component.translatable("gui.herobrine_companion.config.clean_items", newValue));
                         })
                 .pos(col2X, startY + spacingY)
@@ -106,6 +110,7 @@ public class ConfigScreen extends Screen {
                             Config.CLEAVE_SKILL_ENABLED.set(newValue);
                             Config.cleaveSkillEnabled = newValue;
                             Config.SPEC.save();
+                            sendServerConfigSync();
                             button.setMessage(Component.translatable("gui.herobrine_companion.config.cleave_skill", newValue));
                         })
                 .pos(col1X, startY + spacingY * 2)
@@ -122,6 +127,7 @@ public class ConfigScreen extends Screen {
                             Config.SOUL_BOUND_PACT_ENABLED.set(newValue);
                             Config.soulBoundPactEnabled = newValue;
                             Config.SPEC.save();
+                            sendServerConfigSync();
                             button.setMessage(Component.translatable("gui.herobrine_companion.config.soul_bound_pact", newValue));
                         })
                 .pos(col2X, startY + spacingY * 2)
@@ -138,6 +144,7 @@ public class ConfigScreen extends Screen {
                             Config.ABYSSAL_GAZE_ENABLED.set(newValue);
                             Config.abyssalGazeEnabled = newValue;
                             Config.SPEC.save();
+                            sendServerConfigSync();
                             button.setMessage(Component.translatable("gui.herobrine_companion.config.abyssal_gaze", newValue));
                         })
                 .pos(col1X, startY + spacingY * 3)
@@ -154,6 +161,7 @@ public class ConfigScreen extends Screen {
                             Config.TRANSCENDENCE_PERMIT_ENABLED.set(newValue);
                             Config.transcendencePermitEnabled = newValue;
                             Config.SPEC.save();
+                            sendServerConfigSync();
                             button.setMessage(Component.translatable("gui.herobrine_companion.config.transcendence_permit", newValue));
                         })
                 .pos(col2X, startY + spacingY * 3)
@@ -196,6 +204,7 @@ public class ConfigScreen extends Screen {
                             Config.AI_VISION_INTERVAL.set(next);
                             Config.aiVisionInterval = next;
                             Config.SPEC.save();
+                            sendServerConfigSync();
                             button.setMessage(Component.translatable("gui.herobrine_companion.config.ai_vision_interval", next));
                         })
                 .pos(col2X, startY + spacingY * 4)
@@ -229,6 +238,7 @@ public class ConfigScreen extends Screen {
                             Config.AWAKENED_MOB_AI_DIALOGUE_ENABLED.set(newValue);
                             Config.awakenedMobAiDialogueEnabled = newValue;
                             Config.SPEC.save();
+                            sendServerConfigSync();
                             button.setMessage(Component.translatable("gui.herobrine_companion.config.awakened_mob_ai_dialogue", newValue));
                         })
                 .pos(col2X, startY + spacingY * 5)
@@ -245,6 +255,7 @@ public class ConfigScreen extends Screen {
                             Config.HERO_LEAF_VANISH_ENABLED.set(newValue);
                             Config.heroLeafVanishEnabled = newValue;
                             Config.SPEC.save();
+                            sendServerConfigSync();
                             button.setMessage(Component.translatable("gui.herobrine_companion.config.leaf_vanish", newValue));
                         })
                 .pos(col1X, startY + spacingY * 6)
@@ -255,32 +266,16 @@ public class ConfigScreen extends Screen {
 
         int doneButtonY = this.height - 28; // 完成按钮紧贴屏幕底端
         int noteY = doneButtonY - 14;       // 提示文字在按钮上方
-        int editBoxY = noteY - 26;          // 输入框在提示文字上方
 
         // 【碰撞检测】如果窗口极其扁平（比如高度被压到了240像素以下），上下可能会重叠
         // 强制计算一个最小的Y坐标，保证无论如何都不覆盖上方的配置按钮
-        int minEditBoxY = startY + spacingY * 6 + buttonHeight + 15;
-        if (editBoxY < minEditBoxY) {
-            editBoxY = minEditBoxY;
-            noteY = editBoxY + 26;
+        int minNoteY = startY + spacingY * 6 + buttonHeight + 15;
+        if (noteY < minNoteY) {
+            noteY = minNoteY;
             doneButtonY = noteY + 14;
         }
 
-        // 记录输入框的Y坐标供 render 绘制标题使用
-        this.currentEditBoxY = editBoxY;
-
-        // 13. AI 语言风格输入框
-        EditBox languageStyleBox = new EditBox(this.font, centerX - 150, editBoxY, 300, 20, Component.translatable("gui.herobrine_companion.config.ai_language_style"));
-        languageStyleBox.setMaxLength(256);
-        languageStyleBox.setValue(Config.AI_LANGUAGE_STYLE.get());
-        languageStyleBox.setTooltip(Tooltip.create(Component.translatable("gui.herobrine_companion.config.ai_language_style.tooltip")));
-        languageStyleBox.setResponder(val -> {
-            Config.AI_LANGUAGE_STYLE.set(val);
-            Config.aiLanguageStyle = val;
-        });
-        this.addRenderableWidget(languageStyleBox);
-
-        // 14. 返回按钮
+        // 13. 返回按钮
         this.addRenderableWidget(Button.builder(Component.translatable("gui.done"), button -> this.onClose())
                 .pos(centerX - 100, doneButtonY)
                 .size(200, 20)
@@ -300,10 +295,23 @@ public class ConfigScreen extends Screen {
         // 主标题
         guiGraphics.drawCenteredString(this.font, this.title, this.width / 2, 15, 0xFFFFFF);
 
-        // 绘制输入框的小标题提示 (动态跟随在输入框的正上方)
-        guiGraphics.drawCenteredString(this.font, Component.translatable("gui.herobrine_companion.config.ai_language_style"), this.width / 2, this.currentEditBoxY - 12, 0xAAAAAA);
-
         super.render(guiGraphics, mouseX, mouseY, partialTick);
+    }
+
+    private void sendServerConfigSync() {
+        PacketHandler.sendToServer(new SyncServerConfigPacket(
+                Config.poemOfTheEndExplosion,
+                Config.heroKingAuraEnabled,
+                Config.heroBlockRestoration,
+                Config.heroCleanItems,
+                Config.cleaveSkillEnabled,
+                Config.soulBoundPactEnabled,
+                Config.abyssalGazeEnabled,
+                Config.transcendencePermitEnabled,
+                Config.aiVisionInterval,
+                Config.awakenedMobAiDialogueEnabled,
+                Config.heroLeafVanishEnabled
+        ));
     }
 
     @Override

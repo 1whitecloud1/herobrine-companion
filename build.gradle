@@ -24,7 +24,21 @@ apply plugin: 'maven-publish'
 apply plugin: 'java'
 
 
-version = mod_version
+// 安全版/完整版开关：普通构建（不带参数）默认就是安全版，排除
+//   1) 本机电脑控制（cmd 执行）
+//   2) JVM 代码注入
+//   3) 联网查找（web_lookup）
+//   4) 本地模型（运行时下载 llama.cpp 推理引擎/GGUF 模型并启动 llama-server 进程）
+// 四个功能；需要完整功能时显式传 -Pfull=true（产物 jar 文件名追加 -full 后缀，避免与普通构建混淆）。
+// 旧的 -PcfSafe=true 仍可用作显式安全版声明（默认值已翻转：cfSafe = !full）。
+def fullBuild = providers.gradleProperty("full")
+        .map { it.toBoolean() }
+        .orElse(false)
+def cfSafe = providers.gradleProperty("cfSafe")
+        .map { it.toBoolean() }
+        .orElse(!fullBuild.get())
+
+version = mod_version + (cfSafe.get() ? "" : "-full")
 group = mod_group_id
 archivesBaseName = "${mod_name}-${minecraft_version}-forge"
 
@@ -34,6 +48,11 @@ java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 def enableAccessoriesRuntime = providers.gradleProperty("enableAccessoriesRuntime")
         .map { it.toBoolean() }
         .orElse(false)
+
+// Kaleidoscope Cookery 运行版本切换：默认 1.4.1（8266769），
+// runClient/build -PcookeryFileId=7966280 切换到 1.3.0 验证兼容。
+// 兼容层（HeroKaleidoscopeCompat）用反射处理两版字段差异，须同时对两版可编译。
+def cookeryFileId = providers.gradleProperty("cookeryFileId").orElse("8266769").get()
 /*def enableEpicFightCompat = providers.gradleProperty("enableEpicFightCompat")
         .map { it.toBoolean() }
         .orElse(false)
@@ -121,6 +140,63 @@ mixin {
 
 sourceSets.main.resources {
     srcDir 'src/generated/resources'
+}
+
+// === 安全版 / 完整版（full）===
+// 四个会被 CurseForge 静态扫描或玩家安全审查标记的功能源码放在独立的 src/full/java：
+//  1) 本机电脑控制（SafeComputerControlService -> ProcessBuilder + cmd.exe）
+//  2) JVM 代码注入（InMemoryJvmCodeCompiler -> 运行时编译 + defineClass）
+//  3) 联网查找（WebLookupService -> 白名单站点的 HTTP 搜索/抓取）
+//  4) 本地模型（LocalModelLauncher -> 运行时下载 llama.cpp 引擎/GGUF 模型并启动进程）
+// 普通构建（默认、无参数）不加入 src/full/java，改用 src/cfsafe/java 下的惰性 stub
+// （同 FQCN、恒不可用），保证 AIService / AIPromptAssembler / AIActionIntentInference
+// 等引用方仍可编译，但 jar 内不含任何危险字节码。
+// 传 -Pfull=true 时才加入 src/full/java，产物为完整版（jar 文件名带 -full 后缀）。
+// JvmCodeResult / JvmCodeStatus 是纯数据类（无危险 API），保留在 src/main/java 供 AIService 使用。
+sourceSets {
+    main {
+        java {
+            if (cfSafe.get()) {
+                srcDir 'src/cfsafe/java'
+            } else {
+                srcDir 'src/full/java'
+            }
+        }
+    }
+}
+
+// 生成 BuildFlags（两种构建都生成；安全版时 CF_SAFE=true，
+// LLMConfig 据此强制关闭对应配置开关，LLMToolTogglesScreen 据此隐藏对应开关行）。
+def cfSafeBuildFlagsDir = layout.buildDirectory.dir('generated/cfsafe/java')
+def generateCfSafeBuildFlags = tasks.register('generateCfSafeBuildFlags') {
+    def outputDir = cfSafeBuildFlagsDir.get().asFile
+    // 必须把 cfSafe 声明为输入：否则切换 -Pfull=true / 安全版参数时任务会被判为
+    // UP-TO-DATE，沿用上一次生成的 CF_SAFE 值，导致完整版 jar 里 CF_SAFE 恒为 true、
+    // 三个功能被自己强制关闭（反之安全版被打开）。
+    inputs.property('cfSafe', cfSafe.get())
+    outputs.dir(outputDir)
+    doLast {
+        def target = new File(outputDir, 'com/whitecloud233/modid/herobrine_companion/BuildFlags.java')
+        target.parentFile.mkdirs()
+        target.text = """package com.whitecloud233.modid.herobrine_companion;
+
+/**
+ * 由 Gradle 构建时生成（generateCfSafeBuildFlags）。
+ * CF_SAFE=true 表示当前构建是安全版（普通构建默认即安全版）：
+ * 本机电脑控制（cmd 执行）、JVM 代码注入、联网查找已被排除，相关配置开关强制关闭。
+ */
+public final class BuildFlags {
+    public static final boolean CF_SAFE = ${cfSafe.get()};
+
+    private BuildFlags() {
+    }
+}
+"""
+    }
+}
+sourceSets.main.java.srcDir(cfSafeBuildFlagsDir)
+tasks.named('compileJava') {
+    dependsOn generateCfSafeBuildFlags
 }
 
 repositories {
@@ -257,20 +333,38 @@ dependencies {
     runtimeOnly fg.deobf("com.whitecloud233.localmods:TRansition:1.0.17-1.20.1-forge-SNAPSHOT")
     runtimeOnly fg.deobf("com.whitecloud233.localmods:TRender:1.0.12-1.20.1-forge-SNAPSHOT")
 
-    compileOnly fg.deobf("local.libs:kaleidoscope_end:1.0.3-forge+mc1.20.1")
-    runtimeOnly fg.deobf("local.libs:kaleidoscope_end:1.0.3-forge+mc1.20.1")
-    compileOnly fg.deobf("local.libs:kaleidoscope_compat:2.4.3-forge+mc1.20.1")
-    runtimeOnly fg.deobf("local.libs:kaleidoscope_compat:2.4.3-forge+mc1.20.1")
+     compileOnly fg.deobf("curse.maven:weapons-of-miracles-epicfight-918614:8632596")
+      runtimeOnly fg.deobf("curse.maven:weapons-of-miracles-epicfight-918614:8632596")
+   // https://www.curseforge.com/minecraft/mc-mods/weapons-of-miracles-epicfight/download/8632596
+  //  compileOnly fg.deobf("local.libs:kaleidoscope_end:1.0.3-forge+mc1.20.1")
+   // runtimeOnly fg.deobf("local.libs:kaleidoscope_end:1.0.3-forge+mc1.20.1")
+   // compileOnly fg.deobf("local.libs:kaleidoscope_compat:2.4.3-forge+mc1.20.1")
+  //  runtimeOnly fg.deobf("local.libs:kaleidoscope_compat:2.4.3-forge+mc1.20.1")
    // kaleidoscopecookery-1.3.0-forge+mc1.20.1
-   compileOnly fg.deobf("curse.maven:kaleidoscope-cookery-1309203:7966280")
-    runtimeOnly fg.deobf("curse.maven:kaleidoscope-cookery-1309203:7966280")
+  //compileOnly fg.deobf("curse.maven:kaleidoscope-cookery-1309203:7966280")
+  //  runtimeOnly fg.deobf("curse.maven:kaleidoscope-cookery-1309203:7966280")
+// kaleidoscopecookery-1.4.1
+      compileOnly fg.deobf("curse.maven:kaleidoscope-cookery-1309203:8266769")
+     runtimeOnly fg.deobf("curse.maven:kaleidoscope-cookery-1309203:8266769")
+   // compileOnly fg.deobf("curse.maven:kaleidoscope-cookery-1309203:${cookeryFileId}")
+  //  runtimeOnly fg.deobf("curse.maven:kaleidoscope-cookery-1309203:${cookeryFileId}")
+   // https://www.curseforge.com/minecraft/mc-mods/kaleidoscope-cookery/download/8266769 (1.4.1)
+   // https://www.curseforge.com/minecraft/mc-mods/kaleidoscope-cookery/download/7966280 (1.3.0)
+ //   compileOnly fg.deobf("curse.maven:kaleidoscope-nether-1417862:8015210")
+   // runtimeOnly fg.deobf("curse.maven:kaleidoscope-nether-1417862:8015210")
 
-    compileOnly fg.deobf("curse.maven:kaleidoscope-nether-1417862:8015210")
-    runtimeOnly fg.deobf("curse.maven:kaleidoscope-nether-1417862:8015210")
+ //   compileOnly fg.deobf("curse.maven:geckolib-388172:8285794")
+   // runtimeOnly fg.deobf("curse.maven:geckolib-388172:8285794")
 
-    compileOnly fg.deobf("curse.maven:kaleidoscope-nether-1417862:8015210")
-    runtimeOnly fg.deobf("curse.maven:kaleidoscope-nether-1417862:8015210")
-
+    // GeckoLib 编译/运行版本切换：默认 4.7（6027567）。
+    // 本模组只引用 4.7 与 4.8+ 共有的 API（SingletonGeoAnimatable 等），
+    // 同一份产物可同时运行在 GeckoLib 4.7 与 4.8+ 上；
+    // 用 -PgeckoFileId=8285794 可切换为 4.8.4 做兼容性验证。
+    // https://www.curseforge.com/minecraft/mc-mods/geckolib/download/6027567 (4.7)
+    // https://www.curseforge.com/minecraft/mc-mods/geckolib/download/8285794 (4.8.4)
+    def geckoFileId = providers.gradleProperty("geckoFileId").orElse("6027567").get()
+    compileOnly fg.deobf("curse.maven:geckolib-388172:${geckoFileId}")
+    runtimeOnly fg.deobf("curse.maven:geckolib-388172:${geckoFileId}")
     compileOnly fg.deobf("curse.maven:farmers-delight-398521:8083474")
     runtimeOnly fg.deobf("curse.maven:farmers-delight-398521:8083474")
 
@@ -282,26 +376,26 @@ dependencies {
    // runtimeOnly fg.deobf("curse.maven:kaleidoscope-end-1456076:7987176")
     //https://www.curseforge.com/minecraft/mc-mods/kaleidoscope-end/download/7987176
 
-  compileOnly fg.deobf("com.whitecloud233.localmods:epic-fight-invincible-lib:20.14.8.2-mc1.20.1-forge")
-  runtimeOnly fg.deobf("com.whitecloud233.localmods:epic-fight-invincible-lib:20.14.8.2-mc1.20.1-forge")
+  //compileOnly fg.deobf("com.whitecloud233.localmods:epic-fight-invincible-lib:20.14.8.2-mc1.20.1-forge")
+  //runtimeOnly fg.deobf("com.whitecloud233.localmods:epic-fight-invincible-lib:20.14.8.2-mc1.20.1-forge")
 
-   compileOnly fg.deobf("curse.maven:epic-fight-avalon-1268823:7619938")
-   runtimeOnly fg.deobf("curse.maven:epic-fight-avalon-1268823:7619938")
+  // compileOnly fg.deobf("curse.maven:epic-fight-avalon-1268823:7619938")
+ //  runtimeOnly fg.deobf("curse.maven:epic-fight-avalon-1268823:7619938")
+
 
     //if (enableEpicFightCompat.get()) {
       //  epicfightCompatRuntimeOnly fg.deobf("curse.maven:epicfight-nightfall-1307848:8366962")
 
-    compileOnly fg.deobf("curse.maven:epicfight-nightfall-1307848:8366962")
-    runtimeOnly fg.deobf("curse.maven:epicfight-nightfall-1307848:8366962")
+ //   compileOnly fg.deobf("curse.maven:epicfight-nightfall-1307848:8366962")
+  //  runtimeOnly fg.deobf("curse.maven:epicfight-nightfall-1307848:8366962")
 
-    compileOnly fg.deobf("curse.maven:epic-fight-mod-405076:8049910")
+     compileOnly fg.deobf("curse.maven:epic-fight-mod-405076:8049910")
     runtimeOnly fg.deobf("curse.maven:epic-fight-mod-405076:8049910")
 
 
-// 引入 Armourer's Workshop 进行测试和 API 调用 (需替换为真实的 ID)
     // 引入 Armourer's Workshop 进行测试和 API 调用 (软依赖声明)
     compileOnly fg.deobf("curse.maven:armourers-workshop-229523:7165521")
-    runtimeOnly fg.deobf("curse.maven:armourers-workshop-229523:7165521")
+   runtimeOnly fg.deobf("curse.maven:armourers-workshop-229523:7165521")
     // JEI
 
     compileOnly fg.deobf("curse.maven:jei-238222:7920915")
@@ -364,6 +458,9 @@ tasks.named('processResources', ProcessResources).configure {
 */
 // 配置 Forge 重混淆处理 shadowJar 的产物
 
+// 恢复 jar 任务自动重混淆：否则 gradlew build 只产出 raw(未 reobf) jar，
+// @Shadow 字段等会在运行期崩（oFlapTime not located）。每次构建后装 build/libs 里的 jar 即可。
+tasks.named('jar').configure { finalizedBy 'reobfJar' }
 
 // 避免编码错误
 tasks.withType(JavaCompile).configureEach {

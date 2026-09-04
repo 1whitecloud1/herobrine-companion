@@ -1,10 +1,12 @@
 package com.whitecloud233.modid.herobrine_companion.entity.ai.learning;
 
+import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.state.HeroMindStateRegistry;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.state.HeroMindStateSnapshot;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.util.Mth;
 
+import javax.annotation.Nullable;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -96,13 +98,13 @@ public class SimpleNeuralNetwork {
         actionFeedback.put(action, clamp(current + reward * 0.1f));
     }
 
-    public void tick(long gameTime) {
+    public void tick(long gameTime, @Nullable HeroEntity hero) {
         if (gameTime - lastUpdateTick < 100) return;
         lastUpdateTick = gameTime;
 
         decayInputs();
         updateWeights();
-        determineState();
+        determineState(gameTime, hero);
     }
 
     private void decayInputs() {
@@ -115,7 +117,9 @@ public class SimpleNeuralNetwork {
         this.directAttackScore = Math.max(0.0f, this.directAttackScore - 0.003f);
 
         this.entropyScore = Math.max(0.0f, this.entropyScore - 0.02f);
-        this.metaScore = Math.max(0.0f, this.metaScore - 0.0001f);
+        // meta 原 0.0001/100tick 过慢：0.30→0.20 需 83 分钟，导致故障之主近乎永久。
+        // 提到 0.002（与其他维度同量级）：0.30→0.20 约 4 分钟，1.0→0.20 约 33 分钟。
+        this.metaScore = Math.max(0.0f, this.metaScore - 0.002f);
         this.nostalgiaScore = Math.max(0.0f, this.nostalgiaScore - 0.005f);
         this.monsterEmpathyScore = Math.max(0.0f, this.monsterEmpathyScore - decayRate);
     }
@@ -150,13 +154,9 @@ public class SimpleNeuralNetwork {
         this.arroganceWeight = clamp(0.8f - (this.respectWeight * 0.5f) + (this.failureScore * 0.3f));
     }
 
-    private void determineState() {
-        determineState(this.lastUpdateTick);
-    }
-
-    private void determineState(long gameTime) {
+    private void determineState(long gameTime, @Nullable HeroEntity hero) {
         int stateAgeTicks = (int) Math.max(0L, gameTime - this.stateEnteredTick);
-        MindState resolved = HeroMindStateRegistry.resolve(buildSnapshot(), this.currentState, stateAgeTicks);
+        MindState resolved = HeroMindStateRegistry.resolve(buildSnapshot(), this.currentState, stateAgeTicks, hero);
         if (resolved != this.currentState) {
             this.currentState = resolved;
             this.stateEnteredTick = gameTime;

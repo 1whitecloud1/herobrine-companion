@@ -268,39 +268,42 @@ public class HeroScreen extends Screen {
             this.onClose();
         }, Tooltip.create(Component.translatable(companionUnlocked ? "gui.herobrine_companion.companion_tooltip_unlocked" : "gui.herobrine_companion.companion_tooltip_locked", 50, currentTrust))).active = companionUnlocked;
 
-        this.actionList.addDynamicAction(() -> {
-            boolean currentState = false;
-            boolean challengeActive = false;
-            if (this.minecraft.level != null) {
-                Entity e = this.minecraft.level.getEntity(this.entityId);
-                if (e instanceof HeroEntity h) {
-                    currentState = h.isBattleModeActive();
-                    challengeActive = h.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE);
+        // 战斗模式按钮：仅在检测到 Epic Fight 安装时显示（未安装时隐藏，避免无意义入口）。
+        if (HeroEpicFightCompat.isLoaded()) {
+            this.actionList.addDynamicAction(() -> {
+                boolean currentState = false;
+                boolean challengeActive = false;
+                if (this.minecraft.level != null) {
+                    Entity e = this.minecraft.level.getEntity(this.entityId);
+                    if (e instanceof HeroEntity h) {
+                        currentState = h.isBattleModeActive();
+                        challengeActive = h.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE);
+                    }
                 }
-            }
 
-            String key;
-            if (challengeActive) {
-                key = "gui.herobrine_companion.battle_mode_blocked";
-            } else {
-                key = currentState
-                        ? "gui.herobrine_companion.battle_mode_disable"
-                        : "gui.herobrine_companion.battle_mode_enable";
-            }
+                String key;
+                if (challengeActive) {
+                    key = "gui.herobrine_companion.battle_mode_blocked";
+                } else {
+                    key = currentState
+                            ? "gui.herobrine_companion.battle_mode_disable"
+                            : "gui.herobrine_companion.battle_mode_enable";
+                }
 
-            return Component.translatable(key).withStyle(style -> style.withColor(0xFF4FC3F7));
-        }, button -> {
-            PacketHandler.sendToServer(new ToggleBattleModePacket(this.entityId));
-            Entity entity = this.minecraft != null && this.minecraft.level != null ? this.minecraft.level.getEntity(this.entityId) : null;
-            boolean challengeActive = entity instanceof HeroEntity hero && hero.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE);
-            if (this.dummyHero != null && !challengeActive) {
-                this.dummyHero.setBattleModeActiveFrom(DUMMY_BATTLE_SYNC_BUTTON, !this.dummyHero.isBattleModeActive());
-            }
-        }, Tooltip.create(Component.translatable(
-                HeroEpicFightCompat.isLoaded()
-                        ? "gui.herobrine_companion.battle_mode_tooltip"
-                        : HeroEpicFightCompat.getInstallHintKey()
-        )));
+                return Component.translatable(key).withStyle(style -> style.withColor(0xFF4FC3F7));
+            }, button -> {
+                PacketHandler.sendToServer(new ToggleBattleModePacket(this.entityId));
+                Entity entity = this.minecraft != null && this.minecraft.level != null ? this.minecraft.level.getEntity(this.entityId) : null;
+                boolean challengeActive = entity instanceof HeroEntity hero && hero.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE);
+                if (this.dummyHero != null && !challengeActive) {
+                    this.dummyHero.setBattleModeActiveFrom(DUMMY_BATTLE_SYNC_BUTTON, !this.dummyHero.isBattleModeActive());
+                }
+            }, Tooltip.create(Component.translatable(
+                    HeroEpicFightCompat.isLoaded()
+                            ? "gui.herobrine_companion.battle_mode_tooltip"
+                            : HeroEpicFightCompat.getInstallHintKey()
+            )));
+        }
 
         boolean finalVisited = visited;
         this.actionList.addDynamicAction(() -> {

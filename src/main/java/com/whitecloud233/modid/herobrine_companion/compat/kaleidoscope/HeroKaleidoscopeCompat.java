@@ -1448,8 +1448,13 @@ public final class HeroKaleidoscopeCompat {
             boolean updated = false;
             updated |= setFieldValue(stockpot, "recipeId", recipeId);
             if (recipe != null) {
-                stockpot.recipe = recipe;
+                // cookery 1.3.x 有公开字段 recipe，1.4.x 移除（改为按 recipeId 解析），反射写入以同时兼容两版
+                updated |= setFieldValue(stockpot, "recipe", recipe);
                 updated |= setFieldValue(stockpot, "soupBaseId", recipe.soupBase());
+                Object visuals = invokeGetter(recipe, "visuals");
+                if (visuals != null) {
+                    updated |= setFieldValue(stockpot, "visuals", visuals);
+                }
             }
             updated |= setFieldValue(stockpot, "result", result.copy());
             updated |= setFieldValue(stockpot, "status", com.github.ysbbbbbb.kaleidoscopecookery.api.blockentity.IStockpot.FINISHED);
@@ -1573,6 +1578,15 @@ public final class HeroKaleidoscopeCompat {
                 return true;
             } catch (IllegalAccessException ignored) {
                 return false;
+            }
+        }
+
+        @Nullable
+        private static Object invokeGetter(Object target, String methodName) {
+            try {
+                return target.getClass().getMethod(methodName).invoke(target);
+            } catch (ReflectiveOperationException | RuntimeException ignored) {
+                return null;
             }
         }
 

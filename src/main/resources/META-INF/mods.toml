@@ -122,3 +122,20 @@ mandatory=false
 versionRange="[0,)"
 ordering="AFTER"
 side="BOTH"
+
+[[dependencies.herobrine_companion]]
+modId="wom"
+mandatory=false
+versionRange="[0,)"
+ordering="AFTER"
+side="BOTH"
+
+# 声明 GeckoLib 为可选依赖：装了之后终末之诗以 GeckoLib 3D 模型渲染，
+# 没装则自动回退到原来的手写模型（客户端特性，故 side=CLIENT）。
+# 兼容范围 [4.7,)：模组只使用 4.7 与 4.8+ 共有的 API（SingletonGeoAnimatable 等）。
+[[dependencies.herobrine_companion]]
+modId="geckolib"
+mandatory=false
+versionRange="[4.7,)"
+ordering="AFTER"
+side="CLIENT"

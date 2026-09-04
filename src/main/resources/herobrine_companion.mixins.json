@@ -16,11 +16,13 @@
     "JeanSubmissionStationaryMixin",
     "MobSubmissionMixin",
     "AwakenedMobMixin",
+    "AwakenedEntityRemovalMixin",
     "LevelMixin",
     "epicfight.JsonAssetLoaderMixin",
     "epicfight.AnimationClipMixin",
     "epicfight.RenderAnimationItemMixin",
-    "epicfight.EffekUnitsVfxMixin"
+    "epicfight.EffekUnitsVfxMixin",
+    "epicfight.HeroWomAnimationEventGuardMixin"
   ],
   "client": [
   ],

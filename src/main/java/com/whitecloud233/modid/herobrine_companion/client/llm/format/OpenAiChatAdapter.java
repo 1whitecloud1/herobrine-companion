@@ -181,6 +181,7 @@ public final class OpenAiChatAdapter implements LlmFormatAdapter {
                 StringBuilder reasoningBuilder = new StringBuilder();
                 StreamToolAccumulator toolAccumulator = new StreamToolAccumulator();
                 StreamEmitState emitState = new StreamEmitState();
+                String[] finishReasonHolder = new String[1];
                 String line;
                 while ((line = reader.readLine()) != null) {
                     if (line.isBlank()) {
@@ -195,13 +196,13 @@ public final class OpenAiChatAdapter implements LlmFormatAdapter {
                         if ("[DONE]".equals(data)) {
                             break;
                         }
-                        processStreamingPayload(data, replyBuilder, reasoningBuilder, toolAccumulator, partialConsumer, emitState, logger);
+                        processStreamingPayload(data, replyBuilder, reasoningBuilder, toolAccumulator, partialConsumer, emitState, finishReasonHolder, logger);
                     } else if (trimmedLine.startsWith("{")) {
-                        processStreamingPayload(trimmedLine, replyBuilder, reasoningBuilder, toolAccumulator, partialConsumer, emitState, logger);
+                        processStreamingPayload(trimmedLine, replyBuilder, reasoningBuilder, toolAccumulator, partialConsumer, emitState, finishReasonHolder, logger);
                     }
                 }
                 return LlmStreamingResponse.success(replyBuilder.toString(), reasoningBuilder.toString(),
-                        toolAccumulator.getToolName(), toolAccumulator.getToolArguments());
+                        toolAccumulator.getToolName(), toolAccumulator.getToolArguments(), finishReasonHolder[0]);
             }
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -210,7 +211,8 @@ public final class OpenAiChatAdapter implements LlmFormatAdapter {
 
     private static void processStreamingPayload(String payload, StringBuilder replyBuilder, StringBuilder reasoningBuilder,
                                                 StreamToolAccumulator toolAccumulator,
-                                                Consumer<String> partialConsumer, StreamEmitState emitState, Logger logger) {
+                                                Consumer<String> partialConsumer, StreamEmitState emitState,
+                                                String[] finishReasonHolder, Logger logger) {
         try {
             JsonObject json = JsonParser.parseString(payload).getAsJsonObject();
             JsonArray choices = json.getAsJsonArray("choices");
@@ -218,6 +220,9 @@ public final class OpenAiChatAdapter implements LlmFormatAdapter {
                 return;
             }
             JsonObject choice = choices.get(0).getAsJsonObject();
+            if (finishReasonHolder[0] == null && choice.has("finish_reason") && !choice.get("finish_reason").isJsonNull()) {
+                finishReasonHolder[0] = choice.get("finish_reason").getAsString();
+            }
             JsonObject delta = null;
             if (choice.has("delta") && choice.get("delta").isJsonObject()) {
                 delta = choice.getAsJsonObject("delta");

@@ -1,7 +1,10 @@
 package com.whitecloud233.modid.herobrine_companion.compat.epicfight;
 
 import com.whitecloud233.modid.herobrine_companion.init.ModEntities;
+import com.whitecloud233.modid.herobrine_companion.init.ModParticles;
+import net.minecraftforge.client.event.RegisterParticleProvidersEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
+import yesman.epicfight.api.animation.AnimationManager;
 import yesman.epicfight.api.client.forgeevent.PatchedRenderersEvent;
 
 public final class HeroEpicFightClientBridge {
@@ -16,6 +19,12 @@ public final class HeroEpicFightClientBridge {
         }
         registered = true;
         modEventBus.addListener(HeroEpicFightClientBridge::onAddPatchedRenderers);
+        // 终末之诗刀光：注册自持的加法混合发光拖尾粒子生成器（仅 EpicFight 环境生效）
+        modEventBus.addListener(HeroEpicFightClientBridge::onRegisterParticleProviders);
+    }
+
+    private static void onRegisterParticleProviders(RegisterParticleProvidersEvent event) {
+        event.registerSpriteSet(ModParticles.GLOW_TRAIL.get(), GlowTrailParticle.Provider::new);
     }
 
     private static void onAddPatchedRenderers(PatchedRenderersEvent.Add event) {

@@ -98,13 +98,13 @@ public class HeroBrain {
            // 方案 B：(终极优化) 如果 Hero 只需要学习【自己主人】的行为
             // 建议直接删除上面的扫描代码，换成下面这两行，性能消耗将直接降为 0！
             if (hero.getOwnerUUID() != null) {
-                getNetwork(hero.getOwnerUUID()).tick(hero.level().getGameTime());
+                getNetwork(hero.getOwnerUUID()).tick(hero.level().getGameTime(), hero);
             }
 
         }
 
         // 默认网络的更新（它内部自带 100 tick 冷却拦截，不会卡顿）
-        defaultNetwork.tick(hero.level().getGameTime());
+        defaultNetwork.tick(hero.level().getGameTime(), hero);
 
         // 方块修复本能
         processBlockRepair();

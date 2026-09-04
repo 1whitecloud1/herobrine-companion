@@ -82,13 +82,11 @@ public final class AIActionIntentInference {
         return completedTone && computerAction;
     }
 
-    static boolean shouldRetryEagerTextOnlyAction(String originalUserMessage, String cleanReply) {
-        if (!LLMConfig.isCommandEagerMode()) {
-            return false;
-        }
+    static boolean shouldRetryTextOnlyAction(String originalUserMessage, String cleanReply) {
         String request = normalizeActionInferenceText(originalUserMessage);
         String reply = normalizeActionInferenceText(cleanReply);
-        if (request.isEmpty() || reply.isEmpty() || !isEagerWorldActionIntent(request)) {
+        if (request.isEmpty() || reply.isEmpty()
+                || !(isLikelyWorldActionRequest(request) || isEagerWorldActionIntent(request))) {
             return false;
         }
         return !containsNoActionQualifier(reply) && !containsClarificationOrSafetyQualifier(reply);
@@ -149,10 +147,48 @@ public final class AIActionIntentInference {
                 "给我", "给予", "清除", "清空", "传送", "tp", "召唤", "生成", "杀", "踢", "设置", "改成", "改为",
                 "切换", "下雨", "天晴", "雷暴", "时间", "天气", "难度", "模式", "放置", "填充", "方块", "定位",
                 "播放", "粒子", "效果", "药水", "附魔", "经验", "边界", "白名单", "封禁", "解封", "保存", "重载",
+                "过来", "到我这里", "来我这里", "到我身边", "来我身边", "到你那里", "到你身边", "传送过来", "传送过去",
+                "传送到我", "传送到你", "拉我过去", "带我过去", "带我去",
                 "give me", "give ", "clear ", "teleport", "tp ", "summon", "spawn", "kill", "kick", "set ",
                 "change ", "switch ", "weather", "time", "difficulty", "gamemode", "place ", "fill ", "setblock",
                 "locate", "playsound", "particle", "effect", "enchant", "xp", "experience", "worldborder",
-                "whitelist", "ban ", "pardon", "reload", "stop server");
+                "whitelist", "ban ", "pardon", "reload", "stop server",
+                "come here", "come to me", "come over", "take me to you", "bring me to you",
+                "teleport to me", "teleport me to you");
+    }
+
+    /**
+     * 是否属于“移动 / 传送类”请求（Hero 过来，或玩家到 Hero 那边）。
+     * 用于在模型错误地回复“不能执行”时，用明确工具名重试一次。
+     */
+    static boolean isMovementRequest(String text) {
+        String normalized = normalizeActionInferenceText(text);
+        if (normalized.isEmpty()) {
+            return false;
+        }
+        return containsAny(normalized,
+                "过来", "到我这里", "来我这里", "到我身边", "来我身边", "到你那里", "到你身边",
+                "传送过来", "传送过去", "传送到我", "传送到你", "拉我过去", "带我过去", "带我去你",
+                "带我去你那里", "带我到你这",
+                "come here", "come to me", "come over", "take me to you", "bring me to you",
+                "teleport to me", "teleport me to you", "go to you");
+    }
+
+    /**
+     * 模型对明确的移动/传送请求回复了“不能执行/无法/做不到”等文本拒绝时，
+     * 说明它可能没有意识到自己有对应工具，应该重试并提示它调用工具。
+     */
+    static boolean shouldRetryDeclinedMovementAction(String originalUserMessage, String cleanReply) {
+        if (!isMovementRequest(originalUserMessage)) {
+            return false;
+        }
+        String reply = normalizeActionInferenceText(cleanReply);
+        if (reply.isEmpty()) {
+            return false;
+        }
+        return containsAny(reply,
+                "不能执行", "无法执行", "不能", "无法", "做不到", "没法", "不可以", "不能移动", "无法移动",
+                "cannot", "can't", "unable", "won't", "not able", "not possible", "i can't");
     }
 
     static boolean containsNoActionQualifier(String reply) {

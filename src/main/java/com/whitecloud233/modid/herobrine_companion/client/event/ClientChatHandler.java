@@ -2,6 +2,7 @@ package com.whitecloud233.modid.herobrine_companion.client.event;
 
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.modid.herobrine_companion.client.network.ClientAiPrompts;
+import com.whitecloud233.modid.herobrine_companion.client.service.AIReplyGuard;
 import com.whitecloud233.modid.herobrine_companion.client.service.AIService;
 import com.whitecloud233.modid.herobrine_companion.client.service.ConversationStore;
 import com.whitecloud233.modid.herobrine_companion.client.service.LLMConfig;
@@ -139,39 +140,53 @@ public class ClientChatHandler {
                     }
                 } else {
                     // -----------------------------
-                    // 【本地模式】走本地 JSON 词库正则匹配
+                    // 【本地模式】已接入本地模型 → 走本地 LLM 完整管线（会话历史/指令/工具），
+                    // 且不要求任何云端 Key；未接入 → 走本地 JSON 词库正则匹配兜底。
                     // -----------------------------
-                    LocalChatService.CachedRule rule = LocalChatService.getInstance().getChatResponse(message);
-                    Component heroMessage;
+                    if (LLMConfig.isLocalModelConnected() && mc.player != null) {
+                        AIService.chatLocal(message, mc.player.getUUID(), null).thenAccept(reply -> {
+                            // M4 Phase 1: 对话结果回流给服务端 agent 记忆（与云端模式一致）。
+                            ClientAiPrompts.sendAgentChatOutcome(message, reply, AgentChatOutcomePacket.KIND_PLAYER_CHAT);
+                            mc.tell(() -> {
+                                showExitHint();
+                                mc.gui.getChat().addMessage(
+                                        Component.translatable("message.herobrine_companion.chat_hero", Component.literal(reply))
+                                );
+                            });
+                        });
+                    } else {
+                        LocalChatService.CachedRule rule = LocalChatService.getInstance().getChatResponse(message);
+                        Component heroMessage;
 
-                    if (rule != null) {
-                        // 1. 生成翻译键: chat.herobrine_companion.rule.123
-                        String translationKey = "chat.herobrine_companion.rule." + rule.id();
+                        if (rule != null) {
+                            // 1. 生成翻译键: chat.herobrine_companion.rule.123
+                            String translationKey = "chat.herobrine_companion.rule." + rule.id();
 
-                        // 2. 获取原始文本作为兜底
-                        String originalText = rule.response();
+                            // 2. 获取原始文本作为兜底
+                            String originalText = rule.response();
 
-                        // 必须先判断 originalText 是否为 null！
-                        if (originalText != null) {
-                            // 3. 替换占位符 {player}
-                            if (mc.getUser() != null && mc.getUser().getName() != null) {
-                                originalText = originalText.replace("{player}", mc.getUser().getName());
+                            // 必须先判断 originalText 是否为 null！
+                            if (originalText != null) {
+                                // 3. 替换占位符 {player}
+                                if (mc.getUser() != null && mc.getUser().getName() != null) {
+                                    originalText = originalText.replace("{player}", mc.getUser().getName());
+                                }
+                            } else {
+                                originalText = "..."; // 防御性赋值，防止 Component 再次崩溃
                             }
+
+                            // 4. 构建消息组件
+                            heroMessage = Component.translatableWithFallback(translationKey, originalText);
                         } else {
-                            originalText = "..."; // 防御性赋值，防止 Component 再次崩溃
+                            // 没有匹配到规则，使用默认回复
+                            heroMessage = Component.translatableWithFallback(DEFAULT_RESPONSE_KEY, DEFAULT_RESPONSE_FALLBACK);
                         }
 
-                        // 4. 构建消息组件
-                        heroMessage = Component.translatableWithFallback(translationKey, originalText);
-                    } else {
-                        // 没有匹配到规则，使用默认回复
-                        heroMessage = Component.translatableWithFallback(DEFAULT_RESPONSE_KEY, DEFAULT_RESPONSE_FALLBACK);
+                        // 立即在聊天栏显示 Herobrine 的本地回复
+                        mc.gui.getChat().addMessage(
+                                Component.translatable("message.herobrine_companion.chat_hero", heroMessage)
+                        );
                     }
-
-                    // 立即在聊天栏显示 Herobrine 的本地回复
-                    mc.gui.getChat().addMessage(
-                            Component.translatable("message.herobrine_companion.chat_hero", heroMessage)
-                    );
                 }
 
                 // 显示退出提示
@@ -274,9 +289,14 @@ public class ClientChatHandler {
         if (partialText == null || partialText.isBlank()) {
             return;
         }
+        // 本地 Qwen3 等模型可能带思考块：预览只显示剥离后的正文，避免思考过程闪屏
+        String visibleText = AIReplyGuard.stripThinkingBlocks(partialText);
+        if (visibleText.isBlank()) {
+            return;
+        }
 
         long now = System.currentTimeMillis();
-        int currentLength = partialText.length();
+        int currentLength = visibleText.length();
         long lastUpdate = lastOverlayUpdate.get();
         int lastLength = lastOverlayLength.get();
         if ((now - lastUpdate) < 45L && (currentLength - lastLength) < 3) {
@@ -285,9 +305,9 @@ public class ClientChatHandler {
 
         lastOverlayUpdate.set(now);
         lastOverlayLength.set(currentLength);
-        String preview = partialText.length() > STREAM_PREVIEW_MAX_CHARS
-                ? partialText.substring(partialText.length() - STREAM_PREVIEW_MAX_CHARS)
-                : partialText;
+        String preview = visibleText.length() > STREAM_PREVIEW_MAX_CHARS
+                ? visibleText.substring(visibleText.length() - STREAM_PREVIEW_MAX_CHARS)
+                : visibleText;
 
         mc.tell(() -> mc.gui.setOverlayMessage(Component.translatable("message.herobrine_companion.streaming_preview", preview + "▌"), false));
     }

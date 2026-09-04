@@ -119,16 +119,31 @@ public class Config {
             .comment("是否启用觉醒怪物AI对话")
             .define("awakenedMobAiDialogueEnabled", true);
 
+    public static final ForgeConfigSpec.IntValue AWAKENED_DIALOGUE_MIN_INTERVAL = BUILDER
+            .comment("The global minimum interval (in seconds) between ANY two awakened LLM dialogues (all speakers share one throttle), to avoid API rate limits")
+            .comment("所有觉醒对话共享的最小 LLM 调用间隔（秒，任意说话者之间），防止触发 API 频率限制；冷却期间改用预设台词")
+            .defineInRange("awakenedDialogueMinIntervalSeconds", 30, 5, 600);
+
+    public static final ForgeConfigSpec.IntValue AWAKENED_WORLD_CAP = BUILDER
+            .comment("Max total awakened mobs per dimension (world). Design doc 5.2 recommends 20 ~ 40. Awakened mobs keep their state until they die or leave the dimension; new awakenings are refused once the cap is reached")
+            .comment("单世界（维度）觉醒怪物总量上限（设计文档 5.2 建议 20 ~ 40）。达到上限后不再产生新的觉醒怪；已觉醒怪物保持觉醒直到死亡或离开本维度")
+            .defineInRange("awakenedWorldCap", 30, 20, 40);
+
+    public static final ForgeConfigSpec.IntValue AWAKENED_PLAYER_NEAR_CAP = BUILDER
+            .comment("Max awakened mobs simultaneously near a single player. Design doc 5.2 recommends 2 ~ 4")
+            .comment("单个玩家附近同时存在的觉醒怪物数量上限（设计文档 5.2 建议 2 ~ 4）")
+            .defineInRange("awakenedPlayerNearCap", 3, 2, 4);
+
+    public static final ForgeConfigSpec.IntValue AWAKENED_PLAYER_NEAR_RADIUS = BUILDER
+            .comment("Radius (in blocks) around a player used to count nearby awakened mobs against the near cap")
+            .comment("计算“玩家附近觉醒怪数量”的半径（格）")
+            .defineInRange("awakenedPlayerNearRadius", 64, 16, 128);
+
     public static final ForgeConfigSpec.IntValue AI_VISION_INTERVAL = BUILDER
             .comment("The global minimum interval (in seconds) between AI observations and speech")
             .comment("全知视觉的每次主动发话最小间隔（秒），建议在 10 ~ 300 之间")
             .defineInRange("aiVisionInterval", 30, 5, 600);
 
-    // 【新增】AI 语言风格配置
-    public static final ForgeConfigSpec.ConfigValue<String> AI_LANGUAGE_STYLE = BUILDER
-            .comment("The language style and tone for Herobrine's AI responses")
-            .comment("Herobrine的AI语言风格与语气")
-            .define("aiLanguageStyle_v1", "");
     // 【新增】更新检查器配置
     public static final ForgeConfigSpec.BooleanValue ENABLE_UPDATE_CHECKER = BUILDER
             .comment("Whether to check for mod updates on Modrinth when joining a world")
@@ -160,10 +175,12 @@ public class Config {
     public static boolean aiVisionEnabled;
     public static boolean awakenedMobAiDialogueEnabled;
     public static int aiVisionInterval;
+    public static int awakenedDialogueMinIntervalSeconds;
+    public static int awakenedWorldCap;
+    public static int awakenedPlayerNearCap;
+    public static int awakenedPlayerNearRadius;
     // 【新增】更新检查器静态变量
     public static boolean enableUpdateChecker;
-    // 【新增】语言风格静态变量
-    public static String aiLanguageStyle;
 
     @SubscribeEvent
     static void onLoad(final ModConfigEvent event) {
@@ -191,15 +208,16 @@ public class Config {
         aiVisionEnabled = AI_VISION_ENABLED.get();
         awakenedMobAiDialogueEnabled = AWAKENED_MOB_AI_DIALOGUE_ENABLED.get();
         aiVisionInterval = AI_VISION_INTERVAL.get();
+        awakenedDialogueMinIntervalSeconds = AWAKENED_DIALOGUE_MIN_INTERVAL.get();
+        awakenedWorldCap = AWAKENED_WORLD_CAP.get();
+        awakenedPlayerNearCap = AWAKENED_PLAYER_NEAR_CAP.get();
+        awakenedPlayerNearRadius = AWAKENED_PLAYER_NEAR_RADIUS.get();
 // 【新增】更新检查器赋值
         enableUpdateChecker = ENABLE_UPDATE_CHECKER.get();
-        // 【新增】语言风格赋值
-        aiLanguageStyle = AI_LANGUAGE_STYLE.get();
-
-        LOGGER.info("Herobrine Companion Config Loaded: Explosion={}, Aura={}, BlockRestoration={}, CleanItems={}, LeafVanish={}, CleaveSkill={}, DGTerrainEnabled={}, DGTerrainMode={}, DGBreakContainers={}, DGMaxBreakPerTick={}, DGWorldCollapse={}, Pact={}, Gaze={}, Permit={}, AIVision={}, AwakenedMobAIDialogue={}, AIInterval={}, AIStyle={}",
+        LOGGER.info("Herobrine Companion Config Loaded: Explosion={}, Aura={}, BlockRestoration={}, CleanItems={}, LeafVanish={}, CleaveSkill={}, DGTerrainEnabled={}, DGTerrainMode={}, DGBreakContainers={}, DGMaxBreakPerTick={}, DGWorldCollapse={}, Pact={}, Gaze={}, Permit={}, AIVision={}, AwakenedMobAIDialogue={}, AIInterval={}",
                 poemOfTheEndExplosion, heroKingAuraEnabled, heroBlockRestoration, heroCleanItems, heroLeafVanishEnabled, cleaveSkillEnabled,
                 destructionGodTerrainDamageEnabled, destructionGodTerrainDamageMode, destructionGodBreakContainers,
                 destructionGodMaxBrokenBlocksPerTick, destructionGodFinalPhaseWorldCollapse,
-                soulBoundPactEnabled, abyssalGazeEnabled, transcendencePermitEnabled, aiVisionEnabled, awakenedMobAiDialogueEnabled, aiVisionInterval, aiLanguageStyle);
+                soulBoundPactEnabled, abyssalGazeEnabled, transcendencePermitEnabled, aiVisionEnabled, awakenedMobAiDialogueEnabled, aiVisionInterval);
     }
 }

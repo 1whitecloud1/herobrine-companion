@@ -72,10 +72,10 @@ public final class HeroSummonTool implements AgentTool {
     private static ServerPlayer resolveRequester(AgentToolContext context) {
         var hero = context.hero();
         UUID requesterUuid = context.requesterUuid();
-        if (requesterUuid != null && hero.level().getPlayerByUUID(requesterUuid) instanceof ServerPlayer requester) {
+        if (requesterUuid != null && hero != null && hero.level().getPlayerByUUID(requesterUuid) instanceof ServerPlayer requester) {
             return requester;
         }
-        if (hero.getOwnerPlayer() instanceof ServerPlayer owner) {
+        if (hero != null && hero.getOwnerPlayer() instanceof ServerPlayer owner) {
             return owner;
         }
         return null;

@@ -6,11 +6,13 @@ import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroStateManager;
 import com.whitecloud233.modid.herobrine_companion.item.LoreFragmentItem;
 import com.whitecloud233.modid.herobrine_companion.util.EndRingContext;
+import com.whitecloud233.modid.herobrine_companion.world.structure.EndRingRestorer;
 import com.whitecloud233.modid.herobrine_companion.world.structure.ModStructures;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffects;
@@ -18,16 +20,31 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.EntityJoinLevelEvent;
+import net.minecraftforge.event.server.ServerStoppingEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.LogicalSide;
 import net.minecraftforge.fml.common.Mod;
 
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+
 @Mod.EventBusSubscriber(modid = HerobrineCompanion.MODID)
 public class EndRingDimensionHandler {
+
+    // 记录本会话是否已经重建过 End Ring 竞技场，避免每次进入都全量重建
+    private static final Set<ResourceKey<Level>> ARENA_RESTORED = ConcurrentHashMap.newKeySet();
 
     @SubscribeEvent
     public static void onPlayerJoinWorld(EntityJoinLevelEvent event) {
         if (event.getEntity() instanceof ServerPlayer player && event.getLevel().dimension() == ModStructures.END_RING_DIMENSION_KEY) {
+            // 兜底：无论结构生成是否被整合包改动/禁用，首次进入时程序化重建竞技场圆环
+            if (ARENA_RESTORED.add(ModStructures.END_RING_DIMENSION_KEY)) {
+                ServerLevel endRingLevel = player.server.getLevel(ModStructures.END_RING_DIMENSION_KEY);
+                if (endRingLevel != null) {
+                    EndRingRestorer.restoreArena(endRingLevel);
+                }
+            }
+
             CompoundTag data = player.getPersistentData();
             if (data.getBoolean("IsChallengeActive")) return;
 
@@ -171,5 +188,11 @@ public class EndRingDimensionHandler {
                 }
             }
         }
+    }
+
+    @SubscribeEvent
+    public static void onServerStopping(ServerStoppingEvent event) {
+        // 服务器关闭时清空会话标记，避免跨存档残留
+        ARENA_RESTORED.clear();
     }
 }

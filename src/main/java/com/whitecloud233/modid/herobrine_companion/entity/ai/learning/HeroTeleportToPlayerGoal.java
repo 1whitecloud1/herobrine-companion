@@ -54,6 +54,8 @@ public class HeroTeleportToPlayerGoal extends Goal {
     @Override
     public boolean canUse() {
         if (this.hero.isBattleModeActive()) return false;
+        // 传送后抑制（庇护传送/观察者传送后 5 秒内不自动拉回）
+        if (this.hero.isTeleportFollowHoldActive()) return false;
 
         // 如果正在骑乘 (比如在船上)，禁止传送，防止下车
         if (this.hero.isPassenger()) return false;

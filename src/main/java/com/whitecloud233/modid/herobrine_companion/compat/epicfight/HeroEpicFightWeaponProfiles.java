@@ -68,7 +68,8 @@ public final class HeroEpicFightWeaponProfiles {
             };
         }
 
-        return EpicFightCapabilities.getItemStackCapabilityOr(stack, CapabilityItem.EMPTY);
+        CapabilityItem epicFightCapability = EpicFightCapabilities.getItemStackCapabilityOr(stack, CapabilityItem.EMPTY);
+        return HeroWomWeaponCompat.resolveCapability(stack, epicFightCapability);
     }
 
     public static boolean isRangedLoadout(HeroEntity hero) {
@@ -131,7 +132,10 @@ public final class HeroEpicFightWeaponProfiles {
             return false;
         }
 
-        if (isRangedLoadout(stack) || stack.getItem() instanceof PoemOfTheEndItem || HeroNightfallMovesets.isSupported(stack)) {
+        if (isRangedLoadout(stack)
+                || stack.getItem() instanceof PoemOfTheEndItem
+                || HeroNightfallMovesets.isSupported(stack)
+                || HeroWomWeaponCompat.isSupported(stack)) {
             return true;
         }
 

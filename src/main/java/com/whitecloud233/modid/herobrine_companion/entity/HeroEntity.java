@@ -115,6 +115,12 @@ public class HeroEntity extends PathfinderMob implements Merchant {
 
 
     public boolean isStateDirty = true;
+    // --- 心智状态"注视目标"续瞄（运行时字段，不写入 NBT 存档）---
+    // 状态系统每 10 tick 才一次性 setLookAt，而原版 LookControl 的 2-tick 冷却结束后
+    // 头部会以 10°/tick 摆回 yBodyRot，形成"快甩慢回"的锯齿摆动。
+    // 这里记录状态系统最近一次指定的注视目标，由 HeroStateGoals 逐 tick 续瞄（10°/tick 平滑）。
+    @Nullable public Vec3 mindLookTarget;
+    public int mindLookTargetTick;
     private final Set<Integer> claimedRewards = new HashSet<>();
     public float clientFloatingAmount;
     public float clientFloatingAmountO;
@@ -918,6 +924,25 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     }
     public void setLastSummonedTime(long time) { this.lastSummonedTime = time; }
     public long getLastSummonedTime() { return this.lastSummonedTime; }
+
+    /**
+     * 传送后抑制跟随的截止 tick。
+     * <p>
+     * 对齐基岩版同步修复中的 {@code _tpFollowHoldUntilTick} / {@code TP_FOLLOW_HOLD_TICKS}：
+     * 创世神的庇护传送/召回、观察者（Observer）背后现身等传送后，5 秒内禁止
+     * 陪伴跟随 AI 重新下发移动目标，防止 Hero 被立刻"平移"拉回传送前的位置。
+     * 该字段为运行期状态，不写入 NBT 存档。
+     */
+    public static final int TP_FOLLOW_HOLD_TICKS = 100;
+    private int tpFollowHoldUntilTick;
+
+    public void markTeleportFollowHold() {
+        this.tpFollowHoldUntilTick = this.tickCount + TP_FOLLOW_HOLD_TICKS;
+    }
+
+    public boolean isTeleportFollowHoldActive() {
+        return this.tickCount < this.tpFollowHoldUntilTick;
+    }
     public GoalSelector getGoalSelector() { return this.goalSelector; }
 
     /**

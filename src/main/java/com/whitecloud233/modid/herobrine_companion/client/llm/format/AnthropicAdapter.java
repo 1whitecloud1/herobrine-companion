@@ -171,13 +171,14 @@ public final class AnthropicAdapter implements LlmFormatAdapter {
                 StringBuilder replyBuilder = new StringBuilder();
                 AnthropicStreamToolAccumulator toolAccumulator = new AnthropicStreamToolAccumulator();
                 StreamEmitState emitState = new StreamEmitState();
+                String[] finishReasonHolder = new String[1];
                 StringBuilder dataBuffer = new StringBuilder();
                 String eventName = null;
                 String line;
                 while ((line = reader.readLine()) != null) {
                     if (line.isEmpty()) {
                         if (!dataBuffer.isEmpty()) {
-                            processStreamingEvent(eventName, dataBuffer.toString(), replyBuilder, toolAccumulator, partialConsumer, emitState, logger);
+                            processStreamingEvent(eventName, dataBuffer.toString(), replyBuilder, toolAccumulator, partialConsumer, emitState, finishReasonHolder, logger);
                             dataBuffer.setLength(0);
                         }
                         eventName = null;
@@ -193,9 +194,9 @@ public final class AnthropicAdapter implements LlmFormatAdapter {
                     }
                 }
                 if (!dataBuffer.isEmpty()) {
-                    processStreamingEvent(eventName, dataBuffer.toString(), replyBuilder, toolAccumulator, partialConsumer, emitState, logger);
+                    processStreamingEvent(eventName, dataBuffer.toString(), replyBuilder, toolAccumulator, partialConsumer, emitState, finishReasonHolder, logger);
                 }
-                return LlmStreamingResponse.success(replyBuilder.toString(), toolAccumulator.getToolName(), toolAccumulator.getToolArguments());
+                return LlmStreamingResponse.success(replyBuilder.toString(), toolAccumulator.getToolName(), toolAccumulator.getToolArguments(), finishReasonHolder[0]);
             }
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -204,7 +205,7 @@ public final class AnthropicAdapter implements LlmFormatAdapter {
 
     private static void processStreamingEvent(String eventName, String payload, StringBuilder replyBuilder,
                                               AnthropicStreamToolAccumulator toolAccumulator, Consumer<String> partialConsumer,
-                                              StreamEmitState emitState, Logger logger) {
+                                              StreamEmitState emitState, String[] finishReasonHolder, Logger logger) {
         try {
             if (payload == null || payload.isBlank() || "[DONE]".equals(payload)) {
                 return;
@@ -215,6 +216,17 @@ public final class AnthropicAdapter implements LlmFormatAdapter {
                 resolvedEvent = json.get("type").getAsString();
             }
             if (resolvedEvent == null) {
+                return;
+            }
+
+            if ("message_delta".equals(resolvedEvent)) {
+                // 结束原因：stop_reason（end_turn / max_tokens / stop_sequence / tool_use）。
+                if (json.has("delta") && json.get("delta").isJsonObject()) {
+                    JsonObject delta = json.getAsJsonObject("delta");
+                    if (delta.has("stop_reason") && !delta.get("stop_reason").isJsonNull()) {
+                        finishReasonHolder[0] = delta.get("stop_reason").getAsString();
+                    }
+                }
                 return;
             }
 
