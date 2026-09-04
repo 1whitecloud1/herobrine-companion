@@ -259,13 +259,21 @@ public class HeroModel extends PlayerModel<HeroEntity> {
         if (entity.isGroundWalking()) {
             walkIntensity = Math.max(walkIntensity, 0.35F);
         }
-        if (!entity.isFloating()
+        // 走路/飞行混合：以浮空量(floatAmount)做渐变，而不是用 isFloating 布尔开关硬切。
+        // 修复"浮空标志已置位但 floatAmount 尚未爬升"的约 1 秒过渡期里，
+        // 走路分支被 isFloating 阻断、飞行姿势又未渐入，导致英雄以滑行雕像姿态移动的问题。
+        // floatAmount≈0 → 正常走路；过渡期 → 腿部摆幅随浮空量衰减 + 飞行姿势渐入；floatAmount 高 → 完全飞行姿势。
+        if (floatAmount < 0.65F
                 && !entity.isBattleModeActive()
                 && !entity.isPassenger()
                 && !entity.isCrouching()
                 && !entity.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE)
                 && (entity.isGroundWalking() || walkIntensity > 0.001F)) {
-            applyImportedWalkAnimation(entity, walkIntensity, partialTick);
+            applyImportedWalkAnimation(entity, walkIntensity * (1.0F - floatAmount), partialTick);
+            if (floatAmount > 0.0F) {
+                // 过渡期同步渐入飞行姿势与身体浮动量，消除走路→飞行之间的姿态空窗
+                applyFlyingPresetPose(floatAmount);
+            }
             copyAllModelProperties();
             return;
         }

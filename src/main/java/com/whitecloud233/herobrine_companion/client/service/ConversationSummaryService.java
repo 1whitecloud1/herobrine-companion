@@ -48,6 +48,7 @@ public final class ConversationSummaryService {
 
     private static final HttpClient CLIENT = HttpClient.newBuilder()
             .connectTimeout(java.time.Duration.ofSeconds(10))
+            .proxy(SystemProxy.SELECTOR)
             .build();
 
     /** 正在生成摘要的 scope(去重,避免并发触发同会话多次调用)。 */

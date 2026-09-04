@@ -11,6 +11,7 @@
     "EnderDragonMixin",
     "AwakenedEnderDragonBrainMixin",
     "AwakenedMobMixin",
+    "AwakenedEntityRemovalMixin",
     "LivingEntitySpeechBubbleMixin",
     "JeanDragonManualFlightMixin",
     "JeanDragonPassengerMixin",
@@ -21,7 +22,8 @@
     "MixinModEntityProfiles",
     "epicfight.AnimationClipMixin",
     "epicfight.JsonAssetLoaderMixin",
-    "epicfight.RenderAnimationItemMixin"
+    "epicfight.RenderAnimationItemMixin",
+    "epicfight.HeroWomAnimationEventGuardMixin"
   ],
   "client": [
   ],

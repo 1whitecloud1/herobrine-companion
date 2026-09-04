@@ -15,7 +15,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class HeroEpicFightDebugLog {
     private static final Logger LOGGER = LogUtils.getLogger();
-    private static final boolean ENABLED = Boolean.parseBoolean(System.getProperty("herobrine.debug.epicfight", "true"));
+    // 默认关闭，防止 [HeroEFDebug] 刷屏；排障时用 -Dherobrine.debug.epicfight=true 开启
+    private static final boolean ENABLED = Boolean.parseBoolean(System.getProperty("herobrine.debug.epicfight", "false"));
     private static final Map<String, String> LAST_STATES = new ConcurrentHashMap<>();
     private static final Map<String, Integer> REPEAT_COUNTS = new ConcurrentHashMap<>();
 

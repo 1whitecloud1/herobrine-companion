@@ -15,6 +15,7 @@ import com.whitecloud233.herobrine_companion.client.render.VoidRiftRenderer;
 import com.whitecloud233.herobrine_companion.item.PoemOfTheEndItem;
 import com.whitecloud233.herobrine_companion.world.inventory.ModMenus;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.resources.ResourceLocation;
@@ -25,6 +26,8 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.client.event.RegisterDimensionSpecialEffectsEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
+import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
+import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
 import org.slf4j.Logger;
 import com.whitecloud233.herobrine_companion.destructiongod.client.render.DestructionGodHerobrineRenderer;
 import com.whitecloud233.herobrine_companion.destructiongod.client.render.FaultAwareBlockDisplayRenderer;
@@ -86,6 +89,26 @@ public class ClientEvents {
 
     public static void registerDimensionSpecialEffects(RegisterDimensionSpecialEffectsEvent event) {
         event.register(ResourceLocation.fromNamespaceAndPath(HerobrineCompanion.MODID, "end_ring_type"), new EndRingDimensionEffects());
+    }
+
+    /**
+     * 终末之诗的 3D 渲染器。NeoForge 1.21.1 移除了 {@code Item#initializeClient}，
+     * 客户端扩展改由本事件注册。
+     *
+     * <p>没装 GeckoLib 时 {@code createRenderer()} 返回 null，此时<b>不</b>注册扩展，
+     * 物品模型会被 {@code PoemOfTheEndModelSwapper} 换成 2D 版本。</p>
+     */
+    public static void registerClientExtensions(RegisterClientExtensionsEvent event) {
+        BlockEntityWithoutLevelRenderer poemRenderer = PoemOfTheEndGeoCompat.createRenderer();
+        if (poemRenderer == null) {
+            return;
+        }
+        event.registerItem(new IClientItemExtensions() {
+            @Override
+            public BlockEntityWithoutLevelRenderer getCustomRenderer() {
+                return poemRenderer;
+            }
+        }, ModItems.POEM_OF_THE_END.get());
     }
 
     private static Method startAttackMethod;

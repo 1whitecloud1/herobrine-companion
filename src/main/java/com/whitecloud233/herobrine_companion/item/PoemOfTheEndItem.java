@@ -54,7 +54,7 @@ import java.util.List;
 import java.util.Random;
 
 public class PoemOfTheEndItem extends DiggerItem {
-    
+
     // 模式常量
     public static final int MODE_NORMAL = 0;        // 普通
     public static final int MODE_REALM_BREAKER = 1; // 破境
@@ -68,6 +68,7 @@ public class PoemOfTheEndItem extends DiggerItem {
                 .attributes(createAttributes(tier, attackDamageModifier, attackSpeedModifier))
                 .component(DataComponents.UNBREAKABLE, new Unbreakable(true)));
     }
+
 
     public static ItemAttributeModifiers createAttributes(Tier tier, float attackDamage, float attackSpeed) {
         return ItemAttributeModifiers.builder()

@@ -47,7 +47,13 @@ public class HeroStateGoals extends Goal {
 
     @Override
     public void tick() {
-        if (hero.tickCount % 10 != 0) return;
+        if (hero.tickCount % 10 != 0) {
+            // 状态 tick 间隙：每 tick 续瞄最近记录的注视目标，消除"2 tick 快甩 + 8 tick 慢回"的锯齿摆动
+            HeroMindStateRegistry.tickServerLook(hero);
+            return;
+        }
         HeroMindStateRegistry.tickServer(hero);
+        // 状态 tick 帧同样续瞄一次，保证 LookControl 的 2-tick 冷却无缝衔接
+        HeroMindStateRegistry.tickServerLook(hero);
     }
 }

@@ -57,6 +57,15 @@ public class HeroInvitedActionGoal extends Goal {
     private Vec3 wanderTarget;
     private Vec3 cachedDoorStandPos;
 
+    // ---- 卡死检测（对齐基岩版 _invitedMoveMarker* 逻辑）----
+    // 每 20 tick 检查一次"与目标的距离是否在缩短"；连续 3 个窗口（3 秒）
+    // 无进展（贴墙滑动/绕圈/被旧寻路冲突）即判定卡死并直接传送。
+    private static final int STALL_WINDOW_TICKS = 20;
+    private static final int STALL_MAX_WINDOWS = 3;
+    private static final double STALL_MIN_PROGRESS_SQ = 0.25D; // 每窗口至少接近 0.5 格
+    private double lastProgressDistSqr = Double.MAX_VALUE;
+    private int noProgressWindows;
+
     public HeroInvitedActionGoal(HeroEntity hero) {
         this.hero = hero;
         this.setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
@@ -124,6 +133,8 @@ public class HeroInvitedActionGoal extends Goal {
         this.hasArrived = false;
         this.seatEntity = null;
         this.lastPos = this.hero.position();
+        this.lastProgressDistSqr = Double.MAX_VALUE;
+        this.noProgressWindows = 0;
         this.wanderTarget = null;
         this.cachedDoorStandPos = null;
 
@@ -186,12 +197,29 @@ public class HeroInvitedActionGoal extends Goal {
         if (!this.hasArrived) {
             this.navigationTicks++;
 
-            if (this.navigationTicks % 20 == 0) {
+            if (this.navigationTicks % STALL_WINDOW_TICKS == 0) {
                 double moveDist = this.hero.position().distanceToSqr(this.lastPos);
                 this.lastPos = this.hero.position();
+
+                // 原地完全不动（且距离目标较远）→ 立即传送
                 if (moveDist < 0.01D && distSqr > 16.0D) {
                     teleportToTarget(destination);
                     return;
+                }
+
+                // 距离目标没有缩短（贴墙滑动/绕圈/旧寻路冲突）→ 连续 3 个窗口无进展即传送
+                if (distSqr > 9.0D) {
+                    double progress = this.lastProgressDistSqr - distSqr;
+                    if (progress < STALL_MIN_PROGRESS_SQ) {
+                        this.noProgressWindows++;
+                        if (this.noProgressWindows >= STALL_MAX_WINDOWS) {
+                            teleportToTarget(destination);
+                            return;
+                        }
+                    } else {
+                        this.noProgressWindows = 0;
+                    }
+                    this.lastProgressDistSqr = distSqr;
                 }
             }
 
@@ -230,6 +258,10 @@ public class HeroInvitedActionGoal extends Goal {
                 }
             } else if (this.actionType == ACTION_COOK) {
                 this.hero.setNoGravity(false);
+                if (this.timer % 20 == 0) {
+                    com.mojang.logging.LogUtils.getLogger().info(
+                            "[CookDebug] goal 做菜阶段 tick={} pos={}", this.timer, this.targetPos);
+                }
                 performCookPresentation(destination);
                 HeroCookingCompat.tickCookware(this.hero, this.targetPos);
             } else if (this.actionType != ACTION_REST) {
@@ -511,12 +543,34 @@ public class HeroInvitedActionGoal extends Goal {
     }
 
     private void teleportToTarget(Vec3 destination) {
-        this.hero.teleportTo(destination.x, destination.y, destination.z);
+        Vec3 landing = findSafeLanding(destination);
+        this.hero.teleportTo(landing.x, landing.y, landing.z);
         this.hero.level().playSound(null, this.hero.blockPosition(), SoundEvents.ENDERMAN_TELEPORT, SoundSource.HOSTILE, 1.0F, 1.0F);
         this.hasArrived = true;
         this.hero.setDeltaMovement(Vec3.ZERO);
         if (!this.isGuardingContainer) this.hero.setNoGravity(false);
         performAction();
+    }
+
+    /**
+     * 传送到目标附近的安全落点（对齐基岩版 relocate_hero_near_target），
+     * 避免卡死兜底传送时直接落进床/方块内部。
+     */
+    private Vec3 findSafeLanding(Vec3 preferred) {
+        if (this.hero.level().noCollision(this.hero.getDimensions(this.hero.getPose()).makeBoundingBox(preferred.x, preferred.y, preferred.z))) {
+            return preferred;
+        }
+        for (int dx = -2; dx <= 2; dx++) {
+            for (int dz = -2; dz <= 2; dz++) {
+                for (int dy = 2; dy >= -2; dy--) {
+                    Vec3 candidate = preferred.add(dx, dy, dz);
+                    if (this.hero.level().noCollision(this.hero.getDimensions(this.hero.getPose()).makeBoundingBox(candidate.x, candidate.y, candidate.z))) {
+                        return candidate;
+                    }
+                }
+            }
+        }
+        return preferred;
     }
 
     private void performAction() {

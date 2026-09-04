@@ -83,9 +83,12 @@ public class HeroCookSelectionScreen extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        this.renderBackground(guiGraphics, mouseX, mouseY, partialTick);
+    public void renderBackground(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        // 留空：禁用原版自带的世界模糊和黑色背景遮罩，保持和 HeroScreen 视觉一致
+    }
 
+    @Override
+    public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         int[] dims = panelDims();
         int left = dims[0];
         int top = dims[1];

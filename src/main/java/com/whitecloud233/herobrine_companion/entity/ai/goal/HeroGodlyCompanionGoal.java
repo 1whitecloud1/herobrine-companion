@@ -96,6 +96,8 @@ public class HeroGodlyCompanionGoal extends Goal {
         if (this.hero.isBattleModeActive()) return false;
 
         if (!this.hero.isCompanionMode()) return false;
+        // 传送后抑制跟随（庇护传送/观察者传送后 5 秒），防止 Hero 被拉回原处
+        if (this.hero.isTeleportFollowHoldActive()) return false;
         // 如果正在交易，禁止跟随移动
         if (this.hero.getTradingPlayer() != null) return false;
 
@@ -120,6 +122,8 @@ public class HeroGodlyCompanionGoal extends Goal {
     public boolean canContinueToUse() {
         if (this.hero.isBattleModeActive()) return false;
         if (!this.hero.isCompanionMode()) return false;
+        // 传送后抑制跟随：传送瞬间若本目标正在运行，立即让出控制权
+        if (this.hero.isTeleportFollowHoldActive()) return false;
         // 如果正在交易，立即停止跟随
         if (this.hero.getTradingPlayer() != null) return false;
         if (this.owner == null || !this.owner.isAlive()) return false;

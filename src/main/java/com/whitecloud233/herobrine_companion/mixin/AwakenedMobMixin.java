@@ -2,6 +2,7 @@ package com.whitecloud233.herobrine_companion.mixin;
 
 import com.whitecloud233.herobrine_companion.entity.awakened.AwakenedMobAccessor;
 import com.whitecloud233.herobrine_companion.entity.awakened.AwakenedMobBrain;
+import com.whitecloud233.herobrine_companion.entity.awakened.AwakenedMobWorldData;
 import com.whitecloud233.herobrine_companion.entity.awakened.AwakenedPlayerMemory;
 import com.whitecloud233.herobrine_companion.entity.family.HerobrineFamilyMembers;
 import net.minecraft.nbt.CompoundTag;
@@ -11,6 +12,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Mob;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -106,6 +108,10 @@ public abstract class AwakenedMobMixin implements AwakenedMobAccessor {
 
         if (herobrineCompanion$awakenedMob && !herobrineCompanion$awakenedMobName.isEmpty() && !self.hasCustomName()) {
             self.setCustomName(Component.literal(herobrineCompanion$awakenedMobName));
+        }
+
+        if (herobrineCompanion$awakenedMob && self.level() instanceof ServerLevel serverLevel) {
+            AwakenedMobWorldData.get(serverLevel).forceRegister(self.getUUID());
         }
     }
 

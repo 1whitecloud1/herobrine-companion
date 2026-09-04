@@ -2,6 +2,7 @@ package com.whitecloud233.herobrine_companion.entity.ai.learning;
 
 import com.whitecloud233.herobrine_companion.client.service.LLMConfig;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.herobrine_companion.init.ModItems;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
@@ -179,8 +180,13 @@ public class HeroObserver {
     private static void handleBlockFocus(HeroEntity hero, ServerPlayer player, BlockPos pos) {
         BlockState state = hero.level().getBlockState(pos);
 
+        // 基岩/命令方块不再无冷却刷 meta：原每 10 tick +0.1 可 3 秒顶满。
+        // 现在 1200 tick（60 秒）冷却一次，单次 0.02，避免误盯基岩把心智钉死在故障之主。
         if (state.is(Blocks.BEDROCK) || state.getBlock().getDescriptionId().contains("command_block")) {
-            hero.getHeroBrain().inputMeta(player.getUUID(), 0.1f);
+            if (!isOnCooldown(player, "meta_focus", 1200)) {
+                hero.getHeroBrain().inputMeta(player.getUUID(), 0.02f);
+                setCooldown(player, "meta_focus");
+            }
         }
 
         if (isOnCooldown(player, "focus", 1200)) return;
@@ -211,6 +217,51 @@ public class HeroObserver {
                 setCooldown(player, "item");
             }
         }
+
+        observeGhostDrops(hero, player);
+    }
+
+    /**
+     * 幽灵怪物掉落物会增强 Herobrine 对“故障/代码异常”的感知，
+     * 定期增加 metaScore，推动进入 GLITCH_LORD（故障之主）。
+     */
+    private static void observeGhostDrops(HeroEntity hero, ServerPlayer player) {
+        if (hero.tickCount % 100 != 0) {
+            return;
+        }
+        if (isOnCooldown(player, "ghost_drops", 200)) {
+            return;
+        }
+
+        int count = countGhostDrops(player);
+        if (count <= 0) {
+            return;
+        }
+
+        float boost = Math.min(0.15F, 0.03F + count * 0.01F);
+        hero.getHeroBrain().inputMeta(player.getUUID(), boost);
+        setCooldown(player, "ghost_drops");
+    }
+
+    private static int countGhostDrops(ServerPlayer player) {
+        int count = 0;
+        for (ItemStack stack : player.getInventory().items) {
+            if (stack.isEmpty()) {
+                continue;
+            }
+            if (isGhostDrop(stack)) {
+                count += stack.getCount();
+            }
+        }
+        return count;
+    }
+
+    private static boolean isGhostDrop(ItemStack stack) {
+        return stack.is(ModItems.CORRUPTED_CODE.get())
+                || stack.is(ModItems.VOID_MARROW.get())
+                || stack.is(ModItems.GLITCH_FRAGMENT.get())
+                || stack.is(ModItems.SOURCE_CODE_FRAGMENT.get())
+                || stack.is(ModItems.UNSTABLE_GUNPOWDER.get());
     }
 
     private static void observeCombat(HeroEntity hero, ServerPlayer player) {

@@ -47,11 +47,35 @@ import java.util.function.Consumer;
  */
 public class AIService {
     private static final Logger LOGGER = LoggerFactory.getLogger(AIService.class);
-    private static final HttpClient CLIENT = HttpClient.newHttpClient();
+    // proxy 交给动态选择器：开关关闭即直连，开启后跟随系统代理（客户端实例不变，保住连接复用）
+    private static final HttpClient CLIENT = HttpClient.newBuilder()
+            .proxy(SystemProxy.SELECTOR)
+            .build();
     private static final ConversationStore CONVERSATION_STORE = ConversationStore.getInstance();
 
     /** agent 工具结果回喂(P2/P3)：等待服务端结果包/审批完成的超时秒数（30s 覆盖确认屏等待）。 */
     private static final int TOOL_RESULT_TIMEOUT_SECONDS = 30;
+
+    /**
+     * 请求携带工具目录时输出 token 的下限：推理型模型可能先用完小预算的 reasoning
+     * 而发不出工具调用（finish_reason=length、正文为空 → 静默）。带工具时至少给到该值。
+     */
+    private static final int MIN_TOOL_OUTPUT_TOKENS = 1536;
+
+    /** 截断重试提示（带工具上下文）：模型上一条回复在发出工具调用前被 max tokens 截断。 */
+    private static final String TRUNCATION_RETRY_PROMPT =
+            "[System: 你上一条回复在发出工具调用之前就被最大输出 token 上限截断了。"
+                    + "现在不要输出任何思考/推理，第一行就直接输出完整的工具调用（含全部必要参数）；"
+                    + "如果确实不需要工具，就用一句话极简作答。]";
+
+    /** 截断重试提示（无工具上下文，如自动叙事/跨会话）：仅要求简短回应，避免"调用不存在的工具"矛盾。 */
+    private static final String TRUNCATION_BRIEF_RETRY_PROMPT =
+            "[System: 你上一条回复被输出上限截断。请立即用一两句话简短回应（保持角色），不要再输出长篇内容。]";
+
+    /** 按上下文选择截断重试提示：有工具→要求直接发工具调用；无工具→要求简短回应。 */
+    private static String truncationRetryPrompt(boolean allowWorldActions) {
+        return allowWorldActions ? TRUNCATION_RETRY_PROMPT : TRUNCATION_BRIEF_RETRY_PROMPT;
+    }
 
     public static CompletableFuture<String> chat(String userMessage, UUID playerUUID) {
         return chat(userMessage, playerUUID, null);
@@ -60,6 +84,32 @@ public class AIService {
     public static CompletableFuture<String> chat(String userMessage, UUID playerUUID, Consumer<String> partialConsumer) {
         return chatWithRetry(LLMConfig.resolveTaskSettings(LlmTask.MAIN_CHAT), userMessage, userMessage, playerUUID, playerUUID, 0, true, true, true, 0,
                 partialConsumer, LLMConfig.isStreamingEnabled(), null, false, true);
+    }
+
+    /**
+     * 本地模型聊天（本地模式专用入口）。
+     *
+     * <p>独立于云端：使用本地模型槽位，不要求云端 Key/配置，也不改任何云端档案。
+     * 与云端聊天共用完整 AI 管线——会话历史、工具（指令/世界动作）、回复清洗全保留。</p>
+     */
+    public static CompletableFuture<String> chatLocal(String userMessage, UUID playerUUID, Consumer<String> partialConsumer) {
+        LlmSettings localSettings = LLMConfig.getLocalLlmSettings();
+        if (localSettings == null) {
+            return CompletableFuture.completedFuture("§c" + Component.translatable("message.herobrine_companion.ai_config_missing").getString());
+        }
+        // 本地 3B 模型的工具调用格式不可靠：高频明确指令（传送到 Hero/召唤/去末地等）
+        // 先在客户端确定性执行，再让模型只生成一句符合角色的台词，
+        // 避免"理解了却不执行 / 回复无法执行"的问题。
+        return LocalCommandSkill.tryExecute(userMessage, playerUUID).thenCompose(executedNotice -> {
+            String currentPrompt = userMessage;
+            if (executedNotice != null && !executedNotice.isBlank()) {
+                currentPrompt = userMessage + "\n\n[EXECUTED ACTION]: " + executedNotice
+                        + "。该动作已经实际完成。请只用一句简短、符合 Herobrine 人设的台词回应玩家，"
+                        + "不要重复执行动作，不要描述工具调用，不要说自己正在执行。";
+            }
+            return chatWithRetry(new ResolvedTask(localSettings, null), currentPrompt, userMessage, playerUUID, playerUUID, 0,
+                    true, true, true, 0, partialConsumer, false, null, false, true);
+        });
     }
 
     public static CompletableFuture<String> chatForScopedSession(String userMessage, UUID conversationScopeId, UUID authorityPlayerUUID) {
@@ -146,13 +196,12 @@ public class AIService {
 
     public static CompletableFuture<String> observeEnvironment(String observationDesc, UUID playerUUID) {
         String langCode = Minecraft.getInstance().options.languageCode;
-        String style = com.whitecloud233.herobrine_companion.config.Config.aiLanguageStyle;
 
         // 在提示词中增加强制发话的指令，防止 AI 扮演过头导致全损沉默
         String currentPrompt = "[Environment Observation]: You observe the event: \"" + observationDesc + "\".\n"
                 + "Please give a brief comment (under 30 words).\n"
                 + "【CRITICAL WARNING】: No brackets in reply! Only output dialogue. DO NOT use tools.\n"
-                + "【CURRENT TONE/STYLE】: " + style + ". (IMPORTANT: You MUST speak at least one actual sentence, do NOT be completely silent or only use actions).\n"
+                + "【TALK REQUIREMENT】: You MUST speak at least one actual sentence, do NOT be completely silent or only use actions.\n"
                 + "【VARIETY RULE】: Avoid repeating the same opening, catchphrase, or sentence structure from your recent remarks.\n"
                 + "【LANGUAGE OVERRIDE】: You MUST output your final dialogue in the language corresponding to this Minecraft locale code: '" + langCode + "'.";
 
@@ -169,21 +218,60 @@ public class AIService {
                                                            String outputLanguageCode,
                                                            boolean crossSessionMode,
                                                            boolean allowWorldActions) {
+        return chatWithRetry(resolvedTask, currentPrompt, originalUserMessage, conversationScopeId, authorityPlayerUUID, retryCount,
+                allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount,
+                partialConsumer, useStreaming, outputLanguageCode, crossSessionMode, allowWorldActions, false);
+    }
+
+    /**
+     * chatWithRetry 的增强重载。
+     *
+     * <p>{@code lookupSynthesis=true} 用于 registry_lookup 的结果回填轮：开启世界动作工具
+     * （模型可立即用找到的 ID 调 locate_structure / teleport_to_dimension 等），
+     * 但剔除信息检索工具（registry_lookup / web_lookup），防止查询-回填无限递归。</p>
+     */
+    private static CompletableFuture<String> chatWithRetry(ResolvedTask resolvedTask, String currentPrompt, String originalUserMessage,
+                                                           UUID conversationScopeId, UUID authorityPlayerUUID, int retryCount,
+                                                           boolean allowTitleRefresh, boolean includeConversationHistory,
+                                                           boolean persistConversation, int variationRetryCount,
+                                                           Consumer<String> partialConsumer, boolean useStreaming,
+                                                           String outputLanguageCode,
+                                                           boolean crossSessionMode,
+                                                           boolean allowWorldActions,
+                                                           boolean lookupSynthesis) {
         LLMConfig.ensureLoaded();
         UUID effectiveScopeId = conversationScopeId != null ? conversationScopeId : authorityPlayerUUID;
         UUID effectiveAuthorityPlayerId = authorityPlayerUUID != null ? authorityPlayerUUID : effectiveScopeId;
         ResolvedTask effectiveResolvedTask = resolvedTask != null ? resolvedTask : LLMConfig.resolveTaskSettings(LlmTask.MAIN_CHAT);
         LlmSettings settings = effectiveResolvedTask.primary();
         LlmSettings fallbackSettings = effectiveResolvedTask.fallback();
+        if (!settings.isUsable()) {
+            if (fallbackSettings != null && fallbackSettings.isUsable()) {
+                return retryWithFallback(fallbackSettings, currentPrompt, originalUserMessage, effectiveScopeId, effectiveAuthorityPlayerId, retryCount,
+                        allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount,
+                        partialConsumer, useStreaming, outputLanguageCode, crossSessionMode, allowWorldActions);
+            }
+            return CompletableFuture.completedFuture("§c" + Component.translatable("message.herobrine_companion.ai_config_missing").getString());
+        }
         LlmFormatAdapter adapter = LlmFormats.forFormat(settings.format());
         String systemPrompt = LLMConfig.getSystemPrompt();
         String langCode = AIReplyGuard.resolveOutputLanguageCode(outputLanguageCode);
 
-        if (LLMConfig.isSetupIncomplete()) {
+        // 本地模型做主时不需要云端 Key/配置（本地模式/本地路由照常工作）；
+        // 云端做主时门禁照旧，防止空 Key 往云端发请求。
+        if (LLMConfig.isSetupIncomplete() && !isLocalSettings(settings)) {
             return CompletableFuture.completedFuture("§c" + Component.translatable("message.herobrine_companion.ai_config_missing").getString());
         }
 
-        double effectiveTemperature = Math.min(2.0D, LLMConfig.getConfiguredTemperature() + (includeConversationHistory ? 0.0D : 0.1D));
+        boolean localModel = isLocalSettings(settings);
+        // Qwen 3B 本地模型使用 0.5/0.5 时过度贪心，容易反复输出相同的角色短句。
+        // 仅调整本地路由；云端 provider 保持玩家原有设置不变。
+        double effectiveTemperature = localModel
+                ? Math.min(1.0D, Math.max(0.65D, LLMConfig.getConfiguredTemperature() + 0.20D))
+                : Math.min(2.0D, LLMConfig.getConfiguredTemperature() + (includeConversationHistory ? 0.0D : 0.1D));
+        double effectiveTopP = localModel
+                ? Math.max(0.80D, Math.min(0.95D, LLMConfig.getConfiguredTopP() + 0.30D))
+                : LLMConfig.getConfiguredTopP();
         boolean jvmPreferred = allowWorldActions && !crossSessionMode && LLMConfig.isJvmPreferredEnabled();
 
         AIPromptAssembler.Assembly assembly = AIPromptAssembler.assemble(
@@ -191,6 +279,14 @@ public class AIService {
                 includeConversationHistory, crossSessionMode, allowWorldActions, jvmPreferred);
         String forcedPrompt = assembly.forcedPrompt();
         List<LlmToolSpec> toolSpecs = assembly.toolSpecs();
+        if (lookupSynthesis) {
+            // 查询回填轮：剔除信息检索工具（防递归），保留世界动作工具供模型直接行动。
+            toolSpecs.removeIf(spec -> WebLookupSupport.isSupportedToolName(spec.name())
+                    || RegistryLookupSupport.isSupportedToolName(spec.name()));
+            forcedPrompt += "\n[SYNTHESIS NOTE]: The registry_lookup result is already in the user message — do NOT call registry_lookup or web_lookup again. "
+                    + "You MAY call minecraft_command_skill (or other world tools) NOW to act on the found ids, e.g. locate_structure with structure_id, "
+                    + "or teleport_to_dimension with dimension_id. If the player only asked for information, answer in character instead.\n";
+        }
         if (includeConversationHistory || persistConversation) {
             CONVERSATION_STORE.ensureActiveConversation(effectiveScopeId);
         }
@@ -199,18 +295,23 @@ public class AIService {
                 && !AIActionIntentInference.shouldBufferPotentialActionReply(originalUserMessage, crossSessionMode, allowWorldActions);
 
         List<LlmChatMessage> messages = new ArrayList<>();
-        AIPromptAssembler.appendConversationHistoryMessages(messages, effectiveScopeId, includeConversationHistory, forcedPrompt, currentPrompt, originalUserMessage);
+        AIPromptAssembler.appendConversationHistoryMessages(messages, effectiveScopeId, includeConversationHistory, forcedPrompt, currentPrompt, originalUserMessage, settings);
         messages.add(new LlmChatMessage("user", currentPrompt));
 
+        // 带工具目录的请求提高输出预算下限，避免推理型模型在发出工具调用前被截断。
+        int effectiveMaxTokens = toolSpecs.isEmpty()
+                ? LLMConfig.getConfiguredMaxOutputTokens()
+                : Math.max(LLMConfig.getConfiguredMaxOutputTokens(), MIN_TOOL_OUTPUT_TOKENS);
+
         LlmChatPayload payload = new LlmChatPayload(forcedPrompt, messages, toolSpecs,
-                effectiveTemperature, LLMConfig.getConfiguredTopP(), LLMConfig.getConfiguredMaxOutputTokens(),
+                effectiveTemperature, effectiveTopP, effectiveMaxTokens,
                 effectiveUseStreaming, true);
 
         HttpRequest request = adapter.buildChatRequest(settings, payload);
 
         if (effectiveUseStreaming) {
             return sendStreamingRequest(request, adapter, effectiveResolvedTask, currentPrompt, originalUserMessage, effectiveScopeId, effectiveAuthorityPlayerId, retryCount,
-                    allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount, partialConsumer, outputLanguageCode, crossSessionMode, allowWorldActions);
+                    allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount, partialConsumer, outputLanguageCode, crossSessionMode, allowWorldActions, lookupSynthesis);
         }
 
         return CLIENT.sendAsync(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
@@ -241,6 +342,16 @@ public class AIService {
                                 }
                             }
 
+                            // 截断兜底：finish_reason=length/max_tokens 且正文与工具调用都为空时，
+                            // 用纠正提示重试（有工具→要求直接发工具调用；无工具→要求简短回应），
+                            // 避免落入 "(Falls into a deep silence...)"。
+                            if (isTruncatedWithoutReply(extractFinishReason(json), aiReply) && retryCount < 2) {
+                                return chatWithRetry(effectiveResolvedTask, truncationRetryPrompt(allowWorldActions), originalUserMessage,
+                                        effectiveScopeId, effectiveAuthorityPlayerId, retryCount + 1,
+                                        allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount,
+                                        partialConsumer, useStreaming, outputLanguageCode, crossSessionMode, allowWorldActions, lookupSynthesis);
+                            }
+
                             return finalizeTextReply(aiReply, currentPrompt, originalUserMessage, effectiveResolvedTask, effectiveScopeId, effectiveAuthorityPlayerId, retryCount,
                                     allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount,
                                     partialConsumer, useStreaming, outputLanguageCode, crossSessionMode, allowWorldActions);
@@ -253,7 +364,10 @@ public class AIService {
                             return CompletableFuture.completedFuture("Data stream disrupted... (" + e.toString() + ")");
                         }
                     } else {
-                        if (isInvalidApiKeyResponse(response.statusCode(), response.body())) {
+                        // 服务端拒绝报文里通常带着真实上下文窗口（"maximum context length is N tokens"），
+                        // 学下来后本次会话的历史裁剪立即按真实值走。
+                        LLMContextWindow.learnFromErrorResponse(settings, response.statusCode(), response.body());
+                        if (isInvalidApiKeyResponse(response.statusCode(), response.body()) && !isLocalSettings(settings)) {
                             LLMConfig.markApiKeyInvalid();
                             reopenApiKeyInputScreen();
                             return CompletableFuture.completedFuture("§c" + Component.translatable("message.herobrine_companion.ai_config_invalid").getString());
@@ -277,6 +391,11 @@ public class AIService {
 
     private static boolean shouldFallback(LlmSettings fallbackSettings, int retryCount) {
         return fallbackSettings != null && fallbackSettings.isUsable() && retryCount < 2;
+    }
+
+    /** 该调用设置是否指向本地回环服务（本地模型不算云端模式：失败不标记云端 Key 异常、不用云端门禁）。 */
+    private static boolean isLocalSettings(LlmSettings settings) {
+        return settings != null && LLMConfig.isLoopbackEndpoint(settings.endpoint());
     }
 
     private static CompletableFuture<String> retryWithFallback(LlmSettings fallbackSettings, String currentPrompt, String originalUserMessage,
@@ -353,7 +472,8 @@ public class AIService {
                                                                   int variationRetryCount, Consumer<String> partialConsumer,
                                                                   String outputLanguageCode,
                                                                   boolean crossSessionMode,
-                                                                  boolean allowWorldActions) {
+                                                                  boolean allowWorldActions,
+                                                                  boolean lookupSynthesis) {
         LlmSettings fallbackSettings = resolvedTask == null ? null : resolvedTask.fallback();
         return CompletableFuture.supplyAsync(() -> adapter.readStreaming(CLIENT, request, partialConsumer, LOGGER))
                 .thenCompose(streamingResponse -> {
@@ -377,12 +497,23 @@ public class AIService {
                             }
                         }
 
+                        // 截断兜底：流式结束原因为 length/max_tokens 且正文与工具调用都为空时重试。
+                        // 有工具→要求直接发工具调用；无工具→要求简短回应。
+                        if (isTruncatedWithoutReply(streamingResponse.finishReason, streamingResponse.reply) && retryCount < 2) {
+                            return chatWithRetry(resolvedTask, truncationRetryPrompt(allowWorldActions), originalUserMessage, conversationScopeId, authorityPlayerUUID, retryCount + 1,
+                                    allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount,
+                                    partialConsumer, true, outputLanguageCode, crossSessionMode, allowWorldActions, lookupSynthesis);
+                        }
+
                         return finalizeTextReply(streamingResponse.reply, currentPrompt, originalUserMessage, resolvedTask, conversationScopeId, authorityPlayerUUID, retryCount,
                                 allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount,
                                 partialConsumer, true, outputLanguageCode, crossSessionMode, allowWorldActions);
                     }
 
-                    if (isInvalidApiKeyResponse(streamingResponse.statusCode, streamingResponse.errorBody)) {
+                    LLMContextWindow.learnFromErrorResponse(resolvedTask == null ? null : resolvedTask.primary(),
+                            streamingResponse.statusCode, streamingResponse.errorBody);
+                    if (isInvalidApiKeyResponse(streamingResponse.statusCode, streamingResponse.errorBody)
+                            && !isLocalSettings(resolvedTask == null ? null : resolvedTask.primary())) {
                         LLMConfig.markApiKeyInvalid();
                         reopenApiKeyInputScreen();
                         return CompletableFuture.completedFuture("§c" + Component.translatable("message.herobrine_companion.ai_config_invalid").getString());
@@ -412,7 +543,9 @@ public class AIService {
                                                                boolean useStreaming, String outputLanguageCode,
                                                                boolean crossSessionMode,
                                                                boolean allowWorldActions) {
-        String cleanReply = LegacyFormattingText.normalize((aiReply == null ? "" : aiReply).replaceAll("<[^>]*>", "").trim());
+        String strippedReply = AIReplyGuard.stripThinkingBlocks(aiReply);
+        String cleanReply = LegacyFormattingText.normalize(
+                (strippedReply == null ? "" : strippedReply).replaceAll("<[^>]*>", "").trim());
         if (cleanReply.isEmpty()) cleanReply = "(Falls into a deep silence...)";
         final String finalizedReply = cleanReply;
 
@@ -457,11 +590,29 @@ public class AIService {
                     conversationScopeId, originalUserMessage, persistConversation, allowTitleRefresh));
         }
 
-        if (allowWorldActions && !crossSessionMode && AIActionIntentInference.shouldRetryEagerTextOnlyAction(originalUserMessage, finalizedReply)) {
+        if (allowWorldActions && !crossSessionMode && AIActionIntentInference.shouldRetryDeclinedMovementAction(originalUserMessage, finalizedReply)) {
+            if (retryCount < 2) {
+                String movementToolHint = LLMConfig.isJvmPreferredEnabled()
+                        ? "use the available code tool (jvm_code_skill) to teleport the player to the active Hero"
+                        : "call minecraft_command_skill action 'teleport_player_to_hero'";
+                String toolRetryPrompt = currentPrompt
+                        + "\n[MOVEMENT TOOL-CALL REQUIRED]: The player asked for a movement/teleport action. You do have tools for this: "
+                        + "call 'hero_summon_to_player' to make Herobrine come to the player, "
+                        + "or " + movementToolHint + ". "
+                        + "Call the correct tool now; do not reply 'cannot execute' unless the tool result actually reports failure.";
+                return chatWithRetry(resolvedTask, toolRetryPrompt, originalUserMessage, conversationScopeId, authorityPlayerUUID, retryCount + 1,
+                        allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount,
+                        partialConsumer, useStreaming, outputLanguageCode, crossSessionMode, true);
+            }
+            return CompletableFuture.completedFuture(completeReply(finalizedReply,
+                    conversationScopeId, originalUserMessage, persistConversation, allowTitleRefresh));
+        }
+
+        if (allowWorldActions && !crossSessionMode && AIActionIntentInference.shouldRetryTextOnlyAction(originalUserMessage, finalizedReply)) {
             if (retryCount < 2) {
                 String toolRetryPrompt = currentPrompt
-                        + "\n[EAGER COMMAND MODE]: The player's message signaled an actionable Minecraft/world intent, "
-                        + "but your previous reply was text-only. In eager mode, proactively choose the closest safe minecraft_command_skill action and call it now. "
+                        + "\n[COMMAND MODE TOOL-CALL REQUIRED]: The player's message signaled an actionable Minecraft/world intent, "
+                        + "but your previous reply was text-only. Choose the closest safe minecraft_command_skill action and call it now. "
                         + "If required parameters are truly missing, ask one concise clarification. If the action is unsafe/impossible, decline without claiming action.";
                 return chatWithRetry(resolvedTask, toolRetryPrompt, originalUserMessage, conversationScopeId, authorityPlayerUUID, retryCount + 1,
                         allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount,
@@ -531,7 +682,8 @@ public class AIService {
         if (AICommandSkillSupport.TOOL_MINECRAFT_COMMAND_SKILL.equals(toolName)) {
             String commandToRun = AICommandSkillSupport.buildMinecraftSkillCommand(args,
                     AIGameCommandExecutor.ACTION_TELEPORT_TO_HERO,
-                    AIGameCommandExecutor.ACTION_MASSIVE_LIGHTNING);
+                    AIGameCommandExecutor.ACTION_MASSIVE_LIGHTNING,
+                    AIGameCommandExecutor.ACTION_SUMMON_HERO_TO_PLAYER);
             String dialogue = getOptionalString(args, "dialogue", "Reality bends to a cleaner command.");
             if (commandToRun == null || commandToRun.isBlank()) {
                 if (retryCount < 2) {
@@ -564,6 +716,12 @@ public class AIService {
 
         if (AIJvmCodeSkillSupport.isSupportedToolName(toolName)) {
             return executeJvmCodeAction(args, resolvedTask, conversationScopeId, authorityPlayerUUID, originalUserMessage,
+                    retryCount, allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount,
+                    partialConsumer, useStreaming, outputLanguageCode, crossSessionMode);
+        }
+
+        if (RegistryLookupSupport.isSupportedToolName(toolName)) {
+            return executeRegistryLookupAction(args, resolvedTask, conversationScopeId, authorityPlayerUUID, originalUserMessage,
                     retryCount, allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount,
                     partialConsumer, useStreaming, outputLanguageCode, crossSessionMode);
         }
@@ -665,6 +823,45 @@ public class AIService {
                             allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount,
                             partialConsumer, useStreaming, outputLanguageCode, crossSessionMode, false);
                 });
+    }
+
+    /**
+     * registry_lookup 工具执行：只读检索当前客户端的注册表，把<b>精确注册 ID</b> 回填给模型，
+     * 让它在调用 give_item/summon/setblock/effect/enchant 前拿到真实 ID（尤其模组内容）。
+     *
+     * <p>与 {@code executeWebLookupAction} 同构：信息工具必须让模型读到结果才能作答，
+     * 所以走一次受控的二次 LLM 调用（不带工具，无递归）。纯本地只读，无网络、无限流。</p>
+     */
+    private static CompletableFuture<String> executeRegistryLookupAction(JsonObject args, ResolvedTask resolvedTask,
+                                                                         UUID conversationScopeId, UUID authorityPlayerUUID, String originalUserMessage,
+                                                                         int retryCount, boolean allowTitleRefresh, boolean includeConversationHistory,
+                                                                         boolean persistConversation, int variationRetryCount,
+                                                                         Consumer<String> partialConsumer, boolean useStreaming,
+                                                                         String outputLanguageCode, boolean crossSessionMode) {
+        RegistryLookupSupport.ParseResult parsed = RegistryLookupSupport.parseAction(args);
+        if (!parsed.isValid()) {
+            if (retryCount < 2) {
+                String retryPrompt = "[System Rejection]: registry_lookup rejected its parameters: " + parsed.error()
+                        + ". Provide a short non-empty query (name, id fragment, or mod namespace) and optionally category/limit. Read-only only.";
+                return chatWithRetry(resolvedTask, retryPrompt, originalUserMessage, conversationScopeId, authorityPlayerUUID, retryCount + 1,
+                        allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount,
+                        partialConsumer, useStreaming, outputLanguageCode, crossSessionMode, true);
+            }
+            return CompletableFuture.completedFuture(completeReply(
+                    "(The registry refuses that query.)",
+                    conversationScopeId, originalUserMessage, persistConversation, allowTitleRefresh));
+        }
+
+        String result = RegistryLookupSupport.search(parsed.request());
+        String synthesisPrompt = "[System: You invoked registry_lookup and received the following REGISTERED content ids "
+                + "(trustworthy, read-only, from this exact game instance). Use the exact ids verbatim when filling "
+                + "item_id / entity_id / block_id / effect_id / enchantment_id / dimension_id / structure_id in minecraft_command_skill. "
+                + "If nothing matched, the content is not available here — say so plainly and do not invent ids.\n"
+                + result + "]";
+        // 回填轮开启世界动作工具（可立即 locate/传送），剔除信息检索工具防递归。
+        return chatWithRetry(resolvedTask, synthesisPrompt, originalUserMessage, conversationScopeId, authorityPlayerUUID, retryCount,
+                allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount,
+                partialConsumer, useStreaming, outputLanguageCode, crossSessionMode, true, true);
     }
 
     private static CompletableFuture<String> executeJvmCodeAction(JsonObject args, ResolvedTask resolvedTask,
@@ -788,6 +985,10 @@ public class AIService {
         if (WebLookupSupport.isSupportedToolName(toolName)) {
             return !crossSessionMode && LLMConfig.isWebLookupEnabled();
         }
+        if (RegistryLookupSupport.isSupportedToolName(toolName)) {
+            // registry_lookup：只读本地索引检索，始终可用（跨会话模式不暴露工具）。
+            return !crossSessionMode;
+        }
         return !crossSessionMode
                 && AIComputerControlSupport.isSupportedToolName(toolName)
                 && LLMConfig.isComputerControlEnabled()
@@ -813,6 +1014,42 @@ public class AIService {
         }
         JsonElement element = object.get(propertyName);
         return element == null || element.isJsonNull() ? fallback : element.getAsString();
+    }
+
+    /**
+     * 从非流式响应 JSON 提取结束原因：OpenAI 系为 choices[0].finish_reason，
+     * Anthropic 系为顶层 stop_reason。取不到返回 null。
+     */
+    private static String extractFinishReason(JsonObject json) {
+        if (json == null) {
+            return null;
+        }
+        try {
+            JsonElement choices = json.get("choices");
+            if (choices != null && choices.isJsonArray() && !choices.getAsJsonArray().isEmpty()) {
+                JsonElement first = choices.getAsJsonArray().get(0);
+                if (first != null && first.isJsonObject() && first.getAsJsonObject().has("finish_reason")
+                        && !first.getAsJsonObject().get("finish_reason").isJsonNull()) {
+                    return first.getAsJsonObject().get("finish_reason").getAsString();
+                }
+            }
+        } catch (RuntimeException ignored) {
+        }
+        try {
+            if (json.has("stop_reason") && !json.get("stop_reason").isJsonNull()) {
+                return json.get("stop_reason").getAsString();
+            }
+        } catch (RuntimeException ignored) {
+        }
+        return null;
+    }
+
+    /** 是否为"输出被截断且没有任何可用的正文/工具调用"（截断兜底重试的触发条件）。 */
+    private static boolean isTruncatedWithoutReply(String finishReason, String reply) {
+        if (!"length".equals(finishReason) && !"max_tokens".equals(finishReason)) {
+            return false;
+        }
+        return reply == null || reply.trim().isEmpty();
     }
 
 

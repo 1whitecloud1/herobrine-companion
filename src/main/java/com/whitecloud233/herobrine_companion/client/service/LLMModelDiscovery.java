@@ -20,6 +20,7 @@ import java.util.concurrent.CompletableFuture;
 public final class LLMModelDiscovery {
     private static final HttpClient CLIENT = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
+            .proxy(SystemProxy.SELECTOR)
             .build();
     private static final String ANTHROPIC_VERSION = "2023-06-01";
 

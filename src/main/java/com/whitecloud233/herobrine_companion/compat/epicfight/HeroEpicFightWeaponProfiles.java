@@ -83,12 +83,13 @@ public final class HeroEpicFightWeaponProfiles {
             return var10000;
          } else {
             CapabilityItem capability = EpicFightCapabilities.getItemStackCapability(stack);
-            if (capability != null && !capability.isEmpty()) {
-               return capability;
-            } else {
-               CapabilityItem inferredCapability = inferCapability(stack);
-               return inferredCapability != null ? inferredCapability : CapabilityItem.EMPTY;
+            CapabilityItem womCapability = HeroWomWeaponCompat.resolveCapability(stack, capability);
+            if (womCapability != null && !womCapability.isEmpty()) {
+               return womCapability;
             }
+
+            CapabilityItem inferredCapability = inferCapability(stack);
+            return inferredCapability != null ? inferredCapability : CapabilityItem.EMPTY;
          }
       } else {
          return CapabilityItem.EMPTY;
@@ -150,7 +151,7 @@ public final class HeroEpicFightWeaponProfiles {
 
    public static boolean hasHeroControlledCombatAnimations(ItemStack stack) {
       if (stack != null && !stack.isEmpty()) {
-         if (!isRangedLoadout(stack) && !(stack.getItem() instanceof PoemOfTheEndItem)) {
+         if (!isRangedLoadout(stack) && !(stack.getItem() instanceof PoemOfTheEndItem) && !HeroWomWeaponCompat.isSupported(stack)) {
             CapabilityItem capability = resolveCapability(stack);
             return capability != null && !capability.isEmpty();
          } else {

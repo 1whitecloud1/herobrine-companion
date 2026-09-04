@@ -195,6 +195,8 @@ public class HeroSummonItem extends Item {
                     newHero.load(heroData);
                     newHero.moveTo(targetPos.x, targetPos.y, targetPos.z, oldYRot, oldXRot);
                     newHero.setUUID(UUID.randomUUID());
+                    // 传送后 5 秒内抑制跟随 AI，防止刚落地就被拉回原处
+                    newHero.markTeleportFollowHold();
 
                     if (player != null) {
                         HeroStateManager.restoreFromGlobal(newHero, player);
@@ -213,8 +215,11 @@ public class HeroSummonItem extends Item {
                 // 近距离同维度传送，区块活跃，直接调用原版传送
                 existingHero.teleportTo(serverLevel, targetPos.x, targetPos.y, targetPos.z, Collections.emptySet(), existingHero.getYRot(), existingHero.getXRot());
                 existingHero.getNavigation().stop();
+                existingHero.setDeltaMovement(Vec3.ZERO);
                 existingHero.setTarget(null);
                 existingHero.setLastSummonedTime(currentTime);
+                // 传送后 5 秒内抑制跟随 AI，防止旧目标/跟随目标把 Hero 平移回原处
+                existingHero.markTeleportFollowHold();
 
                 if (player != null) {
                     player.sendSystemMessage(Component.translatable("message.herobrine_companion.hero_teleported"));
@@ -240,6 +245,7 @@ public class HeroSummonItem extends Item {
 
                 serverLevel.addFreshEntity(hero);
                 hero.setLastSummonedTime(currentTime);
+                hero.markTeleportFollowHold();
                 if (player != null) {
                     player.sendSystemMessage(Component.translatable("message.herobrine_companion.hero_summoned"));
                 }

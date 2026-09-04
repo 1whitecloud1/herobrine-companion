@@ -35,6 +35,7 @@ import com.whitecloud233.herobrine_companion.network.ai.UpdateClientLanguagePack
 import com.whitecloud233.herobrine_companion.network.AgentChatOutcomePacket;
 import com.whitecloud233.herobrine_companion.network.AgentRequestPacket;
 import com.whitecloud233.herobrine_companion.network.AgentStatusPacket;
+import com.whitecloud233.herobrine_companion.network.SyncServerConfigPacket;
 import com.whitecloud233.herobrine_companion.network.AgentToolResultPacket;
 import com.whitecloud233.herobrine_companion.network.ApproveToolPacket;
 import com.whitecloud233.herobrine_companion.network.ClearHeroMemoryPacket;
@@ -284,6 +285,14 @@ public class PacketHandler {
         registrar.playToClient(AgentToolResultPacket.TYPE, AgentToolResultPacket.STREAM_CODEC, AgentToolResultPacket::handle);
         registrar.playToClient(ToolApprovalPromptPacket.TYPE, ToolApprovalPromptPacket.STREAM_CODEC, ToolApprovalPromptPacket::handle);
         registrar.playToClient(HeroMemoryDigestPacket.TYPE, HeroMemoryDigestPacket.STREAM_CODEC, HeroMemoryDigestPacket::handle);
+
+        // ---------- 客户端设置实时同步到服务端 ----------
+        registrar.playToServer(SyncServerConfigPacket.TYPE, SyncServerConfigPacket.STREAM_CODEC, SyncServerConfigPacket::handle);
+
+        // ---------- 结构清单同步(C→S 请求 / S→C 响应, 服务端权威) ----------
+        // 注意：NeoForge 不允许同一 TYPE 双向注册，请求与响应必须拆成两个 payload 类型。
+        registrar.playToServer(StructureIndexRequestPacket.TYPE, StructureIndexRequestPacket.STREAM_CODEC, StructureIndexRequestPacket::handle);
+        registrar.playToClient(StructureIndexResponsePacket.TYPE, StructureIndexResponsePacket.STREAM_CODEC, StructureIndexResponsePacket::handle);
     }
 
     // 统一的发包入口:泛型方法覆盖所有包,不再需要按类型抄重载。

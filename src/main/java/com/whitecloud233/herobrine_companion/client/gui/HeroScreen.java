@@ -259,39 +259,41 @@ public class HeroScreen extends Screen {
                 confirmTime = System.currentTimeMillis();
             }
         }, Tooltip.create(Component.translatable(visited ? "gui.herobrine_companion.void_warning" : "gui.herobrine_companion.void_locked_tooltip"))).active = visited;
-        // 战斗模式按钮：不受 Epic Fight 是否加载限制（未装时装时也可见，tooltip 提示去时装）。
-        this.actionList.addDynamicAction(() -> {
-            boolean currentState = false;
-            boolean challengeActive = false;
-            if (this.minecraft.level != null) {
-                Entity e = this.minecraft.level.getEntity(this.entityId);
-                if (e instanceof HeroEntity h) {
-                    currentState = h.isBattleModeActive();
-                    challengeActive = h.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE);
+        // 战斗模式按钮：仅在检测到 Epic Fight 安装时显示（未安装时隐藏，避免无意义入口）。
+        if (HeroEpicFightCompat.isLoaded()) {
+            this.actionList.addDynamicAction(() -> {
+                boolean currentState = false;
+                boolean challengeActive = false;
+                if (this.minecraft.level != null) {
+                    Entity e = this.minecraft.level.getEntity(this.entityId);
+                    if (e instanceof HeroEntity h) {
+                        currentState = h.isBattleModeActive();
+                        challengeActive = h.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE);
+                    }
                 }
-            }
 
-            String key;
-            if (challengeActive) {
-                key = "gui.herobrine_companion.battle_mode_blocked";
-            } else {
-                key = currentState
-                        ? "gui.herobrine_companion.battle_mode_disable"
-                        : "gui.herobrine_companion.battle_mode_enable";
-            }
+                String key;
+                if (challengeActive) {
+                    key = "gui.herobrine_companion.battle_mode_blocked";
+                } else {
+                    key = currentState
+                            ? "gui.herobrine_companion.battle_mode_disable"
+                            : "gui.herobrine_companion.battle_mode_enable";
+                }
 
-            return Component.translatable(key).withStyle(style -> style.withColor(0xFF4FC3F7));
-        }, button -> {
-            PacketHandler.sendToServer(new ToggleBattleModePacket(this.entityId));
-            Entity entity = this.minecraft != null && this.minecraft.level != null ? this.minecraft.level.getEntity(this.entityId) : null;
-            boolean challengeActive = entity instanceof HeroEntity hero && hero.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE);
-            if (this.dummyHero != null && !challengeActive) {
-                this.dummyHero.setBattleModeActive(!this.dummyHero.isBattleModeActive());
-            }
-        }, Tooltip.create(Component.translatable(
-                HeroEpicFightCompat.isLoaded()
-                        ? "gui.herobrine_companion.battle_mode_tooltip"
-                        : HeroEpicFightCompat.getInstallHintKey())));
+                return Component.translatable(key).withStyle(style -> style.withColor(0xFF4FC3F7));
+            }, button -> {
+                PacketHandler.sendToServer(new ToggleBattleModePacket(this.entityId));
+                Entity entity = this.minecraft != null && this.minecraft.level != null ? this.minecraft.level.getEntity(this.entityId) : null;
+                boolean challengeActive = entity instanceof HeroEntity hero && hero.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE);
+                if (this.dummyHero != null && !challengeActive) {
+                    this.dummyHero.setBattleModeActive(!this.dummyHero.isBattleModeActive());
+                }
+            }, Tooltip.create(Component.translatable(
+                    HeroEpicFightCompat.isLoaded()
+                            ? "gui.herobrine_companion.battle_mode_tooltip"
+                            : HeroEpicFightCompat.getInstallHintKey())));
+        }
 
         // 清除障碍按钮
         boolean desolateUnlocked = currentTrust >= 70;

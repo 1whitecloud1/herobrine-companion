@@ -51,6 +51,9 @@ public class SelectCookOptionPacket implements CustomPacketPayload {
 
     public static void handle(SelectCookOptionPacket packet, IPayloadContext context) {
         context.enqueueWork(() -> {
+            com.mojang.logging.LogUtils.getLogger().info(
+                    "[CookDebug] 收到选菜包 hero={} pos={} recipe={} repeat={}",
+                    packet.heroId, packet.cookwarePos, packet.recipeId, packet.repeatCount);
             if (!(context.player() instanceof ServerPlayer player)) {
                 return;
             }

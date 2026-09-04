@@ -3,6 +3,7 @@ package com.whitecloud233.herobrine_companion.world.inventory;
 import com.whitecloud233.herobrine_companion.compat.accessories.HeroAccessoriesCompat;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.logic.data.HeroStateManager;
+import com.whitecloud233.herobrine_companion.util.HeroMenuValidity;
 import com.whitecloud233.herobrine_companion.world.inventory.ModMenus;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.world.entity.EquipmentSlot;
@@ -93,9 +94,12 @@ public class HeroWardrobeMenu extends AbstractContainerMenu {
     }
     public int getScreenHeight() { return BASE_SCREEN_HEIGHT + this.inventoryOffsetY; }
 
+    // 【核心修改】不再按 8 格距离判定菜单有效性：
+    // 只要 Herobrine 还存活且在玩家所在的已加载区块区域内，衣柜页面就保持打开，
+    // 走远一点（但仍处于同一加载区域）不会被强制关闭。
     @Override
     public boolean stillValid(Player player) {
-        return this.hero != null && this.hero.isAlive() && this.hero.distanceTo(player) < 8.0F;
+        return HeroMenuValidity.isHeroInPlayerLoadedArea(this.hero, player);
     }
 
     @Override

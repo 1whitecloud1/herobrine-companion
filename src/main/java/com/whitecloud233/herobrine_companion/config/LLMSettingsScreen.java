@@ -1,5 +1,6 @@
 package com.whitecloud233.herobrine_companion.config;
 
+import com.whitecloud233.herobrine_companion.BuildFlags;
 import com.whitecloud233.herobrine_companion.client.gui.AIDebugScreen;
 import com.whitecloud233.herobrine_companion.client.gui.HeroScreen;
 import com.whitecloud233.herobrine_companion.client.service.LLMConfig;
@@ -47,6 +48,8 @@ public class LLMSettingsScreen extends Screen {
         super.init();
         LLMConfig.ensureLoaded();
         if (!this.settingsLoaded) {
+            // 打开界面时从磁盘重读一次配置：玩家直接编辑 herobrine_companion_ai.json 后无需重启即可生效
+            LLMConfig.reloadFromDisk();
             this.systemPromptDraft = LLMConfig.getSystemPrompt();
             this.temperatureDraft = Double.toString(LLMConfig.getConfiguredTemperature());
             this.topPDraft = Double.toString(LLMConfig.getConfiguredTopP());
@@ -86,6 +89,16 @@ public class LLMSettingsScreen extends Screen {
                 button -> Minecraft.getInstance().setScreen(new LLMToolTogglesScreen(this)),
                 null
         ));
+
+        if (!BuildFlags.CF_SAFE) {
+            // 本地模型（下载推理引擎并启动进程）仅存在于完整版构建，安全版隐藏入口。
+            this.addRenderableWidget(new HeroScreen.ThemedButton(
+                    layout.localModelButtonX(), layout.actionButtonY(), layout.actionButtonWidth(), BUTTON_HEIGHT,
+                    Component.translatable("gui.herobrine_companion.llm_settings.local_model_button"),
+                    button -> Minecraft.getInstance().setScreen(new LocalModelScreen(this)),
+                    Tooltip.create(Component.translatable("gui.herobrine_companion.llm_settings.local_model_tooltip"))
+            ));
+        }
 
         this.addRenderableWidget(new HeroScreen.ThemedButton(
                 layout.agentStatusButtonX(), layout.actionButtonY(), layout.actionButtonWidth(), BUTTON_HEIGHT,
@@ -177,17 +190,18 @@ public class LLMSettingsScreen extends Screen {
         int numberBoxWidth = Math.max(1, (contentWidth - CONTROL_GAP * 2) / 3);
         int topPBoxX = editorX + numberBoxWidth + CONTROL_GAP;
         int maxOutputTokensBoxX = topPBoxX + numberBoxWidth + CONTROL_GAP;
-        int actionButtonWidth = Math.min(120, Math.max(1, (contentWidth - CONTROL_GAP * 4) / 5));
-        int actionGroupWidth = actionButtonWidth * 5 + CONTROL_GAP * 4;
+        int actionButtonWidth = Math.min(120, Math.max(1, (contentWidth - CONTROL_GAP * 5) / 6));
+        int actionGroupWidth = actionButtonWidth * 6 + CONTROL_GAP * 5;
         int saveButtonX = startX + (panelWidth - actionGroupWidth) / 2;
         int toolTogglesButtonX = saveButtonX + actionButtonWidth + CONTROL_GAP;
-        int agentStatusButtonX = toolTogglesButtonX + actionButtonWidth + CONTROL_GAP;
+        int localModelButtonX = toolTogglesButtonX + actionButtonWidth + CONTROL_GAP;
+        int agentStatusButtonX = localModelButtonX + actionButtonWidth + CONTROL_GAP;
         int debugButtonX = agentStatusButtonX + actionButtonWidth + CONTROL_GAP;
         int backButtonX = debugButtonX + actionButtonWidth + CONTROL_GAP;
         return new Layout(startX, startY, panelWidth, panelHeight, editorX, editorY, contentWidth, editorHeight,
                 editorHintY, numberLabelY, numberBoxY, numberBoxWidth, topPBoxX, maxOutputTokensBoxX,
-                numericHintY, validationY, saveButtonX, toolTogglesButtonX, agentStatusButtonX, debugButtonX, backButtonX,
-                actionButtonY, actionButtonWidth);
+                numericHintY, validationY, saveButtonX, toolTogglesButtonX, localModelButtonX, agentStatusButtonX,
+                debugButtonX, backButtonX, actionButtonY, actionButtonWidth);
     }
 
     private void updateSaveState() {
@@ -327,6 +341,7 @@ public class LLMSettingsScreen extends Screen {
             int validationY,
             int saveButtonX,
             int toolTogglesButtonX,
+            int localModelButtonX,
             int agentStatusButtonX,
             int debugButtonX,
             int backButtonX,

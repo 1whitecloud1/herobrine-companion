@@ -33,6 +33,9 @@ import java.util.*;
 import java.util.function.BooleanSupplier;
 
 public final class HeroKaleidoscopeCompat {
+    // 临时调试开关：定位 1.21.1 炒锅/菜板自主做菜卡住的问题，定位后删除
+    private static final org.slf4j.Logger COOK_DEBUG_LOGGER =
+            com.mojang.logging.LogUtils.getLogger();
     public static final int INVITED_ACTION_COOK = 4;
 
     private static final String MOD_ID = "kaleidoscope_cookery";
@@ -740,9 +743,18 @@ public final class HeroKaleidoscopeCompat {
         private static boolean tickPot(HeroEntity hero, ServerLevel level, ServerPlayer owner,
                                        com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.PotBlockEntity pot) {
             int status = pot.getStatus();
+            if (level.getGameTime() % 20L == 0L) {
+                COOK_DEBUG_LOGGER.info("[CookDebug] pot tick分支 status={} currentTick={}", status, pot.getCurrentTick());
+            }
             if (status == com.github.ysbbbbbb.kaleidoscopecookery.api.blockentity.IPot.FINISHED
                     || status == com.github.ysbbbbbb.kaleidoscopecookery.api.blockentity.IPot.BURNT) {
-                return tryTakeOutPot(hero, level, owner, pot);
+                if (tryTakeOutPot(hero, level, owner, pot)) {
+                    return true;
+                }
+                if (level.getGameTime() % 20L == 0L) {
+                    COOK_DEBUG_LOGGER.info("[CookDebug] pot 出锅失败 status={} result空={}", status, pot.getResult().isEmpty());
+                }
+                return false;
             }
 
             if (status == com.github.ysbbbbbb.kaleidoscopecookery.api.blockentity.IPot.COOKING) {
@@ -755,11 +767,15 @@ public final class HeroKaleidoscopeCompat {
             }
 
             List<PotPlan> plans = collectPotPlans(level, owner, pot);
+            int selectedIndex = plans.isEmpty() ? -1 : resolveSelectedRecipeIndex(hero, pot.getBlockPos(), plans);
+            if (level.getGameTime() % 20L == 0L) {
+                COOK_DEBUG_LOGGER.info("[CookDebug] pot plans={} sel={} status={} currentTick={}",
+                        plans.size(), selectedIndex, status, pot.getCurrentTick());
+            }
             if (plans.isEmpty()) {
                 return false;
             }
 
-            int selectedIndex = resolveSelectedRecipeIndex(hero, pot.getBlockPos(), plans);
             if (selectedIndex < 0) {
                 return false;
             }
@@ -769,6 +785,9 @@ public final class HeroKaleidoscopeCompat {
                 if (tryAccessibleStacks(owner, stack -> pot.onPlaceOil(level, owner, stack))) {
                     return true;
                 }
+                if (level.getGameTime() % 20L == 0L) {
+                    COOK_DEBUG_LOGGER.info("[CookDebug] pot 放油失败（背包无油壶/带油锅铲）");
+                }
                 return false;
             }
 
@@ -777,6 +796,9 @@ public final class HeroKaleidoscopeCompat {
                 if (pot.addIngredient(level, owner, nextIngredient)) {
                     owner.getInventory().setChanged();
                     return true;
+                }
+                if (level.getGameTime() % 20L == 0L) {
+                    COOK_DEBUG_LOGGER.info("[CookDebug] pot addIngredient 失败: {}", nextIngredient);
                 }
                 return false;
             }
@@ -843,11 +865,16 @@ public final class HeroKaleidoscopeCompat {
         private static boolean tickChoppingBoard(HeroEntity hero, ServerLevel level, ServerPlayer owner,
                                                  com.github.ysbbbbbb.kaleidoscopecookery.blockentity.kitchen.ChoppingBoardBlockEntity choppingBoard) {
             List<ChoppingBoardPlan> plans = collectChoppingBoardPlans(level, owner, choppingBoard);
+            int selectedIndex = plans.isEmpty() ? -1 : resolveSelectedRecipeIndex(hero, choppingBoard.getBlockPos(), plans);
+            if (level.getGameTime() % 20L == 0L) {
+                COOK_DEBUG_LOGGER.info("[CookDebug] board plans={} sel={} cutStack空={} cut={}/{}",
+                        plans.size(), selectedIndex, choppingBoard.getCurrentCutStack().isEmpty(),
+                        choppingBoard.getCurrentCutCount(), choppingBoard.getMaxCutCount());
+            }
             if (plans.isEmpty()) {
                 return false;
             }
 
-            int selectedIndex = resolveSelectedRecipeIndex(hero, choppingBoard.getBlockPos(), plans);
             if (selectedIndex < 0) {
                 return false;
             }
@@ -858,6 +885,9 @@ public final class HeroKaleidoscopeCompat {
                 if (ingredientStack != null && !ingredientStack.isEmpty() && choppingBoard.onPutItem(level, owner, ingredientStack)) {
                     owner.getInventory().setChanged();
                     return true;
+                }
+                if (level.getGameTime() % 20L == 0L) {
+                    COOK_DEBUG_LOGGER.info("[CookDebug] board onPutItem 失败: {}", ingredientStack);
                 }
                 return false;
             }
@@ -876,6 +906,9 @@ public final class HeroKaleidoscopeCompat {
                     consumeCookRepeat(hero, choppingBoard.getBlockPos());
                 }
                 return true;
+            }
+            if (level.getGameTime() % 20L == 0L) {
+                COOK_DEBUG_LOGGER.info("[CookDebug] board onCutItem 失败");
             }
             return false;
         }
@@ -1456,8 +1489,13 @@ public final class HeroKaleidoscopeCompat {
             boolean updated = false;
             updated |= setFieldValue(stockpot, "recipeId", recipeId);
             if (recipeHolder != null) {
-                stockpot.recipe = recipeHolder;
+                // cookery 1.3.x 有公开字段 recipe，1.4.x 移除（改为按 recipeId 解析），反射写入以同时兼容两版
+                updated |= setFieldValue(stockpot, "recipe", recipeHolder);
                 updated |= setFieldValue(stockpot, "soupBaseId", recipeHolder.value().soupBase());
+                Object visuals = invokeGetter(recipeHolder.value(), "visuals");
+                if (visuals != null) {
+                    updated |= setFieldValue(stockpot, "visuals", visuals);
+                }
             }
             updated |= setFieldValue(stockpot, "result", result.copy());
             updated |= setFieldValue(stockpot, "status", com.github.ysbbbbbb.kaleidoscopecookery.api.blockentity.IStockpot.FINISHED);
@@ -1581,6 +1619,15 @@ public final class HeroKaleidoscopeCompat {
                 return true;
             } catch (IllegalAccessException ignored) {
                 return false;
+            }
+        }
+
+        @Nullable
+        private static Object invokeGetter(Object target, String methodName) {
+            try {
+                return target.getClass().getMethod(methodName).invoke(target);
+            } catch (ReflectiveOperationException | RuntimeException ignored) {
+                return null;
             }
         }
 

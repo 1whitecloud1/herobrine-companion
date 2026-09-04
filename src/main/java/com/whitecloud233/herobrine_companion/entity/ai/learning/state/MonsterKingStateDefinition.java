@@ -119,7 +119,9 @@ public final class MonsterKingStateDefinition implements HeroMindStateDefinition
 
         Monster nearestMonster = monsters.isEmpty() ? null : monsters.get(0);
         if (nearestMonster != null) {
-            hero.getLookControl().setLookAt(nearestMonster, 20.0F, 20.0F);
+            // 走统一注视入口：记录续瞄目标并以 10°/tick 平滑瞄准，避免锯齿甩头
+            HeroStateBehaviorSupport.lookAtPos(hero,
+                    new net.minecraft.world.phys.Vec3(nearestMonster.getX(), nearestMonster.getEyeY(), nearestMonster.getZ()));
         } else {
             HeroStateBehaviorSupport.clearAggroAndLookAt(hero, focus);
         }

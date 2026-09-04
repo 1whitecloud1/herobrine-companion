@@ -139,11 +139,10 @@ public final class ObserverStateDefinition implements HeroMindStateDefinition {
             return;
         }
 
-        if (hero.tickCount % 40 == 0 || hero.getDeltaMovement().horizontalDistanceSqr() < 0.01D) {
-            HeroStateBehaviorSupport.clearAggroAndLookAt(hero, focus);
-        } else {
-            HeroStateBehaviorSupport.alignHeadToBody(hero);
-        }
+        // 持续注视玩家：目标由 HeroStateGoals 逐 tick 续瞄（10°/tick 平滑）。
+        // 不再用 0.01 速度阈值在"追瞄/回正"之间切换——移动时速度在阈值附近反复横跳，
+        // 配合 alignHeadToBody 的硬回正，正是头部快速左右摆动的直接原因。
+        HeroStateBehaviorSupport.clearAggroAndLookAt(hero, focus);
 
         if (hero.tickCount % 120 == 0) {
             HeroStateBehaviorSupport.clearAnomalyFire((ServerLevel) hero.level(), hero.blockPosition(), 5);

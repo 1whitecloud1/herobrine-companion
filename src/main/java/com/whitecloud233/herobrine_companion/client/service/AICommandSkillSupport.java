@@ -62,6 +62,7 @@ final class AICommandSkillSupport {
             "summon", "tag", "msg", "tell", "w", "tellraw", "time", "title", "teleport",
             "tp", "transfer", "weather", "whitelist",
             "teleport_player_to_hero",
+            "hero_summon_to_player",
             "massive_lightning", "discard_nearby_entities", "discard_nearby_world",
             "kill_player", "kick_player",
             "set_time", "set_weather", "set_difficulty", "set_gamemode", "set_gamerule",
@@ -117,7 +118,7 @@ final class AICommandSkillSupport {
         return TOOL_MANIFEST_DIVINE_POWER.equals(toolName) || TOOL_MINECRAFT_COMMAND_SKILL.equals(toolName);
     }
 
-    static String buildMinecraftSkillCommand(JsonObject args, String actionTeleportToHero, String actionMassiveLightning) {
+    static String buildMinecraftSkillCommand(JsonObject args, String actionTeleportToHero, String actionMassiveLightning, String actionSummonHeroToPlayer) {
         String action = getOptionalString(args, "action", "").trim().toLowerCase(Locale.ROOT);
         return switch (action) {
             case "clear" -> buildClearInventoryCommand(args);
@@ -168,6 +169,7 @@ final class AICommandSkillSupport {
             case "weather" -> buildSetWeatherCommand(args);
             case "whitelist" -> buildWhitelistCommand(args);
             case "teleport_player_to_hero" -> actionTeleportToHero;
+            case "hero_summon_to_player" -> actionSummonHeroToPlayer;
             case "massive_lightning" -> actionMassiveLightning;
             case "discard_nearby_entities" -> HeroAIActionPacket.ACTION_DISCARD_ENTITIES;
             case "discard_nearby_world" -> HeroAIActionPacket.ACTION_DISCARD;
@@ -277,6 +279,8 @@ final class AICommandSkillSupport {
         return "MCP-style structured Minecraft Java Edition command catalog for Herobrine. Pick one action enum and fill parameter slots; never invent raw /commands for covered actions. "
                 + "Project runtime is Minecraft Java 1.21.1, so newer wiki commands may be documented here but can still be rejected by the 1.21.1 dispatcher. "
                 + "The Java side validates ids, selector presets, simple text, coordinates, and numeric ranges before generating the command. "
+                + "Item/entity/block/effect/enchantment/particle/sound ids are checked against the live registries: vanilla ids (minecraft:x or bare x) and installed-mod ids (modid:x) both work; hallucinated or uninstalled mod ids are rejected. "
+                + "If unsure of an exact id — especially modded content — call the read-only 'registry_lookup' tool first to resolve exact ids. "
                 + "Use aliases only when the requested command name is an alias; otherwise prefer the canonical action. "
                 + MinecraftJavaCommandCatalog.compactToolReference();
     }
@@ -302,20 +306,20 @@ final class AICommandSkillSupport {
         addEnumProperty(properties, "coordinate_mode", "For teleport_to_coordinates. absolute uses x/y/z, relative uses offset_x/offset_y/offset_z, local_forward uses distance with ^ ^ ^distance.",
                 "absolute", "relative", "local_forward");
 
-        addStringProperty(properties, "item_id", "For give_item or clear_inventory. Prefer vanilla id like minecraft:diamond or diamond; current-client localized display names may be resolved.");
-        addStringProperty(properties, "entity_id", "For summon_entity_nearby. Prefer vanilla id like minecraft:zombie or zombie; current-client localized display names may be resolved.");
-        addStringProperty(properties, "block_id", "For set_block_nearby or fill_nearby_region. Prefer vanilla block id like minecraft:stone or stone; current-client localized display names may be resolved; block states/NBT are not accepted.");
-        addStringProperty(properties, "effect_id", "For effect_give/effect_clear. Prefer vanilla effect id like minecraft:speed or speed; current-client localized display names may be resolved.");
-        addStringProperty(properties, "enchantment_id", "For enchant_held_item. Prefer vanilla enchantment id like minecraft:sharpness or sharpness; current-client localized display names may be resolved.");
+        addStringProperty(properties, "item_id", "For give_item or clear_inventory. Registered item id: minecraft:diamond, diamond, or modid:item_id for installed mods (e.g. efn:yamato); current-client localized display names may be resolved.");
+        addStringProperty(properties, "entity_id", "For summon_entity_nearby. Registered entity id: minecraft:zombie, zombie, or modid:entity_id for installed mods; current-client localized display names may be resolved.");
+        addStringProperty(properties, "block_id", "For set_block_nearby or fill_nearby_region. Registered block id: minecraft:stone, stone, or modid:block_id for installed mods; current-client localized display names may be resolved; block states/NBT are not accepted.");
+        addStringProperty(properties, "effect_id", "For effect_give/effect_clear. Registered effect id: minecraft:speed, speed, or modid:effect_id for installed mods; current-client localized display names may be resolved.");
+        addStringProperty(properties, "enchantment_id", "For enchant_held_item. Registered enchantment id: minecraft:sharpness, sharpness, or modid:enchantment_id for installed mods; current-client localized display names may be resolved.");
         addStringProperty(properties, "particle_id", "For particle. Vanilla particle id like minecraft:flame; checked against the runtime registry.");
         addStringProperty(properties, "sound_id", "For play_sound. Vanilla sound id like minecraft:entity.lightning_bolt.thunder; checked against the runtime registry.");
         addStringProperty(properties, "damage_type", "For damage. Vanilla damage type id.");
-        addStringProperty(properties, "structure_id", "For locate_structure. Vanilla structure id like minecraft:village_plains or village_plains.");
+        addStringProperty(properties, "structure_id", "For locate_structure. Registered structure id: minecraft:village_plains, village_plains, or modid:structure_id for installed mods; checked against the loaded world's structure registry.");
         addStringProperty(properties, "biome_id", "For locate_biome. Vanilla biome id like minecraft:cherry_grove or cherry_grove.");
         addStringProperty(properties, "poi_id", "For locate poi. Vanilla point-of-interest id.");
         addStringProperty(properties, "feature_id", "For place feature. Vanilla configured feature id.");
         addStringProperty(properties, "template_id", "For place_template. Vanilla/configured structure template id.");
-        addStringProperty(properties, "dimension_id", "For teleport_to_dimension. Vanilla dimension id like minecraft:the_nether or minecraft:overworld.");
+        addStringProperty(properties, "dimension_id", "For teleport_to_dimension or execute in. Registered dimension id like minecraft:the_nether, the_nether, or modid:dimension_id for installed mods; checked against the connected server's dimension list.");
         addStringProperty(properties, "advancement_id", "For advancement grant/revoke. Vanilla advancement id, or omit when advancement_mode=everything.");
         addStringProperty(properties, "attribute_id", "For attribute commands. Vanilla attribute id like minecraft:generic.max_health; checked against the runtime registry.");
         addStringProperty(properties, "bossbar_id", "For bossbar commands. Resource id, preferably minecraft:herobrine_*.");
@@ -448,7 +452,7 @@ final class AICommandSkillSupport {
     private static String buildDivineSpellbookDescription() {
         return "Low-level fallback only. Alter Minecraft 1.21.1 underlying code by generating vanilla commands or action codes (NO '/' prefix). "
                 + "Prefer minecraft_command_skill for: teleport/follow, lightning, time/weather/difficulty/gamemode/gamerule, give/clear/enchant/xp, summon, tp coordinates/dimensions, spawnpoint, setblock/fill, effects, particles, sounds, locate/place, entity/world discard, kill/kick. "
-                + "If forced to use this fallback: [Teleport] use 'action:teleport_to_hero'. "
+                + "If forced to use this fallback: [Teleport] use 'action:teleport_to_hero' or 'action:summon_hero_to_player'. "
                 + "[Punishment] use 'action:massive_lightning', 'action:punishment_kill_player', or 'action:punishment_kick_player' only when explicitly justified. "
                 + "[Entity Annihilation] use '" + HeroAIActionPacket.ACTION_DISCARD_ENTITIES + "' for creature-only erasure. "
                 + "[World Erasure] use '" + HeroAIActionPacket.ACTION_DISCARD + "' only for explicit terrain/world deletion. ";
@@ -595,7 +599,7 @@ final class AICommandSkillSupport {
         }
         StringBuilder command = new StringBuilder("execute");
         if (hasText(args, "dimension_id")) {
-            String dimensionId = normalizeResourceId(getOptionalString(args, "dimension_id", ""));
+            String dimensionId = MinecraftJavaIdResolver.dimensionId(getOptionalString(args, "dimension_id", ""));
             if (dimensionId == null) {
                 return null;
             }
@@ -862,7 +866,9 @@ final class AICommandSkillSupport {
     }
 
     private static String buildLocateCommand(JsonObject args, String fieldName, String locateType) {
-        String id = normalizeResourceId(getOptionalString(args, fieldName, ""));
+        String id = "structure".equals(locateType)
+                ? MinecraftJavaIdResolver.structureId(getOptionalString(args, fieldName, ""))
+                : normalizeResourceId(getOptionalString(args, fieldName, ""));
         return id == null ? null : "locate " + locateType + " " + id;
     }
 
@@ -941,7 +947,7 @@ final class AICommandSkillSupport {
                 yield id == null ? null : "place feature " + id + " " + pos;
             }
             case "structure" -> {
-                String id = normalizeResourceId(getOptionalString(args, "structure_id", ""));
+                String id = MinecraftJavaIdResolver.structureId(getOptionalString(args, "structure_id", ""));
                 yield id == null ? null : "place structure " + id + " " + pos;
             }
             case "jigsaw" -> {
@@ -1201,7 +1207,7 @@ final class AICommandSkillSupport {
     }
 
     private static String buildTeleportDimensionCommand(JsonObject args) {
-        String dimensionId = normalizeResourceId(getOptionalString(args, "dimension_id", ""));
+        String dimensionId = MinecraftJavaIdResolver.dimensionId(getOptionalString(args, "dimension_id", ""));
         if (dimensionId == null) {
             return null;
         }
@@ -1616,7 +1622,8 @@ final class AICommandSkillSupport {
                 .compile("(?<![a-z0-9_.-])([a-z0-9_.-]+):[a-z0-9_/.-]+")
                 .matcher(value.toLowerCase(Locale.ROOT));
         while (matcher.find()) {
-            if (!VANILLA_NAMESPACE.equals(matcher.group(1))) {
+            if (!VANILLA_NAMESPACE.equals(matcher.group(1))
+                    && !MinecraftJavaIdResolver.isRegisteredModResource(matcher.group())) {
                 return null;
             }
         }

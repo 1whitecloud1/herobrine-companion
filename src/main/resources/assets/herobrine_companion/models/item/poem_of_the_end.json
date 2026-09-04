@@ -1,3 +1,82 @@
 {
-	"parent": "herobrine_companion:item/poem_of_the_end_base"
+  "credit": "Made with Blockbench - GeckoLib Model (liandao)",
+  "parent": "builtin/entity",
+  "gui_light": "front",
+  "display": {
+    "thirdperson_righthand": {
+      "translation": [
+        -6.5,
+        -32.25,
+        20.5
+      ]
+    },
+    "thirdperson_lefthand": {
+      "translation": [
+        6.25,
+        -32.25,
+        21.25
+      ]
+    },
+    "firstperson_righthand": {
+      "rotation": [
+        -15,
+        -3,
+        -10
+      ],
+      "translation": [
+        -9,
+        -21,
+        23
+      ],
+      "scale": [
+        0.53,
+        0.58,
+        0.53
+      ]
+    },
+    "ground": {
+      "translation": [
+        -3.5,
+        -10,
+        6.5
+      ],
+      "scale": [
+        0.38,
+        0.38,
+        0.39
+      ]
+    },
+    "head": {
+      "translation": [
+        -7.75,
+        -33.75,
+        0
+      ]
+    },
+    "fixed": {
+      "rotation": [
+        -93.19,
+        -54.64,
+        -93.21
+      ],
+      "translation": [
+        -16.5,
+        -9.25,
+        -3.25
+      ],
+      "scale": [
+        0.38,
+        0.37,
+        0.36
+      ]
+    },
+    "on_shelf": {
+      "translation": [
+        0,
+        -29.25,
+        17.5
+      ]
+    }
+  },
+  "_comment_gui": "物品栏图标由 PoemOfTheEndFlatRenderer 用 2D 模型 poem_of_the_end_base 绘制，故此处不提供 gui 变换（否则 vanilla 会把这套为 3D 调的变换叠加到 2D 贴图上）"
 }

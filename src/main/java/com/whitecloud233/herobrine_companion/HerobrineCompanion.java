@@ -52,6 +52,7 @@ public class HerobrineCompanion {
         ModCreativeTabs.CREATIVE_MODE_TABS.register(modEventBus);
         ModBlockEntities.BLOCK_ENTITY_TYPES.register(modEventBus);
         ModLootModifiers.GLOBAL_LOOT_MODIFIER_SERIALIZERS.register(modEventBus);
+        ModParticles.PARTICLES.register(modEventBus);
         ModMenus.MENUS.register(modEventBus); 
         
         ModEntities.ENTITY_TYPES.register(modEventBus);

@@ -27,6 +27,18 @@ public final class AIReplyGuard {
     private AIReplyGuard() {
     }
 
+    /** 剥离 Qwen3 类模型的思考块（{@code <|think|>...<|/think|>}），玩家只看到正文。
+     *  本地给 Qwen3 等混合推理模型用时，无论引擎是否开启思考模式，回复都保持干净。 */
+    public static String stripThinkingBlocks(String text) {
+        if (text == null || text.isEmpty()) {
+            return text;
+        }
+        String stripped = text.replaceAll("(?is)<\\|think\\|>.*?<\\|/think\\|>", "");
+        // 兜底：去掉残留的未闭合/孤立思考标记
+        stripped = stripped.replaceAll("(?i)<\\|/?\\s*think\\s*\\|>", "");
+        return stripped.trim();
+    }
+
     /** 清空某个玩家的最近回复缓存（换人/清空历史时调用）。 */
     static void clearTransientHistory(UUID playerUUID) {
         if (playerUUID == null) {

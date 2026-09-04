@@ -1,6 +1,7 @@
 {
 	"format_version": "1.9.0",
 	"credit": "Made with Blockbench",
+	"gui_light": "front",
 	"textures": {
 		"0": "herobrine_companion:item/poem_of_the_end",
 		"particle": "herobrine_companion:item/poem_of_the_end"

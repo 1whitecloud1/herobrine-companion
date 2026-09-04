@@ -1,5 +1,6 @@
 # Gradle 缓存
 .gradle/
+.gradle-home/
 build/
 
 # IDE 配置 (IntelliJ IDEA / Eclipse)
@@ -39,3 +40,4 @@ libraries/
 .vscode/
 .workbuddy/
 /libs/Herobrine Companion-*.jar
+/docs/

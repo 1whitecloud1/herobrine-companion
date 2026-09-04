@@ -1,7 +1,12 @@
 package com.whitecloud233.herobrine_companion.config;
 
+import com.whitecloud233.herobrine_companion.BuildFlags;
+import com.whitecloud233.herobrine_companion.client.event.ClientHooks;
+import com.whitecloud233.herobrine_companion.client.llm.LlmSettings;
 import com.whitecloud233.herobrine_companion.client.service.LLMConfig;
+import com.whitecloud233.herobrine_companion.client.service.LLMContextWindow;
 import com.whitecloud233.herobrine_companion.client.service.LLMModelDiscovery;
+import com.whitecloud233.herobrine_companion.client.service.LocalModelLauncher;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -42,6 +47,7 @@ public class ApiKeyInputScreen extends Screen {
     private Button routingButton;
     private Button cancelButton;
     private Button fetchModelsButton;
+    private Button localPageButton;
     private EditBox apiKeyBox;
     private EditBox providerIdBox;
     private EditBox endpointBox;
@@ -91,6 +97,18 @@ public class ApiKeyInputScreen extends Screen {
         this.qiniuButton = this.addRenderableWidget(this.createProviderButton(layout.contentX() + (layout.providerButtonWidth() + CONTROL_GAP) * 2, layout.providerButtonY(), layout.providerButtonWidth(), LLMConfig.Provider.QINIU_CLOUD));
         this.geminiButton = this.addRenderableWidget(this.createProviderButton(layout.contentX() + (layout.providerButtonWidth() + CONTROL_GAP) * 3, layout.providerButtonY(), layout.providerButtonWidth(), LLMConfig.Provider.GEMINI));
         this.customButton = this.addRenderableWidget(this.createProviderButton(layout.contentX() + (layout.providerButtonWidth() + CONTROL_GAP) * 4, layout.providerButtonY(), layout.providerButtonWidth(), LLMConfig.Provider.CUSTOM));
+
+        // 本地模型独立管理页入口（下载/进度/显卡推荐/启用关闭开关都在该页完成）。
+        // 安全版构建不含本地模型功能（下载引擎+启动进程），隐藏入口；字段保留 null 且下方
+        // localPageButton != null 判断已兜底。
+        if (!BuildFlags.CF_SAFE) {
+            this.localPageButton = this.addRenderableWidget(Button.builder(
+                            Component.translatable("gui.herobrine_companion.api_setup.local_page_button"),
+                            (button) -> this.minecraft.setScreen(new LocalModelScreen(this)))
+                    .pos(layout.contentX(), layout.localButtonY())
+                    .size(layout.contentWidth(), BUTTON_HEIGHT)
+                    .build());
+        }
 
         // 创建 API Key 输入框，使用翻译键
         this.apiKeyBox = new MouseSelectableEditBox(this.font, layout.contentX(), layout.apiKeyBoxY(), layout.contentWidth(), BUTTON_HEIGHT, Component.translatable("gui.herobrine_companion.api_setup.api_key"));
@@ -168,6 +186,17 @@ public class ApiKeyInputScreen extends Screen {
                 LLMConfig.customApiFormat = draft.apiFormat;
             }
             LLMConfig.saveProviderSettings(this.selectedProvider, draft.providerId, draft.apiKey, draft.endpoint, draft.modelId, draft.modelName);
+            // 保存云端模型 = 明确要切回云端。本地模型若正在接管聊天，必须整机关掉：
+            // 只清路由会留下"llama 进程还活着、状态却显示未启用"的不一致（进程占着显存和 8090 端口，
+            // 下次启用还会撞端口）。clearLocalModel 清槽位 + 清路由 + 落盘，随后异步停进程回收端口。
+            if (LLMConfig.isLocalRouteActive()) {
+                LLMConfig.clearLocalModel(); // 内部已落盘：清槽位 + 清路由
+                LocalModelLauncher.stopServerAndReclaimPortAsync();
+            } else {
+                LLMConfig.clearLocalChatRoutes();
+                LLMConfig.save();
+            }
+            ClientHooks.setApiEnabled(true);
             this.minecraft.setScreen(this.lastScreen);
         }).pos(layout.saveButtonX(), layout.actionButtonY()).size(layout.actionButtonWidth(), BUTTON_HEIGHT).build());
 
@@ -206,7 +235,8 @@ public class ApiKeyInputScreen extends Screen {
 
         int titleY = contentTop;
         int promptY = titleY + 15;
-        int providerPromptY = promptY + 13;
+        int localButtonY = promptY + 16;
+        int providerPromptY = localButtonY + BUTTON_HEIGHT + 4;
         int providerButtonY = providerPromptY + 12;
         int fieldGap = Math.max(24, Math.min(30, (contentHeight - 132) / 4));
         int apiKeyBoxY = providerButtonY + 40;
@@ -230,7 +260,7 @@ public class ApiKeyInputScreen extends Screen {
         int cancelButtonX = routingButtonX + actionButtonWidth + ACTION_GAP;
 
         return new Layout(contentX, contentTop, contentWidth, contentHeight, centerX,
-                titleY, promptY, providerPromptY, providerButtonY, providerButtonWidth,
+                titleY, promptY, localButtonY, providerPromptY, providerButtonY, providerButtonWidth,
                 apiKeyBoxY, providerIdBoxY, endpointBoxY, modelBoxY, modelBoxWidth,
                 fetchButtonX, fetchButtonWidth, modelNameBoxY, formatBoxY, actionButtonY, actionButtonWidth,
                 saveButtonX, routingButtonX, cancelButtonX, warningY, infoY, modelBoxY + BUTTON_HEIGHT + 2,
@@ -297,6 +327,10 @@ public class ApiKeyInputScreen extends Screen {
         if (this.customButton != null) {
             this.customButton.setX(layout.contentX() + (layout.providerButtonWidth() + CONTROL_GAP) * 4);
             this.customButton.setY(layout.providerButtonY());
+        }
+        if (this.localPageButton != null) {
+            this.localPageButton.setX(layout.contentX());
+            this.localPageButton.setY(layout.localButtonY());
         }
         if (this.apiKeyBox != null) {
             this.apiKeyBox.setX(layout.contentX());
@@ -629,6 +663,25 @@ public class ApiKeyInputScreen extends Screen {
                 });
     }
 
+    /**
+     * 拉取模型列表成功后，用当前输入的 endpoint/key/model 探测真实上下文窗口。
+     * 结果按 endpoint+model 缓存并落盘；重复选择同一模型不会再发请求。
+     */
+    private void probeContextWindowAsync() {
+        String endpoint = this.getCurrentEndpointInput();
+        String apiKey = this.apiKeyBox.getValue().trim();
+        String model = this.modelBox.getValue().trim();
+        if (endpoint.isEmpty() || model.isEmpty() || apiKey.isEmpty()
+                || apiKey.equals(LLMConfig.getDefaultApiKeyPlaceholder())) {
+            return;
+        }
+        LLMConfig.Provider provider = this.selectedProvider == null ? LLMConfig.Provider.QINIU_CLOUD : this.selectedProvider;
+        LLMConfig.EndpointFormat endpointFormat = provider == LLMConfig.Provider.CUSTOM && LLMConfig.getCustomApiFormat() != null
+                ? LLMConfig.getCustomApiFormat()
+                : LLMConfig.detectEndpointFormat(endpoint);
+        LLMContextWindow.probeIfStale(LlmSettings.of(endpoint, apiKey, model, provider, endpointFormat));
+    }
+
     private void handleModelDiscoveryResult(String discoveryKey, LLMModelDiscovery.ModelDiscoveryResult result) {
         this.modelDiscoveryInFlight = false;
         if (!discoveryKey.equals(this.buildModelDiscoveryKey())) {
@@ -641,6 +694,8 @@ public class ApiKeyInputScreen extends Screen {
         if (result.success()) {
             this.discoveredModels = result.models();
             this.lastModelDiscoveryKey = discoveryKey;
+            // 端点确实通了：顺手把这个模型的真实上下文窗口探测下来（缓存 + 落盘）。
+            this.probeContextWindowAsync();
             if (this.discoveredModels.isEmpty()) {
                 this.discoveredModelIndex = -1;
                 this.modelDiscoveryStatus = Component.translatable("gui.herobrine_companion.api_setup.model_discovery_empty");
@@ -1183,6 +1238,7 @@ public class ApiKeyInputScreen extends Screen {
             int centerX,
             int titleY,
             int promptY,
+            int localButtonY,
             int providerPromptY,
             int providerButtonY,
             int providerButtonWidth,

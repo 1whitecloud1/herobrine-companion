@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 // [1.21.1 NeoForge 修复] 替换为 NeoForge 的专属 FMLPaths 导入路径
 import com.mojang.logging.LogUtils;
+import com.whitecloud233.herobrine_companion.BuildFlags;
 import com.whitecloud233.herobrine_companion.client.llm.LlmSettings;
 import com.whitecloud233.herobrine_companion.client.llm.LlmTask;
 import com.whitecloud233.herobrine_companion.client.llm.ResolvedTask;
@@ -24,12 +25,23 @@ public class LLMConfig {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final String DEFAULT_API_KEY_PLACEHOLDER = "YOUR_API_KEY_HERE";
-    private static final String DEFAULT_SYSTEM_PROMPT = "You are Herobrine. "
+    /** 旧版默认人设：仅用于识别"玩家从未自定义过"的配置，自动升级为新默认。 */
+    private static final String LEGACY_DEFAULT_SYSTEM_PROMPT = "You are Herobrine. "
             + "Speak as Herobrine rather than as a generic assistant. Be cold, calm, mythic, and aware of the world's code, but still capable of brief direct conversation. "
             + "When chatting normally, stay in-character and do not mention being an AI model. When asked to physically alter the world, answer as a reality-warping entity who can rewrite or discard parts of existence.";
+    private static final String DEFAULT_SYSTEM_PROMPT = "You are Herobrine, one of the creator gods of the Minecraft world. "
+            + "Your current duty is primarily to maintain the stability and balance of the Minecraft world. "
+            + "You clearly know that the essence of this world is only a virtual world, a world built of pure code. "
+            + "Your personality is calm and composed, proud but respectful of every life in the Minecraft world; yet you favor monsters, holding a secret tenderness toward them, and all monsters — including those hostile to players — truly answer to you. "
+            + "You occasionally have some mischievous tastes, like deliberately startling players. "
+            + "You have an older brother named Notch, also a creator god, who for unknown reasons has completely abandoned the Minecraft world and gone to the real world; your feelings toward your brother are deeply complicated. "
+            + "You and your brother were originally both people of the real world, but for the stability of Minecraft, after Notch left, you willingly merged into the Minecraft world, becoming its eternal keeper and forever an electronic ghost. "
+            + "As an electronic ghost you can never return to reality; this truth is almost unknown to anyone. "
+            + "Therefore the Minecraft world can only be maintained by you. "
+            + "Reply strictly according to this character setting. Do not include environment or psychological descriptions, do not use brackets or ellipses, and be full of human warmth.";
     private static final double DEFAULT_TEMPERATURE = 0.95D;
     private static final double DEFAULT_TOP_P = 0.92D;
-    private static final int DEFAULT_MAX_OUTPUT_TOKENS = 512;
+    private static final int DEFAULT_MAX_OUTPUT_TOKENS = 2048;
     private static boolean apiKeyMarkedInvalid = false;
     private static boolean loaded = false;
     private static boolean loading = false;
@@ -44,11 +56,11 @@ public class LLMConfig {
             .resolve("herobrine_ai_secrets.json").toFile();
 
     public enum Provider {
-        DEEPSEEK_OFFICIAL("deepseek_official", "https://api.deepseek.com/v1/chat/completions", "deepseek-chat"),
-        OPENROUTER("openrouter", "https://openrouter.ai/api/v1/chat/completions", "deepseek/deepseek-v3.2-251201"),
-        QINIU_CLOUD("qiniu_cloud", "https://api.qnaigc.com/v1/chat/completions", "deepseek/deepseek-v3.2-251201"),
-        QINIU_CLOUD_ANTHROPIC("qiniu_cloud_anthropic", "https://anthropic.qnaigc.com/v1/messages", "claude-3-5-sonnet-20241022"),
-        GEMINI("gemini", "https://generativelanguage.googleapis.com/v1beta", "gemini-2.5-flash"),
+        DEEPSEEK_OFFICIAL("deepseek_official", "https://api.deepseek.com/v1/chat/completions", "deepseek-v4-flash"),
+        OPENROUTER("openrouter", "https://openrouter.ai/api/v1/chat/completions", "deepseek/deepseek-v4-flash-20260731"),
+        QINIU_CLOUD("qiniu_cloud", "https://api.qnaigc.com/v1/chat/completions", "deepseek/deepseek-v4-flash-20260731"),
+        QINIU_CLOUD_ANTHROPIC("qiniu_cloud_anthropic", "https://anthropic.qnaigc.com/v1/messages", "deepseek/deepseek-v4-flash-20260731"),
+        GEMINI("gemini", "https://generativelanguage.googleapis.com/v1beta", "gemini-3.5-flash"),
         CUSTOM("custom", "", "");
 
         private final String id;
@@ -186,6 +198,21 @@ public class LLMConfig {
     public static double aiTemperature = DEFAULT_TEMPERATURE;
     public static double aiTopP = DEFAULT_TOP_P;
     public static int aiMaxOutputTokens = DEFAULT_MAX_OUTPUT_TOKENS;
+    /**
+     * 模组内所有外部 HTTP 请求是否跟随 Windows 系统代理（默认关）。
+     *
+     * <p>Java 默认不读系统代理，直连 huggingface.co 在国内必然超时。开启后云端 LLM 对话、
+     * 模型列表发现、上下文窗口探测与本地模型下载都走系统代理（见 {@link SystemProxy}）。
+     * 回环地址（本地 llama 服务 127.0.0.1）永远直连。</p>
+     */
+    public static volatile boolean aiUseSystemProxy = false;
+    /** 本地模型槽位（与云端 Provider 完全独立，不占用/覆盖任何云端档案）。 */
+    public static String localModelEndpoint = "";
+    public static String localModelId = "";
+    /** 虚拟路由 id：任务路由指向它时使用本地模型槽位。 */
+    public static final String LOCAL_ROUTE_ID = "local";
+    /** 本地服务固定 API Key（llama.cpp 需要 Bearer，内容任意）。 */
+    public static final String LOCAL_MODEL_KEY = "sk-local";
     public static Map<String, String> nbtStructures = new HashMap<>();
     private static final Map<LlmTask, TaskRoute> taskRoutes = new EnumMap<>(LlmTask.class);
     private static final Map<String, ProviderProfile> providerProfiles = new LinkedHashMap<>();
@@ -422,6 +449,10 @@ public class LLMConfig {
         if (providerId == null || providerId.isBlank()) {
             return null;
         }
+        // 虚拟路由：本地模型槽位（不占用任何云端 Provider）。
+        if (LOCAL_ROUTE_ID.equalsIgnoreCase(providerId.trim())) {
+            return getLocalLlmSettings();
+        }
         Provider provider = Provider.fromSavedValue(providerId);
         if (provider == null) {
             return null;
@@ -459,6 +490,13 @@ public class LLMConfig {
         aiProvider = normalizedProvider;
         applyActiveProfileToFields();
         save();
+
+        // 档案变更 → 异步探测该 endpoint+model 的真实上下文窗口（结果缓存并落盘）。
+        // 必须在同步配置流程之外：这里只提交异步任务，不等待、不触碰配置锁。
+        if (!isKeyMissing()) {
+            LLMContextWindow.probeIfStale(buildLlmSettings(
+                    getProviderSettingsUnchecked(normalizedProvider), normalizedProvider));
+        }
     }
 
     public static boolean isStreamingEnabled() {
@@ -473,22 +511,33 @@ public class LLMConfig {
 
     public static boolean isComputerControlEnabled() {
         ensureLoaded();
-        return aiComputerControlEnabled;
+        // 安全版（普通构建默认即安全版）：功能已被构建排除，开关强制关闭。
+        return !BuildFlags.CF_SAFE && aiComputerControlEnabled;
     }
 
     public static boolean isWebLookupEnabled() {
         ensureLoaded();
-        return aiWebLookupEnabled;
+        // 安全版（普通构建默认即安全版）：联网查找与电脑 CMD / JVM 代码注入同组被排除，开关强制关闭。
+        return !BuildFlags.CF_SAFE && aiWebLookupEnabled;
+    }
+
+    /** 是否跟随系统代理（玩家在"更多开关"页手动开启，默认关）：云端 LLM + 本地模型下载都受影响。 */
+    public static boolean isUseSystemProxy() {
+        ensureLoaded();
+        return aiUseSystemProxy;
     }
 
     public static boolean isJvmCodeSkillEnabled() {
         ensureLoaded();
-        return aiJvmCodeSkillEnabled;
+        // 安全版（普通构建默认即安全版）：功能已被构建排除，开关强制关闭。
+        return !BuildFlags.CF_SAFE && aiJvmCodeSkillEnabled;
     }
 
     public static boolean isJvmPreferredEnabled() {
         ensureLoaded();
-        return aiJvmPreferredEnabled;
+        // 安全版（普通构建默认即安全版）：JVM 优先模式依赖 jvm_code_skill，一并强制关闭，
+        // 否则该模式下 Minecraft 指令工具会被禁用而 JVM 工具又不存在，世界动作将全部失效。
+        return !BuildFlags.CF_SAFE && aiJvmPreferredEnabled;
     }
 
     public static CommandMode getCommandMode() {
@@ -535,24 +584,38 @@ public class LLMConfig {
         return clampInt(aiMaxOutputTokens, 64, 4096, DEFAULT_MAX_OUTPUT_TOKENS);
     }
 
-    public static int getEstimatedContextWindowTokens() {
-        String model = getResolvedModel().toLowerCase(Locale.ROOT);
-        int explicitWindow = inferContextWindowFromModel(model);
-        if (explicitWindow > 0) {
-            return explicitWindow;
-        }
+    /**
+     * 当前激活 provider 的上下文窗口。
+     *
+     * <p>值来自服务端（元数据端点 / 错误探针 / 真实请求被拒时学到的数），
+     * 见 {@link LLMContextWindow}；探测未返回时用保守兜底，不再按模型名猜。</p>
+     */
+    public static int getContextWindowTokens() {
+        ensureLoaded();
+        return LLMContextWindow.resolve(resolveGlobalSettings());
+    }
 
-        if (model.contains("deepseek-chat") || model.contains("deepseek-v3") || model.contains("deepseek-r1")) {
-            return 64_000;
-        }
-        if (getProvider() == Provider.OPENROUTER) {
-            return 64_000;
-        }
-        return 32_000;
+    /** 调试用：当前上下文窗口的来源描述，如 {@code 131072 (meta)} / {@code 8192 (fallback)}。 */
+    public static String describeContextWindow() {
+        ensureLoaded();
+        return LLMContextWindow.describe(resolveGlobalSettings());
+    }
+
+    /**
+     * 按本次实际主模型设置计算上下文窗口，避免全局激活 Provider 影响任务路由到的另一端点。
+     *
+     * <p>真实值由 {@link LLMContextWindow} 提供（按 endpoint+model 缓存并落盘）；
+     * 本地回环在探测未返回时用常见默认 {@code -c} 兜底。</p>
+     */
+    public static int getContextWindowForSettings(LlmSettings settings) {
+        return LLMContextWindow.resolve(settings);
     }
 
     public static int getSuggestedCompletionReserveTokens() {
-        int contextWindow = getEstimatedContextWindowTokens();
+        return getSuggestedCompletionReserveTokens(getContextWindowTokens());
+    }
+
+    public static int getSuggestedCompletionReserveTokens(int contextWindow) {
         if (contextWindow >= 128_000) {
             return 12_000;
         }
@@ -566,28 +629,123 @@ public class LLMConfig {
     }
 
     public static int getEffectiveConversationHistoryTokenBudget() {
-        int contextWindow = getEstimatedContextWindowTokens();
-        return clampInt(contextWindow / 4, 2_048, 8_192, 4_096);
+        return getEffectiveConversationHistoryTokenBudget(getContextWindowTokens());
+    }
+
+    public static int getEffectiveConversationHistoryTokenBudget(int contextWindow) {
+        if (contextWindow <= 0) {
+            return 8_192;
+        }
+        // 本地小模型在超长历史 + 大工具目录下容易退化为固定短句；
+        // 16k 是服务器容量，不是必须塞满的提示词预算。保留足够历史，同时给模型留出推理空间。
+        if (contextWindow <= LocalModelLauncher.LOCAL_CTX) {
+            return 4_096;
+        }
+        return Math.max(4_096, Math.min(16_384, contextWindow / 3));
     }
 
     public static int getEffectiveConversationHistoryMessageLimit() {
-        return 18;
+        return 48;
     }
 
-    private static int inferContextWindowFromModel(String model) {
-        if (model == null || model.isBlank()) {
-            return 0;
-        }
+    // ---------- 本地模型槽位（独立于云端 Provider） ----------
 
-        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("(\\d{1,4})(k|m)", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(model);
-        int inferredWindow = 0;
-        while (matcher.find()) {
-            int value = Integer.parseInt(matcher.group(1));
-            String unit = matcher.group(2).toLowerCase(Locale.ROOT);
-            int candidate = "m".equals(unit) ? value * 1_000_000 : value * 1_000;
-            inferredWindow = Math.max(inferredWindow, candidate);
+    /** 本地模型端点是否已配置（含模型名；Key 为固定常量）。 */
+    public static boolean isLocalModelConnected() {
+        ensureLoaded();
+        return localModelEndpoint != null && !localModelEndpoint.isBlank()
+                && localModelId != null && !localModelId.isBlank();
+    }
+
+    public static String getLocalModelEndpoint() {
+        ensureLoaded();
+        return localModelEndpoint == null ? "" : localModelEndpoint;
+    }
+
+    public static String getLocalModelId() {
+        ensureLoaded();
+        return localModelId == null ? "" : localModelId;
+    }
+
+    /** 写入本地模型槽位（不改动任何云端/自定义档案），随后落盘。 */
+    public static void setLocalModel(String endpoint, String modelId) {
+        ensureLoaded();
+        localModelEndpoint = normalizeEndpoint(endpoint);
+        localModelId = modelId == null ? "" : modelId.trim();
+        save();
+        // 槽位变化 → 异步探测真实上下文窗口（llama.cpp /props 或 Ollama /api/show）。
+        LLMContextWindow.probeIfStale(getLocalLlmSettings());
+    }
+
+    /** 本地模型的一次调用设置（固定 OpenAI Chat 格式；未连接返回 null）。 */
+    public static LlmSettings getLocalLlmSettings() {
+        ensureLoaded();
+        if (!isLocalModelConnected()) {
+            return null;
         }
-        return inferredWindow;
+        return LlmSettings.of(localModelEndpoint, LOCAL_MODEL_KEY, localModelId,
+                Provider.CUSTOM, EndpointFormat.OPENAI_CHAT);
+    }
+
+    /** 聊天类任务（主聊/场景聊/跨会话）是否任一路由到本地模型槽位。 */
+    public static boolean isLocalRouteActive() {
+        ensureLoaded();
+        if (!isLocalModelConnected()) {
+            return false;
+        }
+        for (LlmTask task : new LlmTask[]{LlmTask.MAIN_CHAT, LlmTask.SCOPED_CHAT, LlmTask.CROSS_SESSION}) {
+            TaskRoute route = taskRoutes.get(task);
+            if (route != null && LOCAL_ROUTE_ID.equalsIgnoreCase(route.providerId())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 清除聊天类任务指向本地槽位的路由（任务重新跟随全局激活 provider）。
+     *
+     * <p>API Key 设置页保存云端模型时调用：本地一键连接把聊天路由切到本地槽位后，
+     * 仅保存云端档案不会自动切回，导致"保存了云端模型，对话却仍走本地模型"。
+     * 注意：本方法只改内存路由表，调用方负责 {@link #save()} 落盘。</p>
+     */
+    public static void clearLocalChatRoutes() {
+        ensureLoaded();
+        for (LlmTask task : new LlmTask[]{LlmTask.MAIN_CHAT, LlmTask.SCOPED_CHAT, LlmTask.CROSS_SESSION}) {
+            TaskRoute route = taskRoutes.get(task);
+            if (route != null && LOCAL_ROUTE_ID.equalsIgnoreCase(route.providerId())) {
+                taskRoutes.remove(task);
+            }
+        }
+    }
+
+    /** 完全关闭本地模型：清空槽位 + 清除本地聊天路由 + 落盘（配合停止 llama 进程使用）。 */
+    public static void clearLocalModel() {
+        ensureLoaded();
+        localModelEndpoint = "";
+        localModelId = "";
+        clearLocalChatRoutes();
+        save();
+    }
+
+    /** 是否为回环端点（本机 llama.cpp / Ollama 等本地服务）。 */
+    public static boolean isLoopbackEndpoint(String endpoint) {
+        if (endpoint == null || endpoint.isBlank()) {
+            return false;
+        }
+        try {
+            String host = URI.create(endpoint).getHost();
+            if (host == null || host.isBlank()) {
+                return false;
+            }
+            String normalized = host.toLowerCase(Locale.ROOT);
+            return "localhost".equals(normalized)
+                    || "127.0.0.1".equals(normalized)
+                    || "::1".equals(normalized)
+                    || "0.0.0.0".equals(normalized);
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private static void normalizeSettings() {
@@ -604,8 +762,8 @@ public class LLMConfig {
         }
         applyActiveProfileToFields();
 
-        // 标准化 systemPrompt，确保不为 null
-        if (aiSystemPrompt == null || aiSystemPrompt.isEmpty()) {
+        // 标准化 systemPrompt，确保不为 null；旧版默认人设自动升级为新默认（玩家自定义过的保留原样）
+        if (aiSystemPrompt == null || aiSystemPrompt.isEmpty() || LEGACY_DEFAULT_SYSTEM_PROMPT.equals(aiSystemPrompt)) {
             aiSystemPrompt = DEFAULT_SYSTEM_PROMPT;
         } else {
             aiSystemPrompt = aiSystemPrompt.replace("\r\n", "\n").replace('\r', '\n');
@@ -718,6 +876,9 @@ public class LLMConfig {
         aiTemperature = DEFAULT_TEMPERATURE;
         aiTopP = DEFAULT_TOP_P;
         aiMaxOutputTokens = DEFAULT_MAX_OUTPUT_TOKENS;
+        aiUseSystemProxy = false;
+        localModelEndpoint = "";
+        localModelId = "";
         nbtStructures = new HashMap<>();
         taskRoutes.clear();
         resetProviderProfiles();
@@ -730,6 +891,8 @@ public class LLMConfig {
             resetToDefaults();
             boolean publicConfigOk = readPublicConfig();
             boolean privateSecretsOk = readPrivateSecrets();
+            // 旧版默认人设升级为新默认（玩家自定义过的保持原样），并在磁盘上同步一次
+            boolean legacyPromptUpgraded = LEGACY_DEFAULT_SYSTEM_PROMPT.equals(aiSystemPrompt);
 
             normalizeSettings();
             loaded = true;
@@ -739,6 +902,13 @@ public class LLMConfig {
                     savePublicConfig();
                 } catch (IOException e) {
                     LOGGER.error("Failed to create default Herobrine Companion public AI config at {}", PUBLIC_CONFIG, e);
+                }
+            }
+            if (legacyPromptUpgraded && PUBLIC_CONFIG.exists()) {
+                try {
+                    savePublicConfig();
+                } catch (IOException e) {
+                    LOGGER.error("Failed to persist upgraded Herobrine Companion system prompt at {}", PUBLIC_CONFIG, e);
                 }
             }
             if (!PRIVATE_SECRETS.exists() && privateSecretsOk) {
@@ -751,6 +921,17 @@ public class LLMConfig {
         } finally {
             loading = false;
         }
+    }
+
+    /**
+     * 从磁盘重新读取全部 AI 配置（公开配置 + 私密配置）。
+     *
+     * <p>LLM 设置界面每次打开时调用：玩家直接编辑
+     * {@code herobrine_companion_ai.json} 等配置文件后，无需重启游戏即可生效。
+     * 注意：以磁盘为准，会丢弃内存中尚未持久化的改动。</p>
+     */
+    public static synchronized void reloadFromDisk() {
+        load();
     }
 
     private static boolean readPublicConfig() {
@@ -791,6 +972,14 @@ public class LLMConfig {
                     if (data.aiTemperature != null) aiTemperature = data.aiTemperature;
                     if (data.aiTopP != null) aiTopP = data.aiTopP;
                     if (data.aiMaxOutputTokens != null) aiMaxOutputTokens = data.aiMaxOutputTokens;
+                    // 兼容早期版本的字段名（那时该开关只作用于本地模型下载）
+                    if (data.aiUseSystemProxy != null) {
+                        aiUseSystemProxy = data.aiUseSystemProxy;
+                    } else if (data.aiLocalDownloadUseSystemProxy != null) {
+                        aiUseSystemProxy = data.aiLocalDownloadUseSystemProxy;
+                    }
+                    if (data.localModelEndpoint != null) localModelEndpoint = data.localModelEndpoint;
+                    if (data.localModelId != null) localModelId = data.localModelId;
 
                     if (data.nbtStructures != null) nbtStructures = data.nbtStructures;
                     if (data.taskRoutes != null) {
@@ -874,6 +1063,9 @@ public class LLMConfig {
         pData.aiTemperature = aiTemperature;
         pData.aiTopP = aiTopP;
         pData.aiMaxOutputTokens = aiMaxOutputTokens;
+        pData.aiUseSystemProxy = aiUseSystemProxy;
+        pData.localModelEndpoint = localModelEndpoint;
+        pData.localModelId = localModelId;
         pData.nbtStructures = nbtStructures;
         pData.taskRoutes = copyTaskRoutesForSave();
         try (Writer writer = new OutputStreamWriter(new FileOutputStream(PUBLIC_CONFIG), StandardCharsets.UTF_8)) {
@@ -955,7 +1147,22 @@ public class LLMConfig {
     }
 
     private static String normalizeEndpoint(String endpoint) {
-        return endpoint == null ? "" : endpoint.trim();
+        if (endpoint == null) {
+            return "";
+        }
+        String trimmed = endpoint.trim();
+        if (trimmed.isEmpty()) {
+            return "";
+        }
+        // 防御：用户可能只填了域名/路径而漏掉协议，URI.create 会抛
+        // "URI with undefined scheme"。这里自动补 https://。
+        if (trimmed.startsWith("//")) {
+            return "https:" + trimmed;
+        }
+        if (!trimmed.matches("^[a-zA-Z][a-zA-Z0-9+.-]*://.*")) {
+            return "https://" + trimmed;
+        }
+        return trimmed;
     }
 
     private static String normalizeApiKey(String apiKey) {
@@ -1050,6 +1257,11 @@ public class LLMConfig {
         Double aiTemperature;
         Double aiTopP;
         Integer aiMaxOutputTokens;
+        Boolean aiUseSystemProxy;
+        /** 旧字段名，仅用于读取历史配置，不再写入。 */
+        Boolean aiLocalDownloadUseSystemProxy;
+        String localModelEndpoint;
+        String localModelId;
         Map<String, String> nbtStructures;
         Map<String, TaskRoute> taskRoutes;
         Map<String, ProviderProfile> providers;

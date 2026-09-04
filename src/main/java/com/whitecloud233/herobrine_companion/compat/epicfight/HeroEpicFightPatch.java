@@ -4,6 +4,7 @@ import com.mojang.datafixers.util.Pair;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.ai.HeroCombatWeaponHelper;
 import com.whitecloud233.herobrine_companion.entity.ai.combat.HeroCombatPlanner;
+import com.whitecloud233.herobrine_companion.entity.ai.combat.HeroCombatPursuit;
 import com.whitecloud233.herobrine_companion.entity.ai.goal.HeroEpicFightChaseGoal;
 import com.whitecloud233.herobrine_companion.item.PoemOfTheEndItem;
 import java.util.ArrayList;
@@ -56,6 +57,7 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
    private static final double MELEE_CHASE_SPEED = 1.35;
    private boolean infantryAiConfigured;
    private String lastWeaponProfileKey = "";
+   private long lastWomAttackTick = Long.MIN_VALUE;
    private Goal heroAttackGoal;
    private Goal heroChasingGoal;
    private boolean offhandSwapActive;
@@ -198,6 +200,13 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
             return nightfallBuilder;
          } else {
             CapabilityItem capability = HeroEpicFightWeaponProfiles.resolveCapability((HeroEntity)this.getOriginal());
+
+            // WOM 武器优先使用 WOM 原生连招动画（含 WOM 命中判定与特效），而非 Epic Fight 通用类别动作
+            CombatBehaviors.Builder<HumanoidMobPatch<?>> womBuilder = HeroWomCombatBehaviors.build(this, capability, stack);
+            if (womBuilder != null) {
+               return womBuilder;
+            }
+
             CombatBehaviors.Builder<HumanoidMobPatch<?>> playerLikeBuilder = this.getPlayerLikeAttackMotionBuilder(capability);
             if (playerLikeBuilder != null) {
                return playerLikeBuilder;
@@ -231,6 +240,9 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
                   ItemStack stack = hero.getMainHandItem();
                   double attackRadius = HeroNightfallMovesets.getAttackRadius(stack, (double)0.0F);
                   if (attackRadius <= (double)0.0F) {
+                     attackRadius = HeroWomWeaponCompat.getAttackRadius(stack, 0.0D);
+                  }
+                  if (attackRadius <= (double)0.0F) {
                      attackRadius = this.getPlayerLikeChaseRadius(HeroEpicFightWeaponProfiles.resolveCapability(hero));
                   }
 
@@ -243,6 +255,21 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
             }
          }
       }
+   }
+
+   /**
+    * WOM 武器时放慢攻击动画播放速率：epicfight 公式 playSpeed = 1 + (getAttackSpeed-1)*factor，
+    * 英雄无攻速属性（基础 1.0），乘 0.7 后连招动画按 0.7 倍播放，段间隔回到 1.20.1 移植版节奏。
+    * 非 WOM 武器完全走原逻辑。
+    */
+   @Override
+   public float getAttackSpeed(InteractionHand hand) {
+      float base = super.getAttackSpeed(hand);
+      HeroEntity hero = (HeroEntity)this.getOriginal();
+      if (hero != null && HeroWomWeaponCompat.isSupported(hero.getMainHandItem())) {
+         return base * HeroWomCombatBehaviors.WOM_ATTACK_SPEED_FACTOR;
+      }
+      return base;
    }
 
    public void updateMotion(boolean considerInaction) {
@@ -596,12 +623,118 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
                   comboStepUpdater.accept(hero);
                }
 
+               this.lastWomAttackTick = (long)hero.tickCount;
                hero.swing(InteractionHand.MAIN_HAND);
             }
 
             mobPatch.playAnimationSynchronized(animation, 0.0F);
          }
       });
+   }
+
+   /**
+    * WOM 兼容层专用：用玩家式动作状态机包装一条 WOM 连招动画。
+    * 复用 {@link #createTrackedAttackBehavior} 的战斗动作管线，WOM 侧不重复实现。
+    * 无独立 ActionProfile（WOM 动画自带动画属性），传 null 走基础动作状态。
+    */
+   CombatBehaviors.Behavior.Builder<HumanoidMobPatch<?>> createWomComboAttackBehavior(AnimationManager.AnimationAccessor<? extends StaticAnimation> animation, int comboIndex, int comboSize) {
+      return this.createTrackedAttackBehavior(animation, (HeroCombatPlanner.ActionProfile)null, HeroEpicFightPatch::resolveNextTapActionState, (hero) -> this.advancePlayerLikeComboStep(hero, comboSize, comboIndex));
+   }
+
+   /**
+    * WOM 长按终结技行为：播放连招表的最后一段（蓄力终结技动画），并把连招步数归位，
+    * 不推进连招序号，也不打断后续连招节奏。
+    */
+   CombatBehaviors.Behavior.Builder<HumanoidMobPatch<?>> createWomHoldAttackBehavior(AnimationManager.AnimationAccessor<? extends StaticAnimation> animation) {
+      return this.createTrackedAttackBehavior(animation, (HeroCombatPlanner.ActionProfile)null, HeroEpicFightPatch::resolveNextTapActionState, this::resetPlayerLikeComboStep);
+   }
+
+   /**
+    * WOM 长按终结技可用门槛：与连招起手相同的战斗就绪条件（战斗模式、目标可达、
+    * 非蓄力/释放动作）。终结技独立成系列后权重低于连招、冷却更长，
+    * 不会挤占普通连招，只在连招间隙周期性打出。
+    */
+   boolean canUseWomHoldAttack(HumanoidMobPatch<?> mobPatch) {
+      HeroEntity hero = this.getTrackedHero(mobPatch);
+      if (hero == null) {
+         return true;
+      } else {
+         return this.isWomComboReady(hero, this.getTrackedTarget(hero));
+      }
+   }
+
+   /**
+    * WOM 连招可用状态：地面（落地且未浮空）或飞行追击悬停贴身（复用地面连招在空中播放，
+    * 避免对凋灵等高目标悬停时永远无法出手）。
+    *
+    * <p>含 6 tick 攻击回放锁（与 1.20.1 移植版一致）与最小攻击间隔
+    * （{@link HeroWomCombatBehaviors#WOM_ATTACK_INTERVAL}）：上一段攻击后需间隔
+    * 至少 24 tick 才能再次起手/选择系列，模拟 1.20.1 收招落地的沉稳节奏。间隔用实体
+    * tickCount 快照计算，物理无关——WOM 动画自带跳跃、英雄常在空中，落地判定会把
+    * 链式推进卡死（1.21.1 实测），故不用 onGround 做节奏闸门。</p>
+    */
+   private boolean isWomComboReady(HeroEntity hero, LivingEntity target) {
+      if (hero == null || target == null || !hero.isBattleModeActive()
+              || hero.isBattleHoldAction() || hero.isBattleReleaseAction()
+              || HeroCombatPlanner.isAttackReplayLocked(hero, 6)) {
+         return false;
+      }
+      if (this.lastWomAttackTick != Long.MIN_VALUE
+              && (long)hero.tickCount - this.lastWomAttackTick < (long)HeroWomCombatBehaviors.WOM_ATTACK_INTERVAL) {
+         return false;
+      }
+      if (!hero.isFloating()) {
+         return hero.onGround();
+      }
+      return HeroCombatPursuit.isWithinAttackReach(hero, target, 3.0D);
+   }
+
+   /** WOM 连招按序执行的门槛：仅允许当前应打的连段序号通过。 */
+   boolean canStartWomCombo(HumanoidMobPatch<?> mobPatch, int comboIndex, int comboSize) {
+      HeroEntity hero = this.getTrackedHero(mobPatch);
+      if (hero == null) {
+         return true;
+      } else {
+         LivingEntity target = this.getTrackedTarget(hero);
+         return this.isWomComboReady(hero, target) && this.getExpectedPlayerLikeComboIndex(hero, comboSize) == comboIndex;
+      }
+   }
+
+   /**
+    * 连段续接门槛（WOM 行为 1..N，经 {@code tryProceed} 的推进路径）。
+    *
+    * <p>刻意不含时间间隔门槛：{@code tryProceed} 在续接判定失败时会直接摧毁整条链
+    * （指针复位、系列归零），无法"等几 tick 再试"；连招内的段间隔改由动画播放速率
+    * （{@link HeroWomCombatBehaviors#WOM_ATTACK_SPEED_FACTOR}）控制——动画放慢后
+    * 每段的自然时长即节奏，与 1.20.1 移植版一致。此处只保留按序推进与战斗状态检查。</p>
+    */
+   boolean canContinueWomCombo(HumanoidMobPatch<?> mobPatch, int comboIndex, int comboSize) {
+      HeroEntity hero = this.getTrackedHero(mobPatch);
+      if (hero == null) {
+         return true;
+      } else {
+         LivingEntity target = this.getTrackedTarget(hero);
+         if (target == null || !hero.isBattleModeActive() || hero.isBattleHoldAction() || hero.isBattleReleaseAction()
+                 || HeroCombatPlanner.isAttackReplayLocked(hero, 6)) {
+            return false;
+         }
+         return this.getExpectedPlayerLikeComboIndex(hero, comboSize) == comboIndex;
+      }
+   }
+
+   /**
+    * WOM 连招被打断后的重起手门槛：comboStep 停在中间段（换目标/受击打断）时，
+    * 允许起手段（comboIndex 0）被选中，由行为执行时的 {@code advancePlayerLikeComboStep}
+    * 把 comboStep 归位，从第一段重新开始。纯判断、无副作用。
+    */
+   boolean canRestartWomCombo(HumanoidMobPatch<?> mobPatch, int comboSize) {
+      HeroEntity hero = this.getTrackedHero(mobPatch);
+      if (hero == null) {
+         return true;
+      } else {
+         LivingEntity target = this.getTrackedTarget(hero);
+         return this.isWomComboReady(hero, target) && comboSize > 0 && hero.getBattleComboStep() % comboSize != 0;
+      }
    }
 
    private CombatBehaviors.Behavior.Builder<HumanoidMobPatch<?>> createTrackedComboAttackBehavior(PlayerLikeAttackProfile profile) {

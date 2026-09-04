@@ -33,6 +33,14 @@ versionRange = "${minecraft_version_range}"
 ordering = "NONE"
 side = "BOTH"
 
+# GeckoLib (终末之诗 3D 模型渲染)
+[[dependencies."${mod_id}"]]
+modId = "geckolib"
+type = "optional"
+versionRange = "[4.7,)"
+ordering = "AFTER"
+side = "BOTH"
+
 # ==================================
 # 可选依赖项 (Optional Dependencies)
 # ==================================
@@ -78,6 +86,14 @@ side = "BOTH"
 
 [[dependencies."${mod_id}"]]
 modId = "epicfight"
+type = "optional"
+versionRange = "*"
+ordering = "AFTER"
+side = "BOTH"
+
+# 奇迹武器 (Weapons of Miracles, 基于 Epic Fight 的武器模组)
+[[dependencies."${mod_id}"]]
+modId = "wom"
 type = "optional"
 versionRange = "*"
 ordering = "AFTER"

@@ -8,6 +8,7 @@ import com.whitecloud233.herobrine_companion.entity.ai.agent.AgentIntentionClass
 import com.whitecloud233.herobrine_companion.entity.ai.agent.HeroAgent;
 import com.whitecloud233.herobrine_companion.entity.ai.agent.task.PlannedTask;
 import com.whitecloud233.herobrine_companion.entity.ai.agent.tool.AgentToolArgs;
+import com.whitecloud233.herobrine_companion.entity.ai.agent.tool.HeroSummonTool;
 import com.whitecloud233.herobrine_companion.item.HeroSummonItem;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.network.FriendlyByteBuf;
@@ -85,6 +86,17 @@ public record AgentRequestPacket(String kind, String name, String argsJson, UUID
         }
         HeroEntity hero = HeroSummonItem.findHeroInAnyDimension(player.getServer(), player.getUUID());
         if (hero == null || !hero.isAlive()) {
+            // hero_summon_to_player 是“召唤/传送到玩家身边”工具：即使当前没有存活 Hero，
+            // 也应该允许它执行（会按需召唤新 Hero），而不是直接判定“无法处理”。
+            if ((hero == null || !hero.isAlive()) && KIND_TOOL.equals(kind) && HeroSummonTool.ID.equals(name)) {
+                boolean success = HeroSummonItem.performSummonOrTeleport(player.serverLevel(), player, player.position());
+                if (requestId != null) {
+                    PacketHandler.sendToPlayer(new AgentToolResultPacket(
+                            requestId, name, success,
+                            success ? "已传送到你身边" : "传送失败"), player);
+                }
+                return;
+            }
             player.sendSystemMessage(Component.translatable("message.herobrine_companion.agent.not_available"));
             // P2：带 requestId 的工具请求补发失败结果，避免客户端等待结果包而悬挂。
             if (KIND_TOOL.equals(kind) && requestId != null) {
