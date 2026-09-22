@@ -13,6 +13,11 @@ public class ModEnUsLangProvider extends LanguageProvider {
 
     @Override
     protected void addTranslations() {
+        add("item.herobrine_companion.poem_of_the_end.epicfight.input", "§7Epic Fight: Tap Attack for combos; hold 0.35s for Heavy");
+        add("item.herobrine_companion.poem_of_the_end.standalone.input", "No Epic Fight required: successive attacks play this mode's four full-body strikes");
+        add("item.herobrine_companion.poem_of_the_end.standalone.rules", "Damage, hit timing and movement follow vanilla rules");
+        add("item.herobrine_companion.poem_of_the_end.mode.usage.3", "§7Attack Combo: Scythe Slashes & Rifts");
+
         // Items
         add(ModItems.HERO_SHELTER.get(), "Hero Shelter");
         add(ModItems.ETERNAL_KEY.get(), "Eternal Key");
@@ -86,6 +91,27 @@ public class ModEnUsLangProvider extends LanguageProvider {
         add("gui.herobrine_companion.request_name_2", "Pacify the Endermen");
         add("gui.herobrine_companion.request_desc_2", "The Endermen are restless today, perhaps sensing fluctuations from the other side of the End Ring. Go pacify them, bring them some dirt blocks for carrying. Do not kill them, they are just afraid.");
         add("gui.herobrine_companion.request_reward", "Reward:");
+        add("gui.herobrine_companion.request_reward_1", "- Void Marrow x3\n- Trust +15");
+        add("gui.herobrine_companion.request_reward_2", "- Ender Pearl x16\n- Trust +10");
+        add("gui.herobrine_companion.request_reward_3", "- Memory Shard x1\n- Trust +8");
+        add("gui.herobrine_companion.request_reward_4", "- Cooked Beef x8\n- Trust +12");
+        add("gui.herobrine_companion.request_reward_5", "- Glitch Fragment x2\n- Trust +12");
+        add("gui.herobrine_companion.request_reward_6", "- Corrupted Code x3\n- Trust +12");
+        add("gui.herobrine_companion.request_reward_7", "- Memory Shard x1\n- Glitch Fragment x2\n- Trust +18");
+        add("gui.herobrine_companion.request_reward_8", "- Abyssal Gaze x1\n- Trust +20");
+        add("gui.herobrine_companion.request_name_3", "Music for the Watcher");
+        add("gui.herobrine_companion.request_desc_3", "The discs hold the sounds of your world. I want to hear your songs. Bring me a music disc.");
+        add("gui.herobrine_companion.request_name_4", "They Are Still Waiting");
+        add("gui.herobrine_companion.request_desc_4", "There is a wolf by the village edge whose owner left long ago. It still waits where it was left. Go feed it—until it trusts you. Do not hurt it.");
+        add("gui.herobrine_companion.request_name_5", "The Candle Rite");
+        add("gui.herobrine_companion.request_desc_5", "When midnight comes, place four lit candles around me. Do not light a fifth.");
+        add("gui.herobrine_companion.request_name_6", "A Banner for the Judge");
+        add("gui.herobrine_companion.request_desc_6", "A pillager captain roams my land. Take his banner and bring it to me. I want to know who dared to raise a flag here.");
+        add("gui.herobrine_companion.request_name_7", "Mirror in the Dark");
+        add("gui.herobrine_companion.request_desc_7", "Something has been learning how you walk. At night it lingers in the shadows nearby, copying your shape. Find it—do not let it see you. Sneak close and touch it with your bare hand.");
+        add("gui.herobrine_companion.request_name_8", "Vigil Under Thunder");
+        add("gui.herobrine_companion.request_desc_8", "When the storm comes, stand on the high ground I marked. If the lightning chooses you—and leaves you standing—I will know this world still remembers you.");
+        add("gui.herobrine_companion.quest_cooldown_line", "§7On cooldown: %1$s day(s) %2$s hour(s)");
         add("message.herobrine_companion.quest_already_active", "§cYou already have an active quest!");
         add("message.herobrine_companion.quest_start_1", "§e[Hero] §fGood. Go clear those ghosts. I will be watching.");
         add("message.herobrine_companion.quest_complete_1", "§e[Hero] §fWell done. Here is your reward.");
@@ -94,6 +120,33 @@ public class ModEnUsLangProvider extends LanguageProvider {
         add("message.herobrine_companion.quest_target_gone", "§c[System] The target has disappeared. Quest failed.");
         add("message.herobrine_companion.quest_target_died", "§c[System] The target has died. Quest failed.");
         add("message.herobrine_companion.quest_cancelled", "§c[System] Quest cancelled.");
+        add("message.herobrine_companion.quest_start_3", "§e[Herobrine] §fA record is one of the few honest things in this world. Bring one back.");
+        add("message.herobrine_companion.quest_complete_3", "§e[Herobrine] §f...A fine melody. It has been a long age since I heard a new song.");
+        add("message.herobrine_companion.quest_start_4", "§e[Herobrine] §fIt has waited by that door for years. Some never return, but promises should be kept. Go. Feed it.");
+        add("message.herobrine_companion.quest_complete_4", "§e[Herobrine] §fIt remembers your scent now. Good—at least someone remembers it.");
+        add("message.herobrine_companion.quest_complete_4_tamed", "§e[Herobrine] §f...It licked your hand. It chose to walk with you. Take care of it for me.");
+        add("message.herobrine_companion.quest_wolf_feed_progress", "§7It ate a bone (%s/%s). Its eyes grow a little softer...");
+        add("message.herobrine_companion.quest_wolf_killed", "§c[System] You killed it. It only wanted its owner to come home. Quest failed.");
+        add("message.herobrine_companion.quest_start_5", "§e[Herobrine] §fFour candles, forming a ring. A fifth will call something that should not come.");
+        add("message.herobrine_companion.quest_candle_progress", "§7Candle %s/%s lit in the night.");
+        add("message.herobrine_companion.quest_candle_fifth", "§c[System] The fifth candle lit. The wind died all at once... Quest failed.");
+        add("message.herobrine_companion.quest_candle_hero_gone", "§c[System] Hero has left. The rite is broken. Quest failed.");
+        add("message.herobrine_companion.quest_complete_5", "§e[Herobrine] §f...The flame remembers you. Now the dark does too.");
+        add("message.herobrine_companion.quest_start_6", "§e[Herobrine] §f(The Judge whispers) A banner is a declaration. Taking it is an answer.");
+        add("message.herobrine_companion.quest_captain_down", "§a[System] The captain is down. Pick up the banner and bring it to me.");
+        add("message.herobrine_companion.quest_complete_6", "§e[Herobrine] §fGood. This banner will rot by my wall, like its owner.");
+        add("message.herobrine_companion.quest_start_7", "§e[Herobrine] §fDo not turn around. It is learning you.");
+        add("message.herobrine_companion.quest_mirror_hint", "§7Sneak. Do not let it see you.");
+        add("message.herobrine_companion.quest_mirror_seen", "§c[System] It saw you. It faded into the mist. Quest failed.");
+        add("message.herobrine_companion.quest_mirror_dawn", "§c[System] Dawn came. It dissolved like morning mist. Quest failed.");
+        add("message.herobrine_companion.quest_complete_7", "§e[Herobrine] §f...You bested it. Remember: some shadows should not be two.");
+        add("message.herobrine_companion.quest_start_8", "§e[Herobrine] §fThe storm is coming. Stand on the highest rock. Do not hide.");
+        add("message.herobrine_companion.quest_storm_mark", "§7Marked: X %s, Y %s, Z %s");
+        add("message.herobrine_companion.quest_storm_hint", "§7The thunder is near. Stand on the mark. Do not move.");
+        add("message.herobrine_companion.quest_storm_died", "§c[System] The lightning chose you, and you could not hold it. Quest failed.");
+        add("message.herobrine_companion.quest_complete_8", "§e[Herobrine] §f...It remembers you. Now so do I.");
+        add("message.herobrine_companion.quest_cooldown", "§c[System] This request is still on cooldown. Come back in %1$s day(s) %2$s hour(s).");
+        add("entity.herobrine_companion.quest_wolf", "The Dog at the Door");
 
         // Messages
         add("message.herobrine_companion.system_cloud_connected", "Connected to Cloud AI System.");

@@ -29,10 +29,11 @@ public class ModItemModelProvider extends ItemModelProvider {
         basicItem(ModItems.SOUL_BOUND_PACT.get());
         basicItem(ModItems.TRANSCENDENCE_PERMIT.get());
         basicItem(ModItems.SOURCE_FLOW.get());
-        // 终末之诗 (poem_of_the_end)：装了 GeckoLib 用 3D 模型渲染，
+        basicItem(ModItems.BIRTHDAY_CAKE.get());
+        // 终末之诗 (poem_of_the_end)：GeckoLib 或 Epic Fight 环境使用 3D 渲染，
         // 物品模型为手写的 builtin/entity + display（见 src/main/resources/assets/herobrine_companion/models/item/poem_of_the_end.json），
         // 因此这里不再用 datagen 生成（避免覆盖手写模型）。
-        // poem_of_the_end_base 是没装 GeckoLib 时的 2D 回退模型，由
+        // poem_of_the_end_base 是两个动画模组都没装时的普通模型，由
         // PoemOfTheEndModelSwapper 在烘焙阶段替换进来（仍在使用，别删）。
         // withExistingParent(ModItems.POEM_OF_THE_END.getId().getPath(),
         //         ResourceLocation.fromNamespaceAndPath(HerobrineCompanion.MODID, "item/poem_of_the_end_base"));
