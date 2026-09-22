@@ -6,6 +6,7 @@
   "plugin": "com.whitecloud233.modid.herobrine_companion.mixin.HerobrineCompanionMixinPlugin",
   "mixins": [
     "LivingEntityMixin",
+    "PoemPlayerAttackMixin",
     "LivingEntitySpeechBubbleMixin",
     "DragonSittingScanningPhaseMixin",
     "EnderDragonSoundMixin",
@@ -22,9 +23,14 @@
     "epicfight.AnimationClipMixin",
     "epicfight.RenderAnimationItemMixin",
     "epicfight.EffekUnitsVfxMixin",
-    "epicfight.HeroWomAnimationEventGuardMixin"
+    "epicfight.HeroWomAnimationEventGuardMixin",
+    "epicfight.WomAntitheusLapseMixin"
   ],
   "client": [
+    "epicfight.PoemAttackControlMixin",
+    "client.PoemLivingRendererMixin",
+    "client.PoemHumanoidRenderMixin",
+    "client.PoemHeldItemMixin"
   ],
   "injectors": {
     "defaultRequire": 1

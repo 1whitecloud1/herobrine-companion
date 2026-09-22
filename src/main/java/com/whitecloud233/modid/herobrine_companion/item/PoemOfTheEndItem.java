@@ -3,11 +3,14 @@ package com.whitecloud233.modid.herobrine_companion.item;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Multimap;
 import com.whitecloud233.modid.herobrine_companion.client.render.PoemOfTheEndGeoCompat;
+import com.whitecloud233.modid.herobrine_companion.combat.poem.PoemMeleeHit;
+import com.whitecloud233.modid.herobrine_companion.compat.epicfight.HeroEpicFightCompat;
 import com.whitecloud233.modid.herobrine_companion.compat.epicfight.HeroEpicFightStateMapper;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.projectile.CleaveBladeEntity;
-import com.whitecloud233.modid.herobrine_companion.entity.projectile.VoidRiftEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.projectile.RealmBreakerLightningEntity;
+import com.whitecloud233.modid.herobrine_companion.network.PacketHandler;
+import com.whitecloud233.modid.herobrine_companion.network.PaleLightningPacket;
 import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroWorldData;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
@@ -48,7 +51,6 @@ import net.minecraftforge.common.ToolActions;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
-import java.util.Random;
 import java.util.UUID;
 import java.util.function.Consumer;
 
@@ -61,7 +63,6 @@ public class PoemOfTheEndItem extends DiggerItem {
     public static final int MODE_VOID_SHATTER = 3;  // 碎空
 
     private static final String TAG_MODE = "PoemMode";
-    private final Random random = new Random();
 
     // 使用固定的 UUID，确保属性修饰符的一致性
     private static final UUID BASE_ATTACK_DAMAGE_UUID = UUID.fromString("CB3F55D3-645C-4F38-A497-9C13A33DB5CF");
@@ -118,6 +119,9 @@ public class PoemOfTheEndItem extends DiggerItem {
         int currentMode = getMode(stack);
         int nextMode = (currentMode + 1) % 4; // 4个模式
         setMode(stack, nextMode);
+        if (!player.level().isClientSide && player.getMainHandItem() == stack) {
+            HeroEpicFightCompat.onPoemModeChanged(player);
+        }
 
         String modeKey = switch (nextMode) {
             case MODE_NORMAL -> "item.herobrine_companion.poem_of_the_end.mode.0";
@@ -219,12 +223,8 @@ public class PoemOfTheEndItem extends DiggerItem {
             // 计算附魔加成 (锋利、亡灵杀手、节肢杀手)
             damage += EnchantmentHelper.getDamageBonus(player.getMainHandItem(), target.getMobType());
 
-            LightningBolt lightning = EntityType.LIGHTNING_BOLT.create(level);
-            if (lightning != null) {
-                lightning.moveTo(target.position());
-                lightning.setVisualOnly(true); // 设置为仅视觉效果，避免造成额外伤害或副作用
-                level.addFreshEntity(lightning);
-            }
+            // Start the full bolt immediately, in the same server tick as damage.
+            PacketHandler.sendToTracking(new PaleLightningPacket(target.getX(), target.getY(), target.getZ(), 6.0F, true), target);
             // 修改：使用 magic() 伤害源，避免被雷电免疫
             target.hurt(level.damageSources().magic(), damage);
             count++;
@@ -232,31 +232,7 @@ public class PoemOfTheEndItem extends DiggerItem {
     }
 
 
-    // 技能：碎空 (左键攻击触发)
-    @Override
-    public boolean hurtEnemy(ItemStack stack, LivingEntity target, LivingEntity attacker) {
-        if (getMode(stack) == MODE_VOID_SHATTER && !attacker.level().isClientSide) {
-            if (attacker instanceof Player player) {
-                if (!player.getCooldowns().isOnCooldown(this)) {
-                    // 在目标位置生成 VoidRiftEntity，并添加随机偏移
-                    ServerLevel level = (ServerLevel) player.level();
-                    double offsetX = (random.nextDouble() - 0.5) * 1.5; // +/- 0.75
-                    double offsetY = (random.nextDouble() - 0.5) * 1.0; // +/- 0.5
-                    double offsetZ = (random.nextDouble() - 0.5) * 1.5; // +/- 0.75
-
-                    VoidRiftEntity rift = new VoidRiftEntity(level,
-                            target.getX() + offsetX,
-                            target.getY() + target.getBbHeight() / 2.0 + offsetY,
-                            target.getZ() + offsetZ,
-                            player.getUUID());
-
-                    level.addFreshEntity(rift);
-                    player.getCooldowns().addCooldown(this, 10); // 0.5秒冷却 (10 ticks)
-                }
-            }
-        }
-        return super.hurtEnemy(stack, target, attacker);
-    }
+    // VoidRiftOnHurtHandler owns melee-triggered rifts for vanilla and Epic Fight.
 
     @Override
     public boolean onLeftClickEntity(ItemStack stack, Player player, Entity entity) {
@@ -347,13 +323,19 @@ public class PoemOfTheEndItem extends DiggerItem {
             case MODE_NORMAL -> "item.herobrine_companion.poem_of_the_end.mode.usage.0"; // 普通模式
             case MODE_REALM_BREAKER -> "item.herobrine_companion.poem_of_the_end.mode.usage.1"; // 右键发射雷枪
             case MODE_THUNDER_CALL -> "item.herobrine_companion.poem_of_the_end.mode.usage.2";  // 右键召唤雷电
-            case MODE_VOID_SHATTER -> "item.herobrine_companion.poem_of_the_end.mode.usage.3";  // 长按左键极速连击
+            case MODE_VOID_SHATTER -> "item.herobrine_companion.poem_of_the_end.mode.usage.3";  // 挥镰连击与裂痕
             default -> "";
         };
         if (!usageKey.isEmpty()) {
             tooltipComponents.add(Component.translatable(usageKey).withStyle(ChatFormatting.GRAY));
         }
 
+        if (HeroEpicFightCompat.isRuntimeBridgeReady()) {
+            tooltipComponents.add(Component.translatable("item.herobrine_companion.poem_of_the_end.epicfight.input").withStyle(ChatFormatting.GRAY));
+        } else if (!HeroEpicFightCompat.isLoaded()) {
+            tooltipComponents.add(Component.translatable("item.herobrine_companion.poem_of_the_end.standalone.input").withStyle(ChatFormatting.GRAY));
+            tooltipComponents.add(Component.translatable("item.herobrine_companion.poem_of_the_end.standalone.rules").withStyle(ChatFormatting.DARK_GRAY));
+        }
         tooltipComponents.add(Component.translatable("item.herobrine_companion.poem_of_the_end.usage").withStyle(ChatFormatting.DARK_GRAY));
 
         super.appendHoverText(stack, level, tooltipComponents, tooltipFlag);
@@ -390,6 +372,7 @@ public class PoemOfTheEndItem extends DiggerItem {
 
     @Override
     public boolean canPerformAction(ItemStack stack, ToolAction toolAction) {
+        if (toolAction == ToolActions.SWORD_SWEEP && PoemMeleeHit.suppressVanillaSweep(stack)) return false;
         return ToolActions.DEFAULT_AXE_ACTIONS.contains(toolAction) ||
                 ToolActions.DEFAULT_HOE_ACTIONS.contains(toolAction) ||
                 ToolActions.DEFAULT_SHOVEL_ACTIONS.contains(toolAction) ||
