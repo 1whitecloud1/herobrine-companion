@@ -1,0 +1,12 @@
+{
+  "targets": ["rift_swap", "rift_depth"],
+  "passes": [
+    {
+      "name": "herobrine_companion:void_rift_lens",
+      "intarget": "minecraft:main",
+      "outtarget": "rift_swap",
+      "auxtargets": [{"name": "DepthSampler", "id": "rift_depth:depth"}]
+    },
+    {"name": "herobrine_companion:void_rift_copy", "intarget": "rift_swap", "outtarget": "minecraft:main"}
+  ]
+}

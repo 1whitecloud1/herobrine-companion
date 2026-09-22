@@ -11,6 +11,7 @@ import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
@@ -51,6 +52,10 @@ public class VoidRiftEntity extends Entity {
 
     public float getRotation() {
         return this.entityData.get(ROTATION);
+    }
+
+    public int getVisualLifetime() {
+        return MAX_LIFE_TIME;
     }
 
     @Override
@@ -124,7 +129,8 @@ public class VoidRiftEntity extends Entity {
                     target.invulnerableTime = 0;
                     
                     if (ownerEntity instanceof Player player) {
-                        target.hurt(this.damageSources().playerAttack(player), damage);
+                        target.hurt(new DamageSource(
+                                this.damageSources().playerAttack(player).typeHolder(), this, player), damage);
                     } else {
                         target.hurt(this.damageSources().magic(), damage);
                     }
