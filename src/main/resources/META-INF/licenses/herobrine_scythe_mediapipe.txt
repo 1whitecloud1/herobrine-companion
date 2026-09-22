@@ -1,0 +1,31 @@
+Herobrine / Poem of the End - MediaPipe scythe animation, Turn07
+
+Visual reference: Pirate_Gn, 镰刀连击
+https://www.bilibili.com/video/BV1JH4y1r7po/
+
+Motion source: Google MediaPipe 0.10.21 Pose Heavy / GHUM on 0.5x footage.
+This edit reuses the existing reviewed capture; it is not a new capture run.
+Explicit source-frame correspondence is retained. Single-view occlusion loses
+complete turns: the pelvis, chest and head headings are unwrapped through
+visual review. Each cut has its own blade plane, body compression, hand height
+and pivot/stepping pattern. Wide forward and lateral footfalls are authored
+for the block skeleton. Blade direction from Blender frame 75 through 365 is
+flipped 180 degrees against the user-reviewed version, with a smooth lead-in.
+Both hands stay attached to the same shaft. The body, weapon and all footfalls
+are baked through Blender MCP and exported to the Epic Fight biped.
+
+These edited depth, heading, blade and movement curves are combat adaptations,
+not exact recovery of the author's original 3D animation. Ordinary attacks do
+not include the later pole-vault and aerial acrobatic sequence.
+
+Resources: player/poem_mediapipe/* and hero/poem_mediapipe/*
+Authoring: scripts/mocap/retarget_turning.py
+Conversion: scripts/epicfight/export_mediapipe.py
+
+The reference video belongs to its original author. This notice does not grant
+rights to that video or describe the derived motion as CC0. The reference video
+is not distributed in this mod. Existing character, weapon, texture and Epic
+Fight assets retain their respective licenses.
+
+The player/poem_v6/* resources remain unchanged for Realm Breaker and Void
+Shatter, including their original per-version animation speeds.

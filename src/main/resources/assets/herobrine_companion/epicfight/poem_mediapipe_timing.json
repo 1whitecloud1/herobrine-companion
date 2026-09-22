@@ -1,0 +1,238 @@
+{
+  "source": "https://www.bilibili.com/video/BV1JH4y1r7po/",
+  "duration": 6.066666666666666,
+  "playback_speed": 1.0,
+  "combat_edit": "mediapipe_turning_07",
+  "segments": [
+    {
+      "name": "combo_01",
+      "label": "跨步大幅斜斩",
+      "first_frame": 1,
+      "last_frame": 37,
+      "start": 0.0,
+      "duration": 0.6,
+      "recovery": 0.55,
+      "contacts": [
+        {
+          "start": 0.13333333333333333,
+          "end": 0.45
+        }
+      ],
+      "travel_blocks": 0.5,
+      "lateral_blocks": 0.1125,
+      "reference_frames": [
+        16,
+        29
+      ],
+      "full_body_turn": false,
+      "root_turn_degrees": 100
+    },
+    {
+      "name": "combo_02",
+      "label": "反向上挑举镰",
+      "first_frame": 37,
+      "last_frame": 75,
+      "start": 0.6,
+      "duration": 0.6333333333333333,
+      "recovery": 0.5833333333333334,
+      "contacts": [
+        {
+          "start": 0.13333333333333333,
+          "end": 0.4666666666666667
+        }
+      ],
+      "travel_blocks": 0.45,
+      "lateral_blocks": -0.20625,
+      "reference_frames": [
+        29,
+        50
+      ],
+      "full_body_turn": false,
+      "root_turn_degrees": -75
+    },
+    {
+      "name": "combo_03",
+      "label": "跨步转体横扫",
+      "first_frame": 75,
+      "last_frame": 119,
+      "start": 1.2333333333333334,
+      "duration": 0.7333333333333333,
+      "recovery": 0.6833333333333333,
+      "contacts": [
+        {
+          "start": 0.11666666666666667,
+          "end": 0.6333333333333333
+        }
+      ],
+      "travel_blocks": 0.34375,
+      "lateral_blocks": 0.16875,
+      "reference_frames": [
+        50,
+        66
+      ],
+      "full_body_turn": true,
+      "root_turn_degrees": 360
+    },
+    {
+      "name": "combo_04",
+      "label": "侧跨换脚转体斜抡",
+      "first_frame": 119,
+      "last_frame": 163,
+      "start": 1.9666666666666666,
+      "duration": 0.7333333333333333,
+      "recovery": 0.6833333333333333,
+      "contacts": [
+        {
+          "start": 0.11666666666666667,
+          "end": 0.6166666666666667
+        }
+      ],
+      "travel_blocks": 0.375,
+      "lateral_blocks": -0.2,
+      "reference_frames": [
+        66,
+        83
+      ],
+      "full_body_turn": true,
+      "root_turn_degrees": 360
+    },
+    {
+      "name": "combo_05",
+      "label": "跨步转身沉身扫镰",
+      "first_frame": 163,
+      "last_frame": 215,
+      "start": 2.7,
+      "duration": 0.8666666666666667,
+      "recovery": 0.8166666666666667,
+      "contacts": [
+        {
+          "start": 0.2,
+          "end": 0.7166666666666667
+        }
+      ],
+      "travel_blocks": 0.90625,
+      "lateral_blocks": 0.3,
+      "reference_frames": [
+        83,
+        111
+      ],
+      "full_body_turn": true,
+      "root_turn_degrees": 360
+    },
+    {
+      "name": "combo_06",
+      "label": "弓步起身绕镰上挑",
+      "first_frame": 215,
+      "last_frame": 261,
+      "start": 3.566666666666667,
+      "duration": 0.7666666666666667,
+      "recovery": 0.7166666666666667,
+      "contacts": [
+        {
+          "start": 0.11666666666666667,
+          "end": 0.65
+        }
+      ],
+      "travel_blocks": 0.4875,
+      "lateral_blocks": -0.2875,
+      "reference_frames": [
+        111,
+        129
+      ],
+      "full_body_turn": false,
+      "root_turn_degrees": -30
+    },
+    {
+      "name": "combo_07",
+      "label": "跨步提膝转体大回环",
+      "first_frame": 261,
+      "last_frame": 311,
+      "start": 4.333333333333333,
+      "duration": 0.8333333333333334,
+      "recovery": 0.7833333333333333,
+      "contacts": [
+        {
+          "start": 0.11666666666666667,
+          "end": 0.7166666666666667
+        }
+      ],
+      "travel_blocks": 0.3875,
+      "lateral_blocks": 0.2,
+      "reference_frames": [
+        129,
+        149
+      ],
+      "full_body_turn": true,
+      "root_turn_degrees": 360
+    },
+    {
+      "name": "combo_08",
+      "label": "侧跨低身转体扫镰",
+      "first_frame": 311,
+      "last_frame": 365,
+      "start": 5.166666666666667,
+      "duration": 0.9,
+      "recovery": 0.85,
+      "contacts": [
+        {
+          "start": 0.2,
+          "end": 0.75
+        }
+      ],
+      "travel_blocks": 0.375,
+      "lateral_blocks": -0.0875,
+      "reference_frames": [
+        149,
+        171
+      ],
+      "full_body_turn": true,
+      "root_turn_degrees": 365
+    }
+  ],
+  "specials": [
+    {
+      "name": "dash",
+      "label": "疾跑 · 腾空旋镰",
+      "first_frame": 1,
+      "last_frame": 91,
+      "start": 0.0,
+      "duration": 1.5,
+      "recovery": 1.35,
+      "contacts": [
+        {
+          "start": 0.26666666666666666,
+          "end": 1.0833333333333333
+        }
+      ],
+      "aerial": true,
+      "full_body_turn": true,
+      "root_turn_degrees": 720.0,
+      "travel_blocks": 3.7,
+      "lateral_blocks": 0.0,
+      "reference_frames": [
+        276,
+        294
+      ],
+      "vertical_coord_policy": "positive_root_height",
+      "reference_playback_rate": 0.5
+    },
+    {
+      "name": "air",
+      "label": "跨步大幅斜斩",
+      "first_frame": 1,
+      "last_frame": 37,
+      "start": 0.0,
+      "duration": 0.6,
+      "recovery": 0.55,
+      "contacts": [
+        {
+          "start": 0.13333333333333333,
+          "end": 0.45
+        }
+      ],
+      "travel_blocks": 0.0,
+      "lateral_blocks": 0.0
+    }
+  ],
+  "dash_edit": "mediapipe_aerial_dash_08"
+}
