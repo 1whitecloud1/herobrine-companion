@@ -1,64 +1,76 @@
 package com.whitecloud233.modid.herobrine_companion.client.render;
 
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
+import com.mojang.blaze3d.vertex.VertexFormat;
+import com.mojang.math.Axis;
 import com.whitecloud233.modid.herobrine_companion.entity.projectile.VoidRiftEntity;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
-import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.resources.ResourceLocation;
-import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 
+/** The normal path submits a procedural screen-space lens, without a textured entity quad. */
 public class VoidRiftRenderer extends EntityRenderer<VoidRiftEntity> {
-    private static final ResourceLocation TEXTURE = new ResourceLocation(HerobrineCompanion.MODID, "textures/entity/void_rift.png");
-
-    public VoidRiftRenderer(EntityRendererProvider.Context context) {
-        super(context);
-    }
+    public VoidRiftRenderer(EntityRendererProvider.Context context) { super(context); }
 
     @Override
-    public void render(VoidRiftEntity entity, float entityYaw, float partialTicks, PoseStack poseStack, MultiBufferSource buffer, int packedLight) {
-        if (entity.isVisualOnly()) {
-            super.render(entity, entityYaw, partialTicks, poseStack, buffer, packedLight);
-            return;
-        }
-
+    public void render(VoidRiftEntity entity, float entityYaw, float partialTicks, PoseStack poseStack,
+                       MultiBufferSource buffer, int packedLight) {
         poseStack.pushPose();
-        poseStack.mulPose(com.mojang.math.Axis.ZP.rotationDegrees(entity.getRotation()));
         poseStack.mulPose(this.entityRenderDispatcher.cameraOrientation());
-        poseStack.mulPose(com.mojang.math.Axis.YP.rotationDegrees(180.0F));
-        poseStack.scale(3.0F, 3.0F, 3.0F);
-
-        PoseStack.Pose last = poseStack.last();
-        Matrix4f pose = last.pose();
-        Matrix3f normal = last.normal();
-
-        VertexConsumer vertexConsumer = buffer.getBuffer(RenderType.entityTranslucentEmissive(this.getTextureLocation(entity)));
-        addVertex(vertexConsumer, pose, normal, packedLight, -0.5F, -0.5F, 0, 1);
-        addVertex(vertexConsumer, pose, normal, packedLight, 0.5F, -0.5F, 1, 1);
-        addVertex(vertexConsumer, pose, normal, packedLight, 0.5F, 0.5F, 1, 0);
-        addVertex(vertexConsumer, pose, normal, packedLight, -0.5F, 0.5F, 0, 0);
-
+        poseStack.mulPose(Axis.ZP.rotationDegrees(entity.getRotation()));
+        if (!VoidRiftPostEffect.submit(entity, poseStack.last().pose(), partialTicks)) {
+            fallback(entity, partialTicks, poseStack.last().pose(), buffer);
+        }
         poseStack.popPose();
         super.render(entity, entityYaw, partialTicks, poseStack, buffer, packedLight);
     }
 
-    private static void addVertex(VertexConsumer consumer, Matrix4f pose, Matrix3f normal, int lightmapUV, float x, float y, int u, int v) {
-        consumer.vertex(pose, x, y, 0.0F)
-                .color(255, 255, 255, 255)
-                .uv((float) u, (float) v)
-                .overlayCoords(OverlayTexture.NO_OVERLAY)
-                .uv2(lightmapUV)
-                .normal(normal, 0.0F, 1.0F, 0.0F)
-                .endVertex();
+    private static void fallback(VoidRiftEntity entity, float partialTick, Matrix4f pose, MultiBufferSource buffers) {
+        float strength = VoidRiftProjection.envelope(entity.tickCount + partialTick, entity.getVisualLifetime());
+        if (strength <= 0) return;
+        VertexConsumer out = buffers.getBuffer(FallbackMaterial.TYPE);
+        int alpha = (int) (255 * strength);
+        for (int i = 0; i < 16; i++) {
+            float y0 = (i / 8.0F - 1) * VoidRiftProjection.HALF_LENGTH;
+            float y1 = ((i + 1) / 8.0F - 1) * VoidRiftProjection.HALF_LENGTH;
+            float w0 = 0.19F * (float) Math.sin(Math.PI * i / 16) * strength;
+            float w1 = 0.19F * (float) Math.sin(Math.PI * (i + 1) / 16) * strength;
+            quad(out, pose, -w0, w0, y0, -w1, w1, y1, 4, 1, 9, alpha);
+            quad(out, pose, -w0 - 0.025F, -w0, y0, -w1 - 0.025F, -w1, y1, 186, 129, 255, alpha);
+            quad(out, pose, w0, w0 + 0.025F, y0, w1, w1 + 0.025F, y1, 186, 129, 255, alpha);
+        }
+    }
+
+    private static void quad(VertexConsumer out, Matrix4f pose, float left0, float right0, float y0,
+                             float left1, float right1, float y1, int r, int g, int b, int a) {
+        out.vertex(pose, left0, y0, 0).color(r, g, b, a).endVertex();
+        out.vertex(pose, right0, y0, 0).color(r, g, b, a).endVertex();
+        out.vertex(pose, right1, y1, 0).color(r, g, b, a).endVertex();
+        out.vertex(pose, left1, y1, 0).color(r, g, b, a).endVertex();
     }
 
     @Override
     public ResourceLocation getTextureLocation(VoidRiftEntity entity) {
-        return TEXTURE;
+        // EntityRenderer requires a location; neither the lens nor fallback samples a texture.
+        return TextureAtlas.LOCATION_BLOCKS;
+    }
+
+    private static final class FallbackMaterial extends RenderType {
+        private static final RenderType TYPE = create("herobrine_companion:rift_fallback",
+                DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.QUADS, 4096, false, true,
+                CompositeState.builder().setShaderState(POSITION_COLOR_SHADER)
+                        .setTransparencyState(TRANSLUCENT_TRANSPARENCY).setCullState(NO_CULL)
+                        .setDepthTestState(LEQUAL_DEPTH_TEST).setWriteMaskState(COLOR_WRITE).createCompositeState(false));
+
+        private FallbackMaterial() {
+            super("rift_fallback", DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.QUADS,
+                    4096, false, true, () -> { }, () -> { });
+        }
     }
 }

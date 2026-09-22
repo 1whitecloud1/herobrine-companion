@@ -10,6 +10,7 @@ import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
@@ -59,6 +60,10 @@ public class VoidRiftEntity extends Entity {
 
     public float getRotation() {
         return this.entityData.get(ROTATION);
+    }
+
+    public int getVisualLifetime() {
+        return MAX_LIFE_TIME;
     }
 
     public void setTarget(Entity target) {
@@ -180,7 +185,9 @@ public class VoidRiftEntity extends Entity {
                             damage += EnchantmentHelper.getDamageBonus(mainHandItem, hurtTarget.getMobType());
                         }
 
-                        hurtTarget.hurt(this.damageSources().playerAttack(player), damage);
+                        // Keep physical damage/kill credit, but identify this rift
+                        // as the direct source so its pulses cannot open more rifts.
+                        hurtTarget.hurt(new DamageSource(this.damageSources().playerAttack(player).typeHolder(), this, player), damage);
                     } else {
                         hurtTarget.hurt(this.damageSources().magic(), damage);
                     }
