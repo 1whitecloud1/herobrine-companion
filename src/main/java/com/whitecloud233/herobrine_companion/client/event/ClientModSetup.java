@@ -35,8 +35,9 @@ public class ClientModSetup {
         modEventBus.addListener(ClientEvents::registerScreens);
         modEventBus.addListener(ClientEvents::registerDimensionSpecialEffects);
         modEventBus.addListener(ClientEvents::registerClientExtensions);
-        // 终末之诗：没装 GeckoLib 时把物品模型换成 2D 版本
+        // 终末之诗：按 GeckoLib / Epic Fight 状态选择 3D 或普通物品模型
         modEventBus.addListener(PoemOfTheEndModelSwapper::onRegisterAdditional);
+        modEventBus.addListener(ClientEvents::onRegisterAdditionalModels);
         modEventBus.addListener(PoemOfTheEndModelSwapper::onModifyBakingResult);
 
         // 2. 注册配置界面 (适配 NeoForge 写法)
