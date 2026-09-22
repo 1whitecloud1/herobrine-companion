@@ -467,4 +467,9 @@ tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
 
-apply from: 'scripts/poem/verify_animation_resources.gradle'
+// scripts/ 是本地开发辅助脚本（动作烘焙、动画/资源校验），不纳入版本控制。
+// 存在时挂上资源校验任务，不存在时静默跳过，保证新克隆的仓库也能正常配置与构建。
+def verifyAnimationResourcesScript = file('scripts/poem/verify_animation_resources.gradle')
+if (verifyAnimationResourcesScript.exists()) {
+    apply from: verifyAnimationResourcesScript
+}
