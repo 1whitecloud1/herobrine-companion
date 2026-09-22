@@ -44,6 +44,9 @@ public class HeroWorldData {
         public CompoundTag curiosBackItem = new CompoundTag();
         public CompoundTag accessoriesData = new CompoundTag();
         public CompoundTag poseData = new CompoundTag();
+        public CompoundTag giftProfile = new CompoundTag();
+        /** 无名之蛋糕再吃发奖冷却(到期 game time tick;0 = 无冷却)。 */
+        public long birthdayCakeRewardTick = 0L;
 
         public UUID activeHeroUUID = null;
         public GlobalPos lastKnownHeroPos = null;
@@ -71,6 +74,8 @@ public class HeroWorldData {
             tag.put("CuriosBackItem", curiosBackItem);
             tag.put("AccessoriesData", accessoriesData);
             tag.put("PoseData", poseData);
+            tag.put("GiftProfile", giftProfile);
+            tag.putLong("BirthdayCakeRewardTick", birthdayCakeRewardTick);
 
             if (activeHeroUUID != null) tag.putUUID("ActiveHeroUUID", activeHeroUUID);
             if (lastKnownHeroPos != null) tag.put("LastKnownHeroPos", writeGlobalPos(lastKnownHeroPos));
@@ -100,6 +105,8 @@ public class HeroWorldData {
             if (tag.contains("CuriosBackItem", 10)) profile.curiosBackItem = tag.getCompound("CuriosBackItem");
             if (tag.contains("AccessoriesData", 10)) profile.accessoriesData = tag.getCompound("AccessoriesData");
             if (tag.contains("PoseData", 10)) profile.poseData = tag.getCompound("PoseData");
+            if (tag.contains("GiftProfile", 10)) profile.giftProfile = tag.getCompound("GiftProfile");
+            if (tag.contains("BirthdayCakeRewardTick")) profile.birthdayCakeRewardTick = tag.getLong("BirthdayCakeRewardTick");
 
             if (tag.hasUUID("ActiveHeroUUID")) profile.activeHeroUUID = tag.getUUID("ActiveHeroUUID");
             if (tag.contains("LastKnownHeroPos")) profile.lastKnownHeroPos = readGlobalPos(tag.getCompound("LastKnownHeroPos"));
@@ -222,6 +229,9 @@ public class HeroWorldData {
                 ListTag profilesTag = compound.getList("PlayerProfiles", Tag.TAG_COMPOUND);
                 for (int i = 0; i < profilesTag.size(); i++) {
                     CompoundTag profileTag = profilesTag.getCompound(i);
+                    if (!profileTag.hasUUID("UUID")) {
+                        continue; // 旧档条目缺失/损坏：跳过该条目，避免迁移时崩溃
+                    }
                     UUID uuid = profileTag.getUUID("UUID");
                     PlayerProfile profile = getProfile(uuid);
 
@@ -346,6 +356,24 @@ public class HeroWorldData {
         profile.accessoriesData = tag;
         profile.setDirty();
     }
+    // 赠礼档案(玩家维度)
+    public CompoundTag getGiftProfile(UUID uuid) { return getProfile(uuid).giftProfile; }
+
+    /** 无名之蛋糕的再吃发奖冷却(到期 tick,持久化)。 */
+    public long getBirthdayCakeRewardTick(UUID uuid) { return getProfile(uuid).birthdayCakeRewardTick; }
+    public void setBirthdayCakeRewardTick(UUID uuid, long tick) {
+        if (uuid == null) return;
+        PlayerProfile profile = getProfile(uuid);
+        profile.birthdayCakeRewardTick = Math.max(0L, tick);
+        profile.setDirty();
+    }
+    public void setGiftProfile(UUID uuid, CompoundTag tag) {
+        if (uuid == null) return;
+        PlayerProfile profile = getProfile(uuid);
+        profile.giftProfile = tag;
+        profile.setDirty();
+    }
+
     public CompoundTag getPoseData(UUID uuid) { return getProfile(uuid).poseData; }
     public void setPoseData(UUID uuid, CompoundTag tag) {
         if (uuid == null) return;

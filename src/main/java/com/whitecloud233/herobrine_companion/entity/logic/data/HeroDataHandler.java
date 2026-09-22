@@ -3,15 +3,23 @@ package com.whitecloud233.herobrine_companion.entity.logic.data;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.herobrine_companion.network.SyncRewardsPacket;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.FloatTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Set;
 import java.util.UUID;
 
 
 public class HeroDataHandler {
+    // Older builds could persist an enabled editor with its untouched zero buffer.
+    // Versioned saves distinguish a newly chosen neutral pose from that legacy state.
+    private static final int POSE_DATA_VERSION = 1;
 
     public static void syncGlobalTrust(HeroEntity hero) {
         if (hero.level() instanceof ServerLevel serverLevel) {
@@ -80,35 +88,55 @@ public class HeroDataHandler {
         }
     }
 
-    public static void savePoseData(HeroEntity hero, net.minecraft.nbt.CompoundTag compound) {
+    public static void savePoseData(HeroEntity hero, CompoundTag compound) {
+        compound.putInt("PoseDataVersion", POSE_DATA_VERSION);
         compound.putBoolean("IsPoseEditing", hero.isPoseEditing);
         if (hero.isPoseEditing) {
-            net.minecraft.nbt.ListTag poseList = new net.minecraft.nbt.ListTag();
+            ListTag poseList = new ListTag();
             for (int i = 0; i < 10; i++) {
                 for (int j = 0; j < 3; j++) {
-                    poseList.add(net.minecraft.nbt.FloatTag.valueOf(hero.customPoseAngles[i][j]));
+                    poseList.add(FloatTag.valueOf(hero.customPoseAngles[i][j]));
                 }
             }
             compound.put("CustomPoseAngles", poseList);
+        } else {
+            compound.remove("CustomPoseAngles");
         }
     }
 
-    public static void loadPoseData(HeroEntity hero, net.minecraft.nbt.CompoundTag compound) {
-        if (compound.contains("IsPoseEditing")) {
-            hero.isPoseEditing = compound.getBoolean("IsPoseEditing");
-            if (hero.isPoseEditing && compound.contains("CustomPoseAngles", 9)) {
-                net.minecraft.nbt.ListTag poseList = compound.getList("CustomPoseAngles", 5);
-                if (poseList.size() == 30) {
-                    int index = 0;
-                    for (int i = 0; i < 10; i++) {
-                        for (int j = 0; j < 3; j++) {
-                            hero.customPoseAngles[i][j] = poseList.getFloat(index++);
-                        }
-                    }
-                } else {
-                    hero.isPoseEditing = false;
-                }
-            }
+    public static void loadPoseData(HeroEntity hero, CompoundTag compound) {
+        float[][] angles = readPoseAngles(compound);
+        // 实体 NBT 和全局重生备份走同一迁移入口，避免重新召唤后恢复旧的木头人姿势。
+        hero.isPoseEditing = angles != null;
+        hero.customPoseAngles = angles != null ? angles : new float[10][3];
+    }
+
+    @Nullable
+    static float[][] readPoseAngles(CompoundTag compound) {
+        if (!compound.getBoolean("IsPoseEditing")) {
+            return null;
         }
+        ListTag poseList = compound.getList("CustomPoseAngles", Tag.TAG_FLOAT);
+        if (poseList.size() != 30) {
+            return null;
+        }
+        float[][] angles = new float[10][3];
+        boolean hasRotation = false;
+        for (int i = 0; i < 30; i++) {
+            float angle = poseList.getFloat(i);
+            if (!Float.isFinite(angle)) {
+                return null;
+            }
+            angles[i / 3][i % 3] = angle;
+            hasRotation |= angle != 0.0F;
+        }
+        // A complete zero list also occurs in affected saves, so validating only
+        // the length/type leaves every animation overridden by a rigid stance.
+        // Keep nonzero legacy poses, and allow intentional neutral poses saved
+        // with the new format. This migration does not touch other entity data.
+        if (!hasRotation && compound.getInt("PoseDataVersion") < POSE_DATA_VERSION) {
+            return null;
+        }
+        return angles;
     }
 }

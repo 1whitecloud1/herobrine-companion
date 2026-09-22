@@ -1,6 +1,7 @@
 package com.whitecloud233.herobrine_companion.event;
 
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.herobrine_companion.entity.logic.quest.HeroQuestManager;
 import com.whitecloud233.herobrine_companion.entity.logic.spawn.GlitchVillagerSpawner;
 import com.whitecloud233.herobrine_companion.entity.logic.spawn.HeroSpawner;
 import com.whitecloud233.herobrine_companion.world.structure.UnstableZoneRuntime;
@@ -63,7 +64,7 @@ public class PlayerMechanicsEventHandler {
             }
 
             if (player instanceof ServerPlayer serverPlayer) {
-                HeroQuestHandler.tickPacifyQuest(serverPlayer);
+                HeroQuestManager.tickAll(serverPlayer);
             }
         }
     }
@@ -71,7 +72,11 @@ public class PlayerMechanicsEventHandler {
     @SubscribeEvent
     public static void onPlayerInteractEntity(PlayerInteractEvent.EntityInteract event) {
         if (event.getEntity() instanceof ServerPlayer player) {
-            HeroQuestHandler.onEndermanInteract(player, event.getTarget(), event.getItemStack());
+            // 委托桥：若目标交互被当前委托消费（交付物品 / 驱散镜像），取消原交互
+            boolean consumed = HeroQuestManager.onEntityInteract(player, event.getTarget(), event.getItemStack());
+            if (consumed) {
+                event.setCanceled(true);
+            }
         }
     }
 
@@ -98,9 +103,14 @@ public class PlayerMechanicsEventHandler {
             }
         }
 
+        if (event.getEntity() instanceof ServerPlayer diedPlayer && !diedPlayer.level().isClientSide) {
+            // 委托桥：处理“被世界选中却没能接住”等死亡失败分支
+            HeroQuestManager.onPlayerDeath(diedPlayer);
+        }
+
         DamageSource source = event.getSource();
         if (source.getEntity() instanceof ServerPlayer player) {
-            HeroQuestHandler.onMobKill(player, event.getEntity());
+            HeroQuestManager.onKill(player, event.getEntity());
         }
     }
 

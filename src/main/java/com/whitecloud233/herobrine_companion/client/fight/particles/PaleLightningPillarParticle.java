@@ -24,6 +24,7 @@ public class PaleLightningPillarParticle extends Particle {
     private final Vec3 absoluteEndPos;
     private final float diameter;
     private final int seed;
+    private final boolean immediate;
 
     private final List<Vec3> mainPath;
     private final List<LightningBranch> branches = new ArrayList<>();
@@ -37,11 +38,16 @@ public class PaleLightningPillarParticle extends Particle {
     }
 
     public PaleLightningPillarParticle(ClientLevel level, double startX, double startY, double startZ, Vec3 endPos, float diameter) {
+        this(level, startX, startY, startZ, endPos, diameter, false);
+    }
+
+    public PaleLightningPillarParticle(ClientLevel level, double startX, double startY, double startZ, Vec3 endPos, float diameter, boolean immediate) {
         super(level, startX, startY, startZ);
         this.absoluteEndPos = endPos;
         this.diameter = diameter;
+        this.immediate = immediate;
 
-        this.lifetime = 45;
+        this.lifetime = immediate ? 10 : 45;
         this.hasPhysics = false;
         this.seed = new Random().nextInt(100000);
 
@@ -100,6 +106,10 @@ public class PaleLightningPillarParticle extends Particle {
         return path;
     }
 
+    public static float fallProgress(boolean immediate, float age) {
+        return immediate ? 1.0F : Math.max(0.0F, Math.min(1.0F, (age - 30.0F) / 5.0F));
+    }
+
     @Override
     public void render(VertexConsumer vertex, Camera camera, float partialTicks) {
         Vec3 cameraPos = camera.getPosition();
@@ -108,16 +118,7 @@ public class PaleLightningPillarParticle extends Particle {
         float currentTime = this.age + partialTicks;
 
         int delayDuration = 30;
-        int fallDuration = 5;
-
-        float fallProgress;
-        if (currentTime < delayDuration) {
-            fallProgress = 0.0f;
-        } else if (currentTime < delayDuration + fallDuration) {
-            fallProgress = (currentTime - delayDuration) / fallDuration;
-        } else {
-            fallProgress = 1.0f;
-        }
+        float fallProgress = fallProgress(this.immediate, currentTime);
 
         float totalAlphaFactor = 1.0f;
         int fadeStartTick = lifetime - 10;
@@ -128,7 +129,7 @@ public class PaleLightningPillarParticle extends Particle {
         ParticleColor coreColor = new ParticleColor(1.0f, 1.0f, 1.0f, 0.95f * totalAlphaFactor);
         ParticleColor glowColor = new ParticleColor(0.6f, 0.8f, 1.0f, 0.35f * totalAlphaFactor);
 
-        if (fallProgress < 1.0f) {
+        if (!this.immediate && fallProgress < 1.0f) {
             float flashSpeed = 0.5f + (currentTime / delayDuration) * 3.0f;
             float warningAlpha = 0.2f + 0.8f * (float)Math.abs(Math.sin(currentTime * flashSpeed));
             ParticleColor warningColor = new ParticleColor(1.0f, 1.0f, 1.0f, warningAlpha * totalAlphaFactor);
@@ -154,7 +155,7 @@ public class PaleLightningPillarParticle extends Particle {
             }
         }
 
-        if (fallProgress >= 1.0f && this.age < (fadeStartTick + 5)) {
+        if (!this.immediate && fallProgress >= 1.0f && this.age < (fadeStartTick + 5)) {
             drawGroundDissipation(mat, vertex, cameraPos, glowColor);
         }
     }

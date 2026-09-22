@@ -1,7 +1,7 @@
 package com.whitecloud233.herobrine_companion.entity.ai.learning;
 
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
-import com.whitecloud233.herobrine_companion.event.HeroQuestHandler;
+import com.whitecloud233.herobrine_companion.entity.logic.quest.HeroQuestManager;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
@@ -48,7 +48,7 @@ public class HeroPacifyAttackerGoal extends Goal {
         if (state == SimpleNeuralNetwork.MindState.REMINISCING) return false;
 
         // [新增] 检查是否在任务模式
-        boolean isQuesting = HeroQuestHandler.isPlayerDoingQuest(owner);
+        boolean isQuesting = HeroQuestManager.isPlayerDoingQuest(owner);
 
         List<Mob> list = this.hero.level().getEntitiesOfClass(Mob.class, this.hero.getBoundingBox().inflate(10.0D),
                 e -> {
@@ -57,7 +57,7 @@ public class HeroPacifyAttackerGoal extends Goal {
 
                     // [修改] 如果在任务模式，使用 HeroQuestHandler 判断是否忽略任务目标怪物
                     if (isQuesting) {
-                        if (HeroQuestHandler.shouldIgnoreTarget(e)) {
+                        if (HeroQuestManager.shouldIgnoreTarget(e)) {
                             return false; // 不要安抚它们，让玩家去打
                         }
                     }

@@ -18,6 +18,15 @@ public class HeroMoveControl extends MoveControl {
 
     @Override
     public void tick() {
+        // 赠礼手势:送东西时站定不动(服务端每 tick 也会 hold,这里从移动控制源头让位,
+        // 避免 Goal 重新寻路把英雄拖走导致"边递东西边走路")
+        if (this.hero.isGiftGestureHolding()) {
+            this.operation = Operation.WAIT;
+            this.hero.getNavigation().stop();
+            this.hero.setDeltaMovement(0.0D, this.hero.getDeltaMovement().y, 0.0D);
+            return;
+        }
+
         // 战斗模式必须覆盖陪伴"贴近主人就原地不动"的行为：否则战斗+陪伴同时开启、
         // 玩家站在 Hero 2 格内时整段移动被冻结，飞行追击也飞不起来
         if (!this.hero.isBattleModeActive() && HeroGodlyCompanionGoal.isOwnerWithinStayStillRadius(this.hero)) {

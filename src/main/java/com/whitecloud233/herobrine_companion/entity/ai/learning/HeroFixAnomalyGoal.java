@@ -4,7 +4,7 @@ import com.whitecloud233.herobrine_companion.entity.GhostCreeperEntity;
 import com.whitecloud233.herobrine_companion.entity.GhostSkeletonEntity;
 import com.whitecloud233.herobrine_companion.entity.GhostZombieEntity;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
-import com.whitecloud233.herobrine_companion.event.HeroQuestHandler;
+import com.whitecloud233.herobrine_companion.entity.logic.quest.HeroQuestManager;
 import com.whitecloud233.herobrine_companion.world.structure.ModStructures;
 import com.whitecloud233.herobrine_companion.world.structure.UnstableZoneRuntime;
 import net.minecraft.core.BlockPos;
@@ -53,7 +53,7 @@ public class HeroFixAnomalyGoal extends Goal {
         boolean isQuesting = false;
         if (this.hero.getOwnerUUID() != null) {
             Player owner = this.hero.level().getPlayerByUUID(this.hero.getOwnerUUID());
-            if (owner != null && HeroQuestHandler.isPlayerDoingQuest(owner)) {
+            if (owner != null && HeroQuestManager.isPlayerDoingQuest(owner)) {
                 isQuesting = true;
             }
         }

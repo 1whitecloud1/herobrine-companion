@@ -25,11 +25,36 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.ServerLevelAccessor;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.EntityDataSerializers;
+import net.minecraft.network.syncher.SynchedEntityData;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.UUID;
+
 public class GhostSteveEntity extends Monster {
+
+    /** 非空时表示这是某个玩家的“镜像”，客户端渲染器会改用对应玩家的皮肤。 */
+    private static final EntityDataAccessor<String> DATA_MIRROR_SKIN = SynchedEntityData.defineId(GhostSteveEntity.class, EntityDataSerializers.STRING);
+
     public GhostSteveEntity(EntityType<? extends Monster> type, Level level) {
         super(type, level);
+    }
+
+    @Override
+    protected void defineSynchedData(SynchedEntityData.Builder builder) {
+        super.defineSynchedData(builder);
+        builder.define(DATA_MIRROR_SKIN, "");
+    }
+
+    /** 设置镜像皮肤来源玩家；传 null 恢复默认幽灵皮肤。 */
+    public void setMirrorSkinUuid(@Nullable UUID uuid) {
+        this.entityData.set(DATA_MIRROR_SKIN, uuid == null ? "" : uuid.toString());
+    }
+
+    /** 镜像皮肤来源玩家的 UUID 字符串；空串 = 普通幽灵。 */
+    public String getMirrorSkinUuid() {
+        return this.entityData.get(DATA_MIRROR_SKIN);
     }
 
     @Override

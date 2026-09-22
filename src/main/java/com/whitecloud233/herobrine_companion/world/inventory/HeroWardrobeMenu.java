@@ -6,6 +6,7 @@ import com.whitecloud233.herobrine_companion.entity.logic.data.HeroStateManager;
 import com.whitecloud233.herobrine_companion.util.HeroMenuValidity;
 import com.whitecloud233.herobrine_companion.world.inventory.ModMenus;
 import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -37,40 +38,51 @@ public class HeroWardrobeMenu extends AbstractContainerMenu {
 
     // 1.21.1: 菜单数据传输使用了带有注册表上下文的 RegistryFriendlyByteBuf
     public HeroWardrobeMenu(int containerId, Inventory playerInv, RegistryFriendlyByteBuf extraData) {
-        this(containerId, playerInv, (HeroEntity) playerInv.player.level().getEntity(extraData.readInt()));
+        // 竞态窗口下 Hero 可能已消失/实体 ID 被复用：不再直接强转，无效实体以 null 进入主构造器
+        this(containerId, playerInv, playerInv.player.level().getEntity(extraData.readInt()) instanceof HeroEntity hero ? hero : null);
     }
 
     public HeroWardrobeMenu(int containerId, Inventory playerInv, HeroEntity hero) {
         super(ModMenus.HERO_WARDROBE_MENU.get(), containerId);
         this.hero = hero;
 
-        // 1. 【核心修正】左侧退回原版护甲槽
-        EntityArmorInvWrapper armorInv = new EntityArmorInvWrapper(this.hero);
-        for (int i = 0; i < 4; ++i) {
-            this.addSlot(new SlotItemHandler(armorInv, 3 - i, 26, 8 + i * 18) {
-                @Override public int getMaxStackSize() { return 1; }
-                @Override
-                public void setChanged() {
-                    super.setChanged();
-                    markHeroEquipmentDirtyAndBackup(hero);
-                }
-            });
+        if (hero == null) {
+            // Hero 已消失/类型不符（客户端竞态窗口）：不创建任何 Hero 槽位；
+            // stillValid() 会在下一 tick 返回 false，由原版逻辑自动关闭菜单，避免 NPE/CCE。
+            this.curioBackSlotIndex = -1;
+            this.accessorySlotCount = 0;
+            this.mainHandSlotIndex = -1;
+            this.offHandSlotIndex = -1;
+            this.heroSlotCount = 0;
+            this.inventoryOffsetY = 0;
+        } else {
+            // 1. 【核心修正】左侧退回原版护甲槽
+            EntityArmorInvWrapper armorInv = new EntityArmorInvWrapper(hero);
+            for (int i = 0; i < 4; ++i) {
+                this.addSlot(new SlotItemHandler(armorInv, 3 - i, 26, 8 + i * 18) {
+                    @Override public int getMaxStackSize() { return 1; }
+                    @Override
+                    public void setChanged() {
+                        super.setChanged();
+                        markHeroEquipmentDirtyAndBackup(hero);
+                    }
+                });
+            }
+
+            // 2. 右上角：使用 Curios 挂载翅膀 (back)
+            int curioBackSlotIndex = ModList.get().isLoaded("curios") ? CuriosSafeInvoker.addCurioSlot(this, hero) : -1;
+            this.curioBackSlotIndex = curioBackSlotIndex;
+            this.accessorySlotCount = HeroAccessoriesCompat.addSlots(slot -> this.addSlot(slot), hero, ACCESSORY_START_X, ACCESSORY_START_Y, ACCESSORY_COLUMNS);
+            int accessoryRows = Math.max(3, (int)Math.ceil(this.accessorySlotCount / (double)ACCESSORY_COLUMNS));
+            this.inventoryOffsetY = Math.max(0, accessoryRows - 3) * 18;
+
+            // 3. 右下角：显式主手/副手槽
+            this.addSlot(createHandSlot(hero, EquipmentSlot.MAINHAND, 134, 26));
+            this.mainHandSlotIndex = this.slots.size() - 1;
+            this.addSlot(createHandSlot(hero, EquipmentSlot.OFFHAND, 134, 44));
+            this.offHandSlotIndex = this.slots.size() - 1;
+            this.heroSlotCount = this.slots.size();
         }
-
-        // 2. 右上角：使用 Curios 挂载翅膀 (back)
-        int curioBackSlotIndex = ModList.get().isLoaded("curios") ? CuriosSafeInvoker.addCurioSlot(this, this.hero) : -1;
-        this.curioBackSlotIndex = curioBackSlotIndex;
-        this.accessorySlotCount = HeroAccessoriesCompat.addSlots(slot -> this.addSlot(slot), this.hero, ACCESSORY_START_X, ACCESSORY_START_Y, ACCESSORY_COLUMNS);
-        int accessoryRows = Math.max(3, (int)Math.ceil(this.accessorySlotCount / (double)ACCESSORY_COLUMNS));
-        this.inventoryOffsetY = Math.max(0, accessoryRows - 3) * 18;
-
-
-        // 3. 右下角：显式主手/副手槽，避免 EntityHandsInvWrapper 在换装时产生中间态串槽
-        this.addSlot(createHandSlot(this.hero, EquipmentSlot.MAINHAND, 134, 26));
-        this.mainHandSlotIndex = this.slots.size() - 1;
-        this.addSlot(createHandSlot(this.hero, EquipmentSlot.OFFHAND, 134, 44));
-        this.offHandSlotIndex = this.slots.size() - 1;
-        this.heroSlotCount = this.slots.size();
 
 
         // --- 下方：玩家背包与快捷栏 ---

@@ -11,6 +11,7 @@ import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.world.Container;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
@@ -67,6 +68,16 @@ public class HeroAccessoriesCompat {
         AccessoriesSafeInvoker.setAccessoriesDataFromTag(hero, tag);
     }
 
+    public static void copyMissingItems(HeroEntity source, HeroEntity target) {
+        if (!isLoaded() || source == null || target == null) return;
+        AccessoriesSafeInvoker.copyMissingItems(source, target);
+    }
+
+    public static void loadMissingItemsFromTag(HeroEntity hero, CompoundTag tag) {
+        if (!isLoaded() || hero == null || tag == null || !tag.contains("Containers", Tag.TAG_COMPOUND)) return;
+        AccessoriesSafeInvoker.loadMissingItemsFromTag(hero, tag.getCompound("Containers"));
+    }
+
     /**
      * 把当前佩戴的饰品整理成 AI 可读的 "槽位=物品, ..." 字符串（未佩戴任何饰品返回 ""）。
      * 供 Omniscient Eye / agent 工具做<b>装备感知</b>，外部依赖隔离在本类内部。
@@ -79,6 +90,53 @@ public class HeroAccessoriesCompat {
     }
 
     private static class AccessoriesSafeInvoker {
+
+        static void loadMissingItemsFromTag(HeroEntity hero, CompoundTag containersTag) {
+            var capability = io.wispforest.accessories.api.AccessoriesCapability.getOptionally(hero).orElse(null);
+            if (capability == null) return;
+            for (var entry : capability.getContainers().entrySet()) {
+                CompoundTag saved = containersTag.getCompound(entry.getKey());
+                var container = entry.getValue();
+                byte[] renders = saved.getByteArray("RenderOptions");
+                loadMissingContainerItems(hero, saved.getList("Items", Tag.TAG_COMPOUND),
+                        container.getAccessories(), container.renderOptions(), renders);
+                loadMissingContainerItems(hero, saved.getList("Cosmetics", Tag.TAG_COMPOUND),
+                        container.getCosmeticAccessories(), container.renderOptions(), renders);
+            }
+        }
+
+        private static void loadMissingContainerItems(HeroEntity hero, ListTag saved, Container target,
+                                                      List<Boolean> renders, byte[] savedRenders) {
+            for (int i = 0; i < saved.size(); i++) {
+                CompoundTag itemTag = saved.getCompound(i);
+                if (!itemTag.contains("Slot", Tag.TAG_ANY_NUMERIC)) continue;
+                int slot = itemTag.getInt("Slot");
+                if (slot < 0 || slot >= target.getContainerSize() || !target.getItem(slot).isEmpty()) continue;
+                ItemStack item = ItemStack.parse(hero.registryAccess(), itemTag).orElse(ItemStack.EMPTY);
+                if (item.isEmpty()) continue;
+                target.setItem(slot, item);
+                if (slot < renders.size() && slot < savedRenders.length) renders.set(slot, savedRenders[slot] != 0);
+            }
+        }
+
+        static void copyMissingItems(HeroEntity source, HeroEntity target) {
+            var sourceCapability = io.wispforest.accessories.api.AccessoriesCapability.getOptionally(source).orElse(null);
+            var targetCapability = io.wispforest.accessories.api.AccessoriesCapability.getOptionally(target).orElse(null);
+            if (sourceCapability == null || targetCapability == null) return;
+            for (var entry : sourceCapability.getContainers().entrySet()) {
+                var targetContainer = targetCapability.getContainers().get(entry.getKey());
+                if (targetContainer == null) continue;
+                copyMissingContainerItems(entry.getValue().getAccessories(), targetContainer.getAccessories());
+                copyMissingContainerItems(entry.getValue().getCosmeticAccessories(), targetContainer.getCosmeticAccessories());
+            }
+        }
+
+        private static void copyMissingContainerItems(Container source, Container target) {
+            for (int i = 0; i < Math.min(source.getContainerSize(), target.getContainerSize()); i++) {
+                ItemStack item = source.getItem(i);
+                if (target.getItem(i).isEmpty() && !item.isEmpty()) target.setItem(i, item.copy());
+            }
+        }
 
         static int addSlots(Consumer<Slot> slotConsumer, HeroEntity hero, int startX, int startY, int columns) {
             var capability = io.wispforest.accessories.api.AccessoriesCapability.getOptionally(hero).orElse(null);

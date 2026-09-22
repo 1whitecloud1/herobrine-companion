@@ -279,7 +279,7 @@ public class SimpleNeuralNetwork {
     public String getDebugInfo() {
         return String.format(
                 "St:%s | V:%.2f E:%.2f M:%.2f N:%.2f | R:%.2f A:%.2f Arr:%.2f",
-                currentState.name().substring(0, 3),
+                currentState.name().substring(0, Math.min(3, currentState.name().length())),
                 violenceScore,
                 entropyScore,
                 metaScore,

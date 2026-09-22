@@ -86,7 +86,7 @@ public final class HerobrineFamilySummonFeedback {
             return;
         }
 
-        int lineIndex = Math.abs(summoned.getRandom().nextInt()) % firstMeetKeys.size();
+        int lineIndex = summoned.getRandom().nextInt(firstMeetKeys.size());
         showBubble(summoned, Component.translatable(firstMeetKeys.get(lineIndex), owner.getDisplayName()));
         showBubble(hero, Component.translatable("message.herobrine_companion.family_summon.bubble.answer." + type.id()));
     }

@@ -265,8 +265,12 @@ public class HeroSummonItem extends Item {
     // 增加 ownerUUID 参数，以便在多人游戏中不同玩家能找到自己的 Hero
     public static HeroEntity findHeroInAnyDimension(net.minecraft.server.MinecraftServer server, UUID ownerUUID) {
         if (ownerUUID == null) return null;
+        HeroEntity activeHero = com.whitecloud233.herobrine_companion.entity.logic.data.HeroLifecycleHandler
+                .findActiveHero(server.overworld(), ownerUUID);
+        if (activeHero != null) return activeHero;
         for (ServerLevel level : server.getAllLevels()) {
-            var entities = level.getEntities(ModEntities.HERO.get(), entity -> ownerUUID.equals(entity.getOwnerUUID()));
+            var entities = level.getEntities(ModEntities.HERO.get(), entity -> entity.isAlive()
+                    && !entity.isRemoved() && ownerUUID.equals(entity.getOwnerUUID()));
             if (!entities.isEmpty()) {
                 return entities.get(0);
             }

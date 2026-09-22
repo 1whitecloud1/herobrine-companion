@@ -7,6 +7,9 @@ import com.whitecloud233.herobrine_companion.entity.ai.goal.HeroGodlyCompanionGo
 import com.whitecloud233.herobrine_companion.entity.ai.combat.HeroCombatPlanner;
 import com.whitecloud233.herobrine_companion.entity.ai.learning.HeroBrain;
 import com.whitecloud233.herobrine_companion.entity.ai.learning.SimpleNeuralNetwork;
+import com.whitecloud233.herobrine_companion.entity.visual.HeroClip;
+import com.whitecloud233.herobrine_companion.entity.visual.HeroGestureLibrary;
+import com.whitecloud233.herobrine_companion.entity.gift.HeroGiftReturnService;
 import com.whitecloud233.herobrine_companion.entity.ai.learning.state.ObserverStateDefinition;
 import com.whitecloud233.herobrine_companion.entity.logic.*;
 import com.whitecloud233.herobrine_companion.entity.logic.data.HeroDataHandler;
@@ -93,6 +96,11 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     public static final EntityDataAccessor<ItemStack> VISUAL_MAIN_HAND_ITEM = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.ITEM_STACK);
     public static final EntityDataAccessor<ItemStack> VISUAL_OFF_HAND_ITEM = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.ITEM_STACK);
     public static final EntityDataAccessor<Boolean> VISUAL_EATING_ACTIVE = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.BOOLEAN);
+    // 赠礼手势:服务端下发 clipId/起始 tick/时长/token,客户端连续播放(见 entity.visual.HeroGestureLibrary)
+    public static final EntityDataAccessor<Integer> OFFER_GESTURE_ID = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.INT);
+    public static final EntityDataAccessor<Integer> OFFER_GESTURE_START_TICK = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.INT);
+    public static final EntityDataAccessor<Integer> OFFER_GESTURE_DURATION_TICKS = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.INT);
+    public static final EntityDataAccessor<Integer> OFFER_GESTURE_TOKEN = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.INT);
 
     public static final int BATTLE_ACTION_IDLE = 0;
     public static final int BATTLE_ACTION_APPROACH = 1;
@@ -126,6 +134,8 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     private int outOfWaterTimer = 0;
     private long lastSummonedTime = 0;
     private boolean isLoadedFromDisk = false;
+    // 一次性装备恢复完成后，空槽也代表有效状态，不能再从旧备份补回。
+    public boolean equipmentStateRestored = false;
     private boolean handlingHeroHurt = false;
     private final HeroCombatTimeline combatTimeline = new HeroCombatTimeline();
     private java.util.List<HeroCombatPlanner.ActionProfile> battleComboProfiles = java.util.List.of();
@@ -152,6 +162,25 @@ public class HeroEntity extends PathfinderMob implements Merchant {
 
     public int scytheAnimTick = 0;
     public int debugAnimTick = 0;
+    // 客户端待机变体调度状态(transient,不同步;见 HeroVisuals.tickIdleVariants)
+    public int idleVariantClip = -1;
+    public int idleVariantStartTick = 0;
+    public int idleVariantNextAt = 100;
+    public int idleVariantLast = -1;
+    // 客户端手势事件游标与本地播放时间基(token 防串扰;两端 tickCount 起点不同,必须本地计时)
+    public int gestureEventCursor = 0;
+    public int gestureEventTokenSeen = -1;
+    public int gestureLocalStartTick = 0;
+    public int gestureLocalClipId = 0;
+    /** 本地已播完(姿态停在末帧等权重淡出);防止服务端仍在窗口内时权重回涨导致手势重播。 */
+    public boolean gestureLocalFinished = false;
+    /** 待机变体是否仍在播放窗口内(淡出期为 false,但 idleVariantClip 保留供淡出采样)。 */
+    public boolean idleVariantActive = false;
+    // 视觉混合权重(客户端;对齐 Bedrock blend_transition:手势 0.2 s / 待机变体 0.25 s)
+    public float clientOfferBlend = 0.0F;
+    public float clientOfferBlendO = 0.0F;
+    public float clientVariantBlend = 0.0F;
+    public float clientVariantBlendO = 0.0F;
     public int thunderTicks = 0;
     public int shockTicks = 0;
     public static final int MAX_THUNDER_TICKS = 60;
@@ -231,6 +260,7 @@ public class HeroEntity extends PathfinderMob implements Merchant {
     @Override
     public void tick() {
         super.tick();
+        if (this.isRemoved()) return;
         this.challengeAfterimages.removeIf(HeroAfterimage::tick);
         if (!this.level().isClientSide) {
             double movedX = this.getX() - this.xOld;
@@ -281,6 +311,10 @@ public class HeroEntity extends PathfinderMob implements Merchant {
             // 👇 这是你原本的维度判断
             if (this.level().dimension() != ModStructures.END_RING_DIMENSION_KEY) {
                 HeroLogic.tick(this);
+                if (this.isRemoved()) return;
+                HeroGiftReturnService.tick(this);
+                // 送东西时按住英雄:停走位 + 停其它表现动作(手势窗口内每 tick 生效)
+                this.holdForGiftGesture();
                 if (this.isAlive()) {
                     this.brain.tick();
                     this.agent.tick(this);
@@ -649,6 +683,10 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         builder.define(VISUAL_MAIN_HAND_ITEM, ItemStack.EMPTY);
         builder.define(VISUAL_OFF_HAND_ITEM, ItemStack.EMPTY);
         builder.define(VISUAL_EATING_ACTIVE, false);
+        builder.define(OFFER_GESTURE_ID, 0);
+        builder.define(OFFER_GESTURE_START_TICK, 0);
+        builder.define(OFFER_GESTURE_DURATION_TICKS, 0);
+        builder.define(OFFER_GESTURE_TOKEN, 0);
     }
 
     // 移除 HolderLookup.Provider 参数，恢复为 1 个参数
@@ -667,6 +705,9 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         }
         // 👇 [新增] 保存姿势编辑器数据
         HeroDataHandler.savePoseData(this, compound);
+        // 显式携带饰品，保证所有 saveWithoutId/load 重建路径都能恢复装备。
+        compound.put("CuriosBackItem", getCuriosBackItemTag());
+        compound.put("AccessoriesData", getAccessoriesDataTag());
         // 👇 [新增] 保存 Agent 任务队列（断线 / 重进恢复）
         this.agent.saveTasks(compound);
     }
@@ -706,6 +747,14 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         if (ownerUUID != null) setOwnerUUID(ownerUUID);
         // 👇 [新增] 读取姿势编辑器数据
         HeroDataHandler.loadPoseData(this, compound);
+        if (compound.contains("CuriosBackItem", 10)) {
+            setCuriosBackItemFromTag(compound.getCompound("CuriosBackItem").copy());
+        }
+        if (compound.contains("AccessoriesData", 10)) {
+            setAccessoriesDataFromTag(compound.getCompound("AccessoriesData").copy());
+        }
+        this.equipmentStateRestored = compound.getList("ArmorItems", 10).size() == 4
+                && compound.getList("HandItems", 10).size() == 2;
         // 👇 [新增] 恢复 Agent 任务队列
         this.agent.loadTasks(compound);
     }
@@ -1064,6 +1113,138 @@ public class HeroEntity extends PathfinderMob implements Merchant {
         this.playSound(SoundEvents.TRIDENT_THUNDER.value(), 5.0F, 0.8F); // 加上 .value()
     }
     public boolean isCastingThunder() { return this.thunderTicks > 0; }
+
+    // --- 赠礼手势与本地台词(Bedrock hero_offer 控制器移植)---
+
+    /**
+     * 服务端权威触发:设置手势 clip 与播放窗口,经 SynchedEntityData 同步给客户端。
+     *
+     * <p>OFFER_GESTURE_START_TICK 记录的是服务端 tickCount,仅供服务端收尾使用;
+     * 客户端播放进度基于自己的本地起点(gestureLocalStartTick),因为两端 tickCount
+     * 起点不同(客户端实体在客户端世界创建时从 0 起算)。
+     */
+    public void playOfferGesture(int clipId) {
+        int duration = offerGestureDurationTicks(clipId);
+        this.entityData.set(OFFER_GESTURE_ID, clipId);
+        this.entityData.set(OFFER_GESTURE_START_TICK, this.tickCount);
+        this.entityData.set(OFFER_GESTURE_DURATION_TICKS, duration);
+        this.entityData.set(OFFER_GESTURE_TOKEN, this.entityData.get(OFFER_GESTURE_TOKEN) + 1);
+        if (!this.level().isClientSide) {
+            // 立刻站定:不等下一 tick 的收尾,避免"边递东西边迈步"的第一帧
+            this.holdForGiftGesture();
+        }
+    }
+
+    /** 由 clip 时长换算播放窗口(tick),尾部留 8 tick 缓冲。 */
+    public static int offerGestureDurationTicks(int clipId) {
+        HeroClip clip = HeroGestureLibrary.byClipId(clipId);
+        return clip == null ? 80 : Math.round(clip.duration * 20.0F) + 8;
+    }
+
+    /** 客户端播放过期清理(本地数据,不回传服务端)。 */
+    public void clearOfferGestureClient() {
+        this.entityData.set(OFFER_GESTURE_ID, 0);
+        this.setVisualMainHandItem(ItemStack.EMPTY);
+    }
+
+    /** 服务端收尾清理:手势窗口结束(服务端时间基)后清 ID 与展示手持物。 */
+    public void clearOfferGestureServer() {
+        this.entityData.set(OFFER_GESTURE_ID, 0);
+        this.setVisualMainHandItem(ItemStack.EMPTY);
+    }
+
+    /**
+     * 本地赠礼台词:直接上气泡。
+     *
+     * <p>用于同一次交互的引导/附加句(冷却提示、模糊线索、生日第二句等),
+     * 不经 LLM 链路,因此不占 API 配额、不受任何频率闸影响。
+     */
+    public void showGiftLine(String text) {
+        if (text == null || text.isBlank()) {
+            return;
+        }
+        if (this instanceof com.whitecloud233.herobrine_companion.entity.dialogue.SpeechBubbleAccessor accessor) {
+            int duration = Math.max(60, Math.min(120, 60 + text.length() * 2));
+            accessor.herobrineCompanion$showSpeechBubble(
+                    net.minecraft.network.chat.Component.literal(text), duration);
+        }
+    }
+
+    public int getOfferGestureId() { return this.entityData.get(OFFER_GESTURE_ID); }
+    public int getOfferGestureStartTick() { return this.entityData.get(OFFER_GESTURE_START_TICK); }
+    public int getOfferGestureDurationTicks() { return this.entityData.get(OFFER_GESTURE_DURATION_TICKS); }
+    public int getOfferGestureToken() { return this.entityData.get(OFFER_GESTURE_TOKEN); }
+    public boolean isOfferGestureActive() { return this.entityData.get(OFFER_GESTURE_ID) != 0; }
+
+    /** 手势混合权重(渲染热路径,带 partial tick 插值)。 */
+    public float getOfferBlend(float partialTick) {
+        return Mth.lerp(partialTick, this.clientOfferBlendO, this.clientOfferBlend);
+    }
+
+    /** 待机变体混合权重(渲染热路径,带 partial tick 插值)。 */
+    public float getVariantBlend(float partialTick) {
+        return Mth.lerp(partialTick, this.clientVariantBlendO, this.clientVariantBlend);
+    }
+
+    /**
+     * 赠礼手势锁:手势窗口内英雄站定不动、不做其它表现动作。
+     *
+     * <p>等价 Bedrock {@code variable.hero_offer_allowed}
+     * (需要 {@code query.is_on_ground && !query.has_target && !query.is_using_item})的门控语义。
+     */
+    public boolean isGiftGestureHolding() {
+        return isOfferGestureActive();
+    }
+
+    /**
+     * 送东西时把英雄按住:清掉 AI 本 tick 给出的走位意图、残留速度,并让抢姿势的表现类小动作让位。
+     *
+     * <p>服务端在每个 tick 的手势窗口内调用(见 {@link #tick()}),因此即使 Goal 每 tick 重新
+     * 寻路,也不会把它拖走;凝视镰刀/调试姿态是纯表现动作,直接中断,技能类(雷击)只压姿态不改逻辑。
+     */
+    public void holdForGiftGesture() {
+        if (!isGiftGestureHolding()) {
+            return;
+        }
+        if (!this.getNavigation().isDone()) {
+            this.getNavigation().stop();
+        }
+        if (this.getMoveControl() instanceof HeroMoveControl moveControl) {
+            moveControl.stopMoving();
+        }
+        Vec3 movement = this.getDeltaMovement();
+        if (movement.horizontalDistanceSqr() > 1.0E-6D) {
+            this.setDeltaMovement(0.0D, movement.y, 0.0D);
+        }
+        this.xxa = 0.0F;
+        this.zza = 0.0F;
+        this.setSpeed(0.0F);
+        if (this.entityData.get(IS_GROUND_WALKING)) {
+            this.entityData.set(IS_GROUND_WALKING, false);
+        }
+        if (this.scytheAnimTick > 0) {
+            this.scytheAnimTick = 0;
+            this.entityData.set(INSPECTING_SCYTHE, false);
+        }
+        if (this.debugAnimTick > 0) {
+            this.debugAnimTick = 0;
+            this.entityData.set(IS_DEBUGGING, false);
+        }
+    }
+
+    /** 待机变体门控:双手空闲(Bedrock variable.hero_idle_hands_free 对应)。 */
+    public boolean isHandsFreeForIdleVisual() {
+        return getMainHandItem().isEmpty() && getOffhandItem().isEmpty();
+    }
+
+    /** 待机变体门控:当前是否处于会与变体冲突的高优先级表现状态。 */
+    public boolean isBusyForIdleVisual() {
+        if (isOfferGestureActive() || isPoseEditing) return true;
+        if (isBattleModeActive() || isVisualEatingActive()) return true;
+        if (isInspectingScythe() || isDebugAnim() || isCastingThunder()) return true;
+        if (getEntityData().get(IS_CHALLENGE_ACTIVE)) return true;
+        return getInvitedAction() != 0;
+    }
 
     // 交易系统 (Merchant)
     @Override public void setTradingPlayer(@Nullable Player player) { this.tradingPlayer = player; }
