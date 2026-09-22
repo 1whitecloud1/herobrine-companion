@@ -34,7 +34,8 @@ public final class ClientFxHandler {
                     mc.level,
                     packet.x, skyY, packet.z, // 天空起点
                     groundPos,                // 地面终点
-                    packet.width              // 直径
+                    packet.width,             // 直径
+                    packet.immediate
             ));
         }
     }

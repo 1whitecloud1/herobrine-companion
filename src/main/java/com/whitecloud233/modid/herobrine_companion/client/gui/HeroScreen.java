@@ -14,6 +14,7 @@ import com.whitecloud233.modid.herobrine_companion.network.DesolateAreaPacket;
 import com.whitecloud233.modid.herobrine_companion.network.FlattenAreaPacket;
 import com.whitecloud233.modid.herobrine_companion.network.OpenTradePacket;
 import com.whitecloud233.modid.herobrine_companion.network.OpenWardrobePacket;
+import com.whitecloud233.modid.herobrine_companion.network.OfferGiftPacket;
 import com.whitecloud233.modid.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.modid.herobrine_companion.network.PeacefulPacket;
 import com.whitecloud233.modid.herobrine_companion.network.ToggleCompanionPacket;
@@ -222,6 +223,12 @@ public class HeroScreen extends Screen {
         this.actionList.addAction(Component.translatable("gui.herobrine_companion.trade"), button -> {
             PacketHandler.sendToServer(new OpenTradePacket(this.entityId));
         }, Tooltip.create(Component.translatable("gui.herobrine_companion.trade_tooltip")));
+
+        // 托付(赠礼):把手中物品托付给祂;服务端权威判定
+        this.actionList.addAction(Component.translatable("gui.herobrine_companion.offer"), button -> {
+            PacketHandler.sendToServer(new OfferGiftPacket(this.entityId, "offer_carried_item_to_hero"));
+            this.onClose();
+        }, Tooltip.create(Component.translatable("gui.herobrine_companion.offer_tooltip")));
 
         this.actionList.addAction(Component.translatable("gui.herobrine_companion.wardrobe"), button -> {
             PacketHandler.sendToServer(new OpenWardrobePacket(this.entityId));
@@ -450,18 +457,20 @@ public class HeroScreen extends Screen {
                     epicFightDisplay = HeroEpicFightCompat.getBridgeStatus().name() + " " + HeroEpicFightCompat.describeCurrentSnapshot(hero);
                 }
 
-                // 【核心修复】：持续刷新渲染时的皮肤与姿势状态
-                this.dummyHero.setSkinVariant(hero.getSkinVariant());
-                if (this.dummyHero.isBattleModeActive() != hero.isBattleModeActive()) {
-                    this.dummyHero.setBattleModeActiveFrom(DUMMY_BATTLE_SYNC_RENDER, hero.isBattleModeActive());
-                }
-                if (hero.getSkinVariant() == HeroEntity.SKIN_CUSTOM) {
-                    this.dummyHero.setCustomSkinName(hero.getCustomSkinName());
-                }
-                this.dummyHero.isPoseEditing = hero.isPoseEditing;
-                if (hero.isPoseEditing) {
-                    for (int i = 0; i < 10; i++) {
-                        System.arraycopy(hero.customPoseAngles[i], 0, this.dummyHero.customPoseAngles[i], 0, 3);
+                // 【核心修复】：持续刷新渲染时的皮肤与姿势状态（dummyHero 仅在 level 非空时创建，这里兜底判空）
+                if (this.dummyHero != null) {
+                    this.dummyHero.setSkinVariant(hero.getSkinVariant());
+                    if (this.dummyHero.isBattleModeActive() != hero.isBattleModeActive()) {
+                        this.dummyHero.setBattleModeActiveFrom(DUMMY_BATTLE_SYNC_RENDER, hero.isBattleModeActive());
+                    }
+                    if (hero.getSkinVariant() == HeroEntity.SKIN_CUSTOM) {
+                        this.dummyHero.setCustomSkinName(hero.getCustomSkinName());
+                    }
+                    this.dummyHero.isPoseEditing = hero.isPoseEditing;
+                    if (hero.isPoseEditing) {
+                        for (int i = 0; i < 10; i++) {
+                            System.arraycopy(hero.customPoseAngles[i], 0, this.dummyHero.customPoseAngles[i], 0, 3);
+                        }
                     }
                 }
             }

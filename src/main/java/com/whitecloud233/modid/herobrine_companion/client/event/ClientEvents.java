@@ -1,7 +1,8 @@
 package com.whitecloud233.modid.herobrine_companion.client.event;
 
-import com.mojang.logging.LogUtils;
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
+
+import com.mojang.logging.LogUtils;
 import com.whitecloud233.modid.herobrine_companion.client.gui.HeroContractScreen;
 import com.whitecloud233.modid.herobrine_companion.client.gui.HeroTradeScreen;
 import com.whitecloud233.modid.herobrine_companion.client.gui.HeroWardrobeScreen;
@@ -16,7 +17,6 @@ import com.whitecloud233.modid.herobrine_companion.compat.ArmourerWorkshop.HeroA
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.init.ModBlockEntities;
 import com.whitecloud233.modid.herobrine_companion.init.ModEntities;
-import com.whitecloud233.modid.herobrine_companion.item.PoemOfTheEndItem;
 import com.whitecloud233.modid.herobrine_companion.world.inventory.ModMenus;
 
 import net.minecraft.client.Minecraft;
@@ -24,9 +24,7 @@ import net.minecraft.client.gui.screens.MenuScreens;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.EntityRenderersEvent;
 import net.minecraftforge.client.event.RegisterDimensionSpecialEffectsEvent;
@@ -37,7 +35,6 @@ import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import org.slf4j.Logger;
 
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.util.Map;
 
 @Mod.EventBusSubscriber(modid = HerobrineCompanion.MODID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.MOD)
@@ -58,6 +55,7 @@ public class ClientEvents {
         event.registerBlockEntityRenderer(ModBlockEntities.END_RING_PORTAL_BE.get(), EndRingPortalRenderer::new);
 
         event.registerEntityRenderer(ModEntities.GHOST_CREEPER.get(), GhostCreeperRenderer::new);
+        event.registerEntityRenderer(ModEntities.BIRTHDAY_CAKE_PROP.get(), BirthdayCakePropRenderer::new);
         event.registerEntityRenderer(ModEntities.GHOST_ZOMBIE.get(), GhostZombieRenderer::new);
         event.registerEntityRenderer(ModEntities.GHOST_SKELETON.get(), GhostSkeletonRenderer::new);
         event.registerEntityRenderer(ModEntities.GHOST_STEVE.get(), GhostSteveRenderer::new);
@@ -150,8 +148,6 @@ public class ClientEvents {
         event.register(new ResourceLocation(HerobrineCompanion.MODID, "end_ring_type"), new EndRingDimensionEffects());
     }
 
-    private static Method startAttackMethod;
-
     @Mod.EventBusSubscriber(modid = HerobrineCompanion.MODID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.FORGE)
     public static class ForgeClientEvents {
         @SubscribeEvent
@@ -172,35 +168,6 @@ public class ClientEvents {
             }
             // ===========================
 
-            if (mc.player != null && mc.level != null && !mc.isPaused()) {
-                ItemStack stack = mc.player.getMainHandItem();
-                if (stack.getItem() instanceof PoemOfTheEndItem poemItem) {
-                    if (poemItem.getMode(stack) == PoemOfTheEndItem.MODE_VOID_SHATTER) {
-                        if (mc.options.keyAttack.isDown()) {
-                            try {
-                                if (startAttackMethod == null) {
-                                    try {
-                                        startAttackMethod = Minecraft.class.getDeclaredMethod("startAttack");
-                                    } catch (NoSuchMethodException e) {
-                                        // ignore
-                                    }
-                                    if (startAttackMethod != null) {
-                                        startAttackMethod.setAccessible(true);
-                                    }
-                                }
-                                if (startAttackMethod != null) {
-                                    boolean attackSuccess = (boolean) startAttackMethod.invoke(mc);
-                                    if (attackSuccess) {
-                                        mc.player.swing(InteractionHand.MAIN_HAND);
-                                    }
-                                }
-                            } catch (Exception e) {
-                                // ignore
-                            }
-                        }
-                    }
-                }
-            }
         }
     }
 

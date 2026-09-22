@@ -34,6 +34,7 @@ public class KeyBindingHandler {
         @SubscribeEvent
         public static void onKeyRegister(RegisterKeyMappingsEvent event) {
             event.register(SKILL_KEY);
+            PoemScytheInputEvents.registerKeys(event);
         }
     }
 

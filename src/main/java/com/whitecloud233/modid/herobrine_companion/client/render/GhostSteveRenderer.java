@@ -4,6 +4,8 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.modid.herobrine_companion.client.model.GhostSteveModel;
 import com.whitecloud233.modid.herobrine_companion.entity.GhostSteveEntity;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.LivingEntityRenderer;
@@ -24,6 +26,12 @@ public class GhostSteveRenderer extends LivingEntityRenderer<GhostSteveEntity, G
 
     @Override
     public ResourceLocation getTextureLocation(GhostSteveEntity entity) {
+        // 「镜中倒影」委托：镜像幽灵复用本地玩家的皮肤
+        String mirrorUuid = entity.getMirrorSkinUuid();
+        AbstractClientPlayer localPlayer = Minecraft.getInstance().player;
+        if (!mirrorUuid.isEmpty() && localPlayer != null && mirrorUuid.equals(localPlayer.getUUID().toString())) {
+            return localPlayer.getSkinTextureLocation();
+        }
         return TEXTURE;
     }
 

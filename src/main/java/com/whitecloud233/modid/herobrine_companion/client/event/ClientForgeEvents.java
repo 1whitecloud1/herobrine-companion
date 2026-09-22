@@ -8,7 +8,6 @@ import com.whitecloud233.modid.herobrine_companion.item.PoemOfTheEndItem;
 import com.whitecloud233.modid.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.modid.herobrine_companion.network.ai.UpdateClientLanguagePacket;
 import net.minecraft.client.Minecraft;
-import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.api.distmarker.Dist;
@@ -79,38 +78,24 @@ public class ClientForgeEvents {
 
     private static void handlePoemRapidFire(Minecraft mc) {
         Player player = mc.player;
-        if (player == null) {
+        if (player == null || mc.screen != null || !mc.mouseHandler.isMouseGrabbed() || player.isUsingItem()) {
             return;
         }
         ItemStack stack = player.getMainHandItem();
+        if (!(stack.getItem() instanceof PoemOfTheEndItem poem) ||
+                poem.getMode(stack) != PoemOfTheEndItem.MODE_VOID_SHATTER || !mc.options.keyAttack.isDown()) {
+            return;
+        }
 
-        if (stack.getItem() instanceof PoemOfTheEndItem && mc.options.keyAttack.isDown()) {
-            if (stack.getOrCreateTag().getInt("PoemMode") == PoemOfTheEndItem.MODE_VOID_SHATTER) {
-                // 碎空模式：极速连击
-                try {
-                    if (startAttackMethod == null) {
-                        // 尝试使用 startAttack 的 SRG 名称
-                        startAttackMethod = ObfuscationReflectionHelper.findMethod(Minecraft.class, "startAttack");
-                        startAttackMethod.setAccessible(true);
-                    }
-                    startAttackMethod.invoke(mc);
-                    // 显式调用挥手动作，确保有动画
-                    player.swing(InteractionHand.MAIN_HAND);
-                } catch (Exception e) {
-                    // 如果找不到方法，尝试使用混淆名（如果需要）或者记录错误但不崩溃
-                    // 在开发环境中通常是 startAttack，在生产环境中可能是 m_91317_
-                    try {
-                         if (startAttackMethod == null) {
-                            startAttackMethod = ObfuscationReflectionHelper.findMethod(Minecraft.class, "m_91317_");
-                            startAttackMethod.setAccessible(true);
-                            startAttackMethod.invoke(mc);
-                            player.swing(InteractionHand.MAIN_HAND);
-                         }
-                    } catch (Exception ex) {
-                        // 忽略错误，避免刷屏
-                    }
-                }
+        // One client input path only; the server hurt handler owns rift spawning.
+        // Forge resolves this SRG name in both development and production.
+        try {
+            if (startAttackMethod == null) {
+                startAttackMethod = ObfuscationReflectionHelper.findMethod(Minecraft.class, "m_91317_");
             }
+            startAttackMethod.invoke(mc); // startAttack already performs the swing.
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+            // Leave normal clicks available if reflection is unavailable.
         }
     }
 }
