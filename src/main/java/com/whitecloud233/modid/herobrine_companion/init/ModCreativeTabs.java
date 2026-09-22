@@ -51,5 +51,6 @@ public class ModCreativeTabs {
                 }
 
                 output.accept(ModItems.LORE_HANDBOOK.get());
+                output.accept(ModItems.BIRTHDAY_CAKE.get());
             }).build());
 }

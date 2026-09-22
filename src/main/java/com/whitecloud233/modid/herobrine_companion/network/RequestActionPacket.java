@@ -1,7 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.network;
 
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
-import com.whitecloud233.modid.herobrine_companion.event.HeroQuestHandler;
+import com.whitecloud233.modid.herobrine_companion.entity.logic.quest.HeroQuestManager;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
@@ -23,7 +23,9 @@ public class RequestActionPacket {
     public RequestActionPacket(FriendlyByteBuf buf) {
         this.entityId = buf.readInt();
         this.questId = buf.readInt();
-        this.action = buf.readEnum(Action.class);
+        int ordinal = buf.readVarInt();
+        Action[] values = Action.values();
+        this.action = ordinal >= 0 && ordinal < values.length ? values[ordinal] : Action.CANCEL;
     }
 
     public void encode(FriendlyByteBuf buf) {
@@ -40,9 +42,9 @@ public class RequestActionPacket {
                 Entity entity = player.level().getEntity(packet.entityId);
                 if (entity instanceof HeroEntity hero) {
                     if (packet.action == Action.ACCEPT) {
-                        HeroQuestHandler.startQuest(hero, player, packet.questId);
+                        HeroQuestManager.startQuest(hero, player, packet.questId);
                     } else if (packet.action == Action.CANCEL) {
-                        HeroQuestHandler.cancelQuest(hero, player);
+                        HeroQuestManager.cancelQuest(hero, player);
                     }
                 }
             }

@@ -79,4 +79,11 @@ public class ModEntities {
             () -> EntityType.Builder.of(GlitchVillagerEntity::new, MobCategory.MISC)
                     .sized(0.6F, 1.95F)
                     .build("glitch_villager"));
+
+    /** 无名之蛋糕摆件(Bedrock herobrine_companion:birthday_cake_prop 的移植)。 */
+    public static final RegistryObject<EntityType<BirthdayCakePropEntity>> BIRTHDAY_CAKE_PROP = ENTITY_TYPES.register("birthday_cake_prop",
+            () -> EntityType.Builder.<BirthdayCakePropEntity>of(BirthdayCakePropEntity::new, MobCategory.MISC)
+                    .sized(1.0F, 0.6F)
+                    .clientTrackingRange(10)
+                    .build("birthday_cake_prop"));
 }

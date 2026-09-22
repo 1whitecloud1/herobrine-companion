@@ -50,7 +50,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 public class PacketHandler {
-    private static final String PROTOCOL_VERSION = "1";
+    private static final String PROTOCOL_VERSION = "3"; // Lightning packets include the immediate-strike profile.
     public static final SimpleChannel INSTANCE = NetworkRegistry.newSimpleChannel(
             ResourceLocation.tryParse(HerobrineCompanion.MODID + ":main"),
             () -> PROTOCOL_VERSION,
@@ -173,6 +173,18 @@ public class PacketHandler {
 
         // ---------- 结构清单同步(C→S 请求 / S→C 响应, 服务端权威) ----------
         reg(id, StructureIndexPacket.class, StructureIndexPacket::encode, StructureIndexPacket::new, StructureIndexPacket::handle);
+
+        // ---------- 委托状态同步(S→C, 交付物品开屏拦截) ----------
+        reg(id, QuestStateSyncPacket.class, QuestStateSyncPacket::encode, QuestStateSyncPacket::new, QuestStateSyncPacket::handle);
+
+        // ---------- 赠礼(托付, C→S;追加在末尾保持协议 ID 稳定) ----------
+        reg(id, OfferGiftPacket.class, OfferGiftPacket::encode, OfferGiftPacket::new, OfferGiftPacket::handle);
+
+        // ---------- 无名之蛋糕:摆放/收回(绕开原版物品冷却门禁) ----------
+        reg(id, BirthdayCakePlacePacket.class, BirthdayCakePlacePacket::encode, BirthdayCakePlacePacket::new, BirthdayCakePlacePacket::handle);
+        reg(id, PoemGesturePacket.class, PoemGesturePacket::encode, PoemGesturePacket::new, PoemGesturePacket::handle);
+        reg(id, PoemAnimationRequestPacket.class, PoemAnimationRequestPacket::encode, PoemAnimationRequestPacket::new, PoemAnimationRequestPacket::handle);
+        reg(id, PoemAnimationPacket.class, PoemAnimationPacket::encode, PoemAnimationPacket::new, PoemAnimationPacket::handle);
     }
 
     /**

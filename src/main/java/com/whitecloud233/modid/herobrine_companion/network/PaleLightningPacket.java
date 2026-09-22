@@ -10,12 +10,18 @@ public class PaleLightningPacket {
     public final double y;
     public final double z;
     public final float width;
+    public final boolean immediate;
 
     public PaleLightningPacket(double x, double y, double z, float width) {
+        this(x, y, z, width, false);
+    }
+
+    public PaleLightningPacket(double x, double y, double z, float width, boolean immediate) {
         this.x = x;
         this.y = y;
         this.z = z;
         this.width = width;
+        this.immediate = immediate;
     }
 
     public PaleLightningPacket(FriendlyByteBuf buf) {
@@ -23,6 +29,7 @@ public class PaleLightningPacket {
         this.y = buf.readDouble();
         this.z = buf.readDouble();
         this.width = buf.readFloat();
+        this.immediate = buf.readBoolean();
     }
 
     public void encode(FriendlyByteBuf buf) {
@@ -30,6 +37,7 @@ public class PaleLightningPacket {
         buf.writeDouble(y);
         buf.writeDouble(z);
         buf.writeFloat(width);
+        buf.writeBoolean(immediate);
     }
 
     public void handle(Supplier<NetworkEvent.Context> supplier) {

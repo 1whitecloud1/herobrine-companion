@@ -106,8 +106,9 @@ public class FlattenAreaPacket {
             this.level = level;
             this.queue = queue;
             this.player = player;
-            // 设定目标为玩家脚下的方块高度
-            this.targetY = player.getBlockY() - 1;
+            // 设定目标为玩家脚下的方块高度，并钳制在世界建造范围内（避免 section 索引越界）
+            this.targetY = Math.max(level.getMinBuildHeight(),
+                    Math.min(player.getBlockY() - 1, level.getMaxBuildHeight() - 1));
         }
 
         @SubscribeEvent
