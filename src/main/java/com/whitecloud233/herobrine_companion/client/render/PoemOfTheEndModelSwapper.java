@@ -9,12 +9,12 @@ import net.neoforged.neoforge.client.event.ModelEvent;
 import org.slf4j.Logger;
 
 /**
- * 没装 GeckoLib 时，把终末之诗的物品模型换成 2D 版本。
+ * 没装 GeckoLib 和 Epic Fight 时，使用终末之诗的普通物品模型。
  *
  * <p>3D 路径要求 {@code models/item/poem_of_the_end.json} 的 parent 是
  * {@code builtin/entity}——这是 vanilla {@code BakedModel.isCustomRenderer()}
  * 返回 true、进而走 {@code IClientItemExtensions.getCustomRenderer()} 的唯一开关。
- * 但没装 GeckoLib 时我们不注册自定义渲染器，此时 vanilla 会拿到默认 BEWLR，
+ * 两个模组都没装时不注册自定义渲染器，此时 vanilla 会拿到默认 BEWLR，
  * 它不认识这个物品 → <b>什么都不画</b>（物品隐形）。</p>
  *
  * <p>所以这里直接做烘焙结果替换：把 {@code poem_of_the_end#inventory} 指向
@@ -58,14 +58,14 @@ public final class PoemOfTheEndModelSwapper {
     }
 
     public static void onRegisterAdditional(final ModelEvent.RegisterAdditional event) {
-        // 无条件烘焙：没装 GeckoLib 时它是完整回退模型；装了 GeckoLib 时
+        // 无条件烘焙：无动画模组时它是完整回退模型；使用 3D 渲染器时
         // 物品栏图标仍用它（PoemOfTheEndFlatRenderer），只有手持/地面等用 3D。
         event.register(FALLBACK_2D);
     }
 
     public static void onModifyBakingResult(final ModelEvent.ModifyBakingResult event) {
-        if (PoemOfTheEndGeoCompat.isGeckoLibLoaded()) {
-            // 装了 GeckoLib：保留 builtin/entity 以便走自定义渲染器，不做替换
+        if (PoemOfTheEndGeoCompat.backend() != PoemRenderBackend.FLAT) {
+            // GeckoLib 或原生 3D 网格都需要 builtin/entity，不能被 2D 烘焙模型覆盖。
             return;
         }
         BakedModel baked2d = event.getModels().get(FALLBACK_2D);
