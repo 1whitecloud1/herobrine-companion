@@ -1,0 +1,12 @@
+{
+	"attributes":
+	{
+		"common":
+		{
+			"armor_negation":20.0,
+			"impact":1.6,
+			"max_strikes":6
+		}
+	},
+	"type":"wom:evil_tachi"
+}

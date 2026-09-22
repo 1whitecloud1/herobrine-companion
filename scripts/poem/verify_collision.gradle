@@ -1,0 +1,30 @@
+// gradlew -I scripts/poem/verify_collision.gradle verifyPoemCollision --offline
+allprojects { p ->
+    p.afterEvaluate {
+        def classes = p.layout.buildDirectory.dir('poem_collision/verify-classes')
+        def compiler = p.tasks.register('compilePoemCollisionVerifier', JavaCompile) {
+            dependsOn p.tasks.named('classes')
+            source = p.files('scripts/poem/PoemCollisionCheck.java')
+            classpath = p.sourceSets.main.compileClasspath + p.sourceSets.main.output
+            destinationDirectory = classes
+            javaCompiler = p.javaToolchains.compilerFor { languageVersion = JavaLanguageVersion.of(17) }
+            options.encoding = 'UTF-8'
+        }
+        p.tasks.register('verifyPoemCollision', JavaExec) {
+            dependsOn compiler
+            def withoutOptionalAnimationMods = p.sourceSets.main.compileClasspath.filter { f ->
+                if (!f.name.endsWith('.jar')) return true
+                def archive = new java.util.zip.ZipFile(f)
+                try {
+                    return archive.getEntry('yesman/epicfight/main/EpicFightMod.class') == null &&
+                            archive.getEntry('software/bernie/geckolib/GeckoLib.class') == null
+                } finally { archive.close() }
+            }
+            classpath = withoutOptionalAnimationMods + p.sourceSets.main.output + p.files(classes)
+            mainClass = 'com.whitecloud233.modid.herobrine_companion.combat.poem.PoemCollisionCheck'
+            javaLauncher = p.javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(17) }
+            workingDir = p.projectDir
+            jvmArgs '-Djava.awt.headless=true'
+        }
+    }
+}

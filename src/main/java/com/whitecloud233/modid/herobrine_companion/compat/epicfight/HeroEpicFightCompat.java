@@ -2,6 +2,7 @@ package com.whitecloud233.modid.herobrine_companion.compat.epicfight;
 
 import com.mojang.logging.LogUtils;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.ModList;
@@ -63,6 +64,38 @@ public final class HeroEpicFightCompat {
     private static volatile boolean efnKinematicsWarningsSuppressed;
 
     private HeroEpicFightCompat() {}
+
+    /** Refresh the optional player moveset after the held Poem's mode changes. */
+    public static void onPoemModeChanged(Player player) {
+        if (player == null || player.level().isClientSide || !isRuntimeBridgeReady()) {
+            return;
+        }
+        try {
+            invokeStatic(BRIDGE_CLASS, "onPoemModeChanged", new Class<?>[]{Player.class}, player);
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            LOGGER.warn("Epic Fight Poem mode refresh failed", exception);
+        }
+    }
+
+    public static boolean canUsePoemGestures(Player player) {
+        if (player == null || !isRuntimeBridgeReady()) return false;
+        try {
+            return Boolean.TRUE.equals(invokeStatic(BRIDGE_CLASS, "canUsePoemGestures", new Class<?>[]{Player.class}, player));
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            return false;
+        }
+    }
+
+    public static void queuePoemGesture(Player player, int gesture, int slot, int mode) {
+        if (player == null || player.level().isClientSide || !isRuntimeBridgeReady()) return;
+        try {
+            invokeStatic(BRIDGE_CLASS, "queuePoemGesture", new Class<?>[]{Player.class, int.class, int.class, int.class},
+                    player, gesture, slot, mode);
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            LOGGER.warn("Epic Fight Poem gesture failed", exception);
+        }
+    }
+
 
     public enum BridgeStatus {
         UNINITIALIZED,
@@ -429,4 +462,3 @@ public final class HeroEpicFightCompat {
         }
     }
 }
-

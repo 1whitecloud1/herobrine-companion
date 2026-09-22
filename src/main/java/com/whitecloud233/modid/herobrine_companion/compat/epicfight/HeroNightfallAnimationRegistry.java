@@ -69,6 +69,16 @@ final class HeroNightfallAnimationRegistry {
     }
 
     private static void buildHeroNightfallAnimations(AnimationBuilder builder) {
+        if (builder == null) {
+            return;
+        }
+        // Both built-in scythe movesets work with Epic Fight alone.
+        HeroScytheComboBehaviors.registerAnimation(builder);
+        PoemScythePlayerAnimations.registerAnimations(builder);
+        if (!net.minecraftforge.fml.ModList.get().isLoaded(EFN_MOD_ID)) {
+            return;
+        }
+
         AssetAccessor<HumanoidArmature> heroArmature = HeroEpicFightBridge.heroNightfallArmature();
         if (builder == null || heroArmature == null) {
             return;

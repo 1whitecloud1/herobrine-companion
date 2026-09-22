@@ -128,6 +128,10 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
         HeroEntity hero = this.getOriginal();
         String currentProfileKey = this.getCurrentWeaponProfileKey(hero);
         boolean weaponProfileChanged = !currentProfileKey.equals(this.lastWeaponProfileKey);
+        if (weaponProfileChanged && hero != null && HeroScytheComboBehaviors.isSupported(hero.getMainHandItem())) {
+            // Mode changes can update the same stack without an equipment event.
+            this.infantryAiConfigured = false;
+        }
 
         this.ensureInfantryAiConfigured();
         this.syncWeaponLivingMotions(weaponProfileChanged);
@@ -297,6 +301,11 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
             return null;
         }
 
+        CombatBehaviors.Builder<HumanoidMobPatch<?>> scytheBuilder = HeroScytheComboBehaviors.build(this, stack);
+        if (scytheBuilder != null) {
+            return scytheBuilder;
+        }
+
         CombatBehaviors.Builder<HumanoidMobPatch<?>> nightfallBuilder = HeroNightfallMovesets.buildCombatBehaviors(this, stack);
         if (nightfallBuilder != null) {
             return nightfallBuilder;
@@ -349,7 +358,8 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
         CombatBehaviors.Builder<HumanoidMobPatch<?>> builder = this.getHoldingItemWeaponMotionBuilder();
         if (builder != null) {
             ItemStack stack = hero.getMainHandItem();
-            double attackRadius = HeroNightfallMovesets.getAttackRadius(stack, 0.0D);
+            double attackRadius = HeroScytheComboBehaviors.getAttackRadius(stack,
+                    HeroNightfallMovesets.getAttackRadius(stack, 0.0D));
             if (attackRadius <= 0.0D) {
                 attackRadius = HeroWomWeaponCompat.getAttackRadius(stack, 0.0D);
             }
@@ -427,6 +437,7 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
                 this.applyWeaponCategoryLivingMotions(livingAnimations, capability);
                 HeroNightfallMovesets.applyLivingAnimations(hero.getMainHandItem(), livingAnimations);
             }
+            HeroScytheComboBehaviors.applyLivingAnimations(hero.getMainHandItem(), livingAnimations);
         }
 
         HeroEpicFightDebugLog.event(hero, "HeroEpicFightPatch.syncWeaponLivingMotions.mapReady", "count=" + livingAnimations.size() + ",motions=" + livingAnimations.keySet());
@@ -839,6 +850,19 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
             AnimationManager.AnimationAccessor<? extends StaticAnimation> animation, int comboIndex, int comboSize) {
         return this.createTrackedAttackBehavior(animation, HeroEpicFightPatch::resolveNextTapActionState,
                 hero -> this.advancePlayerLikeComboStep(hero, comboSize, comboIndex));
+    }
+
+    /** Track each built-in scythe segment through the existing combat action state. */
+    CombatBehaviors.Behavior.Builder<HumanoidMobPatch<?>> createScytheComboAttackBehavior(
+            AnimationManager.AnimationAccessor<? extends StaticAnimation> animation, int comboIndex, int comboSize) {
+        return this.createTrackedAttackBehavior(animation, HeroEpicFightPatch::resolveNextTapActionState,
+                hero -> this.advancePlayerLikeComboStep(hero, comboSize, comboIndex));
+    }
+
+    CombatBehaviors.Behavior.Builder<HumanoidMobPatch<?>> createScytheSpecialAttackBehavior(
+            AnimationManager.AnimationAccessor<? extends StaticAnimation> animation) {
+        return this.createTrackedAttackBehavior(animation, HeroEpicFightPatch::resolveNextTapActionState,
+                this::resetPlayerLikeComboStep);
     }
 
     /** WOM 连招按序执行的门槛：仅允许当前应打的连段序号通过。 */

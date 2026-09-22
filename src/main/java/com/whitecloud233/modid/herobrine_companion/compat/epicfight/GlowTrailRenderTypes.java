@@ -32,9 +32,12 @@ public final class GlowTrailRenderTypes {
     }
 
     private static ParticleRenderType create(ResourceLocation texture) {
-        // 与 EpicFight 1.20.1 TRAIL_EFFECT 相同的初始化：贴图 wrap=CLAMP_TO_EDGE
+        // 与 EpicFight 1.20.1 TRAIL_EFFECT 相同的初始化，但 S 轴用 REPEAT 而非 CLAMP：
+        // 基岩版终末之诗同款 ramp 的 U 方向首尾像素相同（无缝），刀光靠 U 轴滚动让电弧
+        // 沿刀身流动；CLAMP 会把溢出的 U 拉成边缘色，流动到边界就断掉。T 轴仍必须 CLAMP，
+        // 否则 V 方向上下边缘会互相渗透。
         RenderSystem.bindTexture(Minecraft.getInstance().getTextureManager().getTexture(texture).getId());
-        RenderSystem.texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, GL12.GL_CLAMP_TO_EDGE);
+        RenderSystem.texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, GL11.GL_REPEAT);
         RenderSystem.texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T, GL12.GL_CLAMP_TO_EDGE);
         return new ParticleRenderType() {
             @Override

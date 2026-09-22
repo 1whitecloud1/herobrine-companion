@@ -1,0 +1,11 @@
+{
+	"attributes":
+	{
+		"two_hand":
+		{
+			"impact":3.6,
+			"max_strikes":3
+		}
+	},
+	"type":"wom:staff"
+}

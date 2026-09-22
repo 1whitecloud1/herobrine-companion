@@ -5,6 +5,7 @@ import com.whitecloud233.modid.herobrine_companion.config.Config;
 import com.whitecloud233.modid.herobrine_companion.init.ModEntities;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.eventbus.api.IEventBus;
 import yesman.epicfight.api.animation.AnimationManager;
 import yesman.epicfight.api.animation.AnimationManager.AnimationRegistryEvent;
@@ -13,7 +14,10 @@ import yesman.epicfight.api.asset.AssetAccessor;
 import yesman.epicfight.api.forgeevent.EntityPatchRegistryEvent;
 import yesman.epicfight.gameasset.Armatures;
 import yesman.epicfight.model.armature.HumanoidArmature;
+import yesman.epicfight.skill.SkillDataKeys;
+import yesman.epicfight.skill.SkillSlots;
 import yesman.epicfight.world.capabilities.EpicFightCapabilities;
+import yesman.epicfight.world.capabilities.entitypatch.player.ServerPlayerPatch;
 
 import java.util.Locale;
 import java.util.Map;
@@ -71,8 +75,11 @@ public final class HeroEpicFightBridge {
             return;
         }
         registered = true;
+        PoemGestureController.register();
+        PoemScythePlayerAnimations.registerStyles();
         modEventBus.addListener(HeroEpicFightBridge::onEntityPatchRegistry);
         modEventBus.addListener(HeroEpicFightBridge::onAnimationRegistry);
+        modEventBus.addListener(PoemScythePlayerAnimations::registerWeaponPreset);
         // 骨架注册放在 FMLCommonSetupEvent：那时实体已注册（ModEntities.HERO.get() 可用）、
         // 且 Armature 资源可加载（mod 已进 ModList）。此前该逻辑在懒加载路径从未触发，
         // 导致 Hero 从未用上自带 Claw_R/Claw_L/wheel 的骨架资源 → 爪/刺轮模型脱节。
@@ -92,6 +99,31 @@ public final class HeroEpicFightBridge {
 
     public static boolean isPatched(HeroEntity hero) {
         return hero != null && EpicFightCapabilities.getEntityPatch(hero, HeroEpicFightPatch.class) != null;
+    }
+
+    public static void onPoemModeChanged(Player player) {
+        PoemGestureController.cancel(player);
+        ServerPlayerPatch patch = EpicFightCapabilities.getEntityPatch(player, ServerPlayerPatch.class);
+        if (patch == null) {
+            return;
+        }
+        resetPoemComboCounter(patch);
+        patch.modifyLivingMotionByCurrentItem();
+    }
+
+    public static boolean canUsePoemGestures(Player player) { return PoemGestureController.eligible(player); }
+
+    public static void queuePoemGesture(Player player, int gesture, int slot, int mode) {
+        PoemGestureController.enqueue(player, gesture, slot, mode);
+    }
+
+    static void resetPoemComboCounter(ServerPlayerPatch patch) {
+        var attacks = patch.getSkill(SkillSlots.BASIC_ATTACK);
+        if (attacks != null && attacks.getDataManager().hasData(SkillDataKeys.COMBO_COUNTER.get())) {
+            // V6 has 18 normal slots, MediaPipe 8. Reset the old counter before
+            // it can select the new list's reserved dash/air slots as a normal hit.
+            attacks.getDataManager().setDataSync(SkillDataKeys.COMBO_COUNTER.get(), 0);
+        }
     }
 
     /** Hero 是否正处在 Epic Fight 攻击/动作状态（飞行追击据此让出空中连段、不落地打断）。 */
