@@ -3,13 +3,16 @@ package com.whitecloud233.modid.herobrine_companion.entity.dialogue;
 import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroWorldData;
 import com.whitecloud233.modid.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.modid.herobrine_companion.network.ai.ActorDialoguePromptPacket;
+import com.mojang.logging.LogUtils;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
+import org.slf4j.Logger;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -19,18 +22,20 @@ import java.util.UUID;
 public final class ActorDialogueManager {
     public static final ActorDialogueManager INSTANCE = new ActorDialogueManager();
 
+    private static final Logger LOGGER = LogUtils.getLogger();
+
     private static final double GENERATOR_RANGE = 32.0D;
     private static final int MIN_SPEECH_TICKS = 60;
     private static final int MAX_SPEECH_TICKS = 120;
     private static final int MAX_TEXT_LENGTH = 160;
     private static final long JOB_TIMEOUT_MS = 60_000L;
 
-    /** 所有觉醒对话共享的全局最小间隔（毫秒）；实际值来自 Config.awakenedDialogueMinIntervalSeconds。 */
+    /** 觉醒对话的兜底全局最小间隔（毫秒）；实际值来自 Config.awakenedDialogueMinIntervalSeconds。 */
     private static final long FALLBACK_MIN_DIALOGUE_INTERVAL_MS = 30_000L;
 
     private final Map<UUID, PendingJob> jobsById = new HashMap<>();
-    /** 上一次发起觉醒 LLM 对话的时刻（毫秒）——所有说话者共享一个全局间隔。 */
-    private long lastDialogueAtMillis = Long.MIN_VALUE;
+    /** 每个通道各自的上一次 LLM 对话时刻（毫秒）——通道之间互不挤占。 */
+    private final Map<DialogueChannel, Long> lastDialogueAtByChannel = new EnumMap<>(DialogueChannel.class);
 
     private ActorDialogueManager() {
     }
@@ -46,18 +51,24 @@ public final class ActorDialogueManager {
 
         String fallbackText = buildFallbackText(spec);
 
-        // 全局频率闸：所有觉醒对话（任意说话者）共享一个最小间隔，防止触发 API 频率限制。
+        // 分通道频率闸:赠礼通道独立计时(默认不限制),因此不会被觉醒对话挤掉。
         // 冷却期间改用预设台词（不调 API、不触发 followUp 链）。
         long now = System.currentTimeMillis();
-        long minIntervalMs = minDialogueIntervalMs();
-        if (now - lastDialogueAtMillis < minIntervalMs) {
-            deliverLine(spec.speaker(), fallbackText);
-            return;
+        long minIntervalMs = minDialogueIntervalMs(spec.channel());
+        if (minIntervalMs > 0) {
+            long lastAt = lastDialogueAtByChannel.getOrDefault(spec.channel(), Long.MIN_VALUE);
+            if (now - lastAt < minIntervalMs) {
+                LOGGER.debug("[ActorDialogue] {} throttled ({}ms < {}ms), local line used",
+                        spec.channel(), now - lastAt, minIntervalMs);
+                deliverLine(spec.speaker(), fallbackText);
+                return;
+            }
         }
-        lastDialogueAtMillis = now;
+        lastDialogueAtByChannel.put(spec.channel(), now);
 
         ServerPlayer generator = selectGenerator(serverLevel, spec.speaker(), spec.preferredAudience());
         if (generator == null) {
+            LOGGER.debug("[ActorDialogue] {} has no generator, local line used", spec.channel());
             deliverLine(spec.speaker(), fallbackText);
             triggerFollowUp(spec, fallbackText);
             return;
@@ -66,6 +77,8 @@ public final class ActorDialogueManager {
         String outputLanguageCode = resolveLanguageCode(generator);
         UUID jobId = UUID.randomUUID();
         jobsById.put(jobId, new PendingJob(jobId, generator.getUUID(), spec, now));
+        LOGGER.debug("[ActorDialogue] {} LLM request sent (job={} generator={})",
+                spec.channel(), jobId, generator.getName().getString());
         PacketHandler.sendToPlayer(new ActorDialoguePromptPacket(
                 jobId,
                 spec.conversationScopeId(),
@@ -78,12 +91,20 @@ public final class ActorDialogueManager {
         ), generator);
     }
 
-    private long minDialogueIntervalMs() {
-        int seconds = com.whitecloud233.modid.herobrine_companion.config.Config.awakenedDialogueMinIntervalSeconds;
-        if (seconds <= 0) {
-            seconds = (int) (FALLBACK_MIN_DIALOGUE_INTERVAL_MS / 1000L);
-        }
-        return seconds * 1000L;
+    /**
+     * 通道对应的最小间隔(毫秒);返回 0 表示该通道不做限流。
+     *
+     * <p>觉醒通道保持原语义(配置非法时回退 30 秒);赠礼通道默认 0 = 完全不限制。
+     */
+    private long minDialogueIntervalMs(DialogueChannel channel) {
+        int seconds = switch (channel) {
+            case GIFT -> com.whitecloud233.modid.herobrine_companion.config.Config.giftDialogueMinIntervalSeconds;
+            case AWAKENED -> {
+                int configured = com.whitecloud233.modid.herobrine_companion.config.Config.awakenedDialogueMinIntervalSeconds;
+                yield configured <= 0 ? (int) (FALLBACK_MIN_DIALOGUE_INTERVAL_MS / 1000L) : configured;
+            }
+        };
+        return seconds <= 0 ? 0L : seconds * 1000L;
     }
 
     public synchronized void handleGeneratedReply(ServerPlayer generator, UUID jobId, String rawReply) {
