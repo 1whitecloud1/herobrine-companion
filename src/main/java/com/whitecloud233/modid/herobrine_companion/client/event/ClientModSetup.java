@@ -58,6 +58,8 @@ public class ClientModSetup {
         // 注意：ModelBakery 对 inventory 变体的附加模型会自动补 "item/" 前缀，
         // 因此这里只注册文件名，不要写 "item/poem_of_the_end_base"（否则会变成 item/item/...）
         event.register(new ModelResourceLocation(HerobrineCompanion.MODID, "poem_of_the_end_base", "inventory"));
+        // 无名之蛋糕摆件(Bedrock birthday_cake_prop):geo 转换出的方块模型
+        event.register(com.whitecloud233.modid.herobrine_companion.client.render.BirthdayCakePropRenderer.MODEL);
     }
 
     private static void clientSetup(final FMLClientSetupEvent event) {
