@@ -44,6 +44,7 @@ public class ModCreativeTabs {
                         output.accept(ModItems.POEM_OF_THE_END.get());
                         output.accept(ModItems.SOURCE_FLOW.get());
                         output.accept(ModItems.LORE_HANDBOOK.get());
+                output.accept(ModItems.BIRTHDAY_CAKE.get());
                         output.accept(ModItems.DESTRUCTION_GOD_HEROBRINE_SPAWN_EGG.get());
 
                         for (int i = 1; i <= 11; i++) {

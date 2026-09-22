@@ -54,6 +54,9 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 public class PacketHandler {
 
     public static void register(PayloadRegistrar registrar) {
+        registrar.playToServer(PoemAnimationRequestPacket.TYPE, PoemAnimationRequestPacket.STREAM_CODEC, PoemAnimationRequestPacket::handle);
+        registrar.playToClient(PoemAnimationPacket.TYPE, PoemAnimationPacket.STREAM_CODEC, PoemAnimationPacket::handle);
+        registrar.playToServer(PoemGesturePacket.TYPE, PoemGesturePacket.STREAM_CODEC, PoemGesturePacket::handle);
         registrar.playToServer(
                 PeacefulPacket.TYPE,
                 PeacefulPacket.STREAM_CODEC,
@@ -293,6 +296,15 @@ public class PacketHandler {
         // 注意：NeoForge 不允许同一 TYPE 双向注册，请求与响应必须拆成两个 payload 类型。
         registrar.playToServer(StructureIndexRequestPacket.TYPE, StructureIndexRequestPacket.STREAM_CODEC, StructureIndexRequestPacket::handle);
         registrar.playToClient(StructureIndexResponsePacket.TYPE, StructureIndexResponsePacket.STREAM_CODEC, StructureIndexResponsePacket::handle);
+
+        // ---------- 委托状态同步(S→C, 交付物品开屏拦截 + 冷却展示) ----------
+        registrar.playToClient(QuestStateSyncPacket.TYPE, QuestStateSyncPacket.STREAM_CODEC, QuestStateSyncPacket::handle);
+
+        // ---------- 赠礼(托付) ----------
+        registrar.playToServer(OfferGiftPacket.TYPE, OfferGiftPacket.STREAM_CODEC, OfferGiftPacket::handle);
+
+        // ---------- 无名之蛋糕:摆放/收回(绕开原版物品冷却门禁) ----------
+        registrar.playToServer(BirthdayCakePlacePacket.TYPE, BirthdayCakePlacePacket.STREAM_CODEC, BirthdayCakePlacePacket::handle);
     }
 
     // 统一的发包入口:泛型方法覆盖所有包,不再需要按类型抄重载。

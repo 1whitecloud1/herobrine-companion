@@ -10,6 +10,7 @@ import com.whitecloud233.herobrine_companion.entity.GhostZombieEntity;
 import com.whitecloud233.herobrine_companion.entity.GlitchEchoEntity;
 import com.whitecloud233.herobrine_companion.entity.GlitchVillagerEntity;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.herobrine_companion.entity.BirthdayCakePropEntity;
 import com.whitecloud233.herobrine_companion.entity.projectile.VoidRiftEntity;
 import com.whitecloud233.herobrine_companion.entity.projectile.RealmBreakerLightningEntity;
 import net.minecraft.core.registries.Registries;
@@ -85,4 +86,11 @@ public class ModEntities {
                     .clientTrackingRange(16)
                     .updateInterval(1)
                     .build("destruction_god_herobrine"));
+
+    /** 无名之蛋糕摆件(Bedrock herobrine_companion:birthday_cake_prop 的移植)。 */
+    public static final DeferredHolder<EntityType<?>, EntityType<BirthdayCakePropEntity>> BIRTHDAY_CAKE_PROP = ENTITY_TYPES.register("birthday_cake_prop",
+            () -> EntityType.Builder.<BirthdayCakePropEntity>of(BirthdayCakePropEntity::new, MobCategory.MISC)
+                    .sized(1.0F, 0.6F)
+                    .clientTrackingRange(10)
+                    .build("birthday_cake_prop"));
 }

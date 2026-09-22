@@ -2,7 +2,7 @@ package com.whitecloud233.herobrine_companion.network;
 
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
-import com.whitecloud233.herobrine_companion.event.HeroQuestHandler;
+import com.whitecloud233.herobrine_companion.entity.logic.quest.HeroQuestManager;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -18,7 +18,7 @@ public record RequestActionPacket(int entityId, int questId, Action action) impl
     public static final StreamCodec<RegistryFriendlyByteBuf, RequestActionPacket> STREAM_CODEC = StreamCodec.composite(
             net.minecraft.network.codec.ByteBufCodecs.INT, RequestActionPacket::entityId,
             net.minecraft.network.codec.ByteBufCodecs.INT, RequestActionPacket::questId,
-            net.minecraft.network.codec.ByteBufCodecs.idMapper(i -> Action.values()[i], Enum::ordinal), RequestActionPacket::action,
+            net.minecraft.network.codec.ByteBufCodecs.idMapper(i -> (i >= 0 && i < Action.values().length) ? Action.values()[i] : Action.CANCEL, Enum::ordinal), RequestActionPacket::action,
             RequestActionPacket::new
     );
 
@@ -33,9 +33,9 @@ public record RequestActionPacket(int entityId, int questId, Action action) impl
                 Entity entity = player.level().getEntity(packet.entityId);
                 if (entity instanceof HeroEntity hero) {
                     if (packet.action == Action.ACCEPT) {
-                        HeroQuestHandler.startQuest(hero, player, packet.questId);
+                        HeroQuestManager.startQuest(hero, player, packet.questId);
                     } else if (packet.action == Action.CANCEL) {
-                        HeroQuestHandler.cancelQuest(hero, player);
+                        HeroQuestManager.cancelQuest(hero, player);
                     }
                 }
             }

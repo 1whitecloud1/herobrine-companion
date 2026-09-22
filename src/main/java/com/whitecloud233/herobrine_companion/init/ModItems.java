@@ -2,6 +2,7 @@ package com.whitecloud233.herobrine_companion.init;
 
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.item.*;
+import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Rarity;
@@ -37,6 +38,18 @@ public class ModItems {
     // Lore Items
     public static final DeferredItem<LoreHandbookItem> LORE_HANDBOOK = ITEMS.register("lore_handbook", () -> new LoreHandbookItem(new Item.Properties().stacksTo(1).rarity(Rarity.UNCOMMON)));
     public static final DeferredItem<LoreFragmentItem> LORE_FRAGMENT = ITEMS.register("lore_fragment", () -> new LoreFragmentItem(new Item.Properties().stacksTo(64).rarity(Rarity.UNCOMMON)));
+
+    // 无名之蛋糕(Bedrock herobrine_companion:birthday_cake):
+    // 营养 20 / 饱和极高 / 可随时进食 / 不可堆叠 / uncommon,使用时长 32 tick。
+    public static final DeferredItem<BirthdayCakeItem> BIRTHDAY_CAKE = ITEMS.register("birthday_cake",
+            () -> new BirthdayCakeItem(new Item.Properties()
+                    .stacksTo(1)
+                    .rarity(Rarity.UNCOMMON)
+                    .food(new FoodProperties.Builder()
+                            .nutrition(20)
+                            .saturationModifier(1.2F)
+                            .alwaysEdible()
+                            .build())));
 
     public static final DeferredItem<BlockItem> END_RING_PORTAL_ITEM = ITEMS.register("end_ring_portal", () -> new BlockItem(ModBlocks.END_RING_PORTAL.get(), new Item.Properties()));
 

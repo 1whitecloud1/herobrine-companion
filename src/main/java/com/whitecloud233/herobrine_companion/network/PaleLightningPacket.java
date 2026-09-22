@@ -8,7 +8,11 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.network.handling.IPayloadContext; // 别忘了导入这个
 
-public record PaleLightningPacket(double x, double y, double z, float width) implements CustomPacketPayload {
+public record PaleLightningPacket(double x, double y, double z, float width, boolean immediate) implements CustomPacketPayload {
+
+    public PaleLightningPacket(double x, double y, double z, float width) {
+        this(x, y, z, width, false);
+    }
 
     public static final CustomPacketPayload.Type<PaleLightningPacket> TYPE =
             new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath("herobrine_companion", "pale_lightning"));
@@ -18,6 +22,7 @@ public record PaleLightningPacket(double x, double y, double z, float width) imp
             ByteBufCodecs.DOUBLE, PaleLightningPacket::y,
             ByteBufCodecs.DOUBLE, PaleLightningPacket::z,
             ByteBufCodecs.FLOAT, PaleLightningPacket::width,
+            ByteBufCodecs.BOOL, PaleLightningPacket::immediate,
             PaleLightningPacket::new
     );
 

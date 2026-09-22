@@ -87,7 +87,7 @@ public class HerobrineCompanion {
     }
     
     private void registerPayloads(final RegisterPayloadHandlersEvent event) {
-        final var registrar = event.registrar("1");
+        final var registrar = event.registrar("3");
         PacketHandler.register(registrar);
     }
 
