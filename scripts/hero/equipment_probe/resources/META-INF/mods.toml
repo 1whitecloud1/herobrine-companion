@@ -1,0 +1,9 @@
+modLoader="javafml"
+loaderVersion="[47,)"
+license="GPL-3.0"
+
+[[mods]]
+modId="hero_equipment_probe"
+version="1.0"
+displayName="Hero Equipment Regression Probe"
+description="Isolated server regression tests. Not included in the release JAR."
