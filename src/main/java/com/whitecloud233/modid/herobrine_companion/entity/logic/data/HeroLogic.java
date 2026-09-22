@@ -26,6 +26,24 @@ import java.util.List;
 
 public class HeroLogic {
 
+    /**
+     * 一个完整步态环为 2 秒，即 40 游戏刻。
+     * HeroEntity.getImportedWalkAnimationTime 会将这里累计的游戏刻除以 20 转为秒。
+     */
+    private static final float WALK_CYCLE_TICKS = 40.0F;
+
+    /**
+     * Bedrock {@code animation.hero.move} 的 {@code anim_time_update} 系数
+     * ({@code query.modified_distance_moved * 38.17 / 360.0},即每 360/38.17 ≈ 9.43 格推进一个环)。
+     */
+    private static final float WALK_CYCLE_PER_BLOCK = 38.17F / 360.0F;
+
+    /**
+     * 单 tick 计入相位的位移上限(格):超过这个量级只可能是传送/位移包纠偏,
+     * 直接按上限算,避免相位被瞬移拉飞。
+     */
+    private static final float WALK_MAX_STEP_BLOCKS = 4.0F;
+
     public static void tick(HeroEntity hero) {
         if (hero.level().isClientSide) {
             clientTick(hero);
@@ -48,17 +66,35 @@ public class HeroLogic {
         }
 
         hero.clientImportedWalkTicksO = hero.clientImportedWalkTicks;
-        if (hero.isGroundWalking() && !hero.isFloating()) {
-            hero.clientImportedWalkTicks += 1.0F;
-        } else {
-            hero.clientImportedWalkTicks = 0.0F;
+        hero.clientImportedWalkTicks = advanceWalkAnimationTicks(
+                hero.clientImportedWalkTicks, hero.isFloating(), hero.isGroundWalking(),
+                hero.getX() - hero.xOld, hero.getZ() - hero.zOld);
+        if (hero.clientImportedWalkTicks == 0.0F) {
             hero.clientImportedWalkTicksO = 0.0F;
         }
     }
 
+    static float advanceWalkAnimationTicks(float ticks, boolean floating, boolean groundWalking,
+                                           double movedX, double movedZ) {
+        if (floating) {
+            return 0.0F;
+        }
+        double distance = Math.hypot(movedX, movedZ);
+        float movedBlocks = Double.isFinite(distance)
+                ? (float) Math.min(distance, WALK_MAX_STEP_BLOCKS) : 0.0F;
+        // 渲染端也会根据实际位移播放走路；刚加载旧实体、走路标记尚未同步时不能冻结相位。
+        if (!groundWalking && movedBlocks == 0.0F) {
+            return 0.0F;
+        }
+        // 保持游戏刻单位，常速约 4.3 格/秒时每 2.19 秒完成一个步态环。
+        return ticks + movedBlocks * WALK_CYCLE_PER_BLOCK * WALK_CYCLE_TICKS;
+    }
+
     private static void serverTick(HeroEntity hero) {
+        if (hero.isRemoved()) return;
         if (hero.tickCount == 20) {
             HeroLifecycleHandler.checkUniqueness(hero);
+            if (hero.isRemoved()) return;
             if (!hero.isLoadedFromDisk() && hero.getOwnerUUID() != null) {
                 Player owner = hero.level().getPlayerByUUID(hero.getOwnerUUID());
                 if (owner != null) {
@@ -69,6 +105,7 @@ public class HeroLogic {
 
         if (hero.tickCount % 100 == 0) {
             HeroLifecycleHandler.checkUniqueness(hero);
+            if (hero.isRemoved()) return;
         }
 
         if (hero.getOwnerUUID() == null) {

@@ -4,6 +4,7 @@ import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.HeroBrain;
 import com.whitecloud233.modid.herobrine_companion.util.EndRingContext;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 
@@ -11,7 +12,7 @@ import java.util.UUID;
 
 public class HeroLifecycleHandler {
     public static void checkUniqueness(HeroEntity hero) {
-        if (hero.level().isClientSide) return;
+        if (hero.level().isClientSide || hero.isRemoved()) return;
 
         MinecraftServer server = hero.getServer();
         if (server == null) return;
@@ -86,6 +87,7 @@ public class HeroLifecycleHandler {
         for (HeroEntity existing : HeroBrain.ACTIVE_HEROES) {
             if (existing != safeHero && existing.isAlive()) {
                 if (owner != null && owner.equals(existing.getOwnerUUID())) {
+                    syncDataBeforeDiscard(existing, safeHero);
                     existing.remove(Entity.RemovalReason.DISCARDED);
                 }
             }
@@ -100,10 +102,25 @@ public class HeroLifecycleHandler {
         for (HeroEntity existing : HeroBrain.ACTIVE_HEROES) {
             if (existing != newHero && existing.isAlive() && !existing.isRemoved()) {
                 if (owner != null && owner.equals(existing.getOwnerUUID())) {
+                    syncDataBeforeDiscard(newHero, existing);
                     return true;
                 }
             }
         }
         return false;
+    }
+
+    public static HeroEntity findActiveHero(ServerLevel level, UUID owner) {
+        if (owner == null) return null;
+        UUID activeId = HeroWorldData.get(level).getActiveHeroUUID(owner);
+        if (activeId == null) return null;
+        for (ServerLevel candidateLevel : level.getServer().getAllLevels()) {
+            Entity entity = candidateLevel.getEntity(activeId);
+            if (entity instanceof HeroEntity hero && hero.isAlive() && !hero.isRemoved()
+                    && owner.equals(hero.getOwnerUUID())) {
+                return hero;
+            }
+        }
+        return null;
     }
 }

@@ -1,11 +1,12 @@
 package com.whitecloud233.modid.herobrine_companion.entity.logic.data;
 
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.modid.herobrine_companion.compat.accessories.HeroAccessoriesCompat;
+import com.whitecloud233.modid.herobrine_companion.entity.logic.HeroEquipment;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
 
 import java.util.UUID;
 
@@ -17,13 +18,16 @@ public class HeroStateManager {
      * 将当前 Hero 的关键数据（皮肤、信任度、装备）备份到全局存档
      */
     public static void backupToGlobal(HeroEntity hero) {
-        if (!(hero.level() instanceof ServerLevel serverLevel)) return;
+        if (hero.isRemoved() || !hero.isAlive() || !(hero.level() instanceof ServerLevel serverLevel)) return;
 
         // 【修复】：必须先获取并判断 ownerUUID，再执行后续依赖 UUID 的操作
         UUID ownerUUID = hero.getOwnerUUID();
         if (ownerUUID == null) return;
 
         HeroWorldData data = HeroWorldData.get(serverLevel);
+        HeroEntity activeHero = HeroLifecycleHandler.findActiveHero(serverLevel, ownerUUID);
+        if (activeHero != null && activeHero != hero) return;
+        restoreEquipmentFromGlobal(hero);
 
         if (hero.getSkinVariant() == HeroEntity.SKIN_CUSTOM && !hero.getCustomSkinName().isEmpty()) {
             data.setSkinVariant(ownerUUID, HeroEntity.SKIN_CUSTOM);
@@ -44,16 +48,7 @@ public class HeroStateManager {
 
         // 同步姿势数据到全局存档
         CompoundTag poseTag = new CompoundTag();
-        poseTag.putBoolean("IsPoseEditing", hero.isPoseEditing);
-        if (hero.isPoseEditing) {
-            net.minecraft.nbt.ListTag poseList = new net.minecraft.nbt.ListTag();
-            for (int i = 0; i < 10; i++) {
-                for (int j = 0; j < 3; j++) {
-                    poseList.add(net.minecraft.nbt.FloatTag.valueOf(hero.customPoseAngles[i][j]));
-                }
-            }
-            poseTag.put("CustomPoseAngles", poseList);
-        }
+        HeroDataHandler.savePoseData(hero, poseTag);
         data.setPoseData(ownerUUID, poseTag);
     }
 
@@ -61,9 +56,11 @@ public class HeroStateManager {
      * 从全局存档恢复 Hero 的关键数据（作为安全托底机制）
      */
     public static void restoreFromGlobal(HeroEntity hero, Player owner) {
-        if (!(hero.level() instanceof ServerLevel serverLevel) || owner == null) return;
+        if (hero.isRemoved() || !(hero.level() instanceof ServerLevel serverLevel) || owner == null) return;
         HeroWorldData data = HeroWorldData.get(serverLevel);
-        UUID ownerUUID = owner.getUUID();
+        // 契约物品可由其他玩家使用，恢复的必须是 HB 主人的档案。
+        UUID ownerUUID = hero.getOwnerUUID() != null ? hero.getOwnerUUID() : owner.getUUID();
+        if (hero.getOwnerUUID() == null) hero.setOwnerUUID(ownerUUID);
 
         // 以及在 restoreFromGlobal 中：
         hero.setSkinVariant(data.getSkinVariant(ownerUUID));
@@ -79,41 +76,18 @@ public class HeroStateManager {
             hero.setTrustLevel(trust);
         }
 
-        // 3. 恢复原生装备 (仅在实体全裸时恢复，防覆盖)
-        boolean isNaked = true;
-        for (ItemStack stack : hero.getArmorSlots()) if (!stack.isEmpty()) isNaked = false;
-        for (ItemStack stack : hero.getHandSlots()) if (!stack.isEmpty()) isNaked = false;
-
-        if (isNaked) {
-            hero.loadEquipmentFromTag(data.getArmorItems(ownerUUID), data.getHandItems(ownerUUID));
-        }
-
-        // 4. 恢复 Curios 背部饰品
-        CompoundTag savedCurios = data.getCuriosBackItem(ownerUUID);
-        if (savedCurios != null && !savedCurios.isEmpty() && hero.isCuriosBackSlotEmpty()) {
-            hero.setCuriosBackItemFromTag(savedCurios);
-        }
+        // 3. 新实体只恢复一次装备；手里已有物品也不能阻止护甲恢复。
+        // 完整 NBT 已恢复的实体（包括玩家主动清空的槽位）不再被全局旧快照覆盖。
+        restoreEquipmentFromGlobal(hero);
 
         // 👇 [新增] 5. 恢复姿势数据，并立即同步给客户端
-        hero.setAccessoriesDataFromTag(data.getAccessoriesData(ownerUUID));
         CompoundTag poseTag = data.getPoseData(ownerUUID);
         if (poseTag != null && poseTag.contains("IsPoseEditing")) {
-            hero.isPoseEditing = poseTag.getBoolean("IsPoseEditing");
-            if (hero.isPoseEditing && poseTag.contains("CustomPoseAngles", 9)) {
-                net.minecraft.nbt.ListTag poseList = poseTag.getList("CustomPoseAngles", 5);
-                if (poseList.size() == 30) {
-                    int index = 0;
-                    for (int i = 0; i < 10; i++) {
-                        for (int j = 0; j < 3; j++) {
-                            hero.customPoseAngles[i][j] = poseList.getFloat(index++);
-                        }
-                    }
-                } else {
-                    hero.isPoseEditing = false;
-                }
-            } else if (!hero.isPoseEditing) {
-                hero.customPoseAngles = new float[10][3];
-            }
+            HeroDataHandler.loadPoseData(hero, poseTag);
+            // 写回规范化后的备份，避免重新召唤/跨维度时再次恢复损坏的姿势状态。
+            CompoundTag normalizedPose = new CompoundTag();
+            HeroDataHandler.savePoseData(hero, normalizedPose);
+            data.setPoseData(ownerUUID, normalizedPose);
             // 广播发包：确保服务端刚恢复的数据立刻被玩家看到
             com.whitecloud233.modid.herobrine_companion.network.PacketHandler.sendToTracking(
                     new com.whitecloud233.modid.herobrine_companion.network.SavePosePacket(hero.getId(), hero.isPoseEditing, hero.customPoseAngles), hero
@@ -127,10 +101,27 @@ public class HeroStateManager {
 
     // ================== [2. 玩家 NBT 临时挂起与读取 (跨维度/死亡/战斗剔除)] ==================
 
+    /** 首次备份前完成装备恢复，即使主人离线或不在当前维度也不能写空旧备份。 */
+    public static void restoreEquipmentFromGlobal(HeroEntity hero) {
+        UUID ownerUUID = hero.getOwnerUUID();
+        if (hero.equipmentStateRestored || hero.isRemoved() || ownerUUID == null
+                || !(hero.level() instanceof ServerLevel level)) return;
+        HeroWorldData data = HeroWorldData.get(level);
+        HeroEquipment.loadMissingEquipmentFromTag(hero, data.getArmorItems(ownerUUID), data.getHandItems(ownerUUID));
+        CompoundTag savedCurios = data.getCuriosBackItem(ownerUUID);
+        if (savedCurios != null && !savedCurios.isEmpty() && hero.isCuriosBackSlotEmpty()) {
+            hero.setCuriosBackItemFromTag(savedCurios.copy());
+        }
+        HeroAccessoriesCompat.loadMissingItemsFromTag(hero, data.getAccessoriesData(ownerUUID));
+        hero.equipmentStateRestored = true;
+    }
+
     /**
      * 将 Hero 完整数据挂载到玩家身上，以便在传送或复活后重建实体
      */
     public static void backupToPlayerNBT(HeroEntity hero, ServerPlayer player, String tagKey) {
+        // 先初始化并更新全局备份，再提取临时快照，避免新实体被挂起时装备尚未恢复。
+        backupToGlobal(hero);
         CompoundTag heroData = new CompoundTag();
 
         // 保存所有原生 NBT (包括大脑、状态等)
@@ -152,8 +143,6 @@ public class HeroStateManager {
 
         player.getPersistentData().put(tagKey, heroData);
 
-        // 挂载的同时强制备份一次全局数据，双保险
-        backupToGlobal(hero);
     }
 
     /**
@@ -164,7 +153,7 @@ public class HeroStateManager {
         CompoundTag data = player.getPersistentData();
         if (!data.contains(tagKey)) return false;
 
-        CompoundTag heroData = data.getCompound(tagKey);
+        CompoundTag heroData = data.getCompound(tagKey).copy();
 
         // 清洗 UUID，防止与旧实体冲突
         if (heroData.contains("UUID")) heroData.remove("UUID");
@@ -200,10 +189,10 @@ public class HeroStateManager {
             hero.setCuriosBackItemFromTag(heroData.getCompound("CuriosBackItem"));
         }
 
-        data.remove(tagKey); // 阅后即焚
         if (heroData.contains("AccessoriesData", 10)) {
             hero.setAccessoriesDataFromTag(heroData.getCompound("AccessoriesData"));
         }
+        data.remove(tagKey); // 完整恢复成功后再消费临时快照
         return true;
     }
 
@@ -213,6 +202,13 @@ public class HeroStateManager {
      * 实体去重时，将旧实体的关键数据无缝转移给新保留的实体
      */
     public static void syncEntityToEntity(HeroEntity source, HeroEntity target) {
+        UUID ownerUUID = target.getOwnerUUID();
+        if (source == target || source.isRemoved() || target.isRemoved() || ownerUUID == null
+                || !ownerUUID.equals(source.getOwnerUUID())
+                || !(target.level() instanceof ServerLevel serverLevel)) return;
+        HeroEntity activeHero = HeroLifecycleHandler.findActiveHero(serverLevel, ownerUUID);
+        // 两个旧克隆之间的清理不能抢走仍存活的第三个正统实体的身份。
+        if (activeHero != null && activeHero != source && activeHero != target) return;
         // 转移皮肤
         if (source.getSkinVariant() == HeroEntity.SKIN_CUSTOM && target.getSkinVariant() != HeroEntity.SKIN_CUSTOM) {
             target.setSkinVariant(HeroEntity.SKIN_CUSTOM);
@@ -224,10 +220,15 @@ public class HeroStateManager {
             target.setTrustLevel(source.getTrustLevel());
         }
 
-        // 转移装备
-        target.loadEquipmentFromTag(source.getArmorItemsTag(), source.getHandItemsTag());
-        target.setCuriosBackItemFromTag(source.getCuriosBackItemTag());
-        target.setAccessoriesDataFromTag(source.getAccessoriesDataTag());
+        // 正统实体的装备（空槽也有效）优先；旧克隆不能覆盖当前真身。
+        if (activeHero == source) {
+            target.loadEquipmentFromTag(source.getArmorItemsTag(), source.getHandItemsTag());
+            target.setCuriosBackItemFromTag(source.getCuriosBackItemTag().copy());
+            target.setAccessoriesDataFromTag(source.getAccessoriesDataTag().copy());
+        } else if (activeHero != target && !target.equipmentStateRestored) {
+            HeroEquipment.copyMissingEquipment(source, target);
+        }
+        target.equipmentStateRestored = true;
 
         // 👇 [新增] 转移姿势数据
         target.isPoseEditing = source.isPoseEditing;
@@ -235,7 +236,8 @@ public class HeroStateManager {
             System.arraycopy(source.customPoseAngles[i], 0, target.customPoseAngles[i], 0, 3);
         }
 
-        // 转移完成后立即备份到全局存档
+        // 先登记最终保留的实体，旧实体随后退出时就不能再写回装备备份。
+        HeroWorldData.get(serverLevel).setActiveHeroUUID(ownerUUID, target.getUUID());
         backupToGlobal(target);
     }
 }

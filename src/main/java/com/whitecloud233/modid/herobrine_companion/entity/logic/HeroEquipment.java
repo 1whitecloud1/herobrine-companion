@@ -9,6 +9,10 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.fml.ModList;
 
 public class HeroEquipment {
+    private static final EquipmentSlot[] ARMOR_SLOTS = {
+            EquipmentSlot.FEET, EquipmentSlot.LEGS, EquipmentSlot.CHEST, EquipmentSlot.HEAD
+    };
+    private static final EquipmentSlot[] HAND_SLOTS = {EquipmentSlot.MAINHAND, EquipmentSlot.OFFHAND};
 
     // ================= [原生装备序列化] =================
     public static ListTag getArmorItemsTag(HeroEntity hero) {
@@ -24,14 +28,40 @@ public class HeroEquipment {
     }
 
     public static void loadEquipmentFromTag(HeroEntity hero, ListTag armor, ListTag hands) {
-        if (armor != null && !armor.isEmpty()) {
-            for(int i = 0; i < armor.size(); ++i) {
-                hero.setItemSlot(EquipmentSlot.byTypeAndIndex(EquipmentSlot.Type.ARMOR, i), ItemStack.of(armor.getCompound(i)));
+        loadSlots(hero, armor, ARMOR_SLOTS, false);
+        loadSlots(hero, hands, HAND_SLOTS, false);
+    }
+
+    public static void loadMissingEquipmentFromTag(HeroEntity hero, ListTag armor, ListTag hands) {
+        loadSlots(hero, armor, ARMOR_SLOTS, true);
+        loadSlots(hero, hands, HAND_SLOTS, true);
+    }
+
+    private static void loadSlots(HeroEntity hero, ListTag items, EquipmentSlot[] slots, boolean onlyMissing) {
+        if (items == null) return;
+        for (int i = 0; i < Math.min(items.size(), slots.length); i++) {
+            if (!onlyMissing || hero.getItemBySlot(slots[i]).isEmpty()) {
+                hero.setItemSlot(slots[i], ItemStack.of(items.getCompound(i)));
             }
         }
-        if (hands != null && !hands.isEmpty()) {
-            for(int i = 0; i < hands.size(); ++i) {
-                hero.setItemSlot(EquipmentSlot.byTypeAndIndex(EquipmentSlot.Type.HAND, i), ItemStack.of(hands.getCompound(i)));
+    }
+
+    /** 无法确认旧实体的主次时，只补空槽，保留存活实体已有的装备。 */
+    public static void copyMissingEquipment(HeroEntity source, HeroEntity target) {
+        copyMissingSlots(source, target, ARMOR_SLOTS);
+        copyMissingSlots(source, target, HAND_SLOTS);
+        if (target.isCuriosBackSlotEmpty()) {
+            CompoundTag back = source.getCuriosBackItemTag();
+            if (!back.isEmpty()) target.setCuriosBackItemFromTag(back.copy());
+        }
+        HeroAccessoriesCompat.copyMissingItems(source, target);
+    }
+
+    private static void copyMissingSlots(HeroEntity source, HeroEntity target, EquipmentSlot[] slots) {
+        for (EquipmentSlot slot : slots) {
+            ItemStack item = source.getItemBySlot(slot);
+            if (target.getItemBySlot(slot).isEmpty() && !item.isEmpty()) {
+                target.setItemSlot(slot, item.copy());
             }
         }
     }

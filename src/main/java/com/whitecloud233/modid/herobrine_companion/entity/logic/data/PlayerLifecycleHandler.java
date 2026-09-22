@@ -22,6 +22,9 @@ public class PlayerLifecycleHandler {
         if (event.getEntity() instanceof ServerPlayer player) {
             CompoundTag data = player.getPersistentData();
 
+            // [委托] 登录时补发一次委托状态，保证客户端开屏拦截缓存新鲜
+            com.whitecloud233.modid.herobrine_companion.entity.logic.quest.HeroQuestManager.syncQuestStateTo(player);
+
             // 检查玩家登录时的维度
             if (player.level().dimension() == com.whitecloud233.modid.herobrine_companion.world.structure.ModStructures.END_RING_DIMENSION_KEY) {
 
@@ -98,7 +101,7 @@ public class PlayerLifecycleHandler {
 
         // ================= [4. 批量继承任务、进度与系统标记 (NBT)] =================
         String[] keysToCopy = {
-                "ChallengeFailedMessagePending", "HeroRespawnData", "HeroPendingRespawn",
+                "ChallengeFailedMessagePending", "HeroRespawnData", "HeroPendingRespawn", "HeroCombatRespawnData",
                 "HasSeenUnstableZoneIntro", "EnteredEndRingTime", "WakeUpStage",
                 "HasSimulatedCrash", "HeroActiveQuestId", "HeroActiveQuestProgress",
                 "HeroPendingTrustReward", "HeroPendingQuestClear", "HasReceivedFragment4",
@@ -107,7 +110,7 @@ public class PlayerLifecycleHandler {
 
         for (String key : keysToCopy) {
             if (origData.contains(key)) {
-                curData.put(key, origData.get(key));
+                curData.put(key, origData.get(key).copy());
             }
         }
     }

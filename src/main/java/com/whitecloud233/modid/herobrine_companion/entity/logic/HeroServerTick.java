@@ -2,7 +2,8 @@ package com.whitecloud233.modid.herobrine_companion.entity.logic;
 
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.family.HerobrineFamilySummonManager;
-import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroDataHandler;
+import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroLifecycleHandler;
+import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroStateManager;
 import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroWorldData;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.server.level.ServerLevel;
@@ -12,6 +13,7 @@ import java.util.UUID;
 public class HeroServerTick {
 
     public static boolean handleTick(HeroEntity hero, ServerLevel serverLevel) {
+        if (hero.isRemoved() || !hero.isAlive()) return false;
         UUID ownerUUID = hero.getOwnerUUID();
 
         // 没主人的实体不管它
@@ -19,8 +21,22 @@ public class HeroServerTick {
 
         HeroWorldData data = HeroWorldData.get(serverLevel);
 
+        // 必须先确认本体身份，再写任何装备备份。重复实体退出前按同一规则交接数据。
+        int checkInterval = hero.tickCount < 200 ? 10 : 100;
+        if (hero.tickCount % checkInterval == 0 || hero.tickCount % 20 == 0) {
+            HeroEntity activeHero = HeroLifecycleHandler.findActiveHero(serverLevel, ownerUUID);
+            if (activeHero != null && activeHero != hero) {
+                HeroStateManager.syncEntityToEntity(hero, activeHero);
+                hero.discard();
+                return false;
+            }
+            data.setActiveHeroUUID(ownerUUID, hero.getUUID());
+            data.setLastKnownHeroPos(ownerUUID, GlobalPos.of(hero.level().dimension(), hero.blockPosition()));
+        }
+
         // 1. 每秒更新一次皮肤和备份数据
         if (hero.tickCount % 20 == 0) {
+            HeroStateManager.restoreEquipmentFromGlobal(hero);
             int globalSkin = data.getSkinVariant(ownerUUID);
             if (hero.getSkinVariant() != globalSkin) {
                 hero.setSkinVariant(globalSkin);
@@ -36,42 +52,7 @@ public class HeroServerTick {
             data.setAccessoriesData(ownerUUID, hero.getAccessoriesDataTag());
         }
 
-        // 2. 持续性唯一性检查 - 严格比对存档内记录的“唯一合法存活者”
         HerobrineFamilySummonManager.serverTick(hero, serverLevel);
-
-        int checkInterval = hero.tickCount < 200 ? 10 : 100;
-        if (hero.tickCount % checkInterval == 0) {
-            UUID activeUUID = data.getActiveHeroUUID(ownerUUID);
-
-            if (activeUUID != null && !activeUUID.equals(hero.getUUID())) {
-                boolean activeExists = false;
-                // 全维度扫描存档里记录的正统合法体是否还活着
-                for (ServerLevel lvl : serverLevel.getServer().getAllLevels()) {
-                    if (lvl.getEntity(activeUUID) != null) {
-                        activeExists = true;
-                        break;
-                    }
-                }
-
-                if (activeExists) {
-                    // 正统合法体还活着，我就是个意外产生的克隆幽灵，自我销毁
-                    HeroDataHandler.updateGlobalTrust(hero);
-                    hero.discard();
-                    return false;
-                } else {
-                    // 记录上的合法体其实已经死了/被删了，那我接管合法身份
-                    data.setActiveHeroUUID(ownerUUID, hero.getUUID());
-                }
-            }
-
-            if (activeUUID == null) {
-                data.setActiveHeroUUID(ownerUUID, hero.getUUID());
-            }
-
-            // 持续向全服硬盘写入自己的最新坐标，方便 SourceFlowItem 跨维度寻人
-            data.setLastKnownHeroPos(ownerUUID, GlobalPos.of(hero.level().dimension(), hero.blockPosition()));
-        }
-
         return true;
     }
 }
