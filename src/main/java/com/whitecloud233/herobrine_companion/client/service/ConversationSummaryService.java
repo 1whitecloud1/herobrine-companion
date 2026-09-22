@@ -94,7 +94,7 @@ public final class ConversationSummaryService {
         if (history.isEmpty()) {
             return java.util.concurrent.CompletableFuture.completedFuture(null);
         }
-        int covered = Math.min(store.getActiveConversationSummaryMessageCount(scopeId), history.size());
+        int covered = Math.max(0, Math.min(store.getActiveConversationSummaryMessageCount(scopeId), history.size()));
         String prevSummary = store.getActiveConversationSummary(scopeId);
 
         List<String> lines = new ArrayList<>();

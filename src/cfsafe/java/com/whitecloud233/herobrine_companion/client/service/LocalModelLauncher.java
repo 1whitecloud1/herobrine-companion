@@ -178,6 +178,10 @@ public final class LocalModelLauncher {
         return false;
     }
 
+    public static String lastStartupDiagnostic() {
+        return "";
+    }
+
     public static CompletableFuture<Boolean> probeServerRunningAsync() {
         return CompletableFuture.completedFuture(false);
     }

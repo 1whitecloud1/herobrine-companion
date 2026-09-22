@@ -60,6 +60,18 @@ public final class LocalModelConnector {
                 .exceptionally(e -> new ProbeResult(false, null, DEFAULT_ENDPOINT));
     }
 
+    /** Probe the configured chat endpoint, so a healthy service on another port cannot mask a bad configuration. */
+    public static CompletableFuture<ProbeResult> probeEndpointAsync(String endpoint) {
+        String normalized = endpoint == null ? "" : endpoint.trim();
+        String suffix = "/v1/chat/completions";
+        if (!normalized.endsWith(suffix)) {
+            return CompletableFuture.completedFuture(new ProbeResult(false, null, normalized));
+        }
+        return probeSingle(normalized.substring(0, normalized.length() - suffix.length()))
+                .orTimeout(8, java.util.concurrent.TimeUnit.SECONDS)
+                .exceptionally(error -> new ProbeResult(false, null, normalized));
+    }
+
     private static CompletableFuture<ProbeResult> probeCandidates(int index) {
         if (index >= CANDIDATE_BASES.size()) {
             return CompletableFuture.completedFuture(new ProbeResult(false, null, DEFAULT_ENDPOINT));
@@ -73,7 +85,30 @@ public final class LocalModelConnector {
         });
     }
 
-    private static CompletableFuture<ProbeResult> probeSingle(String base) {
+    static CompletableFuture<ProbeResult> probeSingle(String base) {
+        // llama.cpp can expose a process/listening port before its model is usable.
+        URI uri;
+        try {
+            uri = URI.create(base);
+            if (uri.getHost() == null || !("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme()))) {
+                return CompletableFuture.completedFuture(new ProbeResult(false, null, base + "/v1/chat/completions"));
+            }
+        } catch (IllegalArgumentException error) {
+            return CompletableFuture.completedFuture(new ProbeResult(false, null, base + "/v1/chat/completions"));
+        }
+        boolean llamaPort = uri.getPort() == DEFAULT_PORT;
+        CompletableFuture<Boolean> health = llamaPort
+                ? CLIENT.sendAsync(HttpRequest.newBuilder().uri(URI.create(base + "/health"))
+                        .timeout(Duration.ofSeconds(2)).GET().build(),
+                        HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
+                        .handle((response, error) -> error == null && response != null
+                                && isReadyHealthResponse(response.statusCode(), response.body()))
+                : CompletableFuture.completedFuture(true);
+        return health.thenCompose(ready -> ready ? probeModels(base)
+                : CompletableFuture.completedFuture(new ProbeResult(false, null, base + "/v1/chat/completions")));
+    }
+
+    private static CompletableFuture<ProbeResult> probeModels(String base) {
         return CLIENT.sendAsync(HttpRequest.newBuilder()
                         .uri(URI.create(base + "/v1/models"))
                         .timeout(Duration.ofSeconds(6))
@@ -86,15 +121,13 @@ public final class LocalModelConnector {
                         return new ProbeResult(false, null, base + "/v1/chat/completions");
                     }
                     String modelId = parseFirstModelId(response.body());
-                    return new ProbeResult(true,
-                            modelId == null ? DEFAULT_MODEL : modelId,
-                            base + "/v1/chat/completions");
+                    return new ProbeResult(modelId != null, modelId, base + "/v1/chat/completions");
                 })
                 .exceptionally(e -> new ProbeResult(false, null, base + "/v1/chat/completions"));
     }
 
     /** 解析 OpenAI 风格 /v1/models 响应里的第一个模型 id。 */
-    private static String parseFirstModelId(String body) {
+    static String parseFirstModelId(String body) {
         try {
             JsonElement root = JsonParser.parseString(body);
             JsonElement arrayElement = null;
@@ -110,7 +143,7 @@ public final class LocalModelConnector {
             for (JsonElement element : data) {
                 if (element.isJsonObject()) {
                     JsonElement id = element.getAsJsonObject().get("id");
-                    if (id != null && id.isJsonPrimitive()) {
+                    if (id != null && id.isJsonPrimitive() && id.getAsJsonPrimitive().isString()) {
                         String value = id.getAsString();
                         if (value != null && !value.isBlank()) {
                             return value.trim();
@@ -119,9 +152,22 @@ public final class LocalModelConnector {
                 }
             }
         } catch (Exception ignored) {
-            // 响应不可解析时按可达处理，用默认模型名
+            // An HTML error page or an empty model list is not a usable model server.
         }
         return null;
+    }
+
+    static boolean isReadyHealthResponse(int statusCode, String body) {
+        if (statusCode < 200 || statusCode >= 300) return false;
+        try {
+            JsonElement root = JsonParser.parseString(body);
+            if (!root.isJsonObject()) return false;
+            JsonElement status = root.getAsJsonObject().get("status");
+            return status != null && status.isJsonPrimitive() && status.getAsJsonPrimitive().isString()
+                    && "ok".equalsIgnoreCase(status.getAsString());
+        } catch (RuntimeException ignored) {
+            return false;
+        }
     }
 
     /**

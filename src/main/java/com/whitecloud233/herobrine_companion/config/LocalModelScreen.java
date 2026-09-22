@@ -59,6 +59,10 @@ public class LocalModelScreen extends Screen {
     private HeroScreen.ThemedButton toggleButton;
     private HeroScreen.ThemedButton downloadButton;
     private HeroScreen.ThemedButton dirButton;
+    private HeroScreen.ThemedButton diagnosticsButton;
+    private String diagnostic = "";
+    private String observedStartupDiagnostic = "";
+    private int serverProbeTicks;
     private boolean busy = false;
     private boolean progressVisible = false;
     private double progressFraction = 0.0D;
@@ -140,6 +144,12 @@ public class LocalModelScreen extends Screen {
         int actionX = panelLeft + (panelWidth - actionGroupWidth) / 2;
         int buttonY = panelTop + panelHeight - 36;
 
+        this.diagnosticsButton = this.addRenderableWidget(new HeroScreen.ThemedButton(
+                panelLeft + panelWidth - 106, buttonY - 18, 90, 16,
+                Component.translatable("gui.herobrine_companion.local_model.show_diagnostics"),
+                button -> this.showDiagnostics(), null));
+        this.syncStartupDiagnostic();
+
         this.toggleButton = this.addRenderableWidget(new HeroScreen.ThemedButton(
                 actionX, buttonY, toggleWidth, BUTTON_HEIGHT,
                 this.getToggleMessage(),
@@ -193,6 +203,10 @@ public class LocalModelScreen extends Screen {
         }
         if (this.dirButton != null) {
             this.dirButton.active = !this.busy;
+        }
+        if (this.diagnosticsButton != null) {
+            this.diagnosticsButton.visible = !this.diagnostic.isBlank() || !LocalModelLauncher.gpuDowngradeReason().isBlank();
+            this.diagnosticsButton.active = !this.busy;
         }
         this.updateDownloadState();
     }
@@ -382,6 +396,7 @@ public class LocalModelScreen extends Screen {
     /** 仅启动服务器并写入本地槽位/路由（文件已确认就绪，prepareAsync 不会触发下载）。 */
     private void startServer() {
         this.busy = true;
+        this.diagnostic = "";
         this.progressVisible = false;
         this.invalidateFileStates();
         this.setStatus(Component.translatable("gui.herobrine_companion.local_model.enabling"), 0xAAAAAA);
@@ -397,8 +412,9 @@ public class LocalModelScreen extends Screen {
                         return;
                     }
                     if (error != null || result == null) {
-                        this.setStatus(Component.translatable("gui.herobrine_companion.local_model.error_prepare",
-                                error == null ? "未知错误" : LocalModelLauncher.rootMessage(error)), COL_WARN);
+                        this.serverRunning = false;
+                        this.showFailure(Component.translatable("gui.herobrine_companion.local_model.error_prepare",
+                                error == null ? "未知错误" : LocalModelLauncher.rootMessage(error)), LocalModelLauncher.lastStartupDiagnostic());
                         return;
                     }
                     if (result.ready()) {
@@ -408,8 +424,9 @@ public class LocalModelScreen extends Screen {
                                 "gui.herobrine_companion.local_model.enabled_note",
                                 result.modelId()), COL_GOOD);
                     } else {
-                        this.setStatus(Component.translatable("gui.herobrine_companion.local_model.error_prepare",
-                                result.message()), COL_WARN);
+                        this.serverRunning = false;
+                        this.showFailure(Component.translatable("gui.herobrine_companion.local_model.error_prepare",
+                                result.message()), LocalModelLauncher.lastStartupDiagnostic());
                     }
                 });
             }
@@ -463,8 +480,8 @@ public class LocalModelScreen extends Screen {
                         return;
                     }
                     if (error != null) {
-                        this.setStatus(Component.translatable("gui.herobrine_companion.local_model.download_failed",
-                                LocalModelLauncher.rootMessage(error)), COL_WARN);
+                        this.showFailure(Component.translatable("gui.herobrine_companion.local_model.download_failed",
+                                LocalModelLauncher.rootMessage(error)), "");
                         return;
                     }
                     if (!LocalModelLauncher.entryFilesPresent(entry)) {
@@ -574,9 +591,10 @@ public class LocalModelScreen extends Screen {
                             return;
                         }
                         if (error != null || result == null || !result.ready()) {
-                            this.setStatus(Component.translatable("gui.herobrine_companion.local_model.error_prepare",
+                            this.serverRunning = false;
+                            this.showFailure(Component.translatable("gui.herobrine_companion.local_model.error_prepare",
                                     error != null ? LocalModelLauncher.rootMessage(error)
-                                            : (result == null ? "未知错误" : result.message())), COL_WARN);
+                                            : (result == null ? "未知错误" : result.message())), LocalModelLauncher.lastStartupDiagnostic());
                             return;
                         }
                         LocalModelConnector.applyConfig(result.endpoint(), result.modelId());
@@ -670,6 +688,33 @@ public class LocalModelScreen extends Screen {
         this.statusColor = color;
     }
 
+    private void showFailure(Component message, String details) {
+        this.setStatus(message, COL_WARN);
+        this.diagnostic = details == null || details.isBlank() ? message.getString() : details;
+        this.observedStartupDiagnostic = LocalModelLauncher.lastStartupDiagnostic();
+        this.updateToggleState();
+        this.showDiagnostics();
+    }
+
+    private void showDiagnostics() {
+        String details = this.diagnostic.isBlank() ? LocalModelLauncher.gpuDowngradeReason() : this.diagnostic;
+        if (this.minecraft != null && this.minecraft.screen == this && !details.isBlank()) {
+            this.minecraft.setScreen(new LocalModelDiagnosticsScreen(this, details));
+        }
+    }
+
+    private void syncStartupDiagnostic() {
+        String latest = LocalModelLauncher.lastStartupDiagnostic();
+        if (!latest.equals(this.observedStartupDiagnostic)) {
+            this.observedStartupDiagnostic = latest;
+            this.diagnostic = latest;
+            if (!latest.isBlank() && !this.serverRunning) {
+                this.setStatus(Component.literal(latest), COL_WARN);
+            }
+        }
+        this.updateToggleState();
+    }
+
     /** 系统内存缓存（会话内不变；-1 = 还没探测过）。渲染每行都要用，不能每帧查一次 MXBean。 */
     private static volatile long cachedSystemRamMb = -1L;
 
@@ -696,6 +741,13 @@ public class LocalModelScreen extends Screen {
     @Override
     public void tick() {
         super.tick();
+        if (!this.busy) {
+            if (++this.serverProbeTicks >= 60) {
+                this.serverProbeTicks = 0;
+                this.probeServer();
+            }
+            this.syncStartupDiagnostic();
+        }
         this.updateToggleState();
     }
 
@@ -903,7 +955,8 @@ public class LocalModelScreen extends Screen {
                     : "";
             return flag + server + "  ·  " + state;
         });
-        guiGraphics.drawString(this.font, stateLine, contentLeft, baseY - 50,
+        int stateWidth = contentWidth - (this.diagnosticsButton != null && this.diagnosticsButton.visible ? 98 : 0);
+        guiGraphics.drawString(this.font, this.font.plainSubstrByWidth(stateLine, Math.max(1, stateWidth)), contentLeft, baseY - 50,
                 downgraded ? 0xFFD080 : 0xCFCFCF, false);
         if (downgraded && this.status.getString().isBlank()) {
             // 检测到显卡却降级 CPU：状态区空闲时常驻显示具体原因（下载/启动期间状态区让给进度）
@@ -1045,4 +1098,4 @@ public class LocalModelScreen extends Screen {
     public boolean isPauseScreen() {
         return false;
     }
-}
+}

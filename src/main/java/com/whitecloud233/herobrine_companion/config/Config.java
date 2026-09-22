@@ -67,6 +67,11 @@ public class Config {
             .comment("所有觉醒对话共享的最小 LLM 调用间隔（秒，任意说话者之间），防止触发 API 频率限制；冷却期间改用预设台词")
             .defineInRange("awakenedDialogueMinIntervalSeconds", 30, 5, 600);
 
+    public static final ModConfigSpec.IntValue GIFT_DIALOGUE_MIN_INTERVAL = BUILDER
+            .comment("Minimum interval (in seconds) between two GIFT (offer) LLM dialogues. Separate from the awakened-dialogue throttle, so Herobrine's gift reactions are never skipped because awakened mobs were talking. 0 = no throttle")
+            .comment("赠礼（托付）LLM 台词的最小间隔（秒）。该通道与觉醒对话限流相互独立，不会因为觉醒生物在说话而被挤掉。0 = 完全不限制")
+            .defineInRange("giftDialogueMinIntervalSeconds", 0, 0, 600);
+
     public static final ModConfigSpec.IntValue AWAKENED_WORLD_CAP = BUILDER
             .comment("Max total awakened mobs per dimension (world). Design doc 5.2 recommends 20 ~ 40. Awakened mobs keep their state until they die or leave the dimension; new awakenings are refused once the cap is reached")
             .comment("单世界（维度）觉醒怪物总量上限（设计文档 5.2 建议 20 ~ 40）。达到上限后不再产生新的觉醒怪；已觉醒怪物保持觉醒直到死亡或离开本维度")
@@ -147,6 +152,7 @@ public class Config {
     public static int aiVisionInterval;
     public static boolean awakenedMobAiDialogueEnabled;
     public static int awakenedDialogueMinIntervalSeconds;
+    public static int giftDialogueMinIntervalSeconds;
     public static int awakenedWorldCap;
     public static int awakenedPlayerNearCap;
     public static int awakenedPlayerNearRadius;
@@ -175,6 +181,7 @@ public class Config {
         aiVisionInterval = AI_VISION_INTERVAL.get();
         awakenedMobAiDialogueEnabled = AWAKENED_MOB_AI_DIALOGUE_ENABLED.get();
         awakenedDialogueMinIntervalSeconds = AWAKENED_DIALOGUE_MIN_INTERVAL.get();
+        giftDialogueMinIntervalSeconds = GIFT_DIALOGUE_MIN_INTERVAL.get();
         awakenedWorldCap = AWAKENED_WORLD_CAP.get();
         awakenedPlayerNearCap = AWAKENED_PLAYER_NEAR_CAP.get();
         awakenedPlayerNearRadius = AWAKENED_PLAYER_NEAR_RADIUS.get();
