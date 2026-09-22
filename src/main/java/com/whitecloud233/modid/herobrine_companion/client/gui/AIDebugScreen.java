@@ -77,6 +77,9 @@ public class AIDebugScreen extends Screen {
         }
         this.listScroll = 0;
         this.detailScroll = 0;
+        this.selectStart = null;
+        this.selectEnd = null;
+        this.selecting = false;
     }
 
     private AIDebugLog.Entry currentEntry() {
@@ -195,6 +198,9 @@ public class AIDebugScreen extends Screen {
                     startCol = selectEnd.col();
                     endCol = selectStart.col();
                 }
+                int textLen = line.text().length();
+                startCol = Math.max(0, Math.min(startCol, textLen));
+                endCol = Math.max(0, Math.min(endCol, textLen));
                 if (startCol < endCol) {
                     int x1 = line.x() + this.font.width(line.text().substring(0, startCol));
                     int x2 = line.x() + this.font.width(line.text().substring(0, endCol));
@@ -269,6 +275,9 @@ public class AIDebugScreen extends Screen {
                 if (index >= 0 && index < this.entries.size()) {
                     this.selected = index;
                     this.detailScroll = 0;
+                    this.selectStart = null;
+                    this.selectEnd = null;
+                    this.selecting = false;
                     return true;
                 }
             } else if (mouseX > listRight) {

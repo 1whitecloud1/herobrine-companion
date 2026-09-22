@@ -50,9 +50,6 @@ public final class ModContentIndex {
     private static final int SCHEMA_VERSION = 2;
     private static final String INDEX_FILE_NAME = "mod_content_index.json";
 
-    /** 索引文件大小上限：超过视为损坏（防御磁盘上被改坏的巨型文件导致启动 OOM）。 */
-    private static final long MAX_INDEX_FILE_BYTES = 64L * 1024L * 1024L;
-
     private static final String[] COUNT_LABELS = {"items", "blocks", "entities", "effects", "enchantments", "particles", "sounds", "dimensions", "structures"};
 
     private static volatile IndexData data;

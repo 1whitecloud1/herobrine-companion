@@ -92,6 +92,65 @@ public class AIService {
         if (localSettings == null) {
             return CompletableFuture.completedFuture("§c" + Component.translatable("message.herobrine_companion.ai_config_missing").getString());
         }
+        // 就绪保障：本地路由已配置 ≠ 服务器在跑。路由是持久化的，重启游戏/只下载未启用/
+        // 自动连接还在后台准备时，直接发请求只会得到"连接被拒"并折叠成一句 Network Error。
+        // 先确认服务器就绪；未就绪时自动拉起一次（与设置页共用同一准备流程），仍失败则
+        // 返回具体原因，而不是裸抛网络错误。
+        return ensureLocalServerReadyAsync(localSettings.endpoint()).thenCompose(ready -> {
+            if (!ready.ready) {
+                return CompletableFuture.completedFuture("§c" + ready.message);
+            }
+            // Preparation may change the endpoint/model (for example after discovering Ollama).
+            LlmSettings readySettings = LLMConfig.getLocalLlmSettings();
+            if (readySettings == null) {
+                return CompletableFuture.completedFuture("§c" + Component.translatable("message.herobrine_companion.ai_config_missing").getString());
+            }
+            return chatLocalCore(readySettings, userMessage, playerUUID, partialConsumer);
+        });
+    }
+
+    /** 就绪保障的结果：服务器可服务 + （未就绪时的）面向玩家的原因文案。 */
+    private record LocalReady(boolean ready, String message) {
+    }
+
+    /**
+     * 聊天前的本地服务器就绪保障（原子、快速、绝不静默触发多 GB 下载）：
+     * <ol>
+     *  <li>探测实际配置的端点（llama.cpp 要求 /health OK 且模型列表有效）→ 就绪直接通过；</li>
+     *  <li>未就绪且引擎/模型文件缺失 → 立即给出明确提示，指引去【本地模型管理】下载并启用
+     *      （聊天输入框里静默开下载会让玩家以为卡死，且本轮对话必然失败）；</li>
+     *  <li>文件已就绪但服务未运行 → 复用 {@link LocalModelLauncher#prepareAsync} 自动拉起
+     *      （内部已做并发去重：设置页正在下载/启动时这里直接等同一份结果）；
+     *      就绪后按实际运行的服务重写本地槽位与聊天路由（服务器可能由自动准备流程换端口/
+     *      换模型，如 Ollama 11434），保证后续请求打到真实端点；</li>
+     *  <li>拉起失败 → 返回具体原因与日志位置（旧进程占端口/等待就绪超时/进程退出等）。</li>
+     * </ol>
+     */
+    private static CompletableFuture<LocalReady> ensureLocalServerReadyAsync(String endpoint) {
+        return LocalModelConnector.probeEndpointAsync(endpoint).thenCompose(probe -> {
+            if (probe.reachable()) {
+                return CompletableFuture.completedFuture(new LocalReady(true, ""));
+            }
+            if (LocalModelLauncher.needsDownload()) {
+                return CompletableFuture.completedFuture(new LocalReady(false,
+                        Component.translatable("message.herobrine_companion.local_chat.not_downloaded").getString()));
+            }
+            return LocalModelLauncher.prepareAsync(null).handle((result, error) -> {
+                if (error != null || result == null || !result.ready()) {
+                    String detail = error != null ? LocalModelLauncher.rootMessage(error)
+                            : (result == null ? "未知错误" : result.message());
+                    return new LocalReady(false, Component.translatable(
+                            "message.herobrine_companion.local_chat.prepare_failed", detail).getString());
+                }
+                LocalModelConnector.applyConfig(result.endpoint(), result.modelId());
+                return new LocalReady(true, "");
+            });
+        });
+    }
+
+    /** 本地聊天主体（就绪已确认）：先确定性执行高频指令，再走完整 LLM 管线。 */
+    private static CompletableFuture<String> chatLocalCore(LlmSettings localSettings, String userMessage,
+                                                           UUID playerUUID, Consumer<String> partialConsumer) {
         // 本地 3B 模型的工具调用格式不可靠：高频明确指令（传送到 Hero/召唤/去末地等）
         // 先在客户端确定性执行，再让模型只生成一句符合角色的台词，
         // 避免“理解了却不执行 / 回复无法执行”的问题。
@@ -383,15 +442,52 @@ public class AIService {
                         return CompletableFuture.completedFuture("Connection to reality fading... (API Error: " + response.statusCode() + ")");
                     }
                 })
-                .exceptionallyCompose(e -> shouldFallback(fallbackSettings, retryCount)
-                        ? retryWithFallback(fallbackSettings, currentPrompt, originalUserMessage, effectiveScopeId, effectiveAuthorityPlayerId, retryCount,
-                        allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount,
-                        partialConsumer, useStreaming, outputLanguageCode, crossSessionMode, allowWorldActions)
-                        : CompletableFuture.completedFuture("...... (Network Error)"));
+                .exceptionallyCompose(e -> {
+                    LOGGER.warn("LLM chat request failed (endpoint={}): {}", settings == null ? "?" : settings.endpoint(),
+                            describeError(e));
+                    return shouldFallback(fallbackSettings, retryCount)
+                            ? retryWithFallback(fallbackSettings, currentPrompt, originalUserMessage, effectiveScopeId, effectiveAuthorityPlayerId, retryCount,
+                            allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount,
+                            partialConsumer, useStreaming, outputLanguageCode, crossSessionMode, allowWorldActions)
+                            : CompletableFuture.completedFuture(networkFailureText(e, settings));
+                });
     }
 
     private static boolean shouldFallback(LlmSettings fallbackSettings, int retryCount) {
         return fallbackSettings != null && fallbackSettings.isUsable() && retryCount < 2;
+    }
+
+    /**
+     * 网络请求异常 → 面向玩家的失败文案（原"裸 Network Error"完全吞掉原因，玩家报起来
+     * 无从排查）。保留 "Network Error" 标记子串供下游兜底逻辑识别（normalizeReply 等），
+     * 同时把真实异常信息带上；本地回环端点再附上排查提示与日志位置。
+     */
+    private static String networkFailureText(Throwable error, LlmSettings settings) {
+        StringBuilder text = new StringBuilder("...... (Network Error");
+        if (error != null) {
+            String detail = error.getMessage();
+            if (detail == null || detail.isBlank()) {
+                detail = error.getClass().getSimpleName();
+            }
+            text.append(": ").append(detail);
+        }
+        text.append(')');
+        if (isLocalSettings(settings)) {
+            text.append(' ').append(Component.translatable(
+                    "message.herobrine_companion.local_chat.network_error_hint").getString());
+        }
+        return text.toString();
+    }
+
+    /** 异常的可读摘要（类型 + 消息），日志定位用。 */
+    private static String describeError(Throwable error) {
+        if (error == null) {
+            return "null";
+        }
+        String message = error.getMessage();
+        return (message == null || message.isBlank())
+                ? error.getClass().getSimpleName()
+                : error.getClass().getSimpleName() + ": " + message;
     }
 
     /** 该调用设置是否指向本地回环服务（本地模型不算云端模式：失败不标记云端 Key 异常、不用云端门禁）。 */
@@ -529,11 +625,16 @@ public class AIService {
                             null, null, null, streamingResponse.errorBody, "HTTP " + streamingResponse.statusCode);
                     return CompletableFuture.completedFuture("Connection to reality fading... (API Error: " + streamingResponse.statusCode + ")");
                 })
-                .exceptionallyCompose(e -> shouldFallback(fallbackSettings, retryCount)
-                        ? retryWithFallback(fallbackSettings, currentPrompt, originalUserMessage, conversationScopeId, authorityPlayerUUID, retryCount,
-                        allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount,
-                        partialConsumer, false, outputLanguageCode, crossSessionMode, allowWorldActions)
-                        : CompletableFuture.completedFuture("...... (Network Error)"));
+                .exceptionallyCompose(e -> {
+                    LlmSettings primary = resolvedTask == null ? null : resolvedTask.primary();
+                    LOGGER.warn("LLM streaming chat request failed (endpoint={}): {}",
+                            primary == null ? "?" : primary.endpoint(), describeError(e));
+                    return shouldFallback(fallbackSettings, retryCount)
+                            ? retryWithFallback(fallbackSettings, currentPrompt, originalUserMessage, conversationScopeId, authorityPlayerUUID, retryCount,
+                            allowTitleRefresh, includeConversationHistory, persistConversation, variationRetryCount,
+                            partialConsumer, false, outputLanguageCode, crossSessionMode, allowWorldActions)
+                            : CompletableFuture.completedFuture(networkFailureText(e, primary));
+                });
     }
 
 

@@ -417,8 +417,23 @@ public final class LocalModelLauncher {
             .proxy(SystemProxy.SELECTOR)
             .build();
 
+    /** 无代理直连客户端：系统代理不可用（代理软件未运行等）时自动绕过代理重试用。 */
+    private static final HttpClient DIRECT_CLIENT = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(10))
+            .followRedirects(HttpClient.Redirect.NORMAL)
+            .build();
+
     /** 启动的服务器进程（退出游戏时自动结束）。 */
     private static volatile Process serverProcess;
+    /** Invalidate health responses started before a stop, restart, or crash. */
+    private static final java.util.concurrent.atomic.AtomicLong SERVER_STATE_VERSION = new java.util.concurrent.atomic.AtomicLong();
+    private static final Duration STARTUP_TIMEOUT = Duration.ofMinutes(3);
+    private static volatile String lastStartupDiagnostic = "";
+
+    /** Full startup details remain available when the player reopens the model page. */
+    public static String lastStartupDiagnostic() {
+        return lastStartupDiagnostic;
+    }
 
     /** 检测到 NVIDIA 显卡却最终以 CPU 推理时的具体原因（空串 = 未发生）；页面状态行与日志展示。 */
     private static volatile String gpuDowngradeReason = "";
@@ -455,6 +470,9 @@ public final class LocalModelLauncher {
     }
 
     public record PrepareResult(boolean ready, String endpoint, String modelId, String message) {
+    }
+
+    private record ServerStartResult(boolean ready, String message, String details) {
     }
 
     private LocalModelLauncher() {
@@ -943,11 +961,22 @@ public final class LocalModelLauncher {
             // 新一轮准备（进新存档/手动点击）视为新的游戏会话，清除退出标记；
             // 若复用仍在进行中的旧流程，旧流程启动服务器时也会读到最新标记。
             sessionClosed = false;
-            resetGpuDowngrade();
             if (prepareInFlight != null && !prepareInFlight.isDone()) {
                 return prepareInFlight;
             }
-            CompletableFuture<PrepareResult> future = doPrepareAsync(progress);
+            resetGpuDowngrade();
+            lastStartupDiagnostic = "";
+            // File validation and nvidia-smi must not block the game/render thread.
+            CompletableFuture<PrepareResult> future = CompletableFuture.supplyAsync(() -> doPrepareAsync(progress))
+                    .thenCompose(result -> result)
+                    .exceptionally(error -> new PrepareResult(false, DEFAULT_ENDPOINT, LocalModelConnector.DEFAULT_MODEL,
+                            tr("gui.herobrine_companion.local_model.startup_prepare_error", rootMessage(error))))
+                    .thenApply(result -> {
+                        if (!result.ready() && lastStartupDiagnostic.isBlank()) {
+                            lastStartupDiagnostic = result.message();
+                        }
+                        return result;
+                    });
             prepareInFlight = future;
             return future;
         }
@@ -1028,35 +1057,24 @@ public final class LocalModelLauncher {
             return CompletableFuture.completedFuture(new PrepareResult(false, DEFAULT_ENDPOINT,
                     LocalModelConnector.DEFAULT_MODEL, externalMessage));
         }
-        owned.destroy();
-        serverProcess = null;
-        try {
-            if (!owned.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)) {
-                owned.destroyForcibly();
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            owned.destroyForcibly();
-        }
+        stopServerProcess();
         return prepareFreshAsync(progress);
     }
 
     /** 无可用服务器时的完整准备流程：补服务器 → 补模型 → 启动 → 等健康。
      *  任何阶段失败都映射为带信息的 PrepareResult（绝不向调用方抛出异常，避免 UI 卡在连接中）。 */
     private static CompletableFuture<PrepareResult> prepareFreshAsync(Consumer<DownloadProgress> progress) {
+        // A previously ready owned process may now be hung. Reclaim it before starting another one.
+        stopServerProcess();
         return ensureServerAsync(progress)
                 .thenCompose(ignored -> ensureModelAsync(progress))
                 .thenCompose(ignored -> startServerAsync(progress))
-                .thenApply(ok -> {
-                    if (ok) {
+                .thenApply(start -> {
+                    if (start.ready()) {
                         return new PrepareResult(true, DEFAULT_ENDPOINT, LocalModelConnector.DEFAULT_MODEL, "服务器已启动");
                     }
-                    Process p = serverProcess;
-                    String detail = (p == null || p.isAlive())
-                            ? "等待服务器就绪超时（3 分钟）"
-                            : "服务器进程异常退出（可查看 server.cpu.log / server.cuda.log）";
                     return new PrepareResult(false, DEFAULT_ENDPOINT, LocalModelConnector.DEFAULT_MODEL,
-                            "服务器启动失败：" + detail);
+                            start.message());
                 })
                 .exceptionally(e -> new PrepareResult(false, DEFAULT_ENDPOINT, LocalModelConnector.DEFAULT_MODEL,
                         "自动准备失败：" + rootMessage(e)));
@@ -1150,16 +1168,41 @@ public final class LocalModelLauncher {
     /** 依次尝试多个引擎下载地址，全部失败才报错；单个地址失败时清理残留文件。 */
     private static CompletableFuture<Path> downloadEngineFromUrls(List<String> urls, int index, Path target,
                                                                   String label, Consumer<DownloadProgress> progress) {
+        return downloadEngineFromUrlsInternal(urls, index, target, label, progress, CLIENT, false, false);
+    }
+
+    /** 引擎下载（内部）：全部地址失败且曾出现网络层失败 + 开着系统代理 → 绕过代理直连重试一遍。 */
+    private static CompletableFuture<Path> downloadEngineFromUrlsInternal(List<String> urls, int index, Path target,
+                                                                          String label, Consumer<DownloadProgress> progress,
+                                                                          HttpClient client, boolean bypassProxy,
+                                                                          boolean networkFailureSeen) {
         if (index >= urls.size()) {
+            if (!bypassProxy && LLMConfig.isUseSystemProxy() && networkFailureSeen) {
+                LOGGER.info("推理引擎经系统代理的所有地址均失败（含网络层失败），尝试绕过代理直连重试");
+                CompletableFuture<Path> bypass = downloadEngineFromUrlsInternal(
+                        urls, 0, target, label, progress, DIRECT_CLIENT, true, true);
+                return bypass.whenComplete((result, error) -> {
+                    if (error == null) {
+                        // 直连成功 → 说明黑名单是代理故障期间误记的，下轮下载不再跳过这些源
+                        UNREACHABLE_HOSTS.clear();
+                    }
+                });
+            }
+            String finalHint = bypassProxy
+                    ? "已尝试绕过系统代理直连，仍失败：请检查网络连接、确认防火墙/安全软件没有拦截游戏进程；"
+                            + "若代理软件未运行，请关闭设置里的[跟随系统代理]后重试。"
+                    : "";
             return CompletableFuture.failedFuture(new IllegalStateException(
-                    "所有推理引擎下载地址均失败（共 " + urls.size() + " 个）。"));
+                    "所有推理引擎下载地址均失败（共 " + urls.size() + " 个）。" + finalHint));
         }
         String url = urls.get(index);
-        return downloadToFile(url, target, label + " (" + safeHost(url) + ")", progress)
+        String urlLabel = (bypassProxy ? "（系统代理失败，直连重试）" : "") + label;
+        return downloadToFile(url, target, urlLabel + " (" + safeHost(url) + ")", progress, client)
                 .exceptionallyCompose(error -> {
                     // 单个地址失败：清理残留（.part 由 downloadToFile 清理，这里兜底清目标文件）
                     deleteQuietly(target);
-                    return downloadEngineFromUrls(urls, index + 1, target, label, progress);
+                    return downloadEngineFromUrlsInternal(urls, index + 1, target, label, progress,
+                            client, bypassProxy, networkFailureSeen || isNetworkClassFailure(error));
                 });
     }
 
@@ -1388,24 +1431,60 @@ public final class LocalModelLauncher {
         });
     }
 
-    /** GET 返回响应体 + 诊断；任何失败（网络/超时/非 2xx）都不抛异常。 */
+    /** GET 返回响应体 + 诊断；任何失败（网络/超时/非 2xx）都不抛异常。
+     *  网络层失败时剥掉 CompletableFuture 包装给出真实原因（连接被拒/DNS 失败/超时等，
+     *  而非无用的 CompletionException）；开着[跟随系统代理]且经代理失败时，自动绕过代理
+     *  直连重试一次（代理软件未运行/已退出会阻断全部外网请求，这是"所有仓库文件列表全挂"
+     *  的头号原因）。 */
     private static CompletableFuture<JsonFetch> fetchJsonSafely(String url) {
+        return fetchJsonSafelyInternal(url, CLIENT).thenCompose(fetch -> {
+            if (fetch.ok() || !LLMConfig.isUseSystemProxy() || !isNetworkDiagnostic(fetch.diagnostic())) {
+                return CompletableFuture.completedFuture(fetch);
+            }
+            LOGGER.info("仓库文件列表请求经系统代理失败（{}），尝试绕过代理直连重试: {}", fetch.diagnostic(), safeHost(url));
+            return fetchJsonSafelyInternal(url, DIRECT_CLIENT);
+        });
+    }
+
+    private static CompletableFuture<JsonFetch> fetchJsonSafelyInternal(String url, HttpClient client) {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
                 .timeout(Duration.ofSeconds(10))
                 .header("Accept", "application/json")
                 .header("User-Agent", "HerobrineCompanion/1.0")
                 .GET().build();
-        return CLIENT.sendAsync(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
+        return client.sendAsync(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
                 .handle((response, error) -> {
                     if (error != null) {
-                        return new JsonFetch("", "网络错误 " + error.getClass().getSimpleName());
+                        return new JsonFetch("", networkErrorLabel(error));
                     }
                     if (response.statusCode() != 200) {
                         return new JsonFetch("", "HTTP " + response.statusCode());
                     }
                     return new JsonFetch(response.body(), "HTTP 200");
                 });
+    }
+
+    /** 诊断串是否属于网络层失败（可尝试绕过代理重试）。 */
+    private static boolean isNetworkDiagnostic(String diagnostic) {
+        return diagnostic != null && diagnostic.startsWith("网络错误");
+    }
+
+    /** 网络异常的可读标签：剥掉 CompletableFuture 的包装，取最内层的类型与消息
+     *  （如 "网络错误 ConnectException: Connection refused"，而非无用的 CompletionException）。 */
+    private static String networkErrorLabel(Throwable error) {
+        Throwable current = error;
+        Set<Throwable> seen = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+        while (current != null && seen.add(current)
+                && (current instanceof CompletionException
+                || current instanceof java.util.concurrent.ExecutionException)) {
+            current = current.getCause();
+        }
+        String type = current == null ? "未知" : current.getClass().getSimpleName();
+        String message = current == null ? null : current.getMessage();
+        return (message == null || message.isBlank())
+                ? "网络错误 " + type
+                : "网络错误 " + type + ": " + message;
     }
 
     /** 文件列表解析结果：命中的下载直链 + 仓库全部 GGUF 文件名（诊断用）。 */
@@ -1553,24 +1632,30 @@ public final class LocalModelLauncher {
     /** 依次尝试多个模型下载地址，全部失败才报错；单个地址失败时清理残留文件。 */
     private static CompletableFuture<Path> downloadModelFromUrls(List<String> urls, int index, Path target,
                                                                  String fileName, Consumer<DownloadProgress> progress) {
-        return downloadModelFromUrls(urls, index, 0, target, fileName, progress);
+        return downloadModelFromUrlsInternal(urls, index, 0, target, fileName, progress, CLIENT, false, false);
     }
 
     /**
-     * 依次尝试多个下载地址（{@code attempt} = 当前地址已尝试次数）。
+     * 依次尝试多个下载地址（{@code attempt} = 当前地址已尝试次数；{@code client}/{@code bypassProxy} =
+     * 直连重试状态；{@code networkFailureSeen} = 是否已出现过网络层失败）。
      *
-     * <p>两层容错：① 同一地址网络抖动自动重试（退避 2s → 5s，最多 {@value #PER_URL_MAX_ATTEMPTS} 次，
+     * <p>三层容错：① 同一地址网络抖动自动重试（退避 2s → 5s，最多 {@value #PER_URL_MAX_ATTEMPTS} 次，
      * 从 .part 断点续传，不浪费已下载的字节）；② 连接超时/DNS 失败的主机记入
-     * {@link #UNREACHABLE_HOSTS}，本次会话内其余指向它的地址直接跳过，不再逐个空等 10 秒。
+     * {@link #UNREACHABLE_HOSTS}，本次会话内其余指向它的地址直接跳过，不再逐个空等 10 秒
+     * （直连重试不读黑名单——黑名单可能是代理故障期间误记的）；
+     * ③ 全部地址失败且曾出现网络层失败、又开着[跟随系统代理]时，自动绕过代理直连重试一遍
+     * （代理软件未运行/已退出是"所有源全部连不上"的头号原因）。
      * 本地写入类失败（磁盘满/被占用）不重试——重试无效，直接换源并保留断点。</p>
      */
-    private static CompletableFuture<Path> downloadModelFromUrls(List<String> urls, int index, int attempt,
-                                                                 Path target, String fileName,
-                                                                 Consumer<DownloadProgress> progress) {
+    private static CompletableFuture<Path> downloadModelFromUrlsInternal(List<String> urls, int index, int attempt,
+                                                                         Path target, String fileName,
+                                                                         Consumer<DownloadProgress> progress,
+                                                                         HttpClient client, boolean bypassProxy,
+                                                                         boolean networkFailureSeen) {
         // 跳过本次会话内已确认连不上的源（不再逐个空等 10 秒 connect timeout）
         int cursor = index;
         boolean skipped = false;
-        while (cursor < urls.size() && UNREACHABLE_HOSTS.contains(safeHost(urls.get(cursor)))) {
+        while (!bypassProxy && cursor < urls.size() && UNREACHABLE_HOSTS.contains(safeHost(urls.get(cursor)))) {
             LOGGER.info("跳过已知连不上的下载源: {}", safeHost(urls.get(cursor)));
             cursor++;
             skipped = true;
@@ -1579,23 +1664,44 @@ public final class LocalModelLauncher {
         // 换了新地址就重置尝试次数（旧地址的抖动次数与新地址无关）
         final int nextAttempt = skipped ? 0 : attempt;
         if (nextIndex >= urls.size()) {
+            // 全部失败且此前出现过网络层失败：代理开着 → 绕过代理直连重试一遍（只试一次）
+            if (!bypassProxy && LLMConfig.isUseSystemProxy() && networkFailureSeen) {
+                LOGGER.info("模型分片 {} 经系统代理的所有地址均失败（含网络层失败），尝试绕过代理直连重试", fileName);
+                CompletableFuture<Path> bypass = downloadModelFromUrlsInternal(
+                        urls, 0, 0, target, fileName, progress, DIRECT_CLIENT, true, true);
+                return bypass.whenComplete((result, error) -> {
+                    if (error == null) {
+                        // 直连成功 → 说明黑名单是代理故障期间误记的，下轮下载不再跳过这些源
+                        UNREACHABLE_HOSTS.clear();
+                    }
+                });
+            }
+            String finalHint = bypassProxy
+                    ? "已尝试绕过系统代理直连，仍失败：请检查网络连接、确认防火墙/安全软件没有拦截游戏进程；"
+                            + "若代理软件未运行，请关闭设置里的[跟随系统代理]后重试。"
+                    : "";
             return CompletableFuture.failedFuture(new IllegalStateException(
-                    "模型分片 " + fileName + " 的所有下载地址均失败（共 " + urls.size() + " 个）。"));
+                    "模型分片 " + fileName + " 的所有下载地址均失败（共 " + urls.size() + " 个）。" + finalHint));
         }
         String url = urls.get(nextIndex);
         String host = safeHost(url);
-        String label = selectedModelTier().files().size() > 1
+        String label = (bypassProxy ? "（系统代理失败，直连重试）" : "")
+                + (selectedModelTier().files().size() > 1
                 ? "下载模型 " + selectedModelTier().displayName() + " (" + fileName.replaceAll("^.*-0000(\\d)-of.*$", "分片$1") + ", " + host + ")"
-                : "下载模型 " + selectedModelTier().displayName() + " (" + host + ")";
-        return downloadToFile(url, target, label, progress)
+                : "下载模型 " + selectedModelTier().displayName() + " (" + host + ")");
+        return downloadToFile(url, target, label, progress, client)
                 .exceptionallyCompose(error -> {
                     // 单个地址失败：记日志便于玩家反馈定位；清理残留（.part 保留，供断点续传）
                     LOGGER.warn("模型分片 {} 从 {} 下载失败: {}", fileName, host, rootMessage(error));
                     deleteQuietly(target);
+                    boolean networkClass = isNetworkClassFailure(error);
                     if (isUnreachableHost(error)) {
-                        // 根本连不上：拉黑主机，剩下的同主机地址不再逐个等待超时
-                        UNREACHABLE_HOSTS.add(host);
-                        return downloadModelFromUrls(urls, nextIndex + 1, 0, target, fileName, progress);
+                        // 根本连不上：拉黑主机，剩下的同主机地址不再逐个等待超时（直连重试不读黑名单）
+                        if (!bypassProxy) {
+                            UNREACHABLE_HOSTS.add(host);
+                        }
+                        return downloadModelFromUrlsInternal(urls, nextIndex + 1, 0, target, fileName,
+                                progress, client, bypassProxy, networkFailureSeen || networkClass);
                     }
                     boolean localProblem = hasCause(error, java.nio.file.FileSystemException.class);
                     if (!localProblem && nextAttempt + 1 < PER_URL_MAX_ATTEMPTS) {
@@ -1605,10 +1711,11 @@ public final class LocalModelLauncher {
                         return CompletableFuture
                                 .supplyAsync(() -> target, CompletableFuture.delayedExecutor(
                                         delaySeconds, java.util.concurrent.TimeUnit.SECONDS))
-                                .thenCompose(ignored -> downloadModelFromUrls(urls, nextIndex, nextAttempt + 1,
-                                        target, fileName, progress));
+                                .thenCompose(ignored -> downloadModelFromUrlsInternal(urls, nextIndex, nextAttempt + 1,
+                                        target, fileName, progress, client, bypassProxy, networkFailureSeen || networkClass));
                     }
-                    return downloadModelFromUrls(urls, nextIndex + 1, 0, target, fileName, progress);
+                    return downloadModelFromUrlsInternal(urls, nextIndex + 1, 0, target, fileName,
+                            progress, client, bypassProxy, networkFailureSeen || networkClass);
                 });
     }
 
@@ -1641,6 +1748,28 @@ public final class LocalModelLauncher {
                 || lower.contains("connection refused");
     }
 
+    /** 是否"网络层失败"（连接被拒/超时/DNS/连接重置等）；HTTP 状态类错误与本地写入失败不算。
+     *  用于判断是否值得绕过系统代理直连重试。 */
+    private static boolean isNetworkClassFailure(Throwable error) {
+        if (hasCause(error, java.net.ConnectException.class)
+                || hasCause(error, java.net.http.HttpConnectTimeoutException.class)
+                || hasCause(error, java.net.http.HttpTimeoutException.class)
+                || hasCause(error, java.net.UnknownHostException.class)
+                || hasCause(error, java.net.NoRouteToHostException.class)
+                || hasCause(error, java.io.InterruptedIOException.class)) {
+            return true;
+        }
+        String msg = rootMessage(error);
+        if (msg == null) {
+            return false;
+        }
+        String lower = msg.toLowerCase(Locale.ROOT);
+        return lower.contains("connect timed out") || lower.contains("connection timed out")
+                || lower.contains("connection refused") || lower.contains("connection reset")
+                || lower.contains("unexpected end of file") || lower.contains("broken pipe")
+                || lower.contains("network is unreachable");
+    }
+
     private static String safeHost(String url) {
         try {
             String host = URI.create(url).getHost();
@@ -1671,10 +1800,10 @@ public final class LocalModelLauncher {
     }
 
     /** 启动服务器进程并轮询 /health 直到就绪。引擎带 CUDA 库时默认上卡；初始化失败自动降级 CPU 重试。 */
-    private static CompletableFuture<Boolean> startServerAsync(Consumer<DownloadProgress> progress) {
+    private static CompletableFuture<ServerStartResult> startServerAsync(Consumer<DownloadProgress> progress) {
         boolean gpu = gpuEngine;
-        return startServerProcessAsync(gpu, progress).thenCompose(ok -> {
-            if (ok && gpu) {
+        return startServerProcessAsync(gpu, progress).thenCompose(start -> {
+            if (start.ready() && gpu) {
                 // 新引擎在 CUDA 初始化失败时会自动回退 CPU 且 /health 照常通过，
                 // 仅靠"进程存活"会误判为 GPU 模式成功。这里复核 CUDA 日志关键字。
                 // 命中"failed to initialize CUDA" 等时如实记录降级原因并继续按 CPU 服务。
@@ -1689,88 +1818,93 @@ public final class LocalModelLauncher {
                         progress.accept(new DownloadProgress(0, 0,
                                 "注意：CUDA 初始化失败，实际按 CPU 运行。原因：" + gpuDowngradeReason));
                     }
+                    String details = gpuDowngradeReason + "\n"
+                            + tr("gui.herobrine_companion.local_model.startup_log", rootDir().resolve("server.cuda.log").toAbsolutePath().toString())
+                            + "\n\n" + cudaLogTail;
+                    return CompletableFuture.completedFuture(new ServerStartResult(true, "", details));
                 }
-                return CompletableFuture.completedFuture(true);
+                return CompletableFuture.completedFuture(start);
             }
-            if (ok || !gpu) {
-                return CompletableFuture.completedFuture(ok);
+            if (start.ready() || !gpu || sessionClosed) {
+                return CompletableFuture.completedFuture(start);
             }
-            // CUDA 初始化失败（显存不足/驱动过旧/运行库缺失等）：先取退出码与 CUDA 日志，
-            // 分类出具体原因；再停止失败的 GPU 进程改纯 CPU 模式重试，避免进程占住 8090。
-            int exitCode = -1;
-            Process crashed = serverProcess;
-            if (crashed != null && !crashed.isAlive()) {
-                try {
-                    exitCode = crashed.exitValue();
-                } catch (IllegalThreadStateException ignored) {
-                    // 进程刚退出竞争：按未知处理
-                }
-            }
-            String cudaLogTail = tailOfFile(rootDir().resolve("server.cuda.log"), 6000);
-            String shortTail = cudaLogTail == null ? "" : cudaLogTail.trim().replaceAll("\\s+", " ");
-            if (shortTail.length() > 300) {
-                shortTail = shortTail.substring(0, 300);
-            }
-            stopServerProcess();
+            // Preserve the GPU attempt even if CPU startup also fails (including an empty native log).
             gpuEngine = false;
-            gpuDowngradeReason = classifyCudaDowngrade(exitCode, cudaLogTail);
-            LOGGER.warn("检测到 NVIDIA 显卡，但 CUDA 启动失败，已降级 CPU 推理。原因：{}（server.cuda.log 尾部：{}）",
-                    gpuDowngradeReason, shortTail);
+            gpuDowngradeReason = start.message();
+            LOGGER.warn("CUDA 启动失败，将重试 CPU：{}", gpuDowngradeReason);
             if (progress != null) {
-                progress.accept(new DownloadProgress(0, 0, "显卡初始化失败，改用 CPU 模式。原因：" + gpuDowngradeReason));
+                progress.accept(new DownloadProgress(0, 0,
+                        tr("gui.herobrine_companion.local_model.startup_retry_cpu", gpuDowngradeReason)));
             }
-            return startServerProcessAsync(false, progress);
+            return startServerProcessAsync(false, progress).thenApply(cpu -> new ServerStartResult(
+                    cpu.ready(), cpu.message(), cpu.details() + "\n\n"
+                    + tr("gui.herobrine_companion.local_model.startup_gpu_attempt") + "\n" + start.details()));
+        }).thenApply(start -> {
+            if (!start.ready() || !start.details().isBlank() || serverRunning) {
+                lastStartupDiagnostic = start.details().trim();
+            }
+            return start;
         });
     }
 
     /** 读文件尾部文本（下载/启动日志诊断用）；读取失败返回空串。 */
     private static String tailOfFile(Path path, int maxChars) {
-        try {
-            if (path == null || !Files.isRegularFile(path)) {
-                return "";
-            }
-            byte[] bytes = Files.readAllBytes(path);
-            int skip = Math.max(0, bytes.length - maxChars);
-            return new String(bytes, skip, bytes.length - skip, StandardCharsets.UTF_8);
-        } catch (Exception e) {
-            return "";
-        }
+        return LocalModelStartupDiagnostics.readLogTail(path, maxChars);
     }
 
     /** 根据 CUDA 日志尾部与进程退出码，给出"检测到显卡却降级 CPU"的具体原因（翻译键组装；页面/日志展示）。 */
     private static String classifyCudaDowngrade(int exitCode, String logTail) {
-        String lower = logTail == null ? "" : logTail.toLowerCase(Locale.ROOT);
-        String sizeHint = cudaSizeHint();
-        // 引擎自动回退 CPU 场景（进程仍存活）：ggml 的 CUDA 后端初始化失败，错误串常为 (null)，
-        // 多为驱动过旧（CUDA 13 运行库需要较新 NVIDIA 驱动）或运行库缺失/不匹配。
-        if (lower.contains("failed to initialize cuda") || lower.contains("ggml_cuda_init")) {
-            return tr("gui.herobrine_companion.local_model.downgrade_cuda_init_failed", sizeHint);
+        LocalModelStartupDiagnostics.Kind kind = LocalModelStartupDiagnostics.classify(
+                exitCode == -1 ? null : exitCode, logTail, "", false, true);
+        return tr(kind.key) + (kind == LocalModelStartupDiagnostics.Kind.GPU_MEMORY ? cudaSizeHint() : "");
+    }
+
+    private static ServerStartResult startupFailure(boolean gpuMode, Process process, Path logPath,
+                                                    Throwable error, boolean timedOut) {
+        Integer exitCode = null;
+        if (process != null && !process.isAlive()) {
+            try {
+                exitCode = process.exitValue();
+            } catch (IllegalThreadStateException ignored) {
+                // Retain an unknown exit code if the OS has not published it yet.
+            }
         }
-        if (lower.contains("out of memory") || lower.contains("not enough memory")
-                || lower.contains("failed to allocate") || lower.contains("cuda error: 2")) {
-            return tr("gui.herobrine_companion.local_model.downgrade_oom", sizeHint);
+        String logTail = error == null ? tailOfFile(logPath, 6000) : "";
+        String launchError = error == null ? "" : rootMessage(error);
+        LocalModelStartupDiagnostics.Kind kind = LocalModelStartupDiagnostics.classify(
+                exitCode, logTail, launchError, timedOut, gpuMode);
+        String message = tr("gui.herobrine_companion.local_model.startup_failed", gpuMode ? "CUDA" : "CPU", tr(kind.key));
+        if (exitCode != null) {
+            message += "\n" + tr("gui.herobrine_companion.local_model.startup_exit_code",
+                    LocalModelStartupDiagnostics.formatExitCode(exitCode));
         }
-        if (lower.contains("no kernel image") || lower.contains("cuda driver version")
-                || (lower.contains("driver") && (lower.contains("version") || lower.contains("not supported")))) {
-            return tr("gui.herobrine_companion.local_model.downgrade_driver", sizeHint);
+        message += "\n" + tr("gui.herobrine_companion.local_model.startup_log", logPath.toAbsolutePath().toString());
+        String details = message + "\n"
+                + tr("gui.herobrine_companion.local_model.startup_environment", System.getProperty("os.name"), System.getProperty("os.arch"))
+                + "\n" + tr("gui.herobrine_companion.local_model.startup_engine", serverPath().toAbsolutePath().toString())
+                + "\n" + tr("gui.herobrine_companion.local_model.startup_model_path", modelPath().toAbsolutePath().toString());
+        if (!launchError.isBlank()) {
+            details += "\n" + tr("gui.herobrine_companion.local_model.startup_launch_error", launchError);
         }
-        if (lower.contains("cannot load library") || lower.contains("libcublas")
-                || lower.contains("ggml-cuda") || lower.contains("cuda.so") || lower.contains("could not load")) {
-            return tr("gui.herobrine_companion.local_model.downgrade_lib_missing");
-        }
-        String tail = logTail == null ? "" : logTail.trim().replaceAll("\\s+", " ");
-        if (tail.length() > 240) {
-            tail = "…" + tail.substring(tail.length() - 240);
-        }
-        if (tail.isEmpty()) {
-            tail = tr("gui.herobrine_companion.local_model.downgrade_no_log");
-        }
-        return tr("gui.herobrine_companion.local_model.downgrade_generic", exitCode, sizeHint, tail);
+        details += "\n\n" + tr("gui.herobrine_companion.local_model.startup_log_tail") + "\n"
+                + (logTail.isBlank() ? tr("gui.herobrine_companion.local_model.startup_no_log") : logTail.trim());
+        LOGGER.warn("Local model startup failed: {}", details);
+        return new ServerStartResult(false, message, details);
+    }
+
+    private static ServerStartResult cancelledStart() {
+        String message = tr("gui.herobrine_companion.local_model.startup_cancelled");
+        return new ServerStartResult(false, message, message);
     }
 
     private static void stopServerProcess() {
-        Process p = serverProcess;
-        serverProcess = null;
+        Process p;
+        synchronized (LocalModelLauncher.class) {
+            p = serverProcess;
+            serverProcess = null;
+            serverRunning = false;
+            SERVER_STATE_VERSION.incrementAndGet();
+        }
         if (p == null || !p.isAlive()) {
             return;
         }
@@ -1797,18 +1931,18 @@ public final class LocalModelLauncher {
 
     /** 停止本模组拉起的 llama-server 进程（不处理外部进程；最多等待 3 秒）。 */
     public static void stopOwnedServer() {
+        sessionClosed = true;
         stopServerProcess();
     }
 
-    /** 当前已知的本地推理服务器运行状态（进程存活或最近一次健康探测通过）。 */
+    /** True only after a successful health response; process existence alone is not readiness. */
     private static volatile boolean serverRunning = false;
 
     /** 本地推理服务器是否在运行（同步读取缓存；页面状态行用）。 */
     public static boolean isServerRunningCached() {
         Process p = serverProcess;
-        if (p != null && p.isAlive()) {
-            serverRunning = true;
-            return true;
+        if (p != null && !p.isAlive()) {
+            serverRunning = false;
         }
         return serverRunning;
     }
@@ -1816,21 +1950,30 @@ public final class LocalModelLauncher {
     /** 异步健康探测 8090（写缓存，供页面状态行显示；失败/超时视为未运行）。 */
     public static CompletableFuture<Boolean> probeServerRunningAsync() {
         Process p = serverProcess;
-        if (p != null && p.isAlive()) {
-            serverRunning = true;
-            return CompletableFuture.completedFuture(true);
+        long version = SERVER_STATE_VERSION.get();
+        if (p != null && !p.isAlive()) {
+            serverRunning = false;
+            return CompletableFuture.completedFuture(false);
         }
+        return requestHealthAsync(Duration.ofSeconds(2)).thenApply(healthy -> {
+            synchronized (LocalModelLauncher.class) {
+                if (version != SERVER_STATE_VERSION.get() || p != serverProcess || (p != null && !p.isAlive())) {
+                    return false;
+                }
+                serverRunning = healthy;
+                return healthy;
+            }
+        });
+    }
+
+    private static CompletableFuture<Boolean> requestHealthAsync(Duration timeout) {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create("http://127.0.0.1:" + DEFAULT_PORT + "/health"))
-                .timeout(Duration.ofSeconds(2))
+                .timeout(timeout)
                 .GET().build();
         return CLIENT.sendAsync(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
-                .handle((response, error) -> {
-                    boolean running = error == null && response != null
-                            && response.statusCode() >= 200 && response.statusCode() < 300;
-                    serverRunning = running;
-                    return running;
-                });
+                .handle((response, error) -> error == null && response != null
+                        && LocalModelConnector.isReadyHealthResponse(response.statusCode(), response.body()));
     }
 
     /**
@@ -1975,18 +2118,18 @@ public final class LocalModelLauncher {
         }
     }
 
-    private static CompletableFuture<Boolean> startServerProcessAsync(boolean gpuMode, Consumer<DownloadProgress> progress) {
+    private static CompletableFuture<ServerStartResult> startServerProcessAsync(boolean gpuMode, Consumer<DownloadProgress> progress) {
+        Path logPath = rootDir().resolve(gpuMode ? "server.cuda.log" : "server.cpu.log");
         return CompletableFuture.supplyAsync(() -> {
             // 退出存档后不应再拉起服务器（下载完成但玩家已离开世界时防止进程留在后台）。
             if (sessionClosed) {
-                return false;
+                return (Process) null;
             }
             try {
-                Path logPath = rootDir().resolve(gpuMode ? "server.cuda.log" : "server.cpu.log");
                 List<String> command = new java.util.ArrayList<>();
-                command.add(serverPath().toString());
+                command.add(serverPath().toAbsolutePath().toString());
                 command.add("-m");
-                command.add(modelPath().toString());
+                command.add(modelPath().toAbsolutePath().toString());
                 command.add("--host");
                 command.add("127.0.0.1");
                 command.add("--port");
@@ -1997,82 +2140,105 @@ public final class LocalModelLauncher {
                 command.add(String.valueOf(Math.max(2, Runtime.getRuntime().availableProcessors())));
                 command.add("--alias");
                 command.add("herobrine");
-                if (gpuMode) {
-                    command.add("-ngl");
-                    command.add("99"); // 全量上卡：3B Q4_K 权重 1.94GB + 16k KV ≈ 3.2GB，8G 显存绰绰有余
-                }
+                // New llama.cpp releases can offload automatically unless CPU mode is explicit.
+                command.add("-ngl");
+                command.add(gpuMode ? "99" : "0");
                 command.add("--jinja");
                 ProcessBuilder pb = new ProcessBuilder(command);
+                pb.directory(binDir().toFile());
                 pb.redirectErrorStream(true);
                 pb.redirectOutput(logPath.toFile());
-                serverProcess = pb.start();
+                Process process;
+                synchronized (LocalModelLauncher.class) {
+                    if (sessionClosed) {
+                        return (Process) null;
+                    }
+                    serverRunning = false;
+                    SERVER_STATE_VERSION.incrementAndGet();
+                    process = pb.start();
+                    serverProcess = process;
+                }
                 // 启动瞬间退出存档（竞态）：刚拉起的进程立即关掉，不占内存。
                 if (sessionClosed) {
                     stopServerProcess();
-                    return false;
+                    return (Process) null;
                 }
-                Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                    Process p = serverProcess;
-                    if (p != null) {
-                        p.destroy();
+                process.onExit().thenAccept(exited -> {
+                    boolean report;
+                    synchronized (LocalModelLauncher.class) {
+                        if (serverProcess != exited) {
+                            return;
+                        }
+                        report = serverRunning && !sessionClosed;
+                        serverRunning = false;
+                        SERVER_STATE_VERSION.incrementAndGet();
                     }
-                }));
-                return true;
+                    if (report) {
+                        ServerStartResult failure = startupFailure(gpuMode, exited, logPath, null, false);
+                        synchronized (LocalModelLauncher.class) {
+                            if (serverProcess == exited && !sessionClosed) {
+                                lastStartupDiagnostic = failure.details();
+                            }
+                        }
+                    }
+                });
+                Runtime.getRuntime().addShutdownHook(new Thread(process::destroy, "herobrine-local-model-shutdown"));
+                return process;
             } catch (IOException e) {
                 throw new CompletionException(e);
             }
-        }).thenCompose(started -> started
-                ? waitForHealthAsync(progress)
-                : CompletableFuture.completedFuture(false));
-    }
-
-    private static CompletableFuture<Boolean> waitForHealthAsync(Consumer<DownloadProgress> progress) {
-        return waitForHealthInternal(progress, 0);
+        }).thenCompose(process -> {
+            if (process == null) {
+                return CompletableFuture.completedFuture(cancelledStart());
+            }
+            long deadline = System.nanoTime() + STARTUP_TIMEOUT.toNanos();
+            return waitForHealthInternal(process, progress, deadline).thenApply(ready -> {
+                if (ready) {
+                    return new ServerStartResult(true, "", "");
+                }
+                if (sessionClosed || serverProcess != process) {
+                    return cancelledStart();
+                }
+                // Capture the original exit code before cleanup; a forced termination hides missing-DLL errors.
+                ServerStartResult failure = startupFailure(gpuMode, process, logPath, null, process.isAlive());
+                stopServerProcess();
+                return failure;
+            });
+        }).exceptionally(error -> startupFailure(gpuMode, null, logPath, error, false));
     }
 
     /**
      * 轮询 /health 直到就绪。单次连接失败/超时属于瞬时错误，继续轮询而不是直接判失败
-     * （服务器加载模型期间可能短暂拒绝连接）；只有进程退出或达到次数上限（90×2s=3 分钟）才放弃。
+     * （服务器加载模型期间可能短暂拒绝连接）。以实际经过的时间计时，并始终绑定本次启动的进程。
      */
-    private static CompletableFuture<Boolean> waitForHealthInternal(Consumer<DownloadProgress> progress, int attempt) {
-        if (attempt >= 90) { // 90 * 2s = 3 分钟
-            return CompletableFuture.completedFuture(false);
-        }
-        // 进程已退出（如模型损坏导致加载崩溃）：立即放弃，避免干等 3 分钟后才重试。
-        Process p = serverProcess;
-        if (p != null && !p.isAlive()) {
+    private static CompletableFuture<Boolean> waitForHealthInternal(Process process, Consumer<DownloadProgress> progress,
+                                                                    long deadline) {
+        long remaining = deadline - System.nanoTime();
+        if (remaining <= 0 || sessionClosed || process != serverProcess || !process.isAlive()) {
             return CompletableFuture.completedFuture(false);
         }
         if (progress != null) {
-            progress.accept(new DownloadProgress(attempt, 90, "等待模型加载..."));
+            long elapsed = Math.max(0, STARTUP_TIMEOUT.toSeconds() - java.util.concurrent.TimeUnit.NANOSECONDS.toSeconds(remaining));
+            progress.accept(new DownloadProgress(elapsed, STARTUP_TIMEOUT.toSeconds(),
+                    tr("gui.herobrine_companion.local_model.startup_loading")));
         }
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create("http://127.0.0.1:" + DEFAULT_PORT + "/health"))
-                .timeout(Duration.ofSeconds(2))
-                .GET().build();
-        return CLIENT.sendAsync(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
-                .handle((response, error) -> {
-                    if (error != null) {
-                        return null; // 瞬时错误（连接被拒/超时）→ 继续轮询
-                    }
-                    if (response.statusCode() >= 200 && response.statusCode() < 300) {
-                        try {
-                            JsonObject obj = JsonParser.parseString(response.body()).getAsJsonObject();
-                            if (obj.has("status") && "ok".equalsIgnoreCase(obj.get("status").getAsString())) {
-                                return Boolean.TRUE;
-                            }
-                        } catch (Exception ignored) {
-                            // 非标准响应按失败处理继续轮询
-                        }
-                    }
-                    return Boolean.FALSE;
-                })
-                .thenCompose(result -> result == Boolean.TRUE
-                        ? CompletableFuture.completedFuture(true)
-                        : CompletableFuture.runAsync(() -> {
-                            // 2 秒后继续轮询
-                        }, CompletableFuture.delayedExecutor(2, java.util.concurrent.TimeUnit.SECONDS))
-                                .thenCompose(ignored -> waitForHealthInternal(progress, attempt + 1)));
+        Duration timeout = Duration.ofNanos(Math.min(remaining, Duration.ofSeconds(2).toNanos()));
+        return requestHealthAsync(timeout).thenCompose(healthy -> {
+            synchronized (LocalModelLauncher.class) {
+                if (sessionClosed || process != serverProcess || !process.isAlive() || System.nanoTime() >= deadline) {
+                    return CompletableFuture.completedFuture(false);
+                }
+                if (healthy) {
+                    serverRunning = true;
+                    return CompletableFuture.completedFuture(true);
+                }
+            }
+            long delay = Math.min(Duration.ofSeconds(2).toNanos(), Math.max(0, deadline - System.nanoTime()));
+            return CompletableFuture.runAsync(() -> {
+                        // Back off while the model is loading, within the same wall-clock deadline.
+                    }, CompletableFuture.delayedExecutor(delay, java.util.concurrent.TimeUnit.NANOSECONDS))
+                    .thenCompose(ignored -> waitForHealthInternal(process, progress, deadline));
+        });
     }
 
     /**
@@ -2088,13 +2254,20 @@ public final class LocalModelLauncher {
      */
     private static CompletableFuture<Path> downloadToFile(String url, Path target,
                                                           String label, Consumer<DownloadProgress> progress) {
+        return downloadToFile(url, target, label, progress, CLIENT);
+    }
+
+    /** 指定 HTTP 客户端的下载（绕过代理直连重试用；.part 去重键不变，两条链路不会同时写同一文件）。 */
+    private static CompletableFuture<Path> downloadToFile(String url, Path target,
+                                                          String label, Consumer<DownloadProgress> progress,
+                                                          HttpClient client) {
         Path part = target.resolveSibling(target.getFileName() + ".part");
         final long partBytes = existingPartBytes(part);
         if (partBytes > 0L) {
             deleteQuietly(target); // 目标文件不应存在；防止半成品挂正名
         }
         return ACTIVE_DOWNLOADS.computeIfAbsent(part, ignored ->
-                downloadToFileInternal(url, part, target, label, progress, partBytes, partBytes > 0L)
+                downloadToFileInternal(url, part, target, label, progress, partBytes, partBytes > 0L, client)
                         .whenComplete((result, error) -> ACTIVE_DOWNLOADS.remove(part)));
     }
 
@@ -2122,7 +2295,7 @@ public final class LocalModelLauncher {
 
     private static CompletableFuture<Path> downloadToFileInternal(String url, Path part, Path target,
                                                                   String label, Consumer<DownloadProgress> progress,
-                                                                  long offset, boolean ranged) {
+                                                                  long offset, boolean ranged, HttpClient client) {
         HttpRequest.Builder builder = HttpRequest.newBuilder()
                 .uri(URI.create(url))
                 .timeout(Duration.ofMinutes(10))
@@ -2131,13 +2304,13 @@ public final class LocalModelLauncher {
             builder.header("Range", "bytes=" + offset + "-");
         }
         HttpRequest request = builder.GET().build();
-        return CLIENT.sendAsync(request, HttpResponse.BodyHandlers.ofInputStream())
+        return client.sendAsync(request, HttpResponse.BodyHandlers.ofInputStream())
                 .thenCompose(response -> {
                     int status = response.statusCode();
                     if (status == 416) {
                         // 断点超过文件实际大小（.part 比服务器文件还大）：清空从头下载
                         deleteQuietly(part);
-                        return downloadToFileInternal(url, part, target, label, progress, 0L, false);
+                        return downloadToFileInternal(url, part, target, label, progress, 0L, false, client);
                     }
                     if (status != 200 && status != 206) {
                         return CompletableFuture.failedFuture(new IOException("HTTP " + status + " for " + url));
