@@ -1,0 +1,36 @@
+// Opt-in engine asset test: gradlew -I scripts/epicfight/verify_v6.gradle verifyV6WithEpicFight --offline --no-configuration-cache
+allprojects { p ->
+    p.afterEvaluate {
+        def outputDir = p.layout.buildDirectory.dir('epicfight-v6/verify-classes')
+        def compileTask = p.tasks.register('compileV6Verifier', JavaCompile) {
+            dependsOn p.tasks.named('classes')
+            source = p.files('scripts/epicfight/V6ClipCheck.java', 'scripts/epicfight/V6RegistrationCheck.java',
+                    'scripts/epicfight/V6ReachCheck.java')
+            classpath = p.sourceSets.main.compileClasspath + p.sourceSets.main.output
+            destinationDirectory = outputDir
+            javaCompiler = p.javaToolchains.compilerFor { languageVersion = JavaLanguageVersion.of(21) }
+            options.encoding = 'UTF-8'
+        }
+        p.tasks.register('verifyV6WithEpicFight', JavaExec) {
+            dependsOn compileTask
+            classpath = p.sourceSets.main.compileClasspath + p.files(outputDir)
+            mainClass = 'V6ClipCheck'
+            javaLauncher = p.javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
+            workingDir = p.projectDir
+        }
+        p.tasks.register('verifyV6Registration', JavaExec) {
+            dependsOn compileTask
+            classpath = p.sourceSets.main.compileClasspath + p.sourceSets.main.output + p.files(outputDir)
+            mainClass = 'com.whitecloud233.herobrine_companion.compat.epicfight.V6RegistrationCheck'
+            javaLauncher = p.javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
+            workingDir = p.projectDir
+        }
+        p.tasks.register('verifyV6Reach', JavaExec) {
+            dependsOn compileTask
+            classpath = p.sourceSets.main.compileClasspath + p.sourceSets.main.output + p.files(outputDir)
+            mainClass = 'com.whitecloud233.herobrine_companion.compat.epicfight.V6ReachCheck'
+            javaLauncher = p.javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
+            workingDir = p.projectDir
+        }
+    }
+}

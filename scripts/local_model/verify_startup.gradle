@@ -1,0 +1,30 @@
+// gradlew -Pfull=true -I scripts/local_model/verify_startup.gradle verifyLocalModelStartup --offline
+allprojects { p ->
+    p.afterEvaluate {
+        def verifierClasses = p.layout.buildDirectory.dir('local-model-validation/classes')
+        def verifierResources = p.layout.buildDirectory.dir('local-model-validation/resources')
+        def prepareLanguage = p.tasks.register('prepareLocalModelVerifierLanguage', Copy) {
+            // Standalone NeoForge compile artifacts omit vanilla assets. Supply the translations used by this fixture.
+            from p.file('src/main/resources/assets/herobrine_companion/lang/en_us.json')
+            into verifierResources.map { it.dir('assets/minecraft/lang') }
+        }
+        def compiler = p.tasks.register('compileLocalModelStartupVerifier', JavaCompile) {
+            dependsOn p.tasks.named('classes')
+            source = p.files('scripts/local_model/LocalModelStartupCheck.java')
+            classpath = p.sourceSets.main.compileClasspath + p.sourceSets.main.output
+            destinationDirectory = verifierClasses
+            javaCompiler = p.javaToolchains.compilerFor { languageVersion = JavaLanguageVersion.of(21) }
+            options.encoding = 'UTF-8'
+        }
+        p.tasks.register('verifyLocalModelStartup', JavaExec) {
+            group = 'verification'
+            description = 'Validate native startup diagnostics and readiness against an isolated HTTP fixture.'
+            dependsOn compiler, prepareLanguage
+            classpath = p.files(verifierResources) + p.sourceSets.main.compileClasspath + p.sourceSets.main.output + p.files(verifierClasses)
+            mainClass = 'com.whitecloud233.herobrine_companion.client.service.LocalModelStartupCheck'
+            javaLauncher = p.javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
+            workingDir = p.projectDir
+            jvmArgs '-Djava.awt.headless=true', '-Dfile.encoding=UTF-8'
+        }
+    }
+}
