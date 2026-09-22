@@ -75,6 +75,7 @@ hs_err_pid*
 
 # 本地临时产物 / 一次性草稿（不入库）
 /scripts/
+/data/
 /output/
 /.workbuddy-wom/
 /.workbuddy-compile-*.txt
