@@ -27,7 +27,6 @@ Thumbs.db
 gradle.properties
 /epicfight-1.21.1/
 /net/
-/scripts/
 /codex_sync_120_hero_reply.ps1
 /gradle/epicfight-compat.gradle
 /libs/kaleidoscope_compat-2.7.2-neoforge+mc1.21.1.jar
@@ -41,3 +40,15 @@ libraries/
 .workbuddy/
 /libs/Herobrine Companion-*.jar
 /docs/
+/output/
+
+# Python 缓存
+__pycache__/
+*.pyc
+
+# 本地临时产物 / 一次性草稿（不入库）
+/*.log
+/*.ps1
+/*.txt
+*.bak
+*.backup-*

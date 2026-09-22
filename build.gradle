@@ -194,7 +194,7 @@ def generateCfSafeBuildFlags = tasks.register('generateCfSafeBuildFlags') {
     doLast {
         def flagsFile = new File(outputDir, 'com/whitecloud233/herobrine_companion/BuildFlags.java')
         flagsFile.parentFile.mkdirs()
-        flagsFile.text = """package com.whitecloud233.herobrine_companion;
+        flagsFile.setText("""package com.whitecloud233.herobrine_companion;
 
 /**
  * 由 Gradle 构建时生成（generateCfSafeBuildFlags）。
@@ -207,7 +207,7 @@ public final class BuildFlags {
     private BuildFlags() {
     }
 }
-"""
+""", 'UTF-8')
     }
 }
 sourceSets.main.java.srcDir(cfSafeBuildFlagsDir)
@@ -308,6 +308,8 @@ dependencies {
 
 
 var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {
+    // NeoForge reads UTF-8; Windows' default encoding can corrupt the template's Chinese comments.
+    filteringCharset = 'UTF-8'
     var replaceProperties = [minecraft_version      : minecraft_version,
                              minecraft_version_range: minecraft_version_range,
                              neo_version            : neo_version,
@@ -359,3 +361,5 @@ tasks.withType(JavaCompile).configureEach {
 tasks.withType(JavaExec).configureEach {
     systemProperty "file.encoding", "UTF-8"
 }
+
+apply from: 'scripts/poem/verify_animation_resources.gradle'
