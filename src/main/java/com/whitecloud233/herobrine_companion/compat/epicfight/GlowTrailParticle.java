@@ -42,11 +42,26 @@ import java.util.Optional;
  * 加法混合下大一圈的柔光叠加进画面，形成类似 EFN bloom 管线的泛光。</p>
  */
 public class GlowTrailParticle extends AnimationTrailParticle {
-    /** 伪 bloom 光晕层：(截面放大倍数, 该层 alpha 系数)。核心 + 两层外围柔光。 */
+    /**
+     * 贴图沿 U 轴滚动的速度（纹理周期 / 秒），与基岩版终末之诗 {@code hc_poem_trail}
+     * 材质的 {@code uv_anim} 同值；电弧因此沿刀身流动，而不是死板地贴在刀上。
+     * 需要配 {@link GlowTrailRenderTypes} 的 S 轴 REPEAT 才能无缝循环。
+     */
+    private static final float UV_SPEED = 0.65F;
+
+    /**
+     * 伪 bloom 光晕层：{截面放大倍数, 该层 alpha 系数, 贴图 V 覆盖上限}。
+     *
+     * <p>贴图换成基岩版终末之诗同款电弧 ramp 后，V=0 是白刃、V=1 已完全透明，
+     * 不再是旧贴图那种"上下边缘淡、中间实"的对称结构。泛光层若仍固定取 V=1，
+     * 放大出去的截面就整片落在透明区，三层 bloom 实际只剩核心一层。
+     * 所以每层多给一个 V 上限：核心只吃亮刃，外两层越吃越深，
+     * 用"更宽更淡的尾部"撑出柔光，而不是靠透明区。</p>
+     */
     private static final float[][] BLOOM_PASSES = {
-            {1.0F, 1.00F},
-            {1.9F, 0.34F},
-            {3.0F, 0.11F},
+            {1.0F, 1.00F, 0.55F},
+            {1.9F, 0.34F, 0.80F},
+            {3.0F, 0.11F, 1.00F},
     };
 
     protected GlowTrailParticle(
@@ -93,21 +108,26 @@ public class GlowTrailParticle extends AnimationTrailParticle {
         float from = -partialStartEdge;
         float to = -partialStartEdge + interval;
         for (float[] pass : BLOOM_PASSES) {
-            this.drawRibbonPass(vertexConsumer, matrix4f, startEdge, endEdge, interval, from, to, fading, light, pass[0], pass[1]);
+            // age 以 tick 计，除以 20 换成秒；U 轴整体偏移一段，电弧就沿刀身往刀尖方向流
+            float scroll = (this.age + partialTick) / 20.0F * UV_SPEED;
+            this.drawRibbonPass(vertexConsumer, matrix4f, startEdge, endEdge, interval, from, to, fading, light,
+                    pass[0], pass[1], pass.length > 2 ? pass[2] : 1.0F, scroll);
         }
     }
 
     /**
      * 绘制一层光带。{@code scale} 为 1.0 时即原始形状；大于 1.0 时每个刀身截面
      * 绕自身中点放大，产生比核心更宽、更柔的光晕层（配合加法混合 = 泛光）。
+     * {@code vSpan} 是该层在贴图 V 轴上吃到的深度，越大越贴近淡出的尾部。
+     * {@code scroll} 是整条光带共用的 U 轴偏移，逐段递增，靠 REPEAT 采样无缝循环。
      */
     private void drawRibbonPass(
             VertexConsumer vertexConsumer, Matrix4f matrix4f,
             float startEdge, float endEdge, float interval, float startFrom, float startTo,
-            float fading, int light, float scale, float alphaMul
+            float fading, int light, float scale, float alphaMul, float vSpan, float scroll
     ) {
-        float from = startFrom;
-        float to = startTo;
+        float from = startFrom + scroll;
+        float to = startTo + scroll;
         for (int i = (int) startEdge; i < (int) endEdge + 1; i++) {
             // u 沿弧逐段推进，alphaFrom/alphaTo 必须在循环内逐段计算（与父类一致）
             float alphaFrom = Mth.clamp(from, 0.0F, 1.0F);
@@ -145,8 +165,9 @@ public class GlowTrailParticle extends AnimationTrailParticle {
             pos2.mul(matrix4f);
             pos3.mul(matrix4f);
             pos4.mul(matrix4f);
+            // start 侧（刀根）吃贴图尾部，end 侧（刀尖）贴 V=0 的白刃
             vertexConsumer.addVertex(pos1.x(), pos1.y(), pos1.z())
-                    .setUv(from, 1.0F)
+                    .setUv(from, vSpan)
                     .setColor(this.rCol, this.gCol, this.bCol, a1)
                     .setLight(light);
             vertexConsumer.addVertex(pos2.x(), pos2.y(), pos2.z())
@@ -158,7 +179,7 @@ public class GlowTrailParticle extends AnimationTrailParticle {
                     .setColor(this.rCol, this.gCol, this.bCol, a2)
                     .setLight(light);
             vertexConsumer.addVertex(pos4.x(), pos4.y(), pos4.z())
-                    .setUv(to, 1.0F)
+                    .setUv(to, vSpan)
                     .setColor(this.rCol, this.gCol, this.bCol, a2)
                     .setLight(light);
             from += interval;

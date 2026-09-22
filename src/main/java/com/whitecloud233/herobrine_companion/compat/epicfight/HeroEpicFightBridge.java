@@ -5,6 +5,7 @@ import com.whitecloud233.herobrine_companion.config.Config;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.init.ModEntities;
 import net.neoforged.bus.api.IEventBus;
+import net.minecraft.world.entity.player.Player;
 import yesman.epicfight.api.animation.AnimationManager;
 import yesman.epicfight.api.animation.AnimationManager.AnimationRegistryEvent;
 import yesman.epicfight.api.animation.types.StaticAnimation;
@@ -14,6 +15,9 @@ import yesman.epicfight.api.event.types.registry.EntityPatchRegistryEvent;
 import yesman.epicfight.gameasset.Armatures;
 import yesman.epicfight.model.armature.HumanoidArmature;
 import yesman.epicfight.world.capabilities.EpicFightCapabilities;
+import yesman.epicfight.world.capabilities.entitypatch.player.ServerPlayerPatch;
+import yesman.epicfight.skill.SkillSlots;
+import yesman.epicfight.registry.entries.EpicFightSkillDataKeys;
 
 import java.util.Locale;
 import java.util.Map;
@@ -72,7 +76,11 @@ public final class HeroEpicFightBridge {
             return;
         }
         registered = true;
+        PoemGestureController.register();
+        PoemScythePlayerAnimations.registerStyles();
         EpicFightEventHooks.Registry.ENTITY_PATCH.registerEvent(HeroEpicFightBridge::onEntityPatchRegistry, "herobrine_companion:hero_entity_patch");
+        EpicFightEventHooks.Registry.WEAPON_CAPABILITY_PRESET.registerEvent(
+                PoemScythePlayerAnimations::registerWeaponPreset, "herobrine_companion:poem_scythe_v6");
         // 夜幕动画克隆：监听 epicfight 的 AnimationRegistryEvent（IModBusEvent，mod bus 上触发）。
         modEventBus.addListener(HeroEpicFightBridge::onAnimationRegistry);
     }
@@ -90,6 +98,31 @@ public final class HeroEpicFightBridge {
 
     public static boolean isPatched(HeroEntity hero) {
         return hero != null && EpicFightCapabilities.getEntityPatch(hero, HeroEpicFightPatch.class) != null;
+    }
+
+    public static void onPoemModeChanged(Player player) {
+        PoemGestureController.cancel(player);
+        ServerPlayerPatch patch = EpicFightCapabilities.getEntityPatch(player, ServerPlayerPatch.class);
+        if (patch == null) {
+            return;
+        }
+        resetPoemComboCounter(patch);
+        patch.modifyLivingMotionByCurrentItem();
+    }
+
+    public static boolean canUsePoemGestures(Player player) { return PoemGestureController.eligible(player); }
+
+    public static void queuePoemGesture(Player player, int gesture, int slot, int mode) {
+        PoemGestureController.enqueue(player, gesture, slot, mode);
+    }
+
+    static void resetPoemComboCounter(ServerPlayerPatch patch) {
+        var attacks = patch.getSkill(SkillSlots.COMBO_ATTACKS);
+        if (attacks != null && attacks.getDataManager().hasData(EpicFightSkillDataKeys.COMBO_COUNTER)) {
+            // V6 has 18 normal slots, MediaPipe 8. Reset the old counter before
+            // it can select the new list's reserved dash/air slots as a normal hit.
+            attacks.getDataManager().setDataSync(EpicFightSkillDataKeys.COMBO_COUNTER, 0);
+        }
     }
 
     /** Hero 是否正处在 Epic Fight 攻击/动作状态（飞行追击据此让出空中连段、不落地打断）。 */

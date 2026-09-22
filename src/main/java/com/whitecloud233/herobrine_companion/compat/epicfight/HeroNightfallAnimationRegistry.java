@@ -6,8 +6,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import com.mojang.logging.LogUtils;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
 import yesman.epicfight.api.animation.AnimationManager;
 import yesman.epicfight.api.animation.Joint;
 import yesman.epicfight.api.animation.types.ActionAnimation;
@@ -25,6 +27,7 @@ import yesman.epicfight.api.model.Armature;
 import yesman.epicfight.model.armature.HumanoidArmature;
 
 final class HeroNightfallAnimationRegistry {
+   private static final Logger LOGGER = LogUtils.getLogger();
    private static final String EFN_MOD_ID = "efn";
    private static final String REBIND_PATH_PREFIX = "nightfall_rebind/";
    private static final Map<ResourceLocation, AnimationManager.AnimationAccessor<? extends StaticAnimation>> REMAPPED_BY_ORIGINAL_ID = new ConcurrentHashMap();
@@ -53,8 +56,20 @@ final class HeroNightfallAnimationRegistry {
    }
 
    private static void buildHeroNightfallAnimations(AnimationManager.AnimationBuilder builder) {
+      // 本模组的 MediaPipe 镰刀连斩及玩家分模式动作:与 EFN 完全无关,
+      // 放在最前面无条件注册 —— 没装 EFN 时下面那段 rebind 整体跳过,这把镰刀照样能打。
+      HeroScytheComboBehaviors.registerAnimation(builder);
+      PoemScythePlayerAnimations.registerAnimations(builder);
+
+      if (!net.neoforged.fml.ModList.get().isLoaded(EFN_MOD_ID)) {
+         LOGGER.info("[HeroNightfall] EFN ('{}') is not installed: nightfall animation rebinding skipped;"
+                 + " the built-in hero scythe combo was registered independently and still works.", EFN_MOD_ID);
+         return;
+      }
+
       AssetAccessor<HumanoidArmature> heroArmature = HeroEpicFightBridge.heroNightfallArmature();
       if (builder != null && heroArmature != null) {
+         try {
          for(AnimationManager.AnimationAccessor<? extends StaticAnimation> originalAccessor : HeroNightfallMovesets.collectReferencedOriginalAnimations()) {
             if (!AnimationManager.checkNull(originalAccessor) && "efn".equals(originalAccessor.registryName().getNamespace())) {
                ResourceLocation originalId = originalAccessor.registryName();
@@ -74,7 +89,11 @@ final class HeroNightfallAnimationRegistry {
                }
             }
          }
-
+         } catch (Throwable throwable) {
+            LOGGER.error("[HeroNightfall] rebinding EFN animations onto the hero armature failed;"
+                    + " nightfall weapons will fall back to generic motions."
+                    + " (the built-in hero scythe combo is unaffected)", throwable);
+         }
       }
    }
 

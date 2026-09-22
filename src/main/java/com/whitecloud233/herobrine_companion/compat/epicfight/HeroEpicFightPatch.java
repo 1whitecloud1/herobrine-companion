@@ -121,6 +121,11 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
       HeroEntity hero = (HeroEntity)this.getOriginal();
       String currentProfileKey = this.getCurrentWeaponProfileKey(hero);
       boolean weaponProfileChanged = !currentProfileKey.equals(this.lastWeaponProfileKey);
+      if (weaponProfileChanged && hero != null && HeroScytheComboBehaviors.isSupported(hero.getMainHandItem())) {
+         // A mode change modifies the same stack: rebuild its captured motion
+         // set even when Epic Fight does not emit an equipment-change callback.
+         this.infantryAiConfigured = false;
+      }
       this.ensureInfantryAiConfigured();
       this.syncWeaponLivingMotions(weaponProfileChanged);
       super.preTickServer();
@@ -187,6 +192,8 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
       HeroEpicFightWeaponProfiles.bootstrap();
       super.preTickClient();
       this.syncWeaponLivingMotions(false);
+      // 排障:确认客户端动画器是否真的在播镰刀连段(每秒最多一条,定位完可删)
+      HeroScytheComboBehaviors.clientDiag(this, (HeroEntity)this.getOriginal());
    }
 
    protected CombatBehaviors.Builder<HumanoidMobPatch<?>> getHoldingItemWeaponMotionBuilder() {
@@ -195,6 +202,11 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
       if (HeroEpicFightWeaponProfiles.isRangedLoadout(stack)) {
          return null;
       } else {
+         // 终末之诗:按武器模式选择原生镰刀连斩、疾跑与空中攻击
+         CombatBehaviors.Builder<HumanoidMobPatch<?>> scytheBuilder = HeroScytheComboBehaviors.build(this, stack);
+         if (scytheBuilder != null) {
+            return scytheBuilder;
+         }
          CombatBehaviors.Builder<HumanoidMobPatch<?>> nightfallBuilder = HeroNightfallMovesets.buildCombatBehaviors(this, stack);
          if (nightfallBuilder != null) {
             return nightfallBuilder;
@@ -238,7 +250,7 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
                CombatBehaviors.Builder<HumanoidMobPatch<?>> builder = this.getHoldingItemWeaponMotionBuilder();
                if (builder != null) {
                   ItemStack stack = hero.getMainHandItem();
-                  double attackRadius = HeroNightfallMovesets.getAttackRadius(stack, (double)0.0F);
+                  double attackRadius = HeroScytheComboBehaviors.getAttackRadius(stack, HeroNightfallMovesets.getAttackRadius(stack, (double)0.0F));
                   if (attackRadius <= (double)0.0F) {
                      attackRadius = HeroWomWeaponCompat.getAttackRadius(stack, 0.0D);
                   }
@@ -318,6 +330,7 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
                }
 
                this.applyRunChaseLivingMotion(livingAnimations);
+               HeroScytheComboBehaviors.applyLivingAnimations(hero.getMainHandItem(), livingAnimations);
             }
 
             animator.resetLivingAnimations();
@@ -639,6 +652,19 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
     */
    CombatBehaviors.Behavior.Builder<HumanoidMobPatch<?>> createWomComboAttackBehavior(AnimationManager.AnimationAccessor<? extends StaticAnimation> animation, int comboIndex, int comboSize) {
       return this.createTrackedAttackBehavior(animation, (HeroCombatPlanner.ActionProfile)null, HeroEpicFightPatch::resolveNextTapActionState, (hero) -> this.advancePlayerLikeComboStep(hero, comboSize, comboIndex));
+   }
+
+   /**
+    * 镰刀连段(终末之诗)每段的战斗行为:复用连段跟踪管线(动作状态 + 连段步数),
+    * 与 WOM 连招同一套逻辑,只是动画换成 {@link HeroScytheComboBehaviors} 注册的段。
+    */
+   CombatBehaviors.Behavior.Builder<HumanoidMobPatch<?>> createScytheComboAttackBehavior(AnimationManager.AnimationAccessor<? extends StaticAnimation> animation, int comboIndex, int comboSize) {
+      return this.createTrackedAttackBehavior(animation, (HeroCombatPlanner.ActionProfile)null, HeroEpicFightPatch::resolveNextTapActionState, (hero) -> this.advancePlayerLikeComboStep(hero, comboSize, comboIndex));
+   }
+
+   CombatBehaviors.Behavior.Builder<HumanoidMobPatch<?>> createScytheSpecialAttackBehavior(AnimationManager.AnimationAccessor<? extends StaticAnimation> animation) {
+      return this.createTrackedAttackBehavior(animation, (HeroCombatPlanner.ActionProfile)null,
+            HeroEpicFightPatch::resolveNextTapActionState, this::resetPlayerLikeComboStep);
    }
 
    /**
