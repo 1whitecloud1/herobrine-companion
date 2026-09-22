@@ -12,6 +12,11 @@ public class ModZhCnLangProvider extends LanguageProvider {
 
     @Override
     protected void addTranslations() {
+        add("item.herobrine_companion.poem_of_the_end.epicfight.input", "§7史诗战斗：短按左键接连招；长按0.35秒重击");
+        add("item.herobrine_companion.poem_of_the_end.standalone.input", "无需史诗战斗：左键连按播放当前模式的四段全身普攻");
+        add("item.herobrine_companion.poem_of_the_end.standalone.rules", "伤害、命中时机和移动遵循原版规则");
+        add("item.herobrine_companion.poem_of_the_end.mode.usage.3", "§7左键连击：挥镰与裂痕");
+
         // Items
         add(ModItems.HERO_SHELTER.get(), "创世神的庇护");
         add(ModItems.ETERNAL_KEY.get(), "永恒门钥");
@@ -82,11 +87,66 @@ public class ModZhCnLangProvider extends LanguageProvider {
         add("gui.herobrine_companion.request_accept", "接受");
         add("gui.herobrine_companion.back", "返回");
         add("gui.herobrine_companion.request_name_1", "清理不稳定区域");
-        add("gui.herobrine_companion.request_desc_1", "Unstable Zone 的异常正在扩散。我需要你帮我清理那些幽灵实体。我会暂时停止清理，把它们留给你。");
+        add("gui.herobrine_companion.request_desc_1", "不稳定区域的异常正在扩散。我需要你清除 5 个幽灵实体 (Ghost Mobs) 来稳定代码。");
         add("gui.herobrine_companion.request_reward", "奖励:");
-        add("message.herobrine_companion.quest_already_active", "§c你已经有一个正在进行的任务了！");
-        add("message.herobrine_companion.quest_start_1", "很好。去清理那些幽灵吧。我会看着你的。");
-        add("message.herobrine_companion.quest_complete_1", "做得不错。这是你的奖励。");
+        add("gui.herobrine_companion.request_reward_1", "- 虚空骨髓 x3\n- 信任 +15");
+        add("gui.herobrine_companion.request_name_2", "安抚末影人");
+        add("gui.herobrine_companion.request_desc_2", "末影人们今天有些过于躁动了，可能是感受到了来自End Ring另一侧的波动。去安抚它们，给它们送去一些搬运用的土块。别杀它们，它们只是在害怕。");
+        add("gui.herobrine_companion.request_reward_2", "- 末影珍珠 x16\n- 信任 +10");
+        add("gui.herobrine_companion.request_name_3", "人类的音乐");
+        add("gui.herobrine_companion.request_desc_3", "唱片里存着你们世界的声音。我想听听你们的歌。带一张唱片回来给我。");
+        add("gui.herobrine_companion.request_reward_3", "- 记忆碎片 x1\n- 信任 +8");
+        add("gui.herobrine_companion.request_name_4", "它们还在等主人");
+        add("gui.herobrine_companion.request_desc_4", "村子边上有一条狼。它的主人离开很久了，它一直守在原地。替我去喂它——直到它愿意信任你。别伤害它。");
+        add("gui.herobrine_companion.request_reward_4", "- 熟牛排 x8\n- 信任 +12");
+        add("gui.herobrine_companion.request_name_5", "烛火仪式");
+        add("gui.herobrine_companion.request_desc_5", "午夜将至。在我的身边摆上四支点燃的蜡烛。不要点第五支。");
+        add("gui.herobrine_companion.request_reward_5", "- 故障碎片 x2\n- 信任 +12");
+        add("gui.herobrine_companion.request_name_6", "献给审判者的旗帜");
+        add("gui.herobrine_companion.request_desc_6", "有个掠夺者队长在我的土地上横行。取下他的旗帜，带回来给我。我要知道是谁胆敢在此立旗。");
+        add("gui.herobrine_companion.request_reward_6", "- 损坏片段 x3\n- 信任 +12");
+        add("gui.herobrine_companion.request_name_7", "镜中倒影");
+        add("gui.herobrine_companion.request_desc_7", "最近有东西在学你走路。夜里，它会在不远处的阴影里模仿你的影子。找到它，别让它看见你——潜行靠近，用空手触碰它。");
+        add("gui.herobrine_companion.request_reward_7", "- 记忆碎片 x1\n- 故障碎片 x2\n- 信任 +18");
+        add("gui.herobrine_companion.request_name_8", "雷声中的守望");
+        add("gui.herobrine_companion.request_desc_8", "雷暴来临时，站上我标记的高处。如果闪电选中了你，并留下你，我就知道这个世界还记得你。");
+        add("gui.herobrine_companion.request_reward_8", "- 幽邃之视 x1\n- 信任 +20");
+        add("gui.herobrine_companion.quest_cooldown_line", "§7冷却中: %1$s 天 %2$s 小时");
+        add("message.herobrine_companion.quest_already_active", "§c你已经有一个正在进行的委托了！");
+        add("message.herobrine_companion.quest_start_1", "很好。去清理那些幽灵吧。我会在这里等你。");
+        add("message.herobrine_companion.quest_complete_1", "做得好。这是你的奖励。");
+        add("message.herobrine_companion.quest_start_2", "§e[Herobrine] §f去吧。向它们展示善意。");
+        add("message.herobrine_companion.quest_complete_2", "§e[Herobrine] §f它们平静下来了。干得好。");
+        add("message.herobrine_companion.quest_target_gone", "§c[系统] 目标消失了。委托失败。");
+        add("message.herobrine_companion.quest_target_died", "§c[系统] 目标死亡。委托失败。");
+        add("message.herobrine_companion.quest_cancelled", "§c[系统] 委托已放弃。");
+        add("message.herobrine_companion.quest_start_3", "§e[Herobrine] §f唱片是这个世界为数不多的诚实之物。去带一张回来。");
+        add("message.herobrine_companion.quest_complete_3", "§e[Herobrine] §f……旋律很好。这是漫长岁月里，我听到的第一首新歌。");
+        add("message.herobrine_companion.quest_start_4", "§e[Herobrine] §f它在门口等了很久。有些人回不来了，但承诺应该被守住。去吧，喂饱它。");
+        add("message.herobrine_companion.quest_complete_4", "§e[Herobrine] §f它记住了你的味道。这很好——至少有人记得它。");
+        add("message.herobrine_companion.quest_complete_4_tamed", "§e[Herobrine] §f……它舔了舔你的手。它选择跟你走。替我照顾好它。");
+        add("message.herobrine_companion.quest_wolf_feed_progress", "§7它吃下了一根骨头（%s/%s）。它的眼神渐渐柔软…");
+        add("message.herobrine_companion.quest_wolf_killed", "§c[系统] 你杀了它。它只是想等主人回来。委托失败。");
+        add("message.herobrine_companion.quest_start_5", "§e[Herobrine] §f四支蜡烛，围成一个圆。第五支会引来不该来的东西。");
+        add("message.herobrine_companion.quest_candle_progress", "§7烛火 %s/%s 已在夜色中亮起。");
+        add("message.herobrine_companion.quest_candle_fifth", "§c[系统] 第五支蜡烛亮了。风忽然停了……委托失败。");
+        add("message.herobrine_companion.quest_candle_hero_gone", "§c[系统] Hero 离开了。仪式中断。委托失败。");
+        add("message.herobrine_companion.quest_complete_5", "§e[Herobrine] §f……火光记住你了。现在，黑暗也记住了。");
+        add("message.herobrine_companion.quest_start_6", "§e[Herobrine] §f（审判者低语）旗帜是宣言。取下它，就是回应。");
+        add("message.herobrine_companion.quest_captain_down", "§a[系统] 队长倒下了。捡起旗帜，带回我身边。");
+        add("message.herobrine_companion.quest_complete_6", "§e[Herobrine] §f很好。这面旗帜会在我的墙边腐烂，像它的主人一样。");
+        add("message.herobrine_companion.quest_start_7", "§e[Herobrine] §f别回头。它在学你。");
+        add("message.herobrine_companion.quest_mirror_hint", "§7潜行。别让它看见你。");
+        add("message.herobrine_companion.quest_mirror_seen", "§c[系统] 它看见你了。它退进雾里，消失了。委托失败。");
+        add("message.herobrine_companion.quest_mirror_dawn", "§c[系统] 天亮了。它像晨雾一样消散了。委托失败。");
+        add("message.herobrine_companion.quest_complete_7", "§e[Herobrine] §f……你赢了它。记住：有些影子，不该有两个。");
+        add("message.herobrine_companion.quest_start_8", "§e[Herobrine] §f雷暴将至。去最高的那块山岩。别躲。");
+        add("message.herobrine_companion.quest_storm_mark", "§7标记已刻下: X %s, Y %s, Z %s");
+        add("message.herobrine_companion.quest_storm_hint", "§7雷声近了。站到标记处，别动。");
+        add("message.herobrine_companion.quest_storm_died", "§c[系统] 闪电选中了你，而你没能接住它。委托失败。");
+        add("message.herobrine_companion.quest_complete_8", "§e[Herobrine] §f……它记住了你。我也记住你了。");
+        add("message.herobrine_companion.quest_cooldown", "§c[系统] 这个委托还在冷却中，%1$s 天 %2$s 小时后再来。");
+        add("entity.herobrine_companion.quest_wolf", "守着门的狼");
 
         // Messages
         add("message.herobrine_companion.system_cloud_connected", "§b[系统] §f已连接到云端 AI。");

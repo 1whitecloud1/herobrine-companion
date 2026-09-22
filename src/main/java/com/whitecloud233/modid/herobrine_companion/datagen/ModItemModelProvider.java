@@ -36,6 +36,7 @@ public class ModItemModelProvider extends ItemModelProvider {
         simpleItem(ModItems.LORE_FRAGMENT);
         simpleItem(ModItems.LORE_HANDBOOK);
         simpleItem(ModItems.TAB_ICON);
+        simpleItem(ModItems.BIRTHDAY_CAKE);
 
         withExistingParent(ModItems.GHOST_CREEPER_SPAWN_EGG.getId().getPath(), new ResourceLocation("item/template_spawn_egg"));
         withExistingParent(ModItems.GHOST_ZOMBIE_SPAWN_EGG.getId().getPath(), new ResourceLocation("item/template_spawn_egg"));
