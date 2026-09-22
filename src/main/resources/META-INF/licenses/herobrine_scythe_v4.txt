@@ -1,0 +1,19 @@
+Herobrine scythe animation V4
+
+Source animation: Sword_Heavy_Combo, Universal Animation Library 2 Standard
+Author: Quaternius
+Source: https://quaternius.itch.io/universal-animation-library-2
+Source file: Unreal-Godot/UAL2_Standard_RM.glb
+License: CC0 1.0 Universal (Public Domain Dedication)
+https://creativecommons.org/publicdomain/zero/1.0/
+
+Original motion was trimmed to source frames 0-84 at 30 FPS and retimed by
+1.5x (4.20 seconds). The user's delivered Blender action
+HB_Scythe_V4_Quaternius_Heavy_Combo contains BSS rig retargeting, limb/grip
+corrections, weapon clearance edits and root motion.
+
+Epic Fight conversion: scripts/epicfight/export_v4.py
+Animation resources: hero/hero_scythe_combo_v4 and hero/hero_scythe_combo_v4_1..4
+Target: Herobrine Companion hero_biped_nightfall armature.
+CC0 attribution above applies to the original Quaternius animation; the
+character, scythe model/textures and Epic Fight assets retain their own licenses.

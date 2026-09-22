@@ -1,0 +1,798 @@
+{
+  "source_package": "Scythe Animation Pack1.0.unitypackage",
+  "source_fps": 60,
+  "export_hz": 240,
+  "playback_speed": 1.0,
+  "combo_restart_after_last_contact_seconds": 0.1,
+  "contact_method": "Reviewed native blade-speed peaks; separate per-strike hit phases",
+  "modes": [
+    {
+      "mode": 0,
+      "key": "normal",
+      "label": "普通",
+      "ground_source": "Combo_Attack_01_All",
+      "source_boundaries": [
+        0,
+        30,
+        60,
+        105,
+        166
+      ],
+      "segments": [
+        {
+          "name": "combo_01",
+          "source_clip": "Combo_Attack_01_All",
+          "source_first_frame": 0,
+          "source_last_frame": 30,
+          "start": 0.0,
+          "duration": 0.5,
+          "recovery": 0.41,
+          "contacts": [
+            {
+              "start": 0.175,
+              "end": 0.325,
+              "source_frames": [
+                10.5,
+                19.5
+              ]
+            }
+          ],
+          "travel_blocks": [
+            0.03250128055055052,
+            0.9929790161125535,
+            -0.26660469720827973
+          ],
+          "standalone_initial_height_removed": 0.0,
+          "playback_speed": 1.0
+        },
+        {
+          "name": "combo_02",
+          "source_clip": "Combo_Attack_01_All",
+          "source_first_frame": 30,
+          "source_last_frame": 60,
+          "start": 0.5,
+          "duration": 0.5,
+          "recovery": 0.41,
+          "contacts": [
+            {
+              "start": 0.25,
+              "end": 0.3333333,
+              "source_frames": [
+                45.0,
+                50.0
+              ]
+            }
+          ],
+          "travel_blocks": [
+            -0.04008524838572625,
+            1.6909213542114414,
+            0.004043207757797873
+          ],
+          "standalone_initial_height_removed": 0.0,
+          "playback_speed": 1.0
+        },
+        {
+          "name": "combo_03",
+          "source_clip": "Combo_Attack_01_All",
+          "source_first_frame": 60,
+          "source_last_frame": 105,
+          "start": 1.0,
+          "duration": 0.75,
+          "recovery": 0.66,
+          "contacts": [
+            {
+              "start": 0.0333333,
+              "end": 0.3583333,
+              "source_frames": [
+                62.0,
+                81.5
+              ]
+            }
+          ],
+          "travel_blocks": [
+            -0.17708801999440418,
+            1.925048026315924,
+            0.004857834009537487
+          ],
+          "standalone_initial_height_removed": 0.0,
+          "playback_speed": 1.0
+        },
+        {
+          "name": "combo_04",
+          "source_clip": "Combo_Attack_01_All",
+          "source_first_frame": 105,
+          "source_last_frame": 166,
+          "start": 1.75,
+          "duration": 1.0166667,
+          "recovery": 0.8083333,
+          "contacts": [
+            {
+              "start": 0.0166667,
+              "end": 0.175,
+              "source_frames": [
+                106.0,
+                115.5
+              ]
+            },
+            {
+              "start": 0.4333333,
+              "end": 0.7083333,
+              "source_frames": [
+                131.0,
+                147.5
+              ]
+            }
+          ],
+          "travel_blocks": [
+            0.2725981688688178,
+            4.614085621959208,
+            -0.005681042166526817
+          ],
+          "standalone_initial_height_removed": 0.0,
+          "playback_speed": 1.0
+        }
+      ],
+      "specials": [
+        {
+          "name": "dash",
+          "source_clip": "Run_Attack_01",
+          "source_first_frame": 0,
+          "source_last_frame": 130,
+          "start": 0.0,
+          "duration": 2.1666667,
+          "recovery": 2.0766667,
+          "contacts": [
+            {
+              "start": 0.2083333,
+              "end": 0.6166667,
+              "source_frames": [
+                12.5,
+                37.0
+              ]
+            }
+          ],
+          "travel_blocks": [
+            0.014766857437702428,
+            3.8981275427441076,
+            0.17905368706985414
+          ],
+          "standalone_initial_height_removed": 0.0,
+          "playback_speed": 1.0
+        },
+        {
+          "name": "air",
+          "source_clip": "Combo_Attack_Air_01",
+          "source_first_frame": 0,
+          "source_last_frame": 60,
+          "start": 0.0,
+          "duration": 1.0,
+          "recovery": 0.91,
+          "contacts": [
+            {
+              "start": 0.1666667,
+              "end": 0.325,
+              "source_frames": [
+                10.0,
+                19.5
+              ]
+            }
+          ],
+          "travel_blocks": [
+            0.0,
+            2.273124687340829,
+            0.0
+          ],
+          "standalone_initial_height_removed": 0.0653360548316364,
+          "playback_speed": 1.0
+        }
+      ]
+    },
+    {
+      "mode": 1,
+      "key": "realm_breaker",
+      "label": "破境",
+      "ground_source": "Combo_Attack_02_All",
+      "source_boundaries": [
+        0,
+        25,
+        65,
+        102,
+        166
+      ],
+      "segments": [
+        {
+          "name": "combo_01",
+          "source_clip": "Combo_Attack_02_All",
+          "source_first_frame": 0,
+          "source_last_frame": 25,
+          "start": 0.0,
+          "duration": 0.4166667,
+          "recovery": 0.3266667,
+          "contacts": [
+            {
+              "start": 0.1416667,
+              "end": 0.2416667,
+              "source_frames": [
+                8.5,
+                14.5
+              ]
+            }
+          ],
+          "travel_blocks": [
+            -0.049261908391794756,
+            0.7025742300916726,
+            -0.26795361656077815
+          ],
+          "standalone_initial_height_removed": 0.0,
+          "playback_speed": 1.0
+        },
+        {
+          "name": "combo_02",
+          "source_clip": "Combo_Attack_02_All",
+          "source_first_frame": 25,
+          "source_last_frame": 65,
+          "start": 0.4166667,
+          "duration": 0.6666667,
+          "recovery": 0.5766667,
+          "contacts": [
+            {
+              "start": 0.3916667,
+              "end": 0.4916667,
+              "source_frames": [
+                48.5,
+                54.5
+              ]
+            }
+          ],
+          "travel_blocks": [
+            -0.011456863402112799,
+            1.1765660475251933,
+            -1.630437690414155e-08
+          ],
+          "standalone_initial_height_removed": 0.0,
+          "playback_speed": 1.0
+        },
+        {
+          "name": "combo_03",
+          "source_clip": "Combo_Attack_02_All",
+          "source_first_frame": 65,
+          "source_last_frame": 102,
+          "start": 1.0833333,
+          "duration": 0.6166667,
+          "recovery": 0.5266667,
+          "contacts": [
+            {
+              "start": 0.1833333,
+              "end": 0.2666667,
+              "source_frames": [
+                76.0,
+                81.0
+              ]
+            }
+          ],
+          "travel_blocks": [
+            0.0009368784458879328,
+            2.551331487059767,
+            1.4191440023125779e-08
+          ],
+          "standalone_initial_height_removed": 0.0,
+          "playback_speed": 1.0
+        },
+        {
+          "name": "combo_04",
+          "source_clip": "Combo_Attack_02_All",
+          "source_first_frame": 102,
+          "source_last_frame": 166,
+          "start": 1.7,
+          "duration": 1.0666667,
+          "recovery": 0.8666667,
+          "contacts": [
+            {
+              "start": 0.1333333,
+              "end": 0.3833333,
+              "source_frames": [
+                110.0,
+                125.0
+              ]
+            },
+            {
+              "start": 0.5416667,
+              "end": 0.7666667,
+              "source_frames": [
+                134.5,
+                148.0
+              ]
+            }
+          ],
+          "travel_blocks": [
+            0.11406284217079332,
+            4.17866830592336,
+            0.03532861570576107
+          ],
+          "standalone_initial_height_removed": 0.0,
+          "playback_speed": 1.0
+        }
+      ],
+      "specials": [
+        {
+          "name": "dash",
+          "source_clip": "Skill_01",
+          "source_first_frame": 0,
+          "source_last_frame": 140,
+          "start": 0.0,
+          "duration": 2.3333333,
+          "recovery": 2.2433333,
+          "contacts": [
+            {
+              "start": 0.6833333,
+              "end": 0.8166667,
+              "source_frames": [
+                41.0,
+                49.0
+              ]
+            },
+            {
+              "start": 1.1833333,
+              "end": 1.3083333,
+              "source_frames": [
+                71.0,
+                78.5
+              ]
+            }
+          ],
+          "travel_blocks": [
+            0.0,
+            9.53679675346622,
+            6.355067583285745e-10
+          ],
+          "standalone_initial_height_removed": 0.0,
+          "playback_speed": 1.0
+        },
+        {
+          "name": "air",
+          "source_clip": "Combo_Attack_Air_02",
+          "source_first_frame": 0,
+          "source_last_frame": 80,
+          "start": 0.0,
+          "duration": 1.3333333,
+          "recovery": 1.2433333,
+          "contacts": [
+            {
+              "start": 0.1583333,
+              "end": 0.5833333,
+              "source_frames": [
+                9.5,
+                35.0
+              ]
+            }
+          ],
+          "travel_blocks": [
+            -0.016034947845961486,
+            3.3571267930257473,
+            0.02401765037845549
+          ],
+          "standalone_initial_height_removed": 0.04131821451450679,
+          "playback_speed": 1.0
+        }
+      ]
+    },
+    {
+      "mode": 2,
+      "key": "thunder",
+      "label": "鸣雷",
+      "ground_source": "Combo_Attack_03_All",
+      "source_boundaries": [
+        0,
+        25,
+        50,
+        162,
+        233
+      ],
+      "segments": [
+        {
+          "name": "combo_01",
+          "source_clip": "Combo_Attack_03_All",
+          "source_first_frame": 0,
+          "source_last_frame": 25,
+          "start": 0.0,
+          "duration": 0.4166667,
+          "recovery": 0.406,
+          "contacts": [
+            {
+              "start": 0.2416667,
+              "end": 0.4,
+              "source_frames": [
+                14.5,
+                24.0
+              ]
+            }
+          ],
+          "travel_blocks": [
+            -0.015035817254661545,
+            1.7823946310872805,
+            -0.10142572795814964
+          ],
+          "standalone_initial_height_removed": 0.0,
+          "playback_speed": 1.0
+        },
+        {
+          "name": "combo_02",
+          "source_clip": "Combo_Attack_03_All",
+          "source_first_frame": 25,
+          "source_last_frame": 50,
+          "start": 0.4166667,
+          "duration": 0.4166667,
+          "recovery": 0.406,
+          "contacts": [
+            {
+              "start": 0.225,
+              "end": 0.4,
+              "source_frames": [
+                38.5,
+                49.0
+              ]
+            }
+          ],
+          "travel_blocks": [
+            -0.02180189826153498,
+            1.5039397402980732,
+            -0.16652788321108902
+          ],
+          "standalone_initial_height_removed": 0.0,
+          "playback_speed": 1.0
+        },
+        {
+          "name": "combo_03",
+          "source_clip": "Combo_Attack_03_All",
+          "source_first_frame": 50,
+          "source_last_frame": 162,
+          "start": 0.8333333,
+          "duration": 1.8666667,
+          "recovery": 1.856,
+          "contacts": [
+            {
+              "start": 0.1833333,
+              "end": 0.525,
+              "source_frames": [
+                61.0,
+                81.5
+              ]
+            },
+            {
+              "start": 0.7,
+              "end": 1.3583333,
+              "source_frames": [
+                92.0,
+                131.5
+              ]
+            },
+            {
+              "start": 1.5416667,
+              "end": 1.85,
+              "source_frames": [
+                142.5,
+                161.0
+              ]
+            }
+          ],
+          "travel_blocks": [
+            -0.02545081632149051,
+            3.0302527369030434,
+            0.23875258228293106
+          ],
+          "standalone_initial_height_removed": 0.0,
+          "playback_speed": 1.0
+        },
+        {
+          "name": "combo_04",
+          "source_clip": "Combo_Attack_03_All",
+          "source_first_frame": 162,
+          "source_last_frame": 233,
+          "start": 2.7,
+          "duration": 1.1833333,
+          "recovery": 0.9833333,
+          "contacts": [
+            {
+              "start": 0.3333333,
+              "end": 0.8833333,
+              "source_frames": [
+                182.0,
+                215.0
+              ]
+            }
+          ],
+          "travel_blocks": [
+            0.04953089698242265,
+            3.7631964500612662,
+            -0.20683672857718505
+          ],
+          "standalone_initial_height_removed": 0.0,
+          "playback_speed": 1.0
+        }
+      ],
+      "specials": [
+        {
+          "name": "dash",
+          "source_clip": "Dash_Air_Attack",
+          "source_first_frame": 0,
+          "source_last_frame": 50,
+          "start": 0.0,
+          "duration": 0.8333333,
+          "recovery": 0.7433333,
+          "contacts": [
+            {
+              "start": 0.0041667,
+              "end": 0.0833333,
+              "source_frames": [
+                0.25,
+                5.0
+              ]
+            },
+            {
+              "start": 0.275,
+              "end": 0.3916667,
+              "source_frames": [
+                16.5,
+                23.5
+              ]
+            }
+          ],
+          "travel_blocks": [
+            0.0,
+            7.773152093698563,
+            0.0
+          ],
+          "standalone_initial_height_removed": 0.0653360548316364,
+          "playback_speed": 1.0
+        },
+        {
+          "name": "air",
+          "source_clip": "Combo_Attack_Air_03",
+          "source_first_frame": 0,
+          "source_last_frame": 75,
+          "start": 0.0,
+          "duration": 1.25,
+          "recovery": 1.16,
+          "contacts": [
+            {
+              "start": 0.0083333,
+              "end": 0.2833333,
+              "source_frames": [
+                0.5,
+                17.0
+              ]
+            },
+            {
+              "start": 0.3583333,
+              "end": 0.75,
+              "source_frames": [
+                21.5,
+                45.0
+              ]
+            },
+            {
+              "start": 0.7916667,
+              "end": 1.0166667,
+              "source_frames": [
+                47.5,
+                61.0
+              ]
+            }
+          ],
+          "travel_blocks": [
+            0.03703569097050907,
+            2.2612918551721712,
+            -0.004765086488040748
+          ],
+          "standalone_initial_height_removed": 0.07010114131967715,
+          "playback_speed": 1.0
+        }
+      ]
+    },
+    {
+      "mode": 3,
+      "key": "void_shatter",
+      "label": "碎空",
+      "ground_source": "Combo_Attack_04_All",
+      "source_boundaries": [
+        0,
+        35,
+        95,
+        150,
+        220
+      ],
+      "segments": [
+        {
+          "name": "combo_01",
+          "source_clip": "Combo_Attack_04_All",
+          "source_first_frame": 0,
+          "source_last_frame": 35,
+          "start": 0.0,
+          "duration": 0.5833333,
+          "recovery": 0.5143333,
+          "contacts": [
+            {
+              "start": 0.4,
+              "end": 0.5083333,
+              "source_frames": [
+                24.0,
+                30.5
+              ]
+            }
+          ],
+          "travel_blocks": [
+            -0.12594133529994037,
+            1.0747934855291306,
+            -0.26795361682327695
+          ],
+          "standalone_initial_height_removed": 0.0,
+          "playback_speed": 1.0
+        },
+        {
+          "name": "combo_02",
+          "source_clip": "Combo_Attack_04_All",
+          "source_first_frame": 35,
+          "source_last_frame": 95,
+          "start": 0.5833333,
+          "duration": 1.0,
+          "recovery": 0.9893333,
+          "contacts": [
+            {
+              "start": 0.25,
+              "end": 0.6166667,
+              "source_frames": [
+                50.0,
+                72.0
+              ]
+            },
+            {
+              "start": 0.7833333,
+              "end": 0.9833333,
+              "source_frames": [
+                82.0,
+                94.0
+              ]
+            }
+          ],
+          "travel_blocks": [
+            0.05801182368168964,
+            3.2793692742030585,
+            -1.8985897853873723e-09
+          ],
+          "standalone_initial_height_removed": 0.0,
+          "playback_speed": 1.0
+        },
+        {
+          "name": "combo_03",
+          "source_clip": "Combo_Attack_04_All",
+          "source_first_frame": 95,
+          "source_last_frame": 150,
+          "start": 1.5833333,
+          "duration": 0.9166667,
+          "recovery": 0.9101667,
+          "contacts": [
+            {
+              "start": 0.225,
+              "end": 0.4583333,
+              "source_frames": [
+                108.5,
+                122.5
+              ]
+            },
+            {
+              "start": 0.7833333,
+              "end": 0.9041667,
+              "source_frames": [
+                142.0,
+                149.25
+              ]
+            }
+          ],
+          "travel_blocks": [
+            0.031641999472537256,
+            3.328453416318692,
+            1.082991756273799e-07
+          ],
+          "standalone_initial_height_removed": 0.0,
+          "playback_speed": 1.0
+        },
+        {
+          "name": "combo_04",
+          "source_clip": "Combo_Attack_04_All",
+          "source_first_frame": 150,
+          "source_last_frame": 220,
+          "start": 2.5,
+          "duration": 1.1666667,
+          "recovery": 0.9583333,
+          "contacts": [
+            {
+              "start": 0.2333333,
+              "end": 0.8583333,
+              "source_frames": [
+                164.0,
+                201.5
+              ]
+            }
+          ],
+          "travel_blocks": [
+            0.03328220005430481,
+            4.6095548248257465,
+            -1.1466765365009124e-07
+          ],
+          "standalone_initial_height_removed": 0.0,
+          "playback_speed": 1.0
+        }
+      ],
+      "specials": [
+        {
+          "name": "dash",
+          "source_clip": "Run_Attack_02",
+          "source_first_frame": 0,
+          "source_last_frame": 205,
+          "start": 0.0,
+          "duration": 3.4166667,
+          "recovery": 3.3266667,
+          "contacts": [
+            {
+              "start": 0.3166667,
+              "end": 0.8333333,
+              "source_frames": [
+                19.0,
+                50.0
+              ]
+            },
+            {
+              "start": 1.0666667,
+              "end": 1.2916667,
+              "source_frames": [
+                64.0,
+                77.5
+              ]
+            },
+            {
+              "start": 1.4833333,
+              "end": 1.5833333,
+              "source_frames": [
+                89.0,
+                95.0
+              ]
+            }
+          ],
+          "travel_blocks": [
+            0.014766857437702428,
+            9.656955319765334,
+            0.1790537079054103
+          ],
+          "standalone_initial_height_removed": 0.0,
+          "playback_speed": 1.0
+        },
+        {
+          "name": "air",
+          "source_clip": "Combo_Attack_Air_04",
+          "source_first_frame": 0,
+          "source_last_frame": 82,
+          "start": 0.0,
+          "duration": 1.3666667,
+          "recovery": 1.2766667,
+          "contacts": [
+            {
+              "start": 0.1416667,
+              "end": 0.5083333,
+              "source_frames": [
+                8.5,
+                30.5
+              ]
+            }
+          ],
+          "travel_blocks": [
+            0.0032491087669669124,
+            0.22701443625723436,
+            0.00620937908276975
+          ],
+          "standalone_initial_height_removed": 0.05912658077952959,
+          "playback_speed": 1.0
+        }
+      ]
+    }
+  ]
+}

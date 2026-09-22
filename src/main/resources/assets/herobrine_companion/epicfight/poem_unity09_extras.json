@@ -1,0 +1,318 @@
+{
+  "source_package": "Scythe Animation Pack1.0.unitypackage",
+  "source_fps": 60,
+  "export_hz": 240,
+  "playback_speed": 1.0,
+  "moves": [
+    {
+      "gesture": 0,
+      "key": "flurry",
+      "label": "速斩",
+      "damage": 0.7,
+      "impact": 1.0,
+      "ground": {
+        "name": "flurry_ground",
+        "source_clip": "Speed_Attack_All",
+        "source_first_frame": 0,
+        "source_last_frame": 130,
+        "start": 0.0,
+        "duration": 2.1666667,
+        "recovery": 2.0766667,
+        "contacts": [
+          {
+            "start": 0.3083333,
+            "end": 0.3833333,
+            "source_frames": [
+              18.5,
+              23.0
+            ]
+          },
+          {
+            "start": 0.4333333,
+            "end": 0.4916667,
+            "source_frames": [
+              26.0,
+              29.5
+            ]
+          },
+          {
+            "start": 0.55,
+            "end": 0.6208333,
+            "source_frames": [
+              33.0,
+              37.25
+            ]
+          },
+          {
+            "start": 0.6375,
+            "end": 0.7375,
+            "source_frames": [
+              38.25,
+              44.25
+            ]
+          },
+          {
+            "start": 0.7666667,
+            "end": 0.85,
+            "source_frames": [
+              46.0,
+              51.0
+            ]
+          },
+          {
+            "start": 1.0,
+            "end": 1.1333333,
+            "source_frames": [
+              60.0,
+              68.0
+            ]
+          }
+        ],
+        "travel_blocks": [
+          0.02176664115018826,
+          3.3270037553889233,
+          -0.02278523286729306
+        ],
+        "standalone_initial_height_removed": 0.0,
+        "playback_speed": 1.0
+      },
+      "air": {
+        "name": "flurry_air",
+        "source_clip": "Speed_Attack_Air_All",
+        "source_first_frame": 0,
+        "source_last_frame": 115,
+        "start": 0.0,
+        "duration": 1.9166667,
+        "recovery": 1.8266667,
+        "contacts": [
+          {
+            "start": 0.3083333,
+            "end": 0.3833333,
+            "source_frames": [
+              18.5,
+              23.0
+            ]
+          },
+          {
+            "start": 0.4333333,
+            "end": 0.4916667,
+            "source_frames": [
+              26.0,
+              29.5
+            ]
+          },
+          {
+            "start": 0.55,
+            "end": 0.6208333,
+            "source_frames": [
+              33.0,
+              37.25
+            ]
+          },
+          {
+            "start": 0.6375,
+            "end": 0.7375,
+            "source_frames": [
+              38.25,
+              44.25
+            ]
+          },
+          {
+            "start": 0.7666667,
+            "end": 0.8416667,
+            "source_frames": [
+              46.0,
+              50.5
+            ]
+          },
+          {
+            "start": 1.0,
+            "end": 1.1333333,
+            "source_frames": [
+              60.0,
+              68.0
+            ]
+          }
+        ],
+        "travel_blocks": [
+          3.7097397297277875e-08,
+          5.719628503516715,
+          -1.899386741222031e-07
+        ],
+        "standalone_initial_height_removed": 0.0653360548316364,
+        "playback_speed": 1.0
+      }
+    },
+    {
+      "gesture": 1,
+      "key": "uppercut",
+      "label": "挑空",
+      "damage": 1.0,
+      "impact": 1.2,
+      "ground": {
+        "name": "uppercut_ground",
+        "source_clip": "Attack_Up_Floor_to_Air_02",
+        "source_first_frame": 0,
+        "source_last_frame": 55,
+        "start": 0.0,
+        "duration": 0.9166667,
+        "recovery": 0.8893333,
+        "contacts": [
+          {
+            "start": 0.175,
+            "end": 0.2583333,
+            "source_frames": [
+              10.5,
+              15.5
+            ]
+          },
+          {
+            "start": 0.275,
+            "end": 0.3666667,
+            "source_frames": [
+              16.5,
+              22.0
+            ]
+          },
+          {
+            "start": 0.7166667,
+            "end": 0.8833333,
+            "source_frames": [
+              43.0,
+              53.0
+            ]
+          }
+        ],
+        "travel_blocks": [
+          0.005739077170184825,
+          1.3665536294119551,
+          2.3623695717980135
+        ],
+        "standalone_initial_height_removed": 0.0,
+        "playback_speed": 1.0
+      },
+      "air": {
+        "name": "uppercut_air",
+        "source_clip": "Attack_Up_Air_to_Air_03",
+        "source_first_frame": 0,
+        "source_last_frame": 55,
+        "start": 0.0,
+        "duration": 0.9166667,
+        "recovery": 0.8893333,
+        "contacts": [
+          {
+            "start": 0.175,
+            "end": 0.2583333,
+            "source_frames": [
+              10.5,
+              15.5
+            ]
+          },
+          {
+            "start": 0.275,
+            "end": 0.3666667,
+            "source_frames": [
+              16.5,
+              22.0
+            ]
+          },
+          {
+            "start": 0.7166667,
+            "end": 0.8833333,
+            "source_frames": [
+              43.0,
+              53.0
+            ]
+          }
+        ],
+        "travel_blocks": [
+          0.0,
+          1.3554845124580812,
+          2.281015416611303
+        ],
+        "standalone_initial_height_removed": 0.06533605771017315,
+        "playback_speed": 1.0
+      }
+    },
+    {
+      "gesture": 2,
+      "key": "heavy",
+      "label": "重击",
+      "damage": 1.5,
+      "impact": 1.7,
+      "ground": {
+        "name": "heavy_ground",
+        "source_clip": "Combo_Attack_05_01",
+        "source_first_frame": 0,
+        "source_last_frame": 52,
+        "start": 0.0,
+        "duration": 0.8666667,
+        "recovery": 0.6366667,
+        "contacts": [
+          {
+            "start": 0.3583333,
+            "end": 0.5166667,
+            "source_frames": [
+              21.5,
+              31.0
+            ]
+          }
+        ],
+        "travel_blocks": [
+          -0.13691409250628261,
+          2.054014532685994,
+          -0.08662034221190373
+        ],
+        "standalone_initial_height_removed": 0.0,
+        "playback_speed": 1.0
+      },
+      "air": {
+        "name": "heavy_air",
+        "source_clip": "Attack_Air_to_Floor_01_All",
+        "source_first_frame": 0,
+        "source_last_frame": 66,
+        "start": 0.0,
+        "duration": 1.1,
+        "recovery": 0.8575,
+        "contacts": [
+          {
+            "start": 0.6833333,
+            "end": 0.7375,
+            "source_frames": [
+              41.0,
+              44.25
+            ]
+          }
+        ],
+        "travel_blocks": [
+          -0.024973006666963223,
+          0.05880748569112992,
+          -0.3493080105436906
+        ],
+        "standalone_initial_height_removed": 0.0,
+        "playback_speed": 1.0,
+        "runtime_landing": {
+          "hold_source_frames": [
+            27,
+            35
+          ],
+          "maximum_hold_ticks": 60,
+          "descent_blocks_per_tick": 0.35,
+          "resume_floor_distance": 1.0
+        }
+      }
+    }
+  ],
+  "inputs": [
+    "Mouse 4 + Attack",
+    "Mouse 5 + Attack",
+    "Use / Mouse Right + Attack"
+  ],
+  "primary_attack": "Release a short attack tap for a native combo; hold attack for 350 ms for one heavy",
+  "heavy_hold_milliseconds": 350,
+  "heavy_repeat_while_held": false,
+  "heavy_chain_after_last_contact_seconds": 0.12,
+  "shared_use_behavior": "A use tap without an attack chord is replayed through vanilla on release",
+  "buffer_ticks": 10,
+  "live_gameplay_tested": false
+}
