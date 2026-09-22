@@ -7,6 +7,7 @@
   "plugin": "com.whitecloud233.herobrine_companion.mixin.HerobrineCompanionMixinPlugin",
   "mixins": [
     "LivingEntityMixin",
+    "PoemPlayerAttackMixin",
     "DragonSittingScanningPhaseMixin",
     "EnderDragonMixin",
     "AwakenedEnderDragonBrainMixin",
@@ -26,6 +27,10 @@
     "epicfight.HeroWomAnimationEventGuardMixin"
   ],
   "client": [
+    "epicfight.PoemAttackControlMixin",
+    "client.PoemLivingRendererMixin",
+    "client.PoemHumanoidRenderMixin",
+    "client.PoemHeldItemMixin"
   ],
   "injectors": {
     "defaultRequire": 1

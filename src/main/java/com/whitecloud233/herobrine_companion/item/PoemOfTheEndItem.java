@@ -1,12 +1,15 @@
 package com.whitecloud233.herobrine_companion.item;
 
 import com.whitecloud233.herobrine_companion.init.*;
+import com.whitecloud233.herobrine_companion.combat.poem.PoemMeleeHit;
 
 import com.whitecloud233.herobrine_companion.compat.epicfight.HeroEpicFightStateMapper;
+import com.whitecloud233.herobrine_companion.compat.epicfight.HeroEpicFightCompat;
 import com.whitecloud233.herobrine_companion.entity.projectile.CleaveBladeEntity;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
-import com.whitecloud233.herobrine_companion.entity.projectile.VoidRiftEntity;
 import com.whitecloud233.herobrine_companion.entity.projectile.RealmBreakerLightningEntity;
+import com.whitecloud233.herobrine_companion.network.PacketHandler;
+import com.whitecloud233.herobrine_companion.network.PaleLightningPacket;
 import com.whitecloud233.herobrine_companion.entity.logic.data.HeroWorldData;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -51,7 +54,6 @@ import net.neoforged.neoforge.common.ItemAbility;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
-import java.util.Random;
 
 public class PoemOfTheEndItem extends DiggerItem {
 
@@ -61,7 +63,6 @@ public class PoemOfTheEndItem extends DiggerItem {
     public static final int MODE_THUNDER_CALL = 2;  // 鸣雷
     public static final int MODE_VOID_SHATTER = 3;  // 碎空
     private static final String TAG_MODE = "PoemMode";
-    private final Random random = new Random();
 
     public PoemOfTheEndItem(Tier tier, float attackDamageModifier, float attackSpeedModifier, Properties properties) {
         super(tier, BlockTags.MINEABLE_WITH_PICKAXE, properties
@@ -118,6 +119,9 @@ public class PoemOfTheEndItem extends DiggerItem {
         // 立即更新属性，以便攻速变化生效
         if (!player.level().isClientSide) {
             updateAttributes(stack, (ServerLevel) player.level(), player);
+            if (player.getMainHandItem() == stack) {
+                HeroEpicFightCompat.onPoemModeChanged(player);
+            }
         }
     }
 
@@ -215,12 +219,7 @@ public class PoemOfTheEndItem extends DiggerItem {
         for (LivingEntity target : targets) {
             if (count >= maxTargets) break;
             
-            LightningBolt lightning = EntityType.LIGHTNING_BOLT.create(level);
-            if (lightning != null) {
-                lightning.moveTo(target.position());
-                lightning.setVisualOnly(true);
-                level.addFreshEntity(lightning);
-            }
+            PacketHandler.sendToTracking(new PaleLightningPacket(target.getX(), target.getY(), target.getZ(), 6.0F, true), target);
             
             // 计算针对该目标的附魔加成 (支持锋利、亡灵杀手、节肢杀手)
             // 使用魔法伤害以绕过护甲，并防止被免疫雷电的生物（如女巫）免疫
@@ -240,31 +239,6 @@ public class PoemOfTheEndItem extends DiggerItem {
         return super.onLeftClickEntity(stack, player, entity);
     }
 
-    // 技能：碎空 (左键攻击触发)
-    @Override
-    public boolean hurtEnemy(ItemStack stack, LivingEntity target, LivingEntity attacker) {
-        if (getMode(stack) == MODE_VOID_SHATTER && !attacker.level().isClientSide) {
-            if (attacker instanceof Player player) {
-                if (!player.getCooldowns().isOnCooldown(this)) {
-                    // 在目标位置生成 VoidRiftEntity，并添加随机偏移
-                    ServerLevel level = (ServerLevel) player.level();
-                    double offsetX = (random.nextDouble() - 0.5) * 1.5; // +/- 0.75
-                    double offsetY = (random.nextDouble() - 0.5) * 1.0; // +/- 0.5
-                    double offsetZ = (random.nextDouble() - 0.5) * 1.5; // +/- 0.75
-                    
-                    VoidRiftEntity rift = new VoidRiftEntity(level, 
-                            target.getX() + offsetX, 
-                            target.getY() + target.getBbHeight() / 2.0 + offsetY, 
-                            target.getZ() + offsetZ, 
-                            player.getUUID());
-
-                    level.addFreshEntity(rift);
-                    player.getCooldowns().addCooldown(this, 10); // 0.5秒冷却 (10 ticks)
-                }
-            }
-        }
-        return super.hurtEnemy(stack, target, attacker);
-    }
 
     @Override
     public void inventoryTick(ItemStack stack, Level level, Entity entity, int slotId, boolean isSelected) {
@@ -323,11 +297,17 @@ public class PoemOfTheEndItem extends DiggerItem {
             case MODE_NORMAL -> "item.herobrine_companion.poem_of_the_end.mode.usage.0"; // 普通模式
             case MODE_REALM_BREAKER -> "item.herobrine_companion.poem_of_the_end.mode.usage.1"; // 右键发射雷枪
             case MODE_THUNDER_CALL -> "item.herobrine_companion.poem_of_the_end.mode.usage.2";  // 右键召唤雷电
-            case MODE_VOID_SHATTER -> "item.herobrine_companion.poem_of_the_end.mode.usage.3";  // 长按左键极速连击
+            case MODE_VOID_SHATTER -> "item.herobrine_companion.poem_of_the_end.mode.usage.3";  // 挥镰连击与裂痕
             default -> "";
         };
         tooltipComponents.add(Component.translatable(usageKey).withStyle(ChatFormatting.GRAY));
         
+        if (HeroEpicFightCompat.isRuntimeBridgeReady()) {
+            tooltipComponents.add(Component.translatable("item.herobrine_companion.poem_of_the_end.epicfight.input").withStyle(ChatFormatting.GRAY));
+        } else if (!HeroEpicFightCompat.isLoaded()) {
+            tooltipComponents.add(Component.translatable("item.herobrine_companion.poem_of_the_end.standalone.input").withStyle(ChatFormatting.GRAY));
+            tooltipComponents.add(Component.translatable("item.herobrine_companion.poem_of_the_end.standalone.rules").withStyle(ChatFormatting.DARK_GRAY));
+        }
         tooltipComponents.add(Component.translatable("item.herobrine_companion.poem_of_the_end.usage").withStyle(ChatFormatting.DARK_GRAY));
 
         super.appendHoverText(stack, context, tooltipComponents, tooltipFlag);
@@ -364,6 +344,7 @@ public class PoemOfTheEndItem extends DiggerItem {
 
     @Override
     public boolean canPerformAction(ItemStack stack, ItemAbility itemAbility) {
+        if (itemAbility == ItemAbilities.SWORD_SWEEP && PoemMeleeHit.suppressVanillaSweep(stack)) return false;
         return ItemAbilities.DEFAULT_AXE_ACTIONS.contains(itemAbility) ||
                ItemAbilities.DEFAULT_HOE_ACTIONS.contains(itemAbility) ||
                ItemAbilities.DEFAULT_SHOVEL_ACTIONS.contains(itemAbility) ||
