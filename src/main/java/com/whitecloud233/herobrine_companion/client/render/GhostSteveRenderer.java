@@ -3,6 +3,8 @@ package com.whitecloud233.herobrine_companion.client.render;
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.client.model.GhostSteveModel;
 import com.whitecloud233.herobrine_companion.entity.GhostSteveEntity;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.MobRenderer; // 更推荐给怪物使用 MobRenderer
 import net.minecraft.client.renderer.entity.layers.ItemInHandLayer;
@@ -22,6 +24,12 @@ public class GhostSteveRenderer extends MobRenderer<GhostSteveEntity, GhostSteve
 
     @Override
     public ResourceLocation getTextureLocation(GhostSteveEntity entity) {
+        // 「镜中倒影」委托：镜像幽灵复用本地玩家的皮肤
+        String mirrorUuid = entity.getMirrorSkinUuid();
+        AbstractClientPlayer localPlayer = Minecraft.getInstance().player;
+        if (!mirrorUuid.isEmpty() && localPlayer != null && mirrorUuid.equals(localPlayer.getUUID().toString())) {
+            return localPlayer.getSkin().texture();
+        }
         return TEXTURE;
     }
 

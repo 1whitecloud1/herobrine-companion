@@ -1,6 +1,5 @@
 package com.whitecloud233.herobrine_companion.client.event;
 
-import com.whitecloud233.herobrine_companion.init.*;
 
 import com.mojang.logging.LogUtils;
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
@@ -12,6 +11,7 @@ import com.whitecloud233.herobrine_companion.client.model.HeroDragonModel;
 import com.whitecloud233.herobrine_companion.client.model.HeroModel;
 import com.whitecloud233.herobrine_companion.client.render.*;
 import com.whitecloud233.herobrine_companion.client.render.VoidRiftRenderer;
+import com.whitecloud233.herobrine_companion.init.*;
 import com.whitecloud233.herobrine_companion.item.PoemOfTheEndItem;
 import com.whitecloud233.herobrine_companion.world.inventory.ModMenus;
 import net.minecraft.client.Minecraft;
@@ -19,7 +19,6 @@ import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
@@ -52,6 +51,7 @@ public class ClientEvents {
         event.registerEntityRenderer(ModEntities.DESTRUCTION_GOD_HEROBRINE.get(), DestructionGodHerobrineRenderer::new);
 
         event.registerEntityRenderer(ModEntities.GHOST_CREEPER.get(), GhostCreeperRenderer::new);
+        event.registerEntityRenderer(ModEntities.BIRTHDAY_CAKE_PROP.get(), BirthdayCakePropRenderer::new);
         event.registerEntityRenderer(ModEntities.GHOST_ZOMBIE.get(), GhostZombieRenderer::new);
         event.registerEntityRenderer(ModEntities.GHOST_SKELETON.get(), GhostSkeletonRenderer::new);
         event.registerEntityRenderer(ModEntities.GHOST_STEVE.get(), GhostSteveRenderer::new);
@@ -64,6 +64,14 @@ public class ClientEvents {
 
         // 尝试正常注册
         event.registerEntityRenderer(EntityType.ENDER_DRAGON, DragonRendererWrapper::new);
+    }
+
+    public static void onRegisterAdditionalModels(final net.neoforged.neoforge.client.event.ModelEvent.RegisterAdditional event) {
+        // 无名之蛋糕摆件(Bedrock birthday_cake_prop):geo 转换出的方块模型。
+        // ⚠️ 这里注册的 MRL 必须是 standalone variant(见 BirthdayCakePropRenderer.MODEL 的注释),
+        // 否则 register() 会抛 "Side-loaded models must use the 'standalone' variant",
+        // 导致整次资源重载被判定失败(游戏清空已选资源包并重载)。
+        event.register(com.whitecloud233.herobrine_companion.client.render.BirthdayCakePropRenderer.MODEL);
     }
 
     public static void registerLayerDefinitions(EntityRenderersEvent.RegisterLayerDefinitions event) {
@@ -95,7 +103,7 @@ public class ClientEvents {
      * 终末之诗的 3D 渲染器。NeoForge 1.21.1 移除了 {@code Item#initializeClient}，
      * 客户端扩展改由本事件注册。
      *
-     * <p>没装 GeckoLib 时 {@code createRenderer()} 返回 null，此时<b>不</b>注册扩展，
+     * <p>GeckoLib 和 Epic Fight 都没装时 {@code createRenderer()} 才返回 null，
      * 物品模型会被 {@code PoemOfTheEndModelSwapper} 换成 2D 版本。</p>
      */
     public static void registerClientExtensions(RegisterClientExtensionsEvent event) {
@@ -124,7 +132,8 @@ public class ClientEvents {
         }
         // ===========================
 
-        if (mc.player != null && mc.level != null && !mc.isPaused()) {
+        if (mc.player != null && mc.level != null && !mc.isPaused()
+                && mc.screen == null && mc.mouseHandler.isMouseGrabbed() && !mc.player.isUsingItem()) {
             ItemStack stack = mc.player.getMainHandItem();
             if (stack.getItem() instanceof PoemOfTheEndItem poemItem) {
                 if (poemItem.getMode(stack) == PoemOfTheEndItem.MODE_VOID_SHATTER) {
@@ -138,10 +147,7 @@ public class ClientEvents {
                                 }
                                 startAttackMethod.setAccessible(true);
                             }
-                            boolean attackSuccess = (boolean) startAttackMethod.invoke(mc);
-                            if (attackSuccess) {
-                                mc.player.swing(InteractionHand.MAIN_HAND);
-                            }
+                            startAttackMethod.invoke(mc);
                         } catch (Exception e) {
                             // ignore
                         }

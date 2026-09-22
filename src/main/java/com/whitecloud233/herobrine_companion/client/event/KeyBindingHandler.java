@@ -29,6 +29,7 @@ public class KeyBindingHandler {
     // 必须在 Mod 事件总线上注册按键
     public static void onKeyRegister(RegisterKeyMappingsEvent event) {
         event.register(SKILL_KEY);
+        PoemScytheInputEvents.registerKeys(event);
     }
 
     // 1.21.1 更新：TickEvent 被拆分成了具体的 Pre 和 Post，不再需要检查 event.phase

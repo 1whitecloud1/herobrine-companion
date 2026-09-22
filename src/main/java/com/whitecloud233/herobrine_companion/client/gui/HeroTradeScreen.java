@@ -188,6 +188,11 @@ public class HeroTradeScreen extends Screen implements MenuAccess<MerchantMenu> 
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
         int i = this.menu.getOffers().size();
         if (this.isDragging) {
+            // 条目 ≤7 时无滚动余量：拒绝拖拽并复位，防止 scrollOff 被 clamp 成负数
+            if (i <= 7) {
+                this.isDragging = false;
+                return true;
+            }
             int j = this.topPos + 18;
             int k = j + 139;
             int l = i - 7;
@@ -227,9 +232,9 @@ public class HeroTradeScreen extends Screen implements MenuAccess<MerchantMenu> 
             }
         }
 
-        // 检查点击区域：滚动条
+        // 检查点击区域：滚动条（条目 ≤7 时无滚动余量，禁止拖拽，避免 scrollOff 变负数）
         int i = this.menu.getOffers().size();
-        if (mouseX >= x + 100 && mouseX < x + 100 + 6 && mouseY >= y + 18 && mouseY < y + 18 + 139) {
+        if (i > 7 && mouseX >= x + 100 && mouseX < x + 100 + 6 && mouseY >= y + 18 && mouseY < y + 18 + 139) {
             this.isDragging = true;
         }
 
@@ -351,7 +356,8 @@ public class HeroTradeScreen extends Screen implements MenuAccess<MerchantMenu> 
 
         for (int l = 0; l < 7; ++l) {
             int index = this.scrollOff + l;
-            if (index >= offers.size()) break;
+            // 双端保护：scrollOff 理论上可能残留负值，负 index 直接跳过
+            if (index < 0 || index >= offers.size()) break;
 
             MerchantOffer offer = offers.get(index);
             ItemStack costA = offer.getCostA();

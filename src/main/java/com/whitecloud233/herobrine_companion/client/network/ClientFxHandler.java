@@ -30,7 +30,7 @@ public final class ClientFxHandler {
                     mc.level,
                     packet.x(), packet.y() + 80.0, packet.z(),
                     groundPos,
-                    packet.width()
+                    packet.width(), packet.immediate()
             ));
         }
     }
