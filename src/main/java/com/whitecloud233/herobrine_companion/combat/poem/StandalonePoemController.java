@@ -1,6 +1,9 @@
 package com.whitecloud233.herobrine_companion.combat.poem;
 
+import com.whitecloud233.herobrine_companion.api.compat.HeroEpicFightCompat;
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.herobrine_companion.config.ServerConfigAccess;
+import com.whitecloud233.herobrine_companion.config.ServerRule;
 import com.whitecloud233.herobrine_companion.item.PoemOfTheEndItem;
 import com.whitecloud233.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.herobrine_companion.network.PoemAnimationPacket;
@@ -22,7 +25,6 @@ import net.neoforged.neoforge.event.entity.player.AttackEntityEvent;
 import net.neoforged.neoforge.event.entity.player.SweepAttackEvent;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
@@ -33,7 +35,13 @@ public final class StandalonePoemController {
     private static final Map<ServerPlayer, State> STATES = new WeakHashMap<>();
     private StandalonePoemController() { }
 
-    public static boolean enabled() { return !ModList.get().isLoaded("epicfight"); }
+    /** The optional add-on owns the player pose only while its Epic Fight bridge is ready. */
+    public static boolean standalone() { return !HeroEpicFightCompat.isRuntimeBridgeReady(); }
+
+    /** The live configuration switch is authoritative; the optional bridge owns the player pose only while ready. */
+    public static boolean enabled() {
+        return ServerConfigAccess.snapshot().enabled(ServerRule.POEM_ACTIONS) && standalone();
+    }
 
     public static boolean usable(Player player) {
         return enabled() && player != null && player.isAlive() && !player.isSpectator()
@@ -48,6 +56,15 @@ public final class StandalonePoemController {
     }
 
     public static void request(ServerPlayer player, int slot, int mode) {
+        requestMove(player, slot, mode, PoemMotionLibrary.basicMove(player.isSprinting(), !player.onGround()));
+    }
+
+    public static void requestGesture(ServerPlayer player, int gesture, int slot, int mode) {
+        if (gesture < 0 || gesture >= 3) return;
+        requestMove(player, slot, mode, PoemMotionLibrary.extraMove(gesture, !player.onGround()));
+    }
+
+    private static void requestMove(ServerPlayer player, int slot, int mode, int move) {
         if (!usable(player) || slot < 0 || slot > 8 || mode < 0 || mode > 3
                 || player.getInventory().selected != slot || mode(player) != mode) return;
         State state = STATES.computeIfAbsent(player, ignored -> new State(slot, mode, player.getMainHandItem()));
@@ -57,7 +74,7 @@ public final class StandalonePoemController {
         long now = player.level().getGameTime();
         // Finish the old contact interval before an input can advance the combo.
         collide(player, state, now);
-        if (STATES.get(player) == state && matches(player, state) && state.clock.request(mode, now)) begin(player, state);
+        if (STATES.get(player) == state && matches(player, state) && state.clock.request(mode, move, now)) begin(player, state);
     }
 
     public static void stop(ServerPlayer player) {
@@ -136,7 +153,7 @@ public final class StandalonePoemController {
                 player.level().playSound(null, player.getX(), player.getY(), player.getZ(),
                         SoundEvents.PLAYER_ATTACK_SWEEP, player.getSoundSource(), .7f, 1f);
             }
-            for (Entity target : player.level().getEntities(player, sweep.bounds(), entity -> targetable(player, entity))) {
+            for (Entity target : player.level().getEntities(player, sweep.queryBounds(), entity -> targetable(player, entity))) {
                 if (STATES.get(player) != state || !matches(player, state)) return;
                 Entity owner = target instanceof PartEntity<?> part ? part.getParent() : target;
                 if (player.hasLineOfSight(target) && state.sweep.claim(sweep, owner.getUUID(), target.getBoundingBox())) {

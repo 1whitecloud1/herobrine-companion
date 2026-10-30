@@ -18,15 +18,22 @@ public final class PoemMotionLibrary {
     // Custom rig/mesh data must stay outside GeckoLib's scanned animations/ tree.
     public static final String DATA_ROOT = "poem_standalone/";
     public static final List<String> MODES = List.of("normal", "realm_breaker", "thunder", "void_shatter");
+    public static final List<String> LOCOMOTION = List.of("idle", "run", "sprint");
+    public static final int DASH = 4, AIR = 5, FIRST_EXTRA = 6, MOVE_COUNT = 12;
+    private final Extras extras;
     public final Rig rig;
     private final Timeline timeline;
     private final Matrix4f[] bindWorld;
     private final Matrix4f[] inverseBind;
     private final Map<Integer, Clip> clips = new ConcurrentHashMap<>();
+    private final Map<String, LocomotionClip> locomotion = new ConcurrentHashMap<>();
+    private volatile LocomotionData locomotionData;
 
     private PoemMotionLibrary() {
         rig = read(DATA_ROOT + "rig.json", Rig.class);
         timeline = read("epicfight/poem_unity09_timing.json", Timeline.class);
+        extras = read("epicfight/poem_unity09_extras.json", Extras.class);
+        if (extras.moves().size() != 3) throw new IllegalStateException("Missing standalone Poem gestures");
         if (rig.format() != 1 || rig.joints().size() != 20 || timeline.modes().size() != 4) {
             throw new IllegalStateException("Invalid standalone Poem rig/timeline");
         }
@@ -41,10 +48,11 @@ public final class PoemMotionLibrary {
         }
         for (int m = 0; m < 4; m++) {
             Mode mode = timeline.modes().get(m);
-            if (mode.mode() != m || !MODES.get(m).equals(mode.key()) || mode.segments().size() != 4) {
+            if (mode.mode() != m || !MODES.get(m).equals(mode.key()) || mode.segments().size() != 4 || mode.specials().size() != 2) {
                 throw new IllegalStateException("Invalid standalone Poem mode " + m);
             }
-            for (Timing t : mode.segments()) {
+            for (int move = 0; move < MOVE_COUNT; move++) {
+                Timing t = timing(m, move);
                 if (!(0 < t.recovery() && t.recovery() < t.duration()) || t.contacts().isEmpty()) {
                     throw new IllegalStateException("Invalid standalone Poem timing");
                 }
@@ -63,8 +71,19 @@ public final class PoemMotionLibrary {
     public static PoemMotionLibrary get() { return Holder.INSTANCE; }
 
     public Timing timing(int mode, int step) {
-        if (mode < 0 || mode >= 4 || step < 0 || step >= 4) throw new IllegalArgumentException("Poem mode/step");
-        return timeline.modes().get(mode).segments().get(step);
+        if (mode < 0 || mode >= 4 || !validMove(step)) throw new IllegalArgumentException("Poem mode/step");
+        if (step < DASH) return timeline.modes().get(mode).segments().get(step);
+        if (step < FIRST_EXTRA) return timeline.modes().get(mode).specials().get(step - DASH);
+        Extra extra = extras.moves().get((step - FIRST_EXTRA) / 2);
+        return (step - FIRST_EXTRA) % 2 == 0 ? extra.ground() : extra.air();
+    }
+
+    public static boolean validMove(int move) { return move >= 0 && move < MOVE_COUNT; }
+    public static boolean combo(int move) { return move >= 0 && move < DASH; }
+    public static int basicMove(boolean sprinting, boolean airborne) { return airborne ? AIR : sprinting ? DASH : 0; }
+    public static int extraMove(int gesture, boolean airborne) {
+        if (gesture < 0 || gesture >= 3) throw new IllegalArgumentException("Poem gesture");
+        return FIRST_EXTRA + gesture * 2 + (airborne ? 1 : 0);
     }
 
     public int joint(String name) {
@@ -77,12 +96,32 @@ public final class PoemMotionLibrary {
 
     public Clip clip(int mode, int step) {
         Timing timing = timing(mode, step);
-        return clips.computeIfAbsent(mode * 4 + step, ignored -> new Clip(read(
-                "animmodels/animations/player/poem_unity09/" + MODES.get(mode) + "/" + timing.name() + ".json",
+        int key = (step >= FIRST_EXTRA ? 4 : mode) * MOVE_COUNT + step;
+        return clips.computeIfAbsent(key, ignored -> new Clip(read(
+                "animmodels/animations/player/poem_unity09/" + (step >= FIRST_EXTRA ? "extra" : MODES.get(mode)) + "/" + timing.name() + ".json",
                 ClipData.class), timing));
     }
 
-    public void preload() { for (int m = 0; m < 4; m++) for (int s = 0; s < 4; s++) clip(m, s); }
+    /** Bedrock-era idle/run/sprint loops, retargeted onto this rig and stored outside GeckoLib's tree. */
+    public LocomotionClip locomotion(String name) {
+        return locomotion.computeIfAbsent(name, key -> {
+            LocomotionData data = locomotionData;
+            if (data == null) {
+                synchronized (this) {
+                    if (locomotionData == null) locomotionData = read(DATA_ROOT + "locomotion.json", LocomotionData.class);
+                    data = locomotionData;
+                }
+            }
+            if (data.format() != 1) throw new IllegalStateException("Invalid Poem locomotion format");
+            for (LocomotionClipData clip : data.clips()) if (clip.name().equals(key)) return new LocomotionClip(clip);
+            throw new IllegalStateException("Missing Poem locomotion clip " + key);
+        });
+    }
+
+    public void preload() {
+        for (int m = 0; m < 4; m++) for (int s = 0; s < MOVE_COUNT; s++) clip(m, s);
+        for (String name : LOCOMOTION) locomotion(name);
+    }
 
     /** Local-space quaternion interpolation preserves every turn in the 240 Hz source. */
     public final class Clip {
@@ -120,6 +159,48 @@ public final class PoemMotionLibrary {
                 Matrix4f local = channels[i].sample(seconds);
                 if (i == 0 && inPlace) local.m30(0).m31(0);
                 world = local.mul(world);
+            }
+            return world;
+        }
+    }
+
+    /** A loop-only clip with no contact windows; the root's horizontal motion is removed. */
+    public final class LocomotionClip {
+        private final Channel[] channels = new Channel[rig.joints().size()];
+        private final float duration;
+
+        private LocomotionClip(LocomotionClipData data) {
+            if (!(data.duration() > 0) || !Float.isFinite(data.duration())) throw new IllegalStateException("Invalid Poem locomotion duration");
+            duration = data.duration();
+            for (ChannelData channel : data.animation()) {
+                int index = joint(channel.name());
+                if (channels[index] != null) throw new IllegalStateException("Duplicate Poem locomotion channel");
+                channels[index] = new Channel(channel);
+            }
+            if (Arrays.stream(channels).anyMatch(Objects::isNull)) throw new IllegalStateException("Missing Poem locomotion joint");
+            for (Channel channel : channels) {
+                if (channel.times[0] < 0 || channel.times[channel.times.length - 1] > duration + 1e-4f) {
+                    throw new IllegalStateException("Poem locomotion key outside its duration");
+                }
+            }
+        }
+
+        public float duration() { return duration; }
+
+        /** Wrap a timeline in seconds into this loop, including negative input. */
+        public float phase(double seconds) {
+            double value = seconds % duration;
+            return (float) (value < 0 ? value + duration : value);
+        }
+
+        public Matrix4f[] sample(float seconds, boolean inPlace) {
+            seconds = phase(seconds);
+            Matrix4f[] world = new Matrix4f[channels.length];
+            for (int i = 0; i < world.length; i++) {
+                Matrix4f local = channels[i].sample(seconds);
+                if (i == 0 && inPlace) local.m30(0).m31(0);
+                int parent = rig.joints().get(i).parent();
+                world[i] = parent < 0 ? local : new Matrix4f(world[parent]).mul(local);
             }
             return world;
         }
@@ -197,9 +278,13 @@ public final class PoemMotionLibrary {
     public record Rig(int format, List<Joint> joints, float[][] weapon_to_tool) { }
     public record Joint(String name, int parent, float[] bind) { }
     private record ClipData(List<ChannelData> animation) { }
+    private record LocomotionData(int format, List<LocomotionClipData> clips) { }
+    private record LocomotionClipData(String name, float duration, List<ChannelData> animation) { }
     private record ChannelData(String name, float[] time, float[][] transform) { }
     private record Timeline(List<Mode> modes) { }
-    private record Mode(int mode, String key, List<Timing> segments) { }
+    private record Mode(int mode, String key, List<Timing> segments, List<Timing> specials) { }
+    private record Extras(List<Extra> moves) { }
+    private record Extra(String key, Timing ground, Timing air) { }
     public record Timing(String name, float duration, float recovery, List<Contact> contacts) { }
     public record Contact(float start, float end) { }
 }
