@@ -85,3 +85,9 @@ hs_err_pid*
 /*.py
 /*.mp4
 /*.jpg
+/libs-original/
+/.workbuddy/
+/.poem-ref/
+/net/
+/.acl-repair/
+/.sonar-inspect/
