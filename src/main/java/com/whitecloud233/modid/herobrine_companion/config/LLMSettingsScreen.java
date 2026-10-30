@@ -1,27 +1,28 @@
 package com.whitecloud233.modid.herobrine_companion.config;
 
-import com.whitecloud233.modid.herobrine_companion.BuildFlags;
+import com.whitecloud233.modid.herobrine_companion.client.gui.HeroTheme;
 import com.whitecloud233.modid.herobrine_companion.client.gui.AIDebugScreen;
 import com.whitecloud233.modid.herobrine_companion.client.gui.HeroScreen;
 import com.whitecloud233.modid.herobrine_companion.client.service.LLMConfig;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import com.whitecloud233.modid.herobrine_companion.client.gui.HeroPanelScreen;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
-public class LLMSettingsScreen extends Screen {
+public class LLMSettingsScreen extends HeroPanelScreen {
     private static final int MAX_PANEL_WIDTH = 500;
     private static final int MAX_PANEL_HEIGHT = 340;
     private static final int BUTTON_HEIGHT = 20;
     private static final int CONTROL_GAP = 8;
-    private static final int COL_BG = 0xFF2B2B2B;
-    private static final int COL_BORDER = 0xFF555555;
-    private static final int COL_TITLE = 0xFFCC7832;
-    private static final int COL_TEXT = 0xFFA9B7C6;
-    private static final int COL_INFO = 0xFF6A8759;
-    private static final int COL_WARN = 0xFFFF8080;
+    private static final int COL_BG = HeroTheme.BG_MAIN;
+    private static final int COL_BORDER = HeroTheme.BORDER;
+    private static final int COL_TITLE = HeroTheme.LABEL;
+    private static final int COL_TEXT = HeroTheme.TEXT;
+    private static final int COL_INFO = HeroTheme.INFO;
+    private static final int COL_WARN = HeroTheme.WARN;
 
     private final Screen lastScreen;
     private MultilineTextEditor systemPromptBox;
@@ -77,48 +78,52 @@ public class LLMSettingsScreen extends Screen {
                 "gui.herobrine_companion.llm_settings.max_output_tokens", this.maxOutputTokensDraft);
 
         this.saveButton = this.addRenderableWidget(new HeroScreen.ThemedButton(
-                layout.saveButtonX(), layout.actionButtonY(), layout.actionButtonWidth(), BUTTON_HEIGHT,
+                layout.saveButtonX(), layout.primaryActionY(), layout.actionButtonWidth(), BUTTON_HEIGHT,
                 Component.translatable("gui.herobrine_companion.api_setup.confirm_save"),
                 button -> this.saveAndClose(),
                 null
         ));
 
         this.addRenderableWidget(new HeroScreen.ThemedButton(
-                layout.toolTogglesButtonX(), layout.actionButtonY(), layout.actionButtonWidth(), BUTTON_HEIGHT,
+                layout.ttsButtonX(), layout.primaryActionY(), layout.actionButtonWidth(), BUTTON_HEIGHT,
+                Component.translatable("gui.herobrine_companion.llm_settings.tts_button"),
+                button -> Minecraft.getInstance().setScreen(new TtsSettingsScreen(this)),
+                Tooltip.create(Component.translatable("gui.herobrine_companion.llm_settings.tts_tooltip"))
+        ));
+
+        this.addRenderableWidget(new HeroScreen.ThemedButton(
+                layout.backButtonX(), layout.primaryActionY(), layout.actionButtonWidth(), BUTTON_HEIGHT,
+                Component.translatable("gui.herobrine_companion.back"),
+                button -> Minecraft.getInstance().setScreen(this.lastScreen),
+                null
+        ));
+
+        this.addRenderableWidget(new HeroScreen.ThemedButton(
+                layout.toolTogglesButtonX(), layout.secondaryActionY(), layout.actionButtonWidth(), BUTTON_HEIGHT,
                 Component.translatable("gui.herobrine_companion.llm_settings.tool_toggles_button"),
                 button -> Minecraft.getInstance().setScreen(new LLMToolTogglesScreen(this)),
                 null
         ));
 
-        if (!BuildFlags.CF_SAFE) {
-            // 本地模型（下载推理引擎并启动进程）仅存在于完整版构建，安全版隐藏入口。
-            this.addRenderableWidget(new HeroScreen.ThemedButton(
-                    layout.localModelButtonX(), layout.actionButtonY(), layout.actionButtonWidth(), BUTTON_HEIGHT,
-                    Component.translatable("gui.herobrine_companion.llm_settings.local_model_button"),
-                    button -> Minecraft.getInstance().setScreen(new LocalModelScreen(this)),
-                    Tooltip.create(Component.translatable("gui.herobrine_companion.llm_settings.local_model_tooltip"))
-            ));
-        }
+        this.addRenderableWidget(new HeroScreen.ThemedButton(
+                layout.localModelButtonX(), layout.secondaryActionY(), layout.actionButtonWidth(), BUTTON_HEIGHT,
+                Component.translatable("gui.herobrine_companion.llm_settings.local_model_button"),
+                button -> Minecraft.getInstance().setScreen(new LocalModelScreen(this)),
+                Tooltip.create(Component.translatable("gui.herobrine_companion.llm_settings.local_model_tooltip"))
+        ));
 
         this.addRenderableWidget(new HeroScreen.ThemedButton(
-                layout.agentStatusButtonX(), layout.actionButtonY(), layout.actionButtonWidth(), BUTTON_HEIGHT,
+                layout.agentStatusButtonX(), layout.secondaryActionY(), layout.actionButtonWidth(), BUTTON_HEIGHT,
                 Component.translatable("gui.herobrine_companion.llm_settings.agent_status"),
                 button -> com.whitecloud233.modid.herobrine_companion.client.gui.AgentStatusScreen.open(),
                 Tooltip.create(Component.translatable("gui.herobrine_companion.llm_settings.agent_status_tooltip"))
         ));
 
         this.addRenderableWidget(new HeroScreen.ThemedButton(
-                layout.debugButtonX(), layout.actionButtonY(), layout.actionButtonWidth(), BUTTON_HEIGHT,
+                layout.debugButtonX(), layout.secondaryActionY(), layout.actionButtonWidth(), BUTTON_HEIGHT,
                 Component.translatable("gui.herobrine_companion.llm_settings.ai_debug"),
                 button -> Minecraft.getInstance().setScreen(new AIDebugScreen(this)),
                 Tooltip.create(Component.translatable("gui.herobrine_companion.llm_settings.ai_debug_tooltip"))
-        ));
-
-        this.addRenderableWidget(new HeroScreen.ThemedButton(
-                layout.backButtonX(), layout.actionButtonY(), layout.actionButtonWidth(), BUTTON_HEIGHT,
-                Component.translatable("gui.herobrine_companion.back"),
-                button -> Minecraft.getInstance().setScreen(this.lastScreen),
-                null
         ));
 
         this.setInitialFocus(this.systemPromptBox);
@@ -179,9 +184,13 @@ public class LLMSettingsScreen extends Screen {
         int hintToValidation = compact ? 10 : 12; // 数值范围提示 -> 校验信息
         int validationToAction = compact ? 10 : 14;
         int bottomMargin = compact ? 6 : (panelHeight < 300 ? 8 : 12);
+        int actionRowGap = 6;
 
-        int actionButtonY = startY + panelHeight - bottomMargin - BUTTON_HEIGHT;
-        int validationY = actionButtonY - validationToAction;
+        // 底部按钮分两行：主操作（保存/语音/返回）在上，工具入口（更多开关/本地模型/Agent/调试）在下。
+        // 新增「语音(TTS)」入口后若仍挤在一行，按钮会被压到看不清，因此按行拆开。
+        int secondaryActionY = startY + panelHeight - bottomMargin - BUTTON_HEIGHT;
+        int primaryActionY = secondaryActionY - BUTTON_HEIGHT - actionRowGap;
+        int validationY = primaryActionY - validationToAction;
         int numericHintY = validationY - hintToValidation;
         int numberBoxY = numericHintY - boxToHint;
         int numberLabelY = numberBoxY - labelToBox;
@@ -190,18 +199,24 @@ public class LLMSettingsScreen extends Screen {
         int numberBoxWidth = Math.max(1, (contentWidth - CONTROL_GAP * 2) / 3);
         int topPBoxX = editorX + numberBoxWidth + CONTROL_GAP;
         int maxOutputTokensBoxX = topPBoxX + numberBoxWidth + CONTROL_GAP;
-        int actionButtonWidth = Math.min(120, Math.max(1, (contentWidth - CONTROL_GAP * 5) / 6));
-        int actionGroupWidth = actionButtonWidth * 6 + CONTROL_GAP * 5;
-        int saveButtonX = startX + (panelWidth - actionGroupWidth) / 2;
-        int toolTogglesButtonX = saveButtonX + actionButtonWidth + CONTROL_GAP;
-        int localModelButtonX = toolTogglesButtonX + actionButtonWidth + CONTROL_GAP;
-        int agentStatusButtonX = localModelButtonX + actionButtonWidth + CONTROL_GAP;
-        int debugButtonX = agentStatusButtonX + actionButtonWidth + CONTROL_GAP;
-        int backButtonX = debugButtonX + actionButtonWidth + CONTROL_GAP;
+        // 两行共用同一按钮宽度（按 4 列基准算），保证上下两行视觉对齐。
+        int actionButtonWidth = Math.min(120, Math.max(1, (contentWidth - CONTROL_GAP * 3) / 4));
+        int primaryGroupWidth = actionButtonWidth * 3 + CONTROL_GAP * 2;
+        int primaryStartX = startX + (panelWidth - primaryGroupWidth) / 2;
+        int secondaryGroupWidth = actionButtonWidth * 4 + CONTROL_GAP * 3;
+        int secondaryStartX = startX + (panelWidth - secondaryGroupWidth) / 2;
+        int saveButtonX = primaryStartX;
+        int ttsButtonX = primaryStartX + actionButtonWidth + CONTROL_GAP;
+        int backButtonX = primaryStartX + (actionButtonWidth + CONTROL_GAP) * 2;
+        int toolTogglesButtonX = secondaryStartX;
+        int localModelButtonX = secondaryStartX + actionButtonWidth + CONTROL_GAP;
+        int agentStatusButtonX = secondaryStartX + (actionButtonWidth + CONTROL_GAP) * 2;
+        int debugButtonX = secondaryStartX + (actionButtonWidth + CONTROL_GAP) * 3;
         return new Layout(startX, startY, panelWidth, panelHeight, editorX, editorY, contentWidth, editorHeight,
                 editorHintY, numberLabelY, numberBoxY, numberBoxWidth, topPBoxX, maxOutputTokensBoxX,
-                numericHintY, validationY, saveButtonX, toolTogglesButtonX, localModelButtonX, agentStatusButtonX,
-                debugButtonX, backButtonX, actionButtonY, actionButtonWidth);
+                numericHintY, validationY, saveButtonX, ttsButtonX, backButtonX, toolTogglesButtonX,
+                localModelButtonX, agentStatusButtonX, debugButtonX, primaryActionY, secondaryActionY,
+                actionButtonWidth);
     }
 
     private void updateSaveState() {
@@ -278,17 +293,11 @@ public class LLMSettingsScreen extends Screen {
     }
 
     @Override
-    public void renderBackground(GuiGraphics guiGraphics) {
-        // No default dim overlay.
-    }
-
-    @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         Layout layout = this.createLayout();
         int centerX = layout.startX() + layout.panelWidth() / 2;
 
-        guiGraphics.fill(layout.startX(), layout.startY(), layout.startX() + layout.panelWidth(), layout.startY() + layout.panelHeight(), COL_BG);
-        guiGraphics.renderOutline(layout.startX(), layout.startY(), layout.panelWidth(), layout.panelHeight(), COL_BORDER);
+        HeroTheme.plainPanel(guiGraphics, layout.startX(), layout.startY(), layout.panelWidth(), layout.panelHeight());
         guiGraphics.drawCenteredString(this.font, this.title, centerX, layout.startY() + 10, COL_TITLE);
 
         guiGraphics.drawString(this.font,
@@ -321,11 +330,6 @@ public class LLMSettingsScreen extends Screen {
         super.render(guiGraphics, mouseX, mouseY, partialTick);
     }
 
-    @Override
-    public boolean isPauseScreen() {
-        return false;
-    }
-
     private record Layout(
             int startX,
             int startY,
@@ -344,12 +348,14 @@ public class LLMSettingsScreen extends Screen {
             int numericHintY,
             int validationY,
             int saveButtonX,
+            int ttsButtonX,
+            int backButtonX,
             int toolTogglesButtonX,
             int localModelButtonX,
             int agentStatusButtonX,
             int debugButtonX,
-            int backButtonX,
-            int actionButtonY,
+            int primaryActionY,
+            int secondaryActionY,
             int actionButtonWidth
     ) {
         int temperatureBoxX() {

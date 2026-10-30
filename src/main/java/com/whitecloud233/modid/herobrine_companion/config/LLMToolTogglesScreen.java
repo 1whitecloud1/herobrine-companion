@@ -1,10 +1,12 @@
 package com.whitecloud233.modid.herobrine_companion.config;
 
+import com.whitecloud233.modid.herobrine_companion.client.gui.HeroTheme;
 import com.whitecloud233.modid.herobrine_companion.BuildFlags;
 import com.whitecloud233.modid.herobrine_companion.client.gui.HeroScreen;
 import com.whitecloud233.modid.herobrine_companion.client.service.LLMConfig;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import com.whitecloud233.modid.herobrine_companion.client.gui.HeroPanelScreen;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -14,14 +16,14 @@ import net.minecraft.network.chat.Component;
  * 从 LLM 设置页进入，保存后写回 LLMConfig 并返回上一页。
  * 安全版构建中电脑 CMD / JVM 代码 / 联网查找 / JVM 优先四个开关随功能一起被排除，此处一并隐藏。
  */
-public class LLMToolTogglesScreen extends Screen {
+public class LLMToolTogglesScreen extends HeroPanelScreen {
     private static final int MIN_PANEL_WIDTH = 340;
     private static final int MIN_PANEL_HEIGHT = 280;
     private static final int BUTTON_HEIGHT = 20;
     private static final int CONTROL_GAP = 8;
-    private static final int COL_BG = 0xFF2B2B2B;
-    private static final int COL_BORDER = 0xFF555555;
-    private static final int COL_TITLE = 0xFFCC7832;
+    private static final int COL_BG = HeroTheme.BG_MAIN;
+    private static final int COL_BORDER = HeroTheme.BORDER;
+    private static final int COL_TITLE = HeroTheme.LABEL;
 
     // 每行开关采用“标签并入按钮”的全宽按钮（如“流式输出：开”），不再单独画标签行。
     // 安全版隐藏 4 行（电脑 CMD / JVM 代码 / 联网查找 / JVM 优先），剩余 2 行（指令模式 / 流式输出）。
@@ -130,7 +132,7 @@ public class LLMToolTogglesScreen extends Screen {
                     Tooltip.create(Component.translatable("gui.herobrine_companion.llm_settings.jvm_preferred_tooltip"))));
         }
 
-        // 公网访问总开关（安全版同样保留）：云端 LLM 与本地模型下载一起跟随 Windows 系统代理
+        // 代理只影响外部 HTTP 请求，本机服务始终直连。
         this.addRenderableWidget(new HeroScreen.ThemedButton(
                 contentLeft, rowYs[rowIndex++], contentWidth, BUTTON_HEIGHT,
                 this.getSystemProxyButtonMessage(),
@@ -153,24 +155,11 @@ public class LLMToolTogglesScreen extends Screen {
     }
 
     @Override
-    public void renderBackground(GuiGraphics guiGraphics) {
-        // No default dim overlay.
-    }
-
-    @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         Layout layout = this.computeLayout();
-        guiGraphics.fill(layout.panelLeft, layout.panelTop, layout.panelLeft + layout.panelWidth,
-                layout.panelTop + layout.panelHeight, COL_BG);
-        guiGraphics.renderOutline(layout.panelLeft, layout.panelTop, layout.panelWidth, layout.panelHeight,
-                COL_BORDER);
+        HeroTheme.plainPanel(guiGraphics, layout.panelLeft, layout.panelTop, layout.panelWidth, layout.panelHeight);
         guiGraphics.drawCenteredString(this.font, this.title, this.width / 2, layout.panelTop + 12, COL_TITLE);
         super.render(guiGraphics, mouseX, mouseY, partialTick);
-    }
-
-    @Override
-    public boolean isPauseScreen() {
-        return false;
     }
 
     private Component getCommandModeButtonMessage() {
