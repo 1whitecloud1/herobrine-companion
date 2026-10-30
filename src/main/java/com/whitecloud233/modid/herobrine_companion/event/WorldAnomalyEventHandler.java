@@ -1,5 +1,8 @@
 package com.whitecloud233.modid.herobrine_companion.event;
 
+import com.whitecloud233.modid.herobrine_companion.config.ServerConfigAccess;
+import com.whitecloud233.modid.herobrine_companion.config.ServerRule;
+
 import com.whitecloud233.modid.herobrine_companion.config.Config;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
@@ -22,7 +25,7 @@ public class WorldAnomalyEventHandler {
     @SubscribeEvent
     public static void onPlayerBreak(BlockEvent.BreakEvent event) {
         // 【新增】如果配置文件中禁用了方块修复，则完全不需要记录玩家破坏事件
-        if (!Config.heroBlockRestoration) {
+        if (!ServerConfigAccess.snapshot().enabled(ServerRule.BLOCK_RESTORATION)) {
             return;
         }
 

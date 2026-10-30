@@ -1,15 +1,14 @@
 package com.whitecloud233.modid.herobrine_companion.event;
 
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.modid.herobrine_companion.fight.ChallengeSession;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroLifecycleHandler;
+import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroDimensionHandler;
 import com.whitecloud233.modid.herobrine_companion.util.EndRingContext;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.entity.EntityJoinLevelEvent;
 import net.minecraftforge.event.entity.EntityTravelToDimensionEvent;
 import net.minecraftforge.event.entity.living.LivingEvent;
@@ -31,7 +30,7 @@ public class HeroEndringEvent {
     public static void onTravelDimension(EntityTravelToDimensionEvent event) {
         if (event.getEntity() instanceof HeroEntity hero) {
             // 👇 [核心新增] 如果是为了挑战而跨越维度，绝对放行！
-            if (hero.getPersistentData().getBoolean("IsChallengeActive")) {
+            if (ChallengeSession.isHeroInChallenge(hero)) {
                 return;
             }
 
@@ -49,9 +48,11 @@ public class HeroEndringEvent {
     }
 
     private static void runIntroSequence(HeroEntity hero) {
+        if (ChallengeSession.isHeroInChallenge(hero)) return;
+        HeroDimensionHandler.handleVoidProtection(hero);
         CompoundTag data = hero.getPersistentData();
         int tick = data.getInt("IntroTick");
-        Player player = hero.level().getNearestPlayer(hero, 50);
+        Player player = hero.level().getNearestPlayer(hero, 64);
 
         if (tick == 0 && player != null) {
              if (!player.getPersistentData().getBoolean("HasSeenHeroIntro")) {
@@ -64,27 +65,26 @@ public class HeroEndringEvent {
 
         if (tick < 100) {
             hero.setDeltaMovement(0, 0, 0);
-            hero.setPos(hero.getX(), 104, hero.getZ());
             if (player != null) hero.lookAt(player, 30, 30);
-        } else if (tick == 100 && player != null) {
-            teleportHeroNearPlayer(hero, player);
+        } else {
+            finishIntro(hero);
         }
         data.putInt("IntroTick", tick + 1);
     }
 
-    private static void teleportHeroNearPlayer(HeroEntity hero, Player player) {
-        Vec3 look = player.getLookAngle();
-        double targetX = player.getX() + look.x * 2;
-        double targetZ = player.getZ() + look.z * 2;
-        hero.teleportTo(targetX, player.getY(), targetZ);
-        hero.setNoGravity(false);
+    private static void finishIntro(HeroEntity hero) {
         hero.removeTag(EndRingContext.TAG_INTRO);
-        hero.level().playSound(null, hero.blockPosition(), SoundEvents.ENDERMAN_TELEPORT, SoundSource.HOSTILE, 1.0f, 1.0f);
+        HeroDimensionHandler.handleVoidProtection(hero);
     }
 
     private static void handleHeroJoin(HeroEntity newHero, EntityJoinLevelEvent event) {
+        // Recovery commits its canonical entity only after every join listener accepts the spawn.
+        if (newHero.removeTag(com.whitecloud233.modid.herobrine_companion.command.HeroRecoveryService.TAG_STAGED_RECOVERY)
+                || newHero.removeTag(EndRingContext.TAG_TRANSFER_STAGED)) {
+            return;
+        }
         // [修复 1：进场清场]
-        if (newHero.getPersistentData().getBoolean("IsChallengeActive")) {
+        if (ChallengeSession.isHeroInChallenge(newHero)) {
             // 必须把之前留在 End Ring 的剧情版假 Hero 强行抹除！只留真身！
             HeroLifecycleHandler.discardAllOtherHeroes(newHero);
             return;
@@ -92,10 +92,12 @@ public class HeroEndringEvent {
 
         if (newHero.getTags().contains(EndRingContext.TAG_RESPAWNED_SAFE)) {
             newHero.removeTag(EndRingContext.TAG_RESPAWNED_SAFE);
-            HeroLifecycleHandler.discardAllOtherHeroes(newHero);
-            return;
+            if (!event.loadedFromDisk()) {
+                HeroLifecycleHandler.discardAllOtherHeroes(newHero);
+                return;
+            }
         }
-        if (newHero.getTags().contains(EndRingContext.TAG_INTRO)) {
+        if (newHero.getTags().contains(EndRingContext.TAG_INTRO) && !event.loadedFromDisk()) {
             HeroLifecycleHandler.discardAllOtherHeroes(newHero);
             return;
         }

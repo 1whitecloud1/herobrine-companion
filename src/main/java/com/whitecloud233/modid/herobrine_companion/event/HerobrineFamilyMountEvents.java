@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.event;
 
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.modid.herobrine_companion.util.NbtKeys;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.awakened.AwakenedMobAccessor;
 import com.whitecloud233.modid.herobrine_companion.entity.awakened.AwakenedMobRelationState;
@@ -38,12 +39,12 @@ import java.util.UUID;
 
 @Mod.EventBusSubscriber(modid = HerobrineCompanion.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class HerobrineFamilyMountEvents {
-    private static final String JEAN_MOUNT_NO_AI_TAG = "HerobrineCompanionJeanMountNoAi";
-    private static final String JEAN_FRONT_HERO_TAG = "HerobrineCompanionJeanFrontHero";
-    private static final String JEAN_FRONT_HERO_TIME_TAG = "HerobrineCompanionJeanFrontHeroTime";
-    private static final String JEAN_PLAYER_RIDDEN_TAG = "HerobrineCompanionJeanPlayerRidden";
-    private static final String HERO_FRONT_SEAT_TAG = "HerobrineCompanionJeanFrontSeat";
-    private static final String HERO_FRONT_SEAT_NO_AI_TAG = "HerobrineCompanionJeanFrontSeatNoAi";
+    private static final String JEAN_MOUNT_NO_AI_TAG = NbtKeys.JEAN_MOUNT_NO_AI;
+    private static final String JEAN_FRONT_HERO_TAG = NbtKeys.JEAN_FRONT_HERO;
+    private static final String JEAN_FRONT_HERO_TIME_TAG = NbtKeys.JEAN_FRONT_HERO_TIME;
+    private static final String JEAN_PLAYER_RIDDEN_TAG = NbtKeys.JEAN_PLAYER_RIDDEN;
+    private static final String HERO_FRONT_SEAT_TAG = NbtKeys.HERO_FRONT_SEAT;
+    private static final String HERO_FRONT_SEAT_NO_AI_TAG = NbtKeys.HERO_FRONT_SEAT_NO_AI;
     private static final double FLIGHT_SPEED = 1.15D;
     private static final double VERTICAL_SPEED = 0.42D;
     private static final double HERO_SEAT_Y_OFFSET = 4.75D;
@@ -366,7 +367,7 @@ public final class HerobrineFamilyMountEvents {
         if (dragon.getPhaseManager().getCurrentPhase().getPhase() != EnderDragonPhase.HOVERING) {
             dragon.getPhaseManager().setPhase(EnderDragonPhase.HOVERING);
         }
-        dragon.getPersistentData().putBoolean("HeroSubmission", true);
+        dragon.getPersistentData().putBoolean(NbtKeys.MOB_SUBMISSION, true);
         dragon.setSilent(true);
         dragon.setDeltaMovement(Vec3.ZERO);
         dragon.setTarget(null);
@@ -381,12 +382,12 @@ public final class HerobrineFamilyMountEvents {
         }
         dragon.getPhaseManager().setPhase(EnderDragonPhase.HOVERING);
         dragon.setSilent(false);
-        dragon.getPersistentData().putBoolean("HeroSubmission", false);
+        dragon.getPersistentData().putBoolean(NbtKeys.MOB_SUBMISSION, false);
         dragon.setTarget(null);
     }
 
     private static void prepareJeanDragonBase(EnderDragon dragon) {
-        dragon.addTag("herobrine_companion_jean");
+        dragon.addTag(NbtKeys.JEAN_ENTITY_TAG);
         dragon.setDragonFight(null);
         dragon.setFightOrigin(BlockPos.containing(dragon.position()));
     }
@@ -419,7 +420,7 @@ public final class HerobrineFamilyMountEvents {
         dragon.getPersistentData().remove(JEAN_FRONT_HERO_TAG);
         dragon.getPersistentData().remove(JEAN_FRONT_HERO_TIME_TAG);
         dragon.getPersistentData().remove(JEAN_PLAYER_RIDDEN_TAG);
-        dragon.getPersistentData().putBoolean("HeroSubmission", false);
+        dragon.getPersistentData().putBoolean(NbtKeys.MOB_SUBMISSION, false);
         releaseMountedJean(dragon);
     }
 

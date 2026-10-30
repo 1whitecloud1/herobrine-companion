@@ -1,5 +1,8 @@
 package com.whitecloud233.modid.herobrine_companion.item;
 
+import com.whitecloud233.modid.herobrine_companion.config.ServerConfigAccess;
+import com.whitecloud233.modid.herobrine_companion.config.ServerRule;
+
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResultHolder;
@@ -23,7 +26,7 @@ public class TranscendencePermitItem extends Item {
         ItemStack stack = player.getItemInHand(hand);
 
         // 【新增】配置检查
-        if (!com.whitecloud233.modid.herobrine_companion.config.Config.transcendencePermitEnabled) {
+        if (!ServerConfigAccess.snapshot().enabled(ServerRule.TRANSCENDENCE_PERMIT)) {
             if (!level.isClientSide) {
                 player.sendSystemMessage(Component.translatable("message.herobrine_companion.item_disabled_in_config").withStyle(net.minecraft.ChatFormatting.RED));
             }

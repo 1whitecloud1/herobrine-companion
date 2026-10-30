@@ -1,5 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.event;
 
+import com.whitecloud233.modid.herobrine_companion.entity.logic.data.PeacefulProtection;
+
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -29,7 +31,7 @@ public class CombatMobsHandler {
                 
                 if (player.getTags().contains(PEACEFUL_TAG)) {
                     
-                    player.removeTag(PEACEFUL_TAG);
+                    PeacefulProtection.setEnabled(player, false);
                     
                     player.sendSystemMessage(Component.translatable("message.herobrine_companion.peace_broken"));
                     

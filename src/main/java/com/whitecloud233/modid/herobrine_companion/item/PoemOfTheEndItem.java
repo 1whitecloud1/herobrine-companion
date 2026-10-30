@@ -1,11 +1,14 @@
 package com.whitecloud233.modid.herobrine_companion.item;
 
+import com.whitecloud233.modid.herobrine_companion.config.ServerConfigAccess;
+import com.whitecloud233.modid.herobrine_companion.config.ServerRule;
+
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Multimap;
 import com.whitecloud233.modid.herobrine_companion.client.render.PoemOfTheEndGeoCompat;
 import com.whitecloud233.modid.herobrine_companion.combat.poem.PoemMeleeHit;
-import com.whitecloud233.modid.herobrine_companion.compat.epicfight.HeroEpicFightCompat;
-import com.whitecloud233.modid.herobrine_companion.compat.epicfight.HeroEpicFightStateMapper;
+import com.whitecloud233.modid.herobrine_companion.api.compat.HeroEpicFightCompat;
+import com.whitecloud233.modid.herobrine_companion.combat.HeroCombatStateMapper;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.projectile.CleaveBladeEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.projectile.RealmBreakerLightningEntity;
@@ -102,10 +105,10 @@ public class PoemOfTheEndItem extends DiggerItem {
 
     public String getEpicFightWeaponStyleKey(ItemStack stack) {
         return switch (getMode(stack)) {
-            case MODE_REALM_BREAKER -> HeroEpicFightStateMapper.HERO_WEAPON_STYLE_REALM_BREAKER;
-            case MODE_THUNDER_CALL -> HeroEpicFightStateMapper.HERO_WEAPON_STYLE_THUNDER;
-            case MODE_VOID_SHATTER -> HeroEpicFightStateMapper.HERO_WEAPON_STYLE_VOID_SHATTER;
-            default -> HeroEpicFightStateMapper.HERO_WEAPON_STYLE_BASIC;
+            case MODE_REALM_BREAKER -> HeroCombatStateMapper.HERO_WEAPON_STYLE_REALM_BREAKER;
+            case MODE_THUNDER_CALL -> HeroCombatStateMapper.HERO_WEAPON_STYLE_THUNDER;
+            case MODE_VOID_SHATTER -> HeroCombatStateMapper.HERO_WEAPON_STYLE_VOID_SHATTER;
+            default -> HeroCombatStateMapper.HERO_WEAPON_STYLE_BASIC;
         };
     }
 
@@ -225,6 +228,11 @@ public class PoemOfTheEndItem extends DiggerItem {
 
             // Start the full bolt immediately, in the same server tick as damage.
             PacketHandler.sendToTracking(new PaleLightningPacket(target.getX(), target.getY(), target.getZ(), 6.0F, true), target);
+            // 原版落雷的雷声与撞击声，由服务端广播给落点附近的玩家。
+            level.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.LIGHTNING_BOLT_THUNDER,
+                    SoundSource.WEATHER, 4.0F, 0.8F + level.random.nextFloat() * 0.2F);
+            level.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.LIGHTNING_BOLT_IMPACT,
+                    SoundSource.WEATHER, 2.0F, 0.5F + level.random.nextFloat() * 0.2F);
             // 修改：使用 magic() 伤害源，避免被雷电免疫
             target.hurt(level.damageSources().magic(), damage);
             count++;
@@ -454,7 +462,7 @@ public class PoemOfTheEndItem extends DiggerItem {
         // ==========================================
         // 【新增】：检查配置，如果关闭则直接取消技能
         // ==========================================
-        if (!com.whitecloud233.modid.herobrine_companion.config.Config.cleaveSkillEnabled) {
+        if (!ServerConfigAccess.snapshot().enabled(ServerRule.CLEAVE_SKILL)) {
             player.sendSystemMessage(net.minecraft.network.chat.Component.translatable("message.herobrine_companion.poem.disabled_by_server"));
             return;
         }

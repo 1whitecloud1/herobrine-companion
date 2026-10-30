@@ -15,8 +15,12 @@ public class HeroTrades {
 
     private static final Logger LOGGER = LogUtils.getLogger();
 
+    private static volatile long revision;
+    public static long revision() { return revision; }
+    public static void invalidate() { revision++; }
+
     public static MerchantOffers getOffers(HeroEntity hero) {
-        LOGGER.info("Generating offers for Hero. Trust level: {}", hero.getTrustLevel());
+        LOGGER.info("Generating offers for Herobrine. Trust level: {}", hero.getTrustLevel());
         MerchantOffers offers = new MerchantOffers();
         int trust = hero.getTrustLevel();
 
@@ -93,10 +97,10 @@ public class HeroTrades {
         // Level 4 (Trust >= 70): Memory Shard (new rare item)
         if (trust >= 70) {
             offers.add(new MerchantOffer(
-                new ItemStack(ModItems.UNSTABLE_GUNPOWDER.get(), 4), 
+                new ItemStack(ModItems.UNSTABLE_GUNPOWDER.get(), 4),
                 new ItemStack(ModItems.VOID_MARROW.get(), 4),
                 new ItemStack(Items.NETHER_STAR, 1),
-                Integer.MAX_VALUE, 40, 0.10f 
+                Integer.MAX_VALUE, 40, 0.10f
             ));
             offers.add(new MerchantOffer(
                 new ItemStack(ModItems.SOURCE_CODE_FRAGMENT.get(), 2),
@@ -105,13 +109,9 @@ public class HeroTrades {
             ));
         }
 
-        // --- 核心修改：在此处调用 KubeJS 事件 ---
-        // --- 核心修改：安全调用 KubeJS 事件 ---
-        if (ModList.get().isLoaded("kubejs")) {
-            // 只有在 KubeJS 真实存在时，才去调用辅助类，完美避开类加载报错
+        if (!hero.level().isClientSide && ModList.get().isLoaded("kubejs")) {
             SafeKubeJSCaller.fireEvent(offers, hero);
         }
-// -------------------------------------
         return offers;
     }
 
@@ -120,7 +120,7 @@ public class HeroTrades {
         if (offer.shouldRewardExp()) {
             int xp = offer.getXp();
             hero.increaseTrust(xp);
-            hero.resetOffers(); 
+            hero.resetOffers();
         }
     }
 }

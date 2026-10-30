@@ -27,7 +27,7 @@ public class ChatEvents {
                 HeroWorldData worldData = HeroWorldData.get(serverLevel);
                 UUID playerUUID = event.getPlayer().getUUID();
 
-                event.getPlayer().sendSystemMessage(Component.translatable("message.herobrine_companion.chat_summon.debug.uuid", playerUUID));
+                event.getPlayer().sendSystemMessage(Component.translatable("message.herobrine_companion.chat_summon.debug.uuid", playerUUID.toString()));
 
                 HeroEntity existingHero = HeroSummonItem.findHeroInAnyDimension(serverLevel.getServer(), playerUUID);
 
@@ -57,14 +57,14 @@ public class ChatEvents {
                         // 3. 强制提前将它的 UUID 写入世界
                         worldData.setActiveHeroUUID(playerUUID, hero.getUUID());
 
-                        event.getPlayer().sendSystemMessage(Component.translatable("message.herobrine_companion.chat_summon.debug.preparing", newHeroUUID));
+                        event.getPlayer().sendSystemMessage(Component.translatable("message.herobrine_companion.chat_summon.debug.preparing", newHeroUUID.toString()));
 
                         // 4. 正式加入世界
                         if (serverLevel.addFreshEntity(hero)) {
                             worldData.setSpawnedFromChat(playerUUID, true);
                             event.getPlayer().sendSystemMessage(Component.translatable("message.herobrine_companion.chat_summon.success"));
                         } else {
-                            event.getPlayer().sendSystemMessage(Component.translatable("message.herobrine_companion.chat_summon.debug.add_fresh_fail", newHeroUUID));
+                            event.getPlayer().sendSystemMessage(Component.translatable("message.herobrine_companion.chat_summon.debug.add_fresh_fail", newHeroUUID.toString()));
                         }
                     } else {
                         event.getPlayer().sendSystemMessage(Component.translatable("message.herobrine_companion.chat_summon.debug.create_fail"));

@@ -2,6 +2,7 @@ package com.whitecloud233.modid.herobrine_companion.event;
 
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.modid.herobrine_companion.entity.logic.HeroInvitationHelper;
 import com.whitecloud233.modid.herobrine_companion.entity.projectile.RealmBreakerLightningEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
@@ -60,7 +61,7 @@ public class HeroGuardEventHandler {
 
         for (HeroEntity hero : heroes) {
             // 2. 检查 Herobrine 是否处于守卫状态 (Action 3) 且有合法的守卫目标
-            if (hero.getInvitedAction() == 3 && hero.getInvitedPos() != null) {
+            if (hero.getInvitedAction() == HeroInvitationHelper.ACTION_GUARD && hero.getInvitedPos() != null) {
                 BlockPos guardedPos = hero.getInvitedPos();
 
                 // 【新增校验】如果守卫的箱子/方块已经消失（变为空气），则自动失效，不产生粒子也不保护
@@ -111,7 +112,7 @@ public class HeroGuardEventHandler {
 
         for (HeroEntity hero : heroes) {
             // 2. 确认 Herobrine 处于守卫模式 (Action 3) 且目标存在
-            if (hero.getInvitedAction() == 3 && hero.getInvitedPos() != null) {
+            if (hero.getInvitedAction() == HeroInvitationHelper.ACTION_GUARD && hero.getInvitedPos() != null) {
                 BlockPos guardedPos = hero.getInvitedPos();
 
                 // 【新增校验】如果守卫的箱子/方块已经消失，取消禁锢和粒子效果
@@ -168,7 +169,7 @@ public class HeroGuardEventHandler {
         List<HeroEntity> heroes = level.getEntitiesOfClass(HeroEntity.class, searchBox);
 
         for (HeroEntity hero : heroes) {
-            if (hero.getInvitedAction() == 3 && hero.getInvitedPos() != null) {
+            if (hero.getInvitedAction() == HeroInvitationHelper.ACTION_GUARD && hero.getInvitedPos() != null) {
                 BlockPos guardedPos = hero.getInvitedPos();
 
                 // 如果守卫的箱子已经消失，不做保护处理

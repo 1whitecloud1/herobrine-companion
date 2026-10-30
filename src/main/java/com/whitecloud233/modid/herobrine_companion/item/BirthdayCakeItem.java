@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.item;
 
 import com.whitecloud233.modid.herobrine_companion.entity.gift.HeroBirthdayCakeService;
+import com.whitecloud233.modid.herobrine_companion.util.DebugLog;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import com.whitecloud233.modid.herobrine_companion.network.BirthdayCakePlacePacket;
@@ -57,7 +58,7 @@ public class BirthdayCakeItem extends Item {
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
         ItemStack held = player.getItemInHand(hand);
-        LOGGER.info("[HeroGift] cake use: player={} sneaking={} held={}",
+        DebugLog.info(LOGGER, "[HeroGift] cake use: player={} sneaking={} held={}",
                 player.getName().getString(), player.isShiftKeyDown(), held.getCount());
         if (player.isShiftKeyDown()) {
             // 摆放/收回一律走网络包:原版物品冷却期间不会调用 use/useOn(见 BirthdayCakePlacePacket)

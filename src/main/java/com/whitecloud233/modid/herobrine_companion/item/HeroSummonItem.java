@@ -1,6 +1,6 @@
 package com.whitecloud233.modid.herobrine_companion.item;
 
-import com.whitecloud233.modid.herobrine_companion.compat.cooking.HeroCookingCompat;
+import com.whitecloud233.modid.herobrine_companion.entity.cooking.CookingService;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.logic.HeroInvitationHelper;
 import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroDataHandler;
@@ -8,6 +8,7 @@ import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroLogic;
 import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroStateManager;
 import com.whitecloud233.modid.herobrine_companion.init.ModEntities;
 import com.whitecloud233.modid.herobrine_companion.compat.cooking.OpenCookSelectionPacket;
+import com.whitecloud233.modid.herobrine_companion.compat.cooking.OpenMillstoneSelectionPacket;
 import com.whitecloud233.modid.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.modid.herobrine_companion.world.inventory.HeroContractMenu;
 import com.whitecloud233.modid.herobrine_companion.world.structure.ModStructures;
@@ -112,14 +113,31 @@ public class HeroSummonItem extends Item {
 
                 if (actionType > 0 && existingHero != null) {
                     if (existingHero.level().dimension() == level.dimension()) {
-                        if (actionType == HeroCookingCompat.INVITED_ACTION_COOK && player instanceof ServerPlayer serverPlayer) {
-                            var cookOptions = HeroCookingCompat.getCookOptions(existingHero, clickedPos);
+                        if (actionType == CookingService.INVITED_ACTION_COOK && player instanceof ServerPlayer serverPlayer) {
+                            var cookOptions = CookingService.getCookOptions(existingHero, clickedPos);
                             if (!cookOptions.isEmpty()) {
                                 PacketHandler.sendToPlayer(new OpenCookSelectionPacket(existingHero.getId(), clickedPos, cookOptions), serverPlayer);
                                 setLastUseTime(stack, currentTime);
                                 return InteractionResult.SUCCESS;
                             }
                             player.sendSystemMessage(Component.translatable("message.herobrine_companion.invite_cook_none"));
+                            return InteractionResult.SUCCESS;
+                        }
+                        // 石磨：先让玩家挑材料与份数，选完由服务端扣料投料再派活。
+                        if (actionType == CookingService.INVITED_ACTION_MILLSTONE && player instanceof ServerPlayer serverPlayer) {
+                            BlockPos center = CookingService.millstoneCenter(level, clickedPos);
+                            if (CookingService.isMillstoneBusy(existingHero, center)
+                                    || !CookingService.canHostMillstone(existingHero, center)) {
+                                player.sendSystemMessage(Component.translatable("message.herobrine_companion.invite_millstone_busy"));
+                                return InteractionResult.SUCCESS;
+                            }
+                            var millstoneOptions = CookingService.getMillstoneOptions(existingHero, center);
+                            if (!millstoneOptions.isEmpty()) {
+                                PacketHandler.sendToPlayer(new OpenMillstoneSelectionPacket(existingHero.getId(), center, millstoneOptions), serverPlayer);
+                                setLastUseTime(stack, currentTime);
+                                return InteractionResult.SUCCESS;
+                            }
+                            player.sendSystemMessage(Component.translatable("message.herobrine_companion.invite_millstone_no_input"));
                             return InteractionResult.SUCCESS;
                         }
                         HeroLogic.handlePlayerInvitation(existingHero, player, clickedPos, actionType);
@@ -158,8 +176,13 @@ public class HeroSummonItem extends Item {
             if (existingHero.isPassenger()) {
                 existingHero.stopRiding();
             }
+            // 先把石磨松开：否则石磨下一 tick 会把刚传走的 Hero 拽回磨盘。
+            if (existingHero.getInvitedAction() == CookingService.INVITED_ACTION_MILLSTONE) {
+                CookingService.releaseMillstone(existingHero, existingHero.getInvitedPos());
+                CookingService.endCookChunkTicket(existingHero);
+            }
             existingHero.setInvitedPos(null);
-            existingHero.setInvitedAction(0);
+            existingHero.setInvitedAction(HeroInvitationHelper.ACTION_NONE);
 
             // 跨维度传送逻辑
             if (existingHero.level().dimension() != serverLevel.dimension()) {
