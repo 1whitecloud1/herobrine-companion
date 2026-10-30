@@ -5,13 +5,10 @@ plugins {
     id 'net.neoforged.moddev' version '2.0.139'
 }
 
-// 安全版/完整版开关：普通构建（不带参数）默认就是安全版，排除
-//   1) 本机电脑控制（cmd 执行）
-//   2) JVM 代码注入
-//   3) 联网查找（web_lookup）
-//   4) 本地模型（运行时下载 llama.cpp 推理引擎/GGUF 模型并启动 llama-server 进程）
-// 四个功能；需要完整功能时显式传 -Pfull=true（产物 jar 文件名追加 -full 后缀，避免与普通构建混淆）。
-// 旧的 -PcfSafe=true 仍可用作显式安全版声明（默认值已翻转：cfSafe = !full）。
+// 普通构建默认排除电脑控制、JVM 代码注入和联网查找三个功能。
+// 手动配置的本地模型连接位于 src/main/java，两种构建均包含；不下载或启动外部程序。
+// 需要完整功能时传 -Pfull=true（jar 文件名追加 -full 后缀）。
+// 旧的 -PcfSafe=true 仍可用作显式安全版声明。
 def fullBuild = providers.gradleProperty("full")
         .map { it.toBoolean() }
         .orElse(false)
@@ -92,15 +89,40 @@ base {
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
-//def epicFightArtifact = "curse.maven:epic-fight-mod-405076:${project.epicfight_file_id}"
-//ext.epicFightArtifact = epicFightArtifact
-def waveyCapesLocalJar = file("libs/waveycapes-neoforge-1.9.2-mc1.21.1.jar")
 def kaleidoscopeCompatLocalJar = file("libs/kaleidoscope_compat-2.7.2-neoforge+mc1.21.1.jar")
 
 // Kaleidoscope Cookery 运行版本切换：默认 1.4.1（8266772），
 // runClient/build -PcookeryFileId=7966281 切换到 1.3.x 验证兼容。
 // 兼容层（HeroKaleidoscopeCompat）用反射处理两版字段差异，须同时对两版可编译。
 def cookeryFileId = providers.gradleProperty("cookeryFileId").orElse("8266772").get()
+
+// Patchouli（帕秋莉手册）：同行手册的书本载体，运行时软依赖。
+//   gradlew runClient -PwithPatchouli=false   → 检查未安装 Patchouli 的环境（不发放手册）
+// 目标为 1.21.1 NeoForge 构建；1.20.1 的 vazkii.patchouli:Patchouli:1.20.1-85-FORGE 不适用于此。
+// 代码侧全程不 import vazkii.patchouli.*（见 CompanionGuideService），因此这里只声明 runtimeOnly：
+// 编译期不需要它，去掉开关也不会让编译失败。
+def patchouliVersion = providers.gradleProperty("patchouliVersion").orElse("1.21.1-93-neoforge").get()
+def withPatchouli = providers.gradleProperty("withPatchouli").map { it.toBoolean() }.orElse(true)
+
+
+// spark 性能分析器：默认不加载，仅性能排查时显式打开。
+//   gradlew runClient -PwithSpark=true -PsparkVersion=<NeoForge 1.21.1 版本>
+//   gradlew runServer -PwithSpark=true -PsparkVersion=<...>   → 游戏内 /spark
+//
+// 与 1.20.1 源项目的两点差异（务必注意）：
+//  1) 源用 fg.deobf() 包了一层；NeoForge moddev 插件下不需要重映射，**必须去掉**。
+//  2) 源默认 sparkVersion = 1.10.53-forge，那是 1.20.1 专用版本线，在 1.21.1 上不可用。
+//     这里**不设默认值**：开了 withSpark 却没给 sparkVersion 就直接失败，
+//     避免静默解析到一个不兼容的 jar 而在运行期才炸。
+// 版本号查 https://modrinth.com/mod/spark/versions?l=neoforge&g=1.21.1
+// 纯开发辅助，只加 runtimeOnly，不会进 build/libs 的产物 jar。
+def withSpark = providers.gradleProperty("withSpark")
+        .map { it.toBoolean() }
+        .orElse(false)
+if (withSpark.get() && !providers.gradleProperty("sparkVersion").isPresent()) {
+    throw new GradleException("withSpark=true 时必须同时给出 -PsparkVersion=<spark 的 NeoForge 1.21.1 版本号>（1.10.53-forge 只支持 1.20.1）。")
+}
+def sparkVersion = providers.gradleProperty("sparkVersion").orElse("")
 
 neoForge {
     version = project.neo_version
@@ -159,11 +181,10 @@ sourceSets.main.resources {
 }
 
 // === 安全版 / 完整版（full）===
-// 四个会被 CurseForge 静态扫描或玩家安全审查标记的功能源码放在独立的 src/full/java：
+// 三个需要独立构建的功能源码放在 src/full/java：
 //  1) 本机电脑控制（SafeComputerControlService -> ProcessBuilder + cmd.exe）
 //  2) JVM 代码注入（InMemoryJvmCodeCompiler -> 运行时编译 + defineClass）
 //  3) 联网查找（WebLookupService -> 白名单站点的 HTTP 搜索/抓取）
-//  4) 本地模型（LocalModelLauncher -> 运行时下载 llama.cpp 引擎/GGUF 模型并启动进程）
 // 普通构建（默认、无参数）不加入 src/full/java，改用 src/cfsafe/java 下的惰性 stub
 // （同 FQCN、恒不可用），保证 AIService / AIPromptAssembler / AIActionIntentInference
 // 等引用方仍可编译，但 jar 内不含任何危险字节码。
@@ -215,8 +236,6 @@ tasks.named('compileJava') {
     dependsOn generateCfSafeBuildFlags
 }
 
-//apply from: "$rootDir/gradle/epicfight-compat.gradle"
-
 dependencies {
 
 
@@ -224,29 +243,16 @@ dependencies {
 
 
     // KubeJS (Optional)
-    compileOnly("dev.latvian.mods:kubejs-neoforge:2101.+") {
+    compileOnly("dev.latvian.mods:kubejs-neoforge:2101.7.2-build.379") {
         exclude group: 'dev.latvian.mods', module: 'better-advanced-tooltips'
     }
-// [新增] Rhino (KubeJS 的脚本引擎依赖)
-    // [新增] 显式引入 Rhino，并使用 implementation 确保编译和运行都可用
-    compileOnly "dev.latvian.mods:rhino:2101.+"
-    runtimeOnly "dev.latvian.mods:rhino:2101.+"
-
-/*   if (enableEpicFightCompile) {
-        compileOnly epicFightArtifact
+    compileOnly "dev.latvian.mods:rhino:2101.2.8-build.91"
+    if (providers.gradleProperty('withKubeJS').map { it.toBoolean() }.orElse(false).get()) {
+        runtimeOnly("dev.latvian.mods:kubejs-neoforge:2101.7.2-build.379") {
+            exclude group: 'dev.latvian.mods', module: 'better-advanced-tooltips'
+        }
+        runtimeOnly "dev.latvian.mods:rhino:2101.2.8-build.91"
     }
-    if (enableEpicFightCompile && enableEpicFightDevRuntime) {
-        runtimeOnly epicFightArtifact
-    }
-*/
-
-    runtimeOnly files(waveyCapesLocalJar)
-
-    compileOnly "curse.maven:accessories-mod-938917:7583320"
-    runtimeOnly "curse.maven:accessories-mod-938917:7583320"
-
-    compileOnly "curse.maven:cloth-config-mod-348521:5729127"
-    runtimeOnly "curse.maven:cloth-config-mod-348521:5729127"
 
     // GeckoLib（终末之诗 3D 模型，可选依赖）
     // 用 -PnoGeckolib=true 关掉 runtimeOnly 以验证「未装 GeckoLib → 回退 2D」路径；
@@ -268,16 +274,6 @@ dependencies {
     //https://www.curseforge.com/minecraft/mc-mods/kaleidoscope-cookery/download/7966281 (1.3.x)
  //   compileOnly files(kaleidoscopeCompatLocalJar)
   //  runtimeOnly files(kaleidoscopeCompatLocalJar)
-    compileOnly "curse.maven:weapons-of-miracles-epicfight-918614:8691476"
-    runtimeOnly "curse.maven:weapons-of-miracles-epicfight-918614:8691476"
-
-
-    compileOnly "curse.maven:simplehats-mod-631990:5970513"
-    runtimeOnly "curse.maven:simplehats-mod-631990:5970513"
-
-    compileOnly "curse.maven:owo-lib-mod-532610:6785734"
-    runtimeOnly "curse.maven:owo-lib-mod-532610:6785734"
-
     compileOnly "mezz.jei:jei-${minecraft_version}-common-api:${jei_version}"
     compileOnly "mezz.jei:jei-${minecraft_version}-neoforge-api:${jei_version}"
     // at runtime, use the full JEI jar for NeoForge (only for dev environment)
@@ -286,23 +282,21 @@ dependencies {
     compileOnly "top.theillusivec4.curios:curios-neoforge:9.5.1+1.21.1:api"
     runtimeOnly "top.theillusivec4.curios:curios-neoforge:9.5.1+1.21.1"
 
-    // 引入 Armourer's Workshop 进行测试和 API 调用 (NeoForge 1.21.1)
-    // 直接传入字符串即可，无需 fg.deobf
-    // 这里的 6701555 是时装工坊 1.21.1-3.2.3-beta 版本的参考 File ID，请根据需要替换为最新 ID
-    compileOnly "curse.maven:armourers-workshop-229523:7165519"
-    runtimeOnly "curse.maven:armourers-workshop-229523:7165519"
 
-    compileOnly "curse.maven:epic-fight-mod-405076:8080214"
-    runtimeOnly "curse.maven:epic-fight-mod-405076:8080214"
-    //https://www.curseforge.com/minecraft/mc-mods/epic-fight-mod/download/8080214
+    // === spark 性能分析器（仅 -PwithSpark=true 时加载）===
+    // NeoForge moddev 下不需要 fg.deobf 重映射，直接按坐标引入即可。
+    // 四个 run 配置（client/client2/server/data）都在 neoForge.runs 里声明，
+    // runtimeOnly 会一并带上，游戏内命令前缀：客户端 /sparkc，服务端 /spark。
+    if (withSpark.get()) {
+        runtimeOnly "maven.modrinth:spark:${sparkVersion.get()}"
+    }
 
-    // Epic Fight Nightfall(夜幕) —— 夜幕技能系统运行时依赖(代码仅反射调用,编译期不需要)
-    // https://www.curseforge.com/minecraft/mc-mods/epicfight-nightfall/download/8573921
-    runtimeOnly "curse.maven:epicfight-nightfall-1307848:8573921"
-
-    // Epic Fight Invincible(无敌) —— 无敌技能系统运行时依赖(代码仅反射调用,编译期不需要)
-    // https://www.curseforge.com/minecraft/mc-mods/epic-fight-invincible/download/8390375
-    runtimeOnly "curse.maven:epicfight-invincible-1184379:8390375"
+    // === Patchouli（帕秋莉手册，软依赖）===
+    // only 运行时需要：本模组不 import 任何 vazkii.patchouli.* 类型，
+    // 手册物品与 patchouli:book 数据组件都按注册名查表取得。
+    if (withPatchouli.get()) {
+        runtimeOnly "maven.modrinth:patchouli:${patchouliVersion}"
+    }
 }
 
 
@@ -332,6 +326,8 @@ sourceSets.main.resources.srcDir generateModMetadata
 neoForge.ideSyncTask generateModMetadata
 
 tasks.named('processResources', ProcessResources) {
+    exclude '**/*.bak'
+    includeEmptyDirs = false
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
@@ -362,9 +358,232 @@ tasks.withType(JavaExec).configureEach {
     systemProperty "file.encoding", "UTF-8"
 }
 
+// 独立运行快速回归，不解析仅供游戏启动的 runtimeOnly 模组。
+// 回归入口全部是普通 main 类，不依赖 JUnit 下载，也不读取被 .gitignore 忽略的 scripts/。
+ sourceSets {
+    regression {
+        java.setSrcDirs(['src/test/java'])
+        java.include '**/*Checks.java'
+        resources.setSrcDirs(['src/test/resources'])
+        compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+        runtimeClasspath = output + compileClasspath
+    }
+    test {
+        java.exclude '**/*Checks.java'
+    }
+}
+
+tasks.register('verifyEndRing', JavaExec) {
+    group = 'verification'
+    dependsOn tasks.named('regressionClasses')
+    mainClass = 'com.whitecloud233.herobrine_companion.entity.logic.event.EndRingRegressionChecks'
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
+    classpath = sourceSets.regression.runtimeClasspath
+    systemProperty 'log4j.configurationFile', 'log4j2-regression.xml'
+}
+tasks.named('check') { dependsOn 'verifyEndRing' }
+
+tasks.register('verifyCombatPursuit', JavaExec) {
+    group = 'verification'
+    description = 'Verify ground combo continuation, flight escape and safe melee landing.'
+    dependsOn tasks.named('regressionClasses')
+    mainClass = 'com.whitecloud233.herobrine_companion.compat.epicfight.CombatPursuitChecks'
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
+    classpath = sourceSets.regression.output
+    args projectDir.absolutePath
+}
+tasks.named('check') { dependsOn 'verifyCombatPursuit' }
+
+tasks.register('verifyProtectionAndEndRing', JavaExec) {
+    group = 'verification'
+    description = 'Verify protection UI sync and permanent End Ring story positioning.'
+    dependsOn tasks.named('regressionClasses')
+    mainClass = 'com.whitecloud233.herobrine_companion.regression.ProtectionAndEndRingChecks'
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
+    classpath = sourceSets.regression.output
+    args projectDir.absolutePath
+}
+tasks.named('check') { dependsOn 'verifyProtectionAndEndRing' }
+
+tasks.register('verifyClientSyncAudit', JavaExec) {
+    group = 'verification'
+    description = 'Verify reward snapshots, UI acknowledgements, quest cloning and connection cleanup.'
+    dependsOn tasks.named('regressionClasses')
+    mainClass = 'com.whitecloud233.herobrine_companion.regression.ClientSyncAuditChecks'
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
+    classpath = sourceSets.regression.output
+    args projectDir.absolutePath
+}
+tasks.named('check') { dependsOn 'verifyClientSyncAudit' }
+
+tasks.register('verifyTranslationArguments', JavaExec) {
+    group = 'verification'
+    description = 'Check translation argument types to prevent system_chat encoding failures.'
+    dependsOn tasks.named('regressionClasses')
+    mainClass = 'com.whitecloud233.herobrine_companion.network.TranslationArgumentChecks'
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
+    classpath = sourceSets.regression.runtimeClasspath
+    maxHeapSize = '2g'
+    systemProperty 'log4j.configurationFile', 'log4j2-regression.xml'
+    args sourceSets.main.java.srcDirs.findAll { it.exists() }.collect { it.absolutePath }
+}
+tasks.named('check') { dependsOn 'verifyTranslationArguments' }
+
+tasks.register('verifySystemChatCodec', JavaExec) {
+    group = 'verification'
+    description = 'Round-trip system_chat packets through the vanilla codec.'
+    dependsOn tasks.named('regressionClasses')
+    mainClass = 'com.whitecloud233.herobrine_companion.network.SystemChatCodecChecks'
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
+    classpath = sourceSets.regression.runtimeClasspath
+    classpath += files(tasks.named('createMinecraftArtifacts').flatMap { it.resourcesArtifact })
+    systemProperty 'log4j.configurationFile', 'log4j2-regression.xml'
+}
+tasks.named('check') { dependsOn 'verifySystemChatCodec' }
+
+tasks.register('verifyTerrainEditTasks', JavaExec) {
+    group = 'verification'
+    description = 'Verify inherited terrain task registration and callback cleanup on the NeoForge bus.'
+    dependsOn tasks.named('regressionClasses')
+    mainClass = 'com.whitecloud233.herobrine_companion.world.terrain.TerrainEditTaskChecks'
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
+    classpath = sourceSets.regression.runtimeClasspath
+    classpath += files(tasks.named('createMinecraftArtifacts').flatMap { it.resourcesArtifact })
+    systemProperty 'log4j.configurationFile', 'log4j2-regression.xml'
+}
+
+tasks.named('check') { dependsOn 'verifyTerrainEditTasks' }
+
+/*
+// 必需回归检查随仓库提交。
+def regressionChecks = [
+        verifyUninstallCompat: 'com.whitecloud233.herobrine_companion.compat.uninstall.EndRingUninstallChecks',
+        verifyPlatformInputs: 'com.whitecloud233.herobrine_companion.util.PlatformInputsChecks',
+        verifySpeechOutput: 'com.whitecloud233.herobrine_companion.client.tts.SpeechOutputChecks',
+        verifyMultilineEditor: 'com.whitecloud233.herobrine_companion.config.MultilineEditorChecks',
+        verifyAgentFeedback: 'com.whitecloud233.herobrine_companion.client.service.AgentFeedbackChecks',
+        verifyPoemOutlineBounds: 'com.whitecloud233.herobrine_companion.client.render.PoemOutlineBoundsChecks',
+        verifyCompanionCommands: 'com.whitecloud233.herobrine_companion.command.HeroCommandChecks',
+        verifyEffectPacketCodecs: 'com.whitecloud233.herobrine_companion.network.EffectPacketCodecChecks',
+        verifyRenderReuse: 'com.whitecloud233.herobrine_companion.client.particle.RenderReuseChecks',
+        verifyDestructionRefactor: 'com.whitecloud233.herobrine_companion.destructiongod.world.DestructionRefactorChecks',
+        verifyTerrainBudget: 'com.whitecloud233.herobrine_companion.destructiongod.world.TerrainBudgetChecks',
+        verifyTemplateImport: 'com.whitecloud233.herobrine_companion.structure.template.TemplateImportChecks',
+        verifyTemplatePackets: 'com.whitecloud233.herobrine_companion.network.TemplatePacketChecks',
+        verifyTemplateLlm: 'com.whitecloud233.herobrine_companion.client.service.TemplateLlmChecks',
+        verifyTemplatePlacement: 'com.whitecloud233.herobrine_companion.structure.template.TemplatePlacementChecks',
+        verifyCompanionRules: 'com.whitecloud233.herobrine_companion.entity.companion.CompanionModeChecks',
+        verifyPersistenceState: 'com.whitecloud233.herobrine_companion.entity.logic.data.HeroPersistenceChecks',
+        verifyHeroEntityRefactor: 'com.whitecloud233.herobrine_companion.entity.logic.data.HeroEntityRefactorChecks',
+        verifyHeroVisualState: 'com.whitecloud233.herobrine_companion.entity.visual.HeroVisualStateChecks',
+        verifyWorldData: 'com.whitecloud233.herobrine_companion.entity.logic.data.HeroWorldDataChecks',
+        verifyPacketCodecs: 'com.whitecloud233.herobrine_companion.network.PacketCodecChecks',
+        verifyLlmAdapters: 'com.whitecloud233.herobrine_companion.client.llm.LlmAdapterChecks',
+        verifyLocalModelConnections: 'com.whitecloud233.herobrine_companion.client.service.LocalModelConnectionChecks',
+        verifyAiChatContext: 'com.whitecloud233.herobrine_companion.client.service.AIChatContextChecks',
+        verifyToolCallReply: 'com.whitecloud233.herobrine_companion.client.service.ToolCallReplyChecks',
+        verifyAgentReliability: 'com.whitecloud233.herobrine_companion.entity.ai.agent.AgentReliabilityChecks',
+        verifyTaskLifecycle: 'com.whitecloud233.herobrine_companion.entity.ai.agent.task.TaskLifecycleChecks',
+        verifyAgentToolContract: 'com.whitecloud233.herobrine_companion.entity.ai.agent.tool.AgentToolContractChecks',
+        verifyAgentProtocol: 'com.whitecloud233.herobrine_companion.network.AgentProtocolChecks',
+        verifyTemplateScale: 'com.whitecloud233.herobrine_companion.structure.template.TemplateScaleChecks',
+        verifyAgentFeatures: 'com.whitecloud233.herobrine_companion.network.AgentFeatureNegotiationChecks',
+        verifyAiArchitecture: 'com.whitecloud233.herobrine_companion.architecture.AIArchitectureChecks',
+        verifyCooking: 'com.whitecloud233.herobrine_companion.entity.cooking.CookingChecks',
+        verifyKitchenActionCooldown: 'com.whitecloud233.herobrine_companion.compat.kaleidoscope.KitchenActionCooldownChecks',
+        verifyKitchenRecipes: 'com.whitecloud233.herobrine_companion.compat.kaleidoscope.KitchenRecipeChecks',
+        verifyKitchenCompatibility: 'com.whitecloud233.herobrine_companion.compat.kaleidoscope.KitchenCompatibilityChecks',
+        verifyCookingLegacy: 'com.whitecloud233.herobrine_companion.compat.cooking.CookingLegacyChecks',
+        verifyCookingPackets: 'com.whitecloud233.herobrine_companion.compat.cooking.CookingPacketChecks',
+        verifyCookingArchitecture: 'com.whitecloud233.herobrine_companion.architecture.CookingArchitectureChecks',
+        verifyServerConfig: 'com.whitecloud233.herobrine_companion.config.ServerConfigChecks',
+        verifyNeoForgeConfig: 'com.whitecloud233.herobrine_companion.config.ForgeConfigChecks',
+        verifyConfigArchitecture: 'com.whitecloud233.herobrine_companion.architecture.ConfigArchitectureChecks',
+        verifyServerConfigCodecs: 'com.whitecloud233.herobrine_companion.network.ServerConfigCodecChecks',
+        verifyMemoryImport: 'com.whitecloud233.herobrine_companion.client.memory.MemoryImportChecks',
+        verifyConversationImport: 'com.whitecloud233.herobrine_companion.client.service.ConversationImportChecks',
+        verifyMemoryArchitecture: 'com.whitecloud233.herobrine_companion.architecture.MemoryArchitectureChecks',
+        verifyArchitecture: 'com.whitecloud233.herobrine_companion.architecture.ArchitectureChecks',
+        verifyGlitchText: 'com.whitecloud233.herobrine_companion.util.GlitchTextChecks',
+        verifyHeroSpeechStyle: 'com.whitecloud233.herobrine_companion.client.service.HeroSpeechStyleChecks',
+        verifyCompanionGuide: 'com.whitecloud233.herobrine_companion.guide.CompanionGuideChecks',
+        verifyPoemGlow: 'com.whitecloud233.herobrine_companion.client.render.PoemGlowChecks',
+        verifyHeroPoemAnimation: 'com.whitecloud233.herobrine_companion.client.animation.HeroPoemAnimationChecks'
+]
+regressionChecks.each { taskName, entryPoint ->
+    tasks.register(taskName, JavaExec) {
+        group = 'verification'
+        dependsOn tasks.named('regressionClasses')
+        mainClass = entryPoint
+        javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
+        classpath = sourceSets.regression.runtimeClasspath
+        // 回归进程只写控制台，避免多个 JVM 与游戏争用 logs/latest.log。
+        systemProperty 'log4j.configurationFile', 'log4j2-regression.xml'
+        if (taskName == 'verifyPoemGlow') {
+            classpath += files(tasks.named('createMinecraftArtifacts').flatMap { it.resourcesArtifact })
+        }
+        if (taskName == 'verifyHeroPoemAnimation') {
+            // 本检查必须证明「无 Epic Fight / GeckoLib」时的真实行为，运行时要剥离这两个可选动画模组。
+            classpath = sourceSets.regression.runtimeClasspath.filter { entry ->
+                if (!entry.name.endsWith('.jar')) return true
+                def archive = new java.util.zip.ZipFile(entry)
+                try {
+                    return archive.getEntry('yesman/epicfight/main/EpicFightMod.class') == null &&
+                            archive.getEntry('software/bernie/geckolib/GeckoLib.class') == null
+                } finally { archive.close() }
+            }
+        }
+        // 纯源码/资源扫描的检查：不带主 runtimeClasspath，避免拉起仅供游戏启动的模组。
+        if (taskName in ['verifyArchitecture', 'verifyAiArchitecture', 'verifyCookingArchitecture', 'verifyConfigArchitecture', 'verifyMemoryArchitecture', 'verifyCompanionGuide']) {
+            classpath = sourceSets.regression.output
+            args projectDir.absolutePath
+        }
+    }
+}
+
+tasks.named('check') {
+    dependsOn regressionChecks.keySet()
+}
+
+// Inspect the distributable archive in isolation from development classes.
+def verifyModJar = tasks.register('verifyModJar', JavaExec) {
+    group = 'verification'
+    description = 'Check packaged mod classes and execute hero locomotion from the distributable JAR.'
+    dependsOn tasks.named('regressionClasses'), tasks.named('jar')
+    mainClass = 'com.whitecloud233.herobrine_companion.packaging.ModJarChecks'
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
+    classpath = sourceSets.regression.output
+    args([tasks.named('jar', Jar).get().archiveFile.get().asFile.absolutePath] +
+            sourceSets.main.output.classesDirs.files.collect { it.absolutePath })
+}
+tasks.named('assemble').configure { dependsOn verifyModJar }
+tasks.named('check').configure { dependsOn verifyModJar }
+
+// 真实大文件回归：需要一个外部 .litematic/.nbt 样本，故不进 check 依赖，按需手动运行。
+//   gradlew verifyTemplateSample -PtemplateFixture="D:\path\to\file.litematic"
+// 独立 JVM 限制为 256 MiB 堆，验证原文件的版本前置拒绝、压缩解析与方块实体保留。
+tasks.register('verifyTemplateSample', JavaExec) {
+    group = 'verification'
+    description = 'Parses a real building template file (needs -PtemplateFixture=<path>).'
+    dependsOn tasks.named('regressionClasses')
+    mainClass = 'com.whitecloud233.herobrine_companion.structure.template.TemplateSampleChecks'
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
+    classpath = sourceSets.regression.runtimeClasspath
+    maxHeapSize = '256m'
+    if (providers.gradleProperty('templateFixture').isPresent()) {
+        args providers.gradleProperty('templateFixture').get()
+    }
+}
+*/
 // scripts/ 是本地开发辅助脚本（动作烘焙、动画/资源校验），不纳入版本控制。
 // 存在时挂上资源校验任务，不存在时静默跳过，保证新克隆的仓库也能正常配置与构建。
 def verifyAnimationResourcesScript = file('scripts/poem/verify_animation_resources.gradle')
 if (verifyAnimationResourcesScript.exists()) {
     apply from: verifyAnimationResourcesScript
 }
+
+apply from: 'gradle/compat-dependencies.gradle'
+
+apply from: 'gradle/verify-compat.gradle'
+
+apply from: 'gradle/verify-kubejs.gradle'

@@ -1,6 +1,7 @@
 modLoader = "javafml"
 loaderVersion = "${loader_version_range}"
 license = "${mod_license}"
+issueTrackerURL = "https://github.com/1whitecloud1/herobrine-companion/issues"
 
 [[mods]]
 modId = "${mod_id}"
@@ -44,27 +45,21 @@ side = "BOTH"
 # ==================================
 # 可选依赖项 (Optional Dependencies)
 # ==================================
-
-# 时装工坊 (Armourer's Workshop)
-[[dependencies."${mod_id}"]]
-modId = "armourers_workshop"
-type = "optional"
-versionRange = "*"
-ordering = "AFTER"
-side = "BOTH"
+# optional 允许不安装；已安装时仍由 NeoForge 在加载兼容类之前校验版本。
+# 版本不满足时使用原生加载错误页面显示所需版本与当前版本。
 
 # 饰品栏 (Curios API)
 [[dependencies."${mod_id}"]]
 modId = "curios"
 type = "optional"
-versionRange = "*"
+versionRange = "[9.2.0+1.21.1,)"
 ordering = "AFTER"
 side = "BOTH"
 
 [[dependencies."${mod_id}"]]
 modId = "solcarrot"
 type = "optional"
-versionRange = "*"
+versionRange = "[1.16.0,)"
 ordering = "AFTER"
 side = "BOTH"
 
@@ -72,7 +67,7 @@ side = "BOTH"
 [[dependencies."${mod_id}"]]
 modId = "jei"
 type = "optional"
-versionRange = "*"
+versionRange = "[19.8.4.110,)"
 ordering = "AFTER"
 side = "BOTH"
 
@@ -80,57 +75,90 @@ side = "BOTH"
 [[dependencies."${mod_id}"]]
 modId = "kubejs"
 type = "optional"
-versionRange = "*"
+versionRange = "[2101.7.0-build.131,)"
+ordering = "AFTER"
+side = "BOTH"
+
+# 农夫乐事：1.2.9 已实测可用；旧版砧板缺少 addItem 时使用物品栏接口回退。
+[[dependencies."${mod_id}"]]
+modId = "farmersdelight"
+type = "optional"
+versionRange = "[0,)"
+ordering = "AFTER"
+side = "BOTH"
+
+[[dependencies."${mod_id}"]]
+modId="kaleidoscope_cookery"
+type = "optional"
+versionRange="[1.3.0,)"
+ordering="AFTER"
+side="BOTH"
+
+# 帕秋莉手册 (Patchouli) —— 同行手册的书本载体。
+# 软依赖：未安装时不发放手册，其余功能（含主页面）不受影响。
+# 1.21.1 的版本号为 1.21.1-93-neoforge / 1.21-87~89-neoforge，均满足 [1.21,1.22)。
+[[dependencies."${mod_id}"]]
+modId="patchouli"
+type = "optional"
+versionRange="[1.21,1.22)"
+ordering="AFTER"
+side="BOTH"
+
+[[mixins]]
+config = "herobrine_companion.compat.mixins.json"
+
+[[dependencies."${mod_id}"]]
+modId = "accessories"
+type = "optional"
+versionRange = "[0,)"
+ordering = "AFTER"
+side = "BOTH"
+
+[[dependencies."${mod_id}"]]
+modId = "armourers_workshop"
+type = "optional"
+versionRange = "[0,)"
 ordering = "AFTER"
 side = "BOTH"
 
 [[dependencies."${mod_id}"]]
 modId = "epicfight"
 type = "optional"
-versionRange = "*"
+versionRange = "[0,)"
 ordering = "AFTER"
 side = "BOTH"
 
-# 奇迹武器 (Weapons of Miracles, 基于 Epic Fight 的武器模组)
+[[dependencies."${mod_id}"]]
+modId = "simplehats"
+type = "optional"
+versionRange = "[0,)"
+ordering = "AFTER"
+side = "BOTH"
+
+[[dependencies."${mod_id}"]]
+modId = "waveycapes"
+type = "optional"
+versionRange = "[0,)"
+ordering = "AFTER"
+side = "BOTH"
+
 [[dependencies."${mod_id}"]]
 modId = "wom"
 type = "optional"
-versionRange = "*"
+versionRange = "[0,)"
 ordering = "AFTER"
 side = "BOTH"
 
+[[dependencies."${mod_id}"]]
+modId = "efn"
+type = "optional"
+versionRange = "[0,)"
+ordering = "AFTER"
+side = "BOTH"
 
 [[dependencies."${mod_id}"]]
-modId="accessories"
+modId = "epic_fight_avalon"
 type = "optional"
-versionRange="[0,)"
-ordering="AFTER"
-side="BOTH"
-
-[[dependencies."${mod_id}"]]
-modId="simplehats"
-type = "optional"
-versionRange="[0,)"
-ordering="AFTER"
-side="BOTH"
-
-[[dependencies."${mod_id}"]]
-modId="waveycapes"
-type = "optional"
-versionRange="[1.9.2,)"
-ordering="AFTER"
-side="BOTH"
-
-[[dependencies."${mod_id}"]]
-modId="kaleidoscope_cookery"
-type = "optional"
-versionRange="[0,)"
-ordering="AFTER"
-side="BOTH"
-
-[[dependencies."${mod_id}"]]
-modId="jei"
-type = "optional"
-versionRange="[0,)"
-ordering="AFTER"
-side="BOTH"
+versionRange = "[0,)"
+ordering = "AFTER"
+side = "BOTH"

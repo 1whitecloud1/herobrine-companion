@@ -1,0 +1,69 @@
+def accessoriesRuntime = providers.gradleProperty('enableAccessoriesRuntime')
+        .map { it.toBoolean() }.orElse(providers.gradleProperty('withCompat').map { it.toBoolean() }.orElse(true).get())
+def epicFightRuntime = providers.gradleProperty('enableEpicFightCompat')
+        .map { it.toBoolean() }.orElse(providers.gradleProperty('withCompat').map { it.toBoolean() }.orElse(true).get())
+def cosmeticRuntime = providers.gradleProperty('enableCosmeticRuntime')
+        .map { it.toBoolean() }.orElse(providers.gradleProperty('withCompat').map { it.toBoolean() }.orElse(true).get())
+
+configurations {
+    compatRuntime {
+        canBeConsumed = false
+        canBeResolved = true
+    }
+    runtimeOnly.extendsFrom compatRuntime
+}
+
+dependencies {
+    compileOnly 'curse.maven:accessories-mod-938917:7583320'
+    compileOnly 'curse.maven:simplehats-mod-631990:5970513'
+    compileOnly 'curse.maven:epic-fight-mod-405076:8080214'
+    compileOnly 'curse.maven:armourers-workshop-229523:7165519'
+
+    if (accessoriesRuntime.get()) {
+        compatRuntime 'curse.maven:accessories-mod-938917:7583320'
+        compatRuntime 'curse.maven:cloth-config-mod-348521:5729127'
+        compatRuntime 'curse.maven:owo-lib-mod-532610:6785734'
+        compatRuntime 'curse.maven:simplehats-mod-631990:5970513'
+    }
+    if (epicFightRuntime.get()) {
+        compatRuntime 'curse.maven:epic-fight-mod-405076:8080214'
+        compatRuntime 'curse.maven:weapons-of-miracles-epicfight-918614:8691476'
+        compatRuntime 'curse.maven:epicfight-nightfall-1307848:8573921'
+        compatRuntime 'curse.maven:epicfight-invincible-1184379:8390375'
+    }
+    if (cosmeticRuntime.get()) {
+        compatRuntime files(file('libs/waveycapes-neoforge-1.9.2-mc1.21.1.jar'))
+        compatRuntime 'curse.maven:armourers-workshop-229523:7165519'
+    }
+}
+
+
+sourceSets {
+    integrationChecks {
+        java.setSrcDirs(['src/test/java'])
+        java.include '**/OptionalCompatChecks.java', '**/AccessoriesEquipmentChecks.java', '**/SourceFixturesChecks.java'
+        resources.setSrcDirs([])
+        compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+        runtimeClasspath = output + compileClasspath
+    }
+}
+configurations { optionalCompatFixtures }
+dependencies {
+    optionalCompatFixtures 'curse.maven:weapons-of-miracles-epicfight-918614:8691476'
+    optionalCompatFixtures 'curse.maven:epicfight-nightfall-1307848:8573921'
+}
+[
+    verifyAccessoriesEquipment: 'com.whitecloud233.herobrine_companion.compat.accessories.AccessoriesEquipmentChecks',
+    verifyOptionalCompat: 'com.whitecloud233.herobrine_companion.compat.epicfight.OptionalCompatChecks'
+].each { taskName, entryPoint ->
+    tasks.register(taskName, JavaExec) {
+        group = 'verification'
+        dependsOn tasks.named('integrationChecksClasses')
+        mainClass = entryPoint
+        javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
+        workingDir projectDir
+        classpath = taskName == 'verifyAccessoriesEquipment' ? sourceSets.integrationChecks.output
+                : sourceSets.integrationChecks.runtimeClasspath + configurations.optionalCompatFixtures
+    }
+}
+tasks.named('check') { dependsOn 'verifyAccessoriesEquipment', 'verifyOptionalCompat' }

@@ -1,0 +1,90 @@
+import groovy.json.JsonSlurper
+import java.util.zip.ZipFile
+
+def basePrefix = 'com/whitecloud233/herobrine_companion/'
+def archiveFile = tasks.named('jar', Jar).flatMap { it.archiveFile }
+def foreignPackages = ['yesman/epicfight/', 'io/wispforest/accessories/', 'fonnymunkey/simplehats/',
+                       'dev/tr7zw/waveycapes/', 'moe/plushie/armourers_workshop/']
+def isolatedDirectories = ['accessories', 'ArmourerWorkshop', 'epicfight', 'simplehats', 'waveycapes', 'mixin'].collect {
+    basePrefix + 'compat/' + it + '/'
+}
+
+sourceSets {
+    compatChecks {
+        java.setSrcDirs(['src/test/java'])
+        java.include '**/CompatAbsentChecks.java', '**/CompatSafetyChecks.java'
+        resources.setSrcDirs([])
+        compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+        runtimeClasspath = output + compileClasspath
+    }
+}
+
+def verifyCompatAbsent = tasks.register('verifyCompatAbsent', JavaExec) {
+    group = 'verification'
+    description = 'Verify bundled compatibility fallback without optional target mod classes.'
+    dependsOn tasks.named('compatChecksClasses')
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
+    mainClass = 'com.whitecloud233.herobrine_companion.compat.CompatAbsentChecks'
+    systemProperty 'herobrine.compat.config', layout.buildDirectory.file('compat-tests/absent.properties').get().asFile.absolutePath
+    classpath = sourceSets.compatChecks.runtimeClasspath.filter { file ->
+        if (!file.name.endsWith('.jar')) return true
+        new ZipFile(file).withCloseable { zip ->
+            return !zip.entries().any { entry -> foreignPackages.any { entry.name.startsWith(it) } }
+        }
+    }
+}
+
+def verifyCompatSafety = tasks.register('verifyCompatSafety', JavaExec) {
+    group = 'verification'
+    description = 'Verify compatibility disable switches, bytecode contracts and failure isolation.'
+    dependsOn tasks.named('compatChecksClasses')
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
+    mainClass = 'com.whitecloud233.herobrine_companion.compat.safety.CompatSafetyChecks'
+    classpath = sourceSets.compatChecks.runtimeClasspath
+    systemProperty 'herobrine.compat.config', layout.buildDirectory.file('compat-tests/safety.properties').get().asFile.absolutePath
+}
+
+def verifyBundledCompat = tasks.register('verifyBundledCompat') {
+    group = 'verification'
+    description = 'Verify one mod ID, embedded guarded compatibility classes and no bundled third-party classes.'
+    dependsOn tasks.named('jar')
+    inputs.file(archiveFile)
+    doLast {
+        new ZipFile(archiveFile.get().asFile).withCloseable { zip ->
+            ['compat/accessories/HeroAccessoriesCompat.class', 'compat/ArmourerWorkshop/HeroAWCompat.class',
+             'compat/epicfight/HeroEpicFightPatch.class', 'compat/simplehats/HeroSimpleHatsCompat.class',
+             'compat/waveycapes/HeroWaveyCapeLayer.class', 'compat/safety/CompatBootstrap.class',
+             'compat/safety/CompatPreflight.class', 'api/compat/OptionalCompat.class'].each { path ->
+                if (zip.getEntry(basePrefix + path) == null) throw new GradleException("Missing bundled integration: ${path}")
+            }
+            zip.entries().each { entry ->
+                if (entry.directory) return
+                if (foreignPackages.any { entry.name.startsWith(it) } || entry.name.contains('herobrine_companion_compat/')) {
+                    throw new GradleException("Unexpected third-party or obsolete add-on class: ${entry.name}")
+                }
+                if (entry.name.startsWith(basePrefix) && entry.name.endsWith('.class')
+                        && !isolatedDirectories.any { entry.name.startsWith(it) }) {
+                    def code = new String(zip.getInputStream(entry).bytes, 'ISO-8859-1')
+                    if (foreignPackages.any { code.contains(it) }) throw new GradleException("Optional API escaped isolation: ${entry.name}")
+                }
+            }
+            def config = new JsonSlurper().parse(zip.getInputStream(zip.getEntry('herobrine_companion.compat.mixins.json')))
+            if (!config.plugin?.endsWith('.compat.safety.CompatMixinPlugin')) throw new GradleException('Missing optional Mixin preflight')
+            (config.mixins + config.client).each { mixin ->
+                String path = config.package.replace('.', '/') + '/' + mixin.replace('.', '/') + '.class'
+                if (zip.getEntry(path) == null) throw new GradleException("Missing compatibility mixin: ${path}")
+            }
+            ['accessories', 'armourers_workshop', 'epicfight'].each { id ->
+                if (zip.getEntry("compat_packs/${id}/pack.mcmeta") == null) throw new GradleException("Missing conditional resources: ${id}")
+            }
+            ['data/accessories/', 'data/armourers_workshop/', 'data/herobrine_companion/capabilities/',
+             'assets/herobrine_companion/item_skins/'].each { prefix ->
+                if (zip.entries().any { !it.directory && it.name.startsWith(prefix) }) throw new GradleException("Ungated integration data: ${prefix}")
+            }
+            def metadata = zip.getInputStream(zip.getEntry('META-INF/neoforge.mods.toml')).getText('UTF-8')
+            if (metadata.count('[[mods]]') != 1 || metadata.contains('herobrine_companion_compat')) throw new GradleException('Expected exactly one mod ID')
+        }
+        logger.lifecycle('BUNDLED_COMPAT_OK')
+    }
+}
+tasks.named('check') { dependsOn verifyBundledCompat, verifyCompatAbsent, verifyCompatSafety }

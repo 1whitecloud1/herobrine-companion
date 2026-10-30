@@ -1,0 +1,51 @@
+sourceSets {
+    kubejsChecks {
+        java.setSrcDirs(['src/test/java'])
+        java.include '**/KubeJSIntegrationChecks.java', '**/SourceFixturesChecks.java'
+        resources.setSrcDirs([])
+    }
+}
+def verifyKubeJSIntegration = tasks.register('verifyKubeJSIntegration', JavaExec) {
+    group = 'verification'
+    description = 'Exercise production KubeJS methods with isolated script fixtures and verify integration boundaries.'
+    dependsOn tasks.named('kubejsChecksClasses')
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
+    mainClass = 'com.whitecloud233.herobrine_companion.compat.kubejs.KubeJSIntegrationChecks'
+    classpath = sourceSets.kubejsChecks.output
+    args projectDir.absolutePath
+}
+tasks.named('check') { dependsOn verifyKubeJSIntegration }
+
+sourceSets {
+    contentCodecChecks {
+        java.setSrcDirs(['src/test/java'])
+        java.include '**/KubeJSContentCodecChecks.java', '**/KubeJSAbsentChecks.java', '**/SourceFixturesChecks.java'
+        compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+        runtimeClasspath = output + compileClasspath
+    }
+}
+def verifyKubeJSContentCodec = tasks.register('verifyKubeJSContentCodec', JavaExec) {
+    group = 'verification'
+    description = 'Verify production content snapshot NBT transport with isolated item/registry fixtures.'
+    dependsOn tasks.named('contentCodecChecksClasses')
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
+    mainClass = 'com.whitecloud233.herobrine_companion.compat.kubejs.KubeJSContentCodecChecks'
+    classpath = sourceSets.contentCodecChecks.runtimeClasspath
+    args projectDir.absolutePath
+}
+tasks.named('check') { dependsOn verifyKubeJSContentCodec }
+
+def verifyKubeJSAbsent = tasks.register('verifyKubeJSAbsent', JavaExec) {
+    group = 'verification'
+    description = 'Load common content hooks without any KubeJS or Rhino classes.'
+    dependsOn tasks.named('contentCodecChecksClasses')
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
+    mainClass = 'com.whitecloud233.herobrine_companion.compat.kubejs.KubeJSAbsentChecks'
+    classpath = sourceSets.contentCodecChecks.runtimeClasspath.filter { file ->
+        if (!file.name.endsWith('.jar')) return true
+        new java.util.zip.ZipFile(file).withCloseable { archive ->
+            return !archive.entries().any { entry -> entry.name.startsWith('dev/latvian/mods/kubejs/') || entry.name.startsWith('dev/latvian/mods/rhino/') }
+        }
+    }
+}
+tasks.named('check') { dependsOn verifyKubeJSAbsent }
