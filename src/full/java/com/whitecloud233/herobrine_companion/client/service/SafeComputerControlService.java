@@ -242,12 +242,12 @@ final class SafeComputerControlService {
                     Component.translatable("gui.herobrine_companion.computer_control.action.open_task_manager"),
                     "cmd.exe /d /s /c start Taskmgr.exe");
             case OPEN_WORKSPACE -> new PreparedDisplay(
-                    Component.translatable("gui.herobrine_companion.computer_control.action.open_workspace", workspace),
+                    Component.translatable("gui.herobrine_companion.computer_control.action.open_workspace", workspace.toString()),
                     "cmd.exe /d /s /c start explorer.exe [isolated workspace]");
             case CREATE_FOLDER -> {
                 Path target = resolveWorkspaceEntry(workspace, action.name());
                 yield new PreparedDisplay(
-                        Component.translatable("gui.herobrine_companion.computer_control.action.create_folder", target),
+                        Component.translatable("gui.herobrine_companion.computer_control.action.create_folder", target.toString()),
                         "cmd.exe /d /s /c mkdir [isolated workspace target]");
             }
             case CREATE_NOTE -> {
@@ -256,7 +256,7 @@ final class SafeComputerControlService {
                         : action.name() + ".txt";
                 Path target = resolveWorkspaceEntry(workspace, fileName);
                 yield new PreparedDisplay(
-                        Component.translatable("gui.herobrine_companion.computer_control.action.create_note", target, summarize(action.content())),
+                        Component.translatable("gui.herobrine_companion.computer_control.action.create_note", target.toString(), summarize(action.content())),
                         "safe UTF-8 write; cmd.exe /d /s /c start notepad.exe [new note]");
             }
             case COPY_CLIPBOARD -> new PreparedDisplay(
