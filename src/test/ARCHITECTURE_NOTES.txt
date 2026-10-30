@@ -1,0 +1,105 @@
+架构优化：第一批落地记录（Minecraft 1.20.1 / Forge 47.4.16 / Java 17）
+
+范围
+----
+本轮优先落实服务端规则收敛、装备备份协调、可变档案封装、协议编号和回归保护。
+保留单个 Gradle 项目；regression 只是测试 source set，不是新的 Gradle 子模块。
+没有重写 AIService、烹饪兼容层、配置系统或整个 HeroEntity，也没有改动本机 JDK 路径。
+
+1. 陪伴模式的服务端入口
+--------------------
+CompanionModeService.changeMode(requesterUuid, hero, desiredMode) 是玩家/Agent
+请求切换模式的共同执行入口，CompanionModePolicy 负责无游戏环境依赖的规则判断。
+- 请求者必须来自服务端可信上下文，不能由客户端载荷声明。
+- 拒绝非主人、失效实体、冲突的已加载伙伴。
+- 开启跟随仍要求信任 >= 50；试炼维度、挑战、审判状态不能开启。
+- 主人可以在信任不足时关闭跟随；关闭不解除绑定、不强制停止全部自主活动。
+- 已处于目标状态时不重复修改；没有主人的实体只在成功开启时绑定。
+- GUI 包保留 sender 当前维度查实体，并限制为 8 格内操作；Agent 的主人指令
+  保留跨维度/离线主人上下文，不套用 GUI 距离规则。
+- 内部战斗强退、试炼强退和 NBT 读回仍使用底层实体 setter，不要求模拟玩家鉴权。
+- 右键认主的原规则未改成“信任 50 才能认主”，避免混淆认主与开启跟随。
+
+2. 装备与外观的备份协调
+--------------------
+HeroPersistenceState 持有运行期装备/外观脏状态及一次性恢复完成状态，替代公开布尔字段。
+HeroServerTick 每 20 tick 只调用 HeroStateManager.backupDirtyState。
+HeroLogic 不再维护第二套定时备份，也不会因信任归零而恢复整套旧外观/姿势。
+- 脏装备在下次 20-tick 调度时保存；第三方原地修改 ItemStack/饰品且没有通知的情况，
+  保留每 100 tick 的兜底采样。不能声称已经完全取消轮询序列化。
+- 外观脏标记不再迫使装备序列化；两类状态分别在成功更新档案后清除。
+- 衣柜修改、姿势保存、跨维度/离场等已有显式备份入口仍保留。
+- 正常已初始化实体卸载/换维度前执行最终备份。去重 DISCARDED 不走这个钩子，
+  避免旧克隆回写当前实体档案，已有去重交接机制继续生效。
+- 完整实体 NBT 中的空装备槽是权威状态，不能被全局旧装备补回；只有尚未恢复
+  的新实体/不完整旧 NBT 可以走一次补空槽恢复。
+- 运行期装备以有效实体为准；全局档案作为重建托底；玩家临时 NBT 先完整恢复再消费。
+- 皮肤的档案 setter/定期同步等旧入口尚未整体改造，不能把本轮描述为已完成
+  所有类型状态的单一事实来源迁移。
+
+3. 档案封装与迁移
+----------------
+HeroWorldData 不再公开内部 PlayerProfile 查询，档案字段私有化。
+NBT、列表、皮肤字节数组 getter 返回深副本；奖励集合返回不可变快照。
+setter 同样隔离输入，内容不变时不反复复制/标脏；装备四部分以一个快照方法更新。
+PlayerProfile.load/save 不与外部 NBT 共享可变成员。
+旧档导入使用统一 PlayerProfile.load，包括此前迁移遗漏的 HeroMemory、GiftProfile、
+BirthdayCakeRewardTick；若独立档案已存在则不覆盖，支持迁移中断后安全重试。
+不对“已经标记迁移完成”的历史档强行二次覆盖，避免覆盖后来更新的数据。
+
+4. 端侧与协议
+------------
+HeroLogic.setupHiddenTeam 不再读取 Minecraft 单例，仅在客户端操作实体所在 level
+的 scoreboard，不把队伍的碰撞规则施加到服务端。
+HeroActionTiming 承接两端动作倒计时及服务端 visual-only 闪电创建；
+HeroVisuals 仅处理客户端动画/粒子，保留手势、计时、粒子的原执行次序。
+服务端仍在雷电倒计时从 2 变 1 时创建闪电，并保留 shockTicks 和同步标记收尾。
+PacketHandler 的 78 个消息固定为原有 ID 0..77，并检查重复 ID、重复类型。
+未改变协议号 3，也未擅自把原双向包改成单向注册；原 PacketDispatch 方向检查保留。
+SyncServerConfigPacket 新增的 pranksterFakeChestEnabled 作为可选尾字段读取；
+旧客户端没有该字段时保持服务端现值，不抛越界、不把它误设成默认值。
+
+5. 自动回归
+----------
+全部检查位于 src/test，不依赖被忽略的本地 scripts/，无需新增 JUnit 下载。
+由独立 regression source set 编译，避免为快速检查解析仅供启动游戏的 runtimeOnly 模组。
+Gradle check 必须执行：
+- verifyCompanionRules：54 条权限、信任、关闭、重复请求、冲突、受限状态检查。
+- verifyPersistenceState：19 条独立脏状态、成功清除、100-tick 兜底和完整 NBT 恢复规则检查。
+- verifyWorldData：46 条真实 NBT 副本隔离、空槽、重复更新、序列化、迁移检查。
+- verifyPacketCodecs：16 条当前与旧版配置包字节往返检查。
+- verifyArchitecture：JDK AST 检查 113 个受保护源码文件和全部 78 个消息编号。
+  保护范围为 network、entity/logic、entity/companion、HeroEntity、HeroVisuals、HeroSetModeTool。
+  现存客户端桥和少数旧客户端转发有精确到类的例外，并检查陈旧例外。
+  不是对整个客户端/兼容层/全仓库的端侧安全证明。
+协议基线在 src/test/resources/architecture/packet-ids.txt；它来自修改前的映射，
+不是运行检查时从生产注册表生成。新增消息需要明确追加新 ID 与独立基线。
+
+验证命令（项目根目录，JDK 17）
+----------------------------
+Windows：
+  gradlew.bat --offline --no-daemon --console=plain check build
+  gradlew.bat --offline --no-daemon --console=plain -Pfull=true check build
+Git Bash：
+  ./gradlew --offline --no-daemon --console=plain check build
+  ./gradlew --offline --no-daemon --console=plain -Pfull=true check build
+本机验证仅在调用环境中设置 JAVA_HOME 和 GRADLE_USER_HOME，没有修改 gradle.properties。
+离线命令依赖现有 Forge/Maven 缓存与 local-maven；这不是新克隆可复现构建的承诺。
+
+本轮实际验证
+------------
+安全版和完整版均执行了 compileJava、上述回归、jar、reobfJar。
+还在 build 下的临时源码副本中故意注入四类错误：跨端依赖、重复消息编号、模式入口直接
+修改实体、重复装备备份路径。四类均被架构检查拒绝，测试副本已删除，未修改真实源码。
+中英文 JSON 校验通过，无重复键；git diff --check 通过。
+初次 check 因默认 test 解析未缓存 Jade 运行依赖失败，已通过专用回归源集解决；
+AST 检查初版把包名前缀也当成类依赖的误报已修复，最终不靠关闭检查来通过。
+编译仍有现存弃用 API 和 ArmourersWorkshopHeroWardrobeRangeMixin 的映射警告。
+
+未验证及后续边界
+----------------
+没有启动 Minecraft 客户端、专用服务器、多人联机或真实旧世界存档。
+装备清空/旧档测试覆盖的是快照与恢复状态规则，不是实际跨维度场景的 GameTest。
+尚未验证缺少所有可选模组时的运行启动，也未为全部 78 个包编写编解码测试。
+AI 请求上下文/适配器结果、工具分派、烹饪业务与后端、全局配置快照、完整客户端动画
+状态封装和依赖可复现构建仍属后续批次，本轮没有将它们伪称为完成。

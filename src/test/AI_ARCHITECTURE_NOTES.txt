@@ -1,0 +1,90 @@
+架构优化：第二批（AI 请求与协议边界）
+=================================
+
+落地范围
+--------
+本轮沿用现有四种 LlmFormatAdapter，不引入新的协议体系，不更改网络消息 ID、用户 API
+设置、真实聊天历史、本地模型文件或四类完整版能力的开关/确认机制。
+第一批权限、备份与协议回归检查继续纳入 Gradle check。
+
+1. 请求上下文与单轮尝试
+--------------------
+AIRequestContext 保存请求不变量：原始消息、会话 scope、行为授权玩家、输出语言、
+流式回调和会话策略（PERSISTENT / EPHEMERAL）。AIChatAttempt 保存路由、当前提示词、
+纠正重试次数、去重次数、流式选择和工具策略。
+
+chatWithRetry 不再接收 15/16 个位置参数。流式发送、回复收尾、工具分派及各工具回填
+都传递同一个 attempt/context。纠正、去重、回填、备用路由通过明确方法创建新实例。
+- 普通/本地聊天保留历史、落盘、标题刷新；scoped/跨会话/观察保留各自原有临时策略。
+- 纠正最多重试两次，去重最多一次；工具结果合成不消耗纠正预算。
+- fallback 清空备用路由并计入重试；流式错误回退到非流，行为不变。
+- 跨会话及不带工具的合成不能因递归而重新开启世界动作。
+- WORLD_WITHOUT_LOOKUP 将“注册表结果回填后禁止再次查询”作为稳定限制。
+  此限制在重试、去重和 fallback 后保留，并在调用工具前重新校验，不只从工具目录隐藏。
+  这是对旧短重载重置 lookupSynthesis=false 的明确修复。
+- 原用户消息不会被纠正提示词替换后落盘；scope 与实际玩家权限身份仍分开。
+
+2. 统一响应
+-----------
+LlmResponse 将正文、供应商推理/摘要字段、首个工具调用、结束原因、结构化失败合在一个
+不可变结果中。非流式 parseResponse 与流式 readStreaming 共用它。
+LlmFinishReason 不向编排层泄漏 OpenAI/Anthropic/Gemini/Responses 的私有字段值。
+LlmFailure 区分鉴权、限流、请求拒绝、供应商失败、非法响应。
+
+AIService 不再解析 choices[].finish_reason 或 stop_reason，不再解析流式工具 JSON。
+本地化、Actor 台词和滚动摘要也使用统一响应，不把 HTTP 200 中的错误对象当成功正文。
+LlmStreamingResponse 暂作弃用旧类型保留；运行调用链已不再引用。
+LlmChatPayload 的列表、LlmToolInvocation 的参数 JSON、LlmToolSpec 的 schema 都隔离
+外部可变数据，异步请求不受调用方后续修改污染。
+
+3. 修复实际协议缺陷
+------------------
+- Anthropic 旧四字符串 success 重载把工具名、工具参数、结束原因错位到其他字段；
+  已改为统一 typed result，不再靠相同类型参数的位置区分含义。
+- Anthropic content_block_start 的 input:{} 不再阻挡后续 partial_json；分段参数会合并。
+- Gemini MAX_TOKENS 即使最后帧没有 content 也被识别；blocked prompt 也有明确终态。
+- Responses response.incomplete / failed / cancelled 能反映到统一终态。
+- HTTP 200 的 SSE error 帧返回错误，不再静默当作成功的空回复。
+- Gemini 的 thought 文本不进入玩家正文/partialConsumer。
+- Responses 多工具交错按首个调用的 item_id / output_index 隔离，后续工具不会混入参数。
+  保留当前“一轮最多执行一个工具”的契约，没有扩展为并行多工具执行。
+- 不完整或非法工具参数不会凭空变成空对象执行；缺失参数与明确 {} 有区分。
+
+4. 错误展示
+-----------
+AIClientErrorHandler 接收 LlmFailure，仅由该客户端处理器在主线程打开 ApiKeyInputScreen。
+若配置界面已打开，不用异步错误重复覆盖用户正在输入的内容。
+AIService 保留错误分类后的业务决策（标记 key、是否回退、回传原有 String 接口），
+不直接构造 Screen 或 setScreen。回环本地端点的鉴权失败不标记云端 Key 失效。
+公共接口没有全部改成结构化结果，避免这轮同时重写全部 GUI/网络回调。
+
+回归与验证
+----------
+新增并强制加入 check：
+- verifyLlmAdapters：188 条检查，真实 JSON/SSE 解析经过内存 HttpClient 替身。
+  四种格式正文/工具/结束原因、Anthropic 分段与 input:{}、Responses 交错调用、
+  推理不泄漏到 partial、HTTP/SSE 错误、流关闭、防御性复制等。
+- verifyAiChatContext：56 条检查，请求不变量、纠正/去重/备用路由预算、回填工具权限。
+- verifyAiArchitecture：21 个 AI 源码文件；禁止 AIService 重新解析供应商终态字段、
+  构造/打开 Screen、恢复长位置参数链；协议和上下文禁止直接依赖 Minecraft UI。
+
+第一批 135 条业务/持久化/编解码检查与 113 文件、78 消息编号检查保持通过。
+新增业务检查与第一批合计 379 条，不把 AST 文件数混作单元用例数量。
+AST 反向测试在 build 下的临时源码副本进行：故意添加协议字段泄漏、Screen 构造、
+长重试签名、协议层 Minecraft UI 依赖，四种都被拒绝；副本已删除。
+
+构建命令（Java 17，项目根目录）：
+  gradlew.bat --offline --no-daemon --console=plain check build
+  gradlew.bat --offline --no-daemon --console=plain -Pfull=true check build
+Git Bash 使用 ./gradlew。两种构建都保留 reobfJar。
+回归不加载 AIService 单例，不读取真实 Key/聊天历史，不联网、不启动模型、不执行游戏工具。
+
+仍未覆盖
+--------
+没有实连 OpenAI/Anthropic/Gemini 或本地模型，没有游戏 GUI/联机/专用服务器运行测试。
+请求上下文测试覆盖状态转换，不等同于对真实异步工具执行、全部fallback异常路径的集成测试。
+LlmSettings/LlmFormats/OpenAI 请求头仍依赖 LLMConfig 内枚举，未在本轮扩大配置迁移范围。
+AIService 仍持有工具分派与部分持久化编排；未将全部工具拆成注册执行器。
+烹饪业务/后端分离、整体配置快照、完整客户端动画状态封装、可复现依赖仍属后续批次。
+弃用 API 与 ArmourersWorkshopHeroWardrobeRangeMixin 映射警告是现存构建警告，未作为
+本轮优化无关问题顺带修改。

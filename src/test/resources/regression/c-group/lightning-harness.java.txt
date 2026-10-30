@@ -1,0 +1,75 @@
+    private void queueClearBlocks(java.util.List<BlockPos> positions, DestructionMode mode, boolean absolute) {
+        DestructionTerrainManager.clearBlocksInstant(level, positions, mode, absolute);
+    }
+
+    enum Kind { ARC, BEAM }
+    private final java.util.List<BlockPos> pendingBlocks = new java.util.ArrayList<>();
+    private FakeLevel level;
+    private LivingEntity caster;
+    private Vec3 origin, end;
+    private double radius;
+    private boolean prepared;
+    private Kind kind;
+    private LivingEntity getCaster() { return caster; }
+    public java.util.List<Object> run(int variant, Vec3 start, Vec3 finish, double width) {
+        this.kind = variant == 0 ? Kind.ARC : Kind.BEAM;
+        this.radius = Math.max(variant == 0 ? 1.5D : 2.5D, width);
+        this.origin = start; this.end = finish; this.level = new FakeLevel();
+        this.caster = new LivingEntity("caster",new Vec3(5,-1,0));
+        level.targets.add(caster);
+        level.targets.add(new LivingEntity("center",new Vec3(5,-1,0)));
+        level.targets.add(new LivingEntity("edge",new Vec3(5,-1,2)));
+        level.targets.add(new LivingEntity("outside",new Vec3(5,-1,8)));
+        level.targets.add(new LivingEntity("beforeStart",new Vec3(-2,-1,0)));
+        level.targets.add(new HeroEntity("hero",new Vec3(5,-1,0)));
+        java.util.List<Object> result = new java.util.ArrayList<>();
+        result.add(doTick(new TickBudget()));
+        // A retry must not re-emit the already prepared sound/damage stage.
+        result.add(doTick(new TickBudget()));
+        result.addAll(level.events);
+        result.add(level.cleared);
+        for(LivingEntity entity:level.targets) result.add(entity.name+":"+entity.damage+":"+entity.push);
+        return result;
+    }
+    static class TickBudget { }
+    enum DestructionMode { DIVINE; static DestructionMode current(){return DIVINE;} }
+    enum SoundSource { HOSTILE, WEATHER }
+    static class SoundEvents {
+        static final String WARDEN_SONIC_BOOM="sonic", TRIDENT_THUNDER="trident", LIGHTNING_BOLT_THUNDER="thunder", GENERIC_EXPLODE="explode";
+    }
+    static class ParticleTypes { static final String ELECTRIC_SPARK="spark",FLASH="flash"; }
+    static class LivingEntity {
+        final String name; final Vec3 position;
+        java.util.List<Float> damage = new java.util.ArrayList<>();
+        java.util.List<Vec3> push = new java.util.ArrayList<>();
+        LivingEntity(String name, Vec3 position){this.name=name;this.position=position;}
+        boolean isAlive(){return true;}
+        Vec3 position(){return position;}
+        float getBbHeight(){return 2F;}
+        boolean hurt(Object source,float value){damage.add(value);return true;}
+        void push(double x,double y,double z){push.add(new Vec3(x,y,z));}
+    }
+    static class HeroEntity extends LivingEntity { HeroEntity(String name,Vec3 position){super(name,position);} }
+    static class FakeLevel {
+        java.util.List<LivingEntity> targets=new java.util.ArrayList<>();
+        java.util.List<String> events=new java.util.ArrayList<>();
+        java.util.List<BlockPos> cleared=new java.util.ArrayList<>();
+        int getMinBuildHeight(){return -64;}
+        int getMaxBuildHeight(){return 320;}
+        void playSound(Object...args){events.add("sound:"+java.util.Arrays.toString(args));}
+        void sendParticles(Object...args){events.add("particles:"+java.util.Arrays.toString(args));}
+        <T extends LivingEntity> java.util.List<T> getEntitiesOfClass(Class<T> type,AABB search,java.util.function.Predicate<? super T> predicate){
+            java.util.List<T> found=new java.util.ArrayList<>();
+            for(LivingEntity entity:targets){T typed=type.cast(entity);if(predicate.test(typed))found.add(typed);}
+            return found;
+        }
+        FakeDamageSources damageSources(){return new FakeDamageSources();}
+    }
+    static class FakeDamageSources { String magic(){return "magic";} }
+    static class DestructionTerrainManager {
+        static void damageAndPush(FakeLevel level,LivingEntity caster,AABB area,Vec3 center,float damage,double horizontal,double vertical){
+            level.events.add("area:"+area+":"+center+":"+damage+":"+horizontal+":"+vertical);
+        }
+        static void clearLooseEntities(FakeLevel level,LivingEntity caster,AABB area){level.events.add("clearLoose:"+area);}
+        static void clearBlocksInstant(FakeLevel level,java.util.List<BlockPos> positions,DestructionMode mode,boolean absolute){level.cleared.addAll(positions);}
+    }

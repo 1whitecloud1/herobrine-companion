@@ -1,0 +1,347 @@
+import java.util.*;
+
+public class CombatPursuitProbe {
+    private static int checks;
+    public static void verify() {
+        stableCruiseAndLanding();
+        pursuitYieldsToAttacks();
+        groundProgressAndFlightCooldown();
+        airborneComboContinuation();
+        waterExitDoesNotCancelLanding();
+        System.out.println("CombatPursuitChecks: " + checks + " checks passed");
+    }
+
+    private static void stableCruiseAndLanding() {
+        HeroEntity hero = new HeroEntity(0, 64, 0);
+        LivingEntity target = new LivingEntity(20, 64, 0);
+        for (double height : new double[]{64, 66, 72, 100}) {
+            hero.y = height;
+            check(HeroCombatPursuit.flightTarget(hero, target, 3).y == 66,
+                    "Open-ground cruise must not climb with Hero's current height");
+        }
+        hero.world.surface = 70;
+        check(HeroCombatPursuit.flightTarget(hero, target, 3).y == 72, "Cruise still clears an obstacle");
+        target.x = 1;
+        for (double surface : new double[]{64, -1, 0, -32, -63, 64.5}) {
+            hero.world.surface = surface;
+            target.y = surface;
+            for (double hover : new double[]{0, .05, .5, 2, 5}) {
+                hero.y = surface + hover;
+                check(HeroCombatPursuit.shouldLand(hero, target, 3),
+                        "Reachable ground, including negative Y and slabs, must allow landing");
+            }
+        }
+        hero.y = 70;
+        hero.world.surface = 64;
+        target.y = 64;
+        check(HeroCombatPursuit.shouldLand(hero, target, 3), "A six-block descent must restore ground combat");
+        hero.y = 71;
+        check(!HeroCombatPursuit.shouldLand(hero, target, 3), "A drop beyond landing depth must keep flight");
+        hero.y = 65;
+        hero.world.headroom = false;
+        check(!HeroCombatPursuit.shouldLand(hero, target, 3), "Landing needs clearance for Hero's entire body");
+        hero.world.headroom = true;
+        hero.world.fluid = true;
+        check(!HeroCombatPursuit.shouldLand(hero, target, 3), "A fluid landing must be rejected");
+        hero.world.fluid = false;
+        target.y = 68;
+        check(!HeroCombatPursuit.shouldLand(hero, target, 3), "Ground too low to reach a high target must be rejected");
+        hero.water = true;
+        check(HeroCombatPursuit.shouldTakeFlight(hero, target, 0), "Fluid escape must still take flight");
+        hero.water = false;
+        target.y = 69;
+        check(HeroCombatPursuit.shouldTakeFlight(hero, target, 0), "High targets must still take flight");
+        hero.passenger = true;
+        check(!HeroCombatPursuit.shouldTakeFlight(hero, target, 3), "Riding must not start pursuit flight");
+    }
+
+    private static void pursuitYieldsToAttacks() {
+        HeroEntity hero = new HeroEntity(0, 64, 0);
+        hero.target = new LivingEntity(20, 70, 0);
+        HeroEpicFightChaseGoal goal = new HeroEpicFightChaseGoal(hero, 1, 3);
+        goal.start();
+        hero.midAttack = true;
+        Vec3 attackMotion = new Vec3(.5, .62, .1);
+        hero.velocity = attackMotion;
+        hero.control.moving = true;
+        check(!goal.canUse(), "An attack must not start a new chase goal");
+        for (int tick = 0; tick < 80; tick++) {
+            hero.tickCount++;
+            goal.tick();
+            check(!hero.floating && hero.velocity == attackMotion && !hero.control.moving,
+                    "Pursuit must preserve attack root motion without taking flight");
+        }
+        hero.midAttack = false;
+        goal.tick();
+        check(hero.floating && hero.noGravity, "A high target is chased after the attack finishes");
+        hero.midAttack = true;
+        hero.target = new LivingEntity(1, 64, 0);
+        hero.y = 65;
+        hero.velocity = attackMotion;
+        goal.tick();
+        HeroCombatPursuit.landHeroIfCombatIdle(hero, hero.target, 3, true);
+        check(hero.floating && hero.velocity == attackMotion, "Landing must not interrupt an aerial attack");
+        hero.midAttack = false;
+        goal.tick();
+        check(!hero.floating && !hero.noGravity && !hero.control.moving && hero.velocity.y < 0,
+                "A safe melee landing must immediately cancel the flight movement command");
+    }
+
+    private static void groundProgressAndFlightCooldown() {
+        HeroEntity hero = new HeroEntity(0, 64, 0);
+        hero.target = new LivingEntity(50, 64, 0);
+        hero.navigation.pathWorks = false;
+        HeroEpicFightChaseGoal goal = new HeroEpicFightChaseGoal(hero, 1, 3);
+        goal.start();
+        check(goal.requiresUpdateEveryTick(), "Flight timers must run on server ticks");
+        for (int tick = 0; tick < 100; tick++) {
+            hero.tickCount++;
+            hero.x += .1;
+            goal.tick();
+            check(!hero.floating, "Failed path planning while making ground progress must not cause flight");
+        }
+        for (int tick = 0; tick < 60; tick++) { hero.tickCount++; goal.tick(); }
+        check(hero.floating, "A genuinely stalled ground chase must retain flight escape");
+        hero.target.x = hero.x + 1;
+        hero.y = 65;
+        hero.tickCount++;
+        goal.tick();
+        check(!hero.floating, "Arriving at a ground target must restore gravity");
+        goal.stop();
+        goal.start();
+        hero.target.x = hero.x + 20;
+        for (int tick = 0; tick < 45; tick++) {
+            hero.tickCount++;
+            goal.tick();
+            check(!hero.floating, "Landing cooldown must survive a goal restart");
+        }
+        for (int tick = 0; tick < 30; tick++) { hero.tickCount++; goal.tick(); }
+        check(hero.floating, "A persistent obstacle may take flight after the landing cooldown");
+
+        hero = new HeroEntity(0, 64, 0);
+        hero.target = new LivingEntity(4, 64, 0);
+        hero.navigation.pathWorks = false;
+        goal = new HeroEpicFightChaseGoal(hero, 1, 3);
+        goal.start();
+        for (int tick = 0; tick < 100; tick++) { hero.tickCount++; goal.tick(); }
+        check(!hero.floating, "Near-melee navigation failures must not starve ground combos");
+        hero.target.x = 1;
+        hero.sight = false;
+        check(goal.canUse(), "A nearby target behind a wall still needs a chase");
+        for (int tick = 0; tick < 60; tick++) { hero.tickCount++; goal.tick(); }
+        check(hero.floating, "A nearby wall must still permit flight escape");
+        check(!HeroCombatPursuit.shouldLand(hero, hero.target, 3), "Do not land before clearing the wall");
+        hero.sight = true;
+        goal.tick();
+        check(!hero.floating, "Land once the wall is cleared and melee is reachable");
+    }
+
+    private static void airborneComboContinuation() {
+        HeroEntity hero = new HeroEntity(0, 64, 0);
+        hero.target = new LivingEntity(1, 64, 0);
+        HumanoidMobPatch<?> patch = new HumanoidMobPatch<>(hero);
+        HeroNightfallProfile profile = new HeroNightfallProfile();
+        check(Nightfall.canStartDefaultCombo(patch, profile, 0, 3.6), "Nightfall ground combo can open");
+        hero.grounded = false;
+        check(Nightfall.canStartDefaultCombo(patch, profile, 0, 3.6), "Keep the 1.21.1 height-based Nightfall opening policy");
+        hero.y = 68;
+        check(!Nightfall.canStartDefaultCombo(patch, profile, 0, 3.6), "Nightfall opener remains height bounded");
+        for (int segment = 1; segment < 6; segment++) {
+            check(Nightfall.canContinueDefaultCombo(patch, profile, segment, 3.6),
+                    "Nightfall authored jumps must not discard later combo segments");
+        }
+        HeroEpicFightPatch playerLike = new HeroEpicFightPatch();
+        PlayerLikeAttackProfile playerProfile = new PlayerLikeAttackProfile();
+        HeroCombatPlanner.preferCombo = false;
+        check(!playerLike.canStartPlayerLikeGroundCombo(patch, playerProfile), "Epic Fight opener still needs ground contact");
+        for (int segment = 1; segment < 3; segment++) {
+            hero.combo = segment;
+            hero.velocity = new Vec3(.5, .2, 0);
+            check(playerLike.canStartPlayerLikeGroundCombo(patch, playerProfile),
+                    "Epic Fight continuation must tolerate airborne root motion and a changed utility preference");
+        }
+        hero.hold = true;
+        check(!Nightfall.canContinueDefaultCombo(patch, profile, 1, 3.6)
+                && !playerLike.canStartPlayerLikeGroundCombo(patch, playerProfile), "Hold actions still exclude basic combo continuation");
+        hero.hold = false;
+        hero.battle = false;
+        check(!Nightfall.canContinueDefaultCombo(patch, profile, 1, 3.6)
+                && !playerLike.canStartPlayerLikeGroundCombo(patch, playerProfile), "Leaving combat still excludes continuation");
+    }
+
+    private static void waterExitDoesNotCancelLanding() {
+        HeroEntity hero = new HeroEntity(0, 64, 0);
+        hero.target = new LivingEntity(1, 64, 0);
+        HeroMovementState movement = new HeroMovementState(hero);
+        hero.water = true;
+        movement.afterAiStep();
+        check(hero.floating && hero.noGravity, "Combat must escape water");
+        hero.water = false;
+        HeroCombatPursuit.land(hero);
+        for (int tick = 0; tick < 40; tick++) {
+            movement.afterAiStep();
+            check(!hero.floating && !hero.noGravity, "Water-exit grace must not undo combat landing");
+        }
+    }
+
+    private static void check(boolean condition, String message) {
+        if (!condition) throw new AssertionError(message);
+        checks++;
+    }
+
+    static final class HeroCombatPursuit { /* PURSUIT */ }
+    static class HeroEpicFightChaseGoal extends Goal { /* CHASE */ }
+    static final class Nightfall {
+        /* NIGHTFALL */
+        static HeroEntity getHero(HumanoidMobPatch<?> patch) { return patch.hero; }
+        static LivingEntity getTrackedTarget(HeroEntity hero) { return hero == null ? null : hero.target; }
+        static boolean isSoftlyFacingTarget(HeroEntity hero, LivingEntity target, int ticks) { return true; }
+        static void maybeFallbackHoverMelee(HeroEntity hero, LivingEntity target, double range) { }
+    }
+    static class HeroEpicFightPatch {
+        /* PLAYER_LIKE */
+        HeroEntity getTrackedHero(HumanoidMobPatch<?> patch) { return patch.hero; }
+        LivingEntity getTrackedTarget(HeroEntity hero) { return hero.target; }
+        HeroCombatPlanner.CombatTuning getPlayerLikeCombatTuning(PlayerLikeAttackProfile profile) { return null; }
+        boolean isDashLikeMovement(HeroEntity hero, PlayerLikeAttackProfile profile) { return hero.velocity.horizontalDistanceSqr() > .02; }
+        int getExpectedPlayerLikeComboIndex(HeroEntity hero, int size) { return hero.combo % size; }
+        double getPlayerLikeComboContinueDistance(PlayerLikeAttackProfile profile) { return 4; }
+        boolean isTargetWithinComboFlowDistance(HeroEntity hero, LivingEntity target, PlayerLikeAttackProfile profile, double extraRange) { return true; }
+    }
+    static final class HeroMovementState {
+        final HeroEntity hero;
+        int outOfWaterTimer;
+        HeroMovementState(HeroEntity hero) { this.hero = hero; }
+        void maintainCompanion() { }
+        /* MOVEMENT */
+    }
+    static class Goal {
+        enum Flag { MOVE, LOOK }
+        void setFlags(EnumSet<Flag> flags) { }
+        public boolean canUse() { return true; }
+        public boolean canContinueToUse() { return true; }
+        public boolean requiresUpdateEveryTick() { return false; }
+        public void start() { }
+        public void stop() { }
+        public void tick() { }
+    }
+    static class LivingEntity {
+        double x, y, z;
+        LivingEntity(double x, double y, double z) { this.x = x; this.y = y; this.z = z; }
+        double getX() { return x; }
+        double getY() { return y; }
+        double getZ() { return z; }
+        boolean isAlive() { return true; }
+        boolean isRemoved() { return false; }
+        Component getDisplayName() { return new Component(); }
+    }
+    static class HeroEntity extends LivingEntity {
+        final Level world = new Level();
+        final Navigation navigation = new Navigation();
+        final HeroMoveControl control = new HeroMoveControl();
+        LivingEntity target;
+        Vec3 velocity = new Vec3(0, 0, 0);
+        boolean floating, noGravity, passenger, water, lava, midAttack, horizontalCollision, noPhysics;
+        boolean battle = true, grounded = true, sight = true, hold, release;
+        int tickCount, combo, shockTicks;
+        HeroEntity(double x, double y, double z) { super(x, y, z); }
+        boolean isFloating() { return floating; }
+        void setFloating(boolean value) { floating = value; }
+        boolean isNoGravity() { return noGravity; }
+        void setNoGravity(boolean value) { noGravity = value; }
+        boolean isPassenger() { return passenger; }
+        boolean isInWater() { return water; }
+        boolean isInLava() { return lava; }
+        boolean isBattleModeActive() { return battle; }
+        boolean isBattleHoldAction() { return hold; }
+        boolean isBattleReleaseAction() { return release; }
+        int getBattleActionState() { return 0; }
+        boolean hasLineOfSight(LivingEntity target) { return sight; }
+        boolean onGround() { return grounded; }
+        boolean isCompanionMode() { return false; }
+        boolean isChasingBattleEnemy() { return target != null; }
+        Set<String> getTags() { return Set.of(); }
+        void setSprinting(boolean value) { }
+        Navigation getNavigation() { return navigation; }
+        MoveControl getMoveControl() { return control; }
+        Vec3 getDeltaMovement() { return velocity; }
+        void setDeltaMovement(double x, double y, double z) { velocity = new Vec3(x, y, z); }
+        void setDeltaMovement(Vec3 value) { velocity = value; }
+        Vec3 position() { return new Vec3(x, y, z); }
+        Box getBoundingBox() { return new Box(); }
+        Level level() { return world; }
+        BlockPos blockPosition() { return BlockPos.containing(x, y, z); }
+        LivingEntity getTarget() { return target; }
+        LookControl getLookControl() { return new LookControl(); }
+        Random getRandom() { return new Random(1); }
+        double distanceTo(LivingEntity target) { return Math.sqrt(Math.pow(x - target.x, 2) + Math.pow(y - target.y, 2)); }
+    }
+    static class Navigation {
+        boolean pathWorks = true, done = true;
+        void stop() { done = true; }
+        boolean isDone() { return done; }
+        boolean moveTo(LivingEntity target, double speed) { done = !pathWorks; return pathWorks; }
+    }
+    static class MoveControl {
+        boolean moving;
+        void setWantedPosition(double x, double y, double z, double speed) { moving = true; }
+    }
+    static class HeroMoveControl extends MoveControl { void stopMoving() { moving = false; } }
+    static class LookControl { void setLookAt(LivingEntity target, float yaw, float pitch) { } }
+    static class Component { String getString() { return "target"; } }
+    record Vec3(double x, double y, double z) {
+        double horizontalDistanceSqr() { return x * x + z * z; }
+        Vec3 subtract(Vec3 other) { return new Vec3(x - other.x, y - other.y, z - other.z); }
+        Vec3 add(double x, double y, double z) { return new Vec3(this.x + x, this.y + y, this.z + z); }
+    }
+    record BlockPos(int x, int y, int z) {
+        static BlockPos containing(double x, double y, double z) { return new BlockPos(Mth.floor(x), Mth.floor(y), Mth.floor(z)); }
+        BlockPos below(int amount) { return new BlockPos(x, y - amount, z); }
+        BlockPos above() { return new BlockPos(x, y + 1, z); }
+        int getX() { return x; }
+        int getY() { return y; }
+        int getZ() { return z; }
+    }
+    static class Mth { static int floor(double value) { return (int) Math.floor(value); } }
+    static class Direction { enum Axis { Y } }
+    static class Heightmap { enum Types { WORLD_SURFACE } }
+    static class ModStructures { static final Object END_RING_DIMENSION_KEY = new Object(); }
+    static class Box { Box move(double x, double y, double z) { return this; } }
+    static class Level {
+        double surface = 64;
+        boolean headroom = true, fluid;
+        int getHeight(Heightmap.Types type, int x, int z) { return (int) Math.ceil(surface); }
+        BlockState getBlockState(BlockPos pos) { return new BlockState(Math.max(0, Math.min(1, surface - pos.y)), fluid); }
+        boolean noCollision(HeroEntity hero, Box box) { return headroom; }
+        Object dimension() { return null; }
+    }
+    record BlockState(double height, boolean fluid) {
+        Shape getCollisionShape(Level level, BlockPos pos) { return new Shape(height); }
+        FluidState getFluidState() { return new FluidState(fluid); }
+    }
+    record Shape(double height) {
+        boolean isEmpty() { return height == 0; }
+        double max(Direction.Axis axis) { return height; }
+    }
+    record FluidState(boolean present) { boolean isEmpty() { return !present; } }
+    static class HeroEpicFightCompat { static boolean isHeroMidAttack(HeroEntity hero) { return hero.midAttack; } }
+    static class HeroCombatDebugLog {
+        static void transition(HeroEntity hero, String scope, String key, String message) { }
+        static String heroCoreState(HeroEntity hero) { return "hero"; }
+        static boolean enabled() { return false; }
+        static void repeatedEvent(HeroEntity hero, String scope, String key, String message) { }
+    }
+    static class HumanoidMobPatch<T> { final HeroEntity hero; HumanoidMobPatch(HeroEntity hero) { this.hero = hero; } }
+    static class HeroNightfallProfile { double attackRadius() { return 3; } }
+    static class PlayerLikeAttackProfile { List<Integer> comboAnimations() { return List.of(0, 1, 2); } }
+    static class HeroCombatPlanner {
+        static boolean preferCombo = true;
+        enum PlannedAction { LIGHT_COMBO }
+        record CombatTuning() { }
+        static boolean isAttackReplayLocked(HeroEntity hero, int ticks) { return false; }
+        static double predictedDistanceSqr(HeroEntity hero, LivingEntity target, int ticks, double influence) { return 1; }
+        static boolean canStartPredictedMeleeCombo(HeroEntity hero, LivingEntity target, double range, int ticks) { return true; }
+        static boolean canQueueComboFollowUp(HeroEntity hero, LivingEntity target, double range, int ticks) { return true; }
+        static boolean prefersAction(HeroEntity hero, LivingEntity target, CombatTuning tuning, PlannedAction action) { return preferCombo; }
+    }
+}
