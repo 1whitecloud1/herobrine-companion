@@ -42,6 +42,7 @@ public class ModItemModelProvider extends ItemModelProvider {
         withExistingParent(ModItems.GHOST_ZOMBIE_SPAWN_EGG.getId().getPath(), new ResourceLocation("item/template_spawn_egg"));
         withExistingParent(ModItems.GHOST_SKELETON_SPAWN_EGG.getId().getPath(), new ResourceLocation("item/template_spawn_egg"));
         withExistingParent(ModItems.GHOST_STEVE_SPAWN_EGG.getId().getPath(), new ResourceLocation("item/template_spawn_egg"));
+        withExistingParent(ModItems.DESTRUCTION_GOD_HEROBRINE_SPAWN_EGG.getId().getPath(), new ResourceLocation("item/template_spawn_egg"));
     }
 
     @SuppressWarnings("removal")

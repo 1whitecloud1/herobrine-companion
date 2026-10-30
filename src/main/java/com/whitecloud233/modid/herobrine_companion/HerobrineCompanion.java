@@ -2,8 +2,7 @@ package com.whitecloud233.modid.herobrine_companion;
 
 import com.mojang.logging.LogUtils;
 import com.whitecloud233.modid.herobrine_companion.client.event.ClientModSetup;
-import com.whitecloud233.modid.herobrine_companion.compat.epicfight.HeroEpicFightCompat;
-import com.whitecloud233.modid.herobrine_companion.compat.KubeJS.HerobrineCompanionKubeJSPlugin;
+import com.whitecloud233.modid.herobrine_companion.util.DebugLog;
 import com.whitecloud233.modid.herobrine_companion.compat.kaleidoscope.KaleidoscopeCompatBuiltinPackFallback;
 import com.whitecloud233.modid.herobrine_companion.config.Config;
 import com.whitecloud233.modid.herobrine_companion.client.service.LLMConfig;
@@ -36,7 +35,7 @@ public class HerobrineCompanion {
     public HerobrineCompanion() {
         IEventBus modEventBus = resolveModEventBus();
 
-        HeroEpicFightCompat.bootstrap(modEventBus);
+        com.whitecloud233.modid.herobrine_companion.compat.cooking.CookingCompatBootstrap.registerBackends();
 
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(KaleidoscopeCompatBuiltinPackFallback::onAddPackFinders);
@@ -63,29 +62,29 @@ public class HerobrineCompanion {
         LLMConfig.load();
 
         registerCommonConfig();
+        com.whitecloud233.modid.herobrine_companion.compat.safety.CompatBootstrap.register(modEventBus);
 
-        // KubeJS Soft Dependency
-        try {
-            Class.forName("dev.latvian.mods.kubejs.plugin.KubeJSPlugin");
-            MinecraftForge.EVENT_BUS.register(HerobrineCompanionKubeJSPlugin.class);
-        } catch (ClassNotFoundException e) {
-            LOGGER.info("KubeJS not found, skipping KubeJS integration.");
-        }
+
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {
-        LOGGER.info("HELLO FROM COMMON SETUP");
+        DebugLog.info(LOGGER, "HELLO FROM COMMON SETUP");
         event.enqueueWork(() -> {
             PacketHandler.register();
-            HeroEpicFightCompat.tryRegisterRuntimeBridge();
+            com.whitecloud233.modid.herobrine_companion.network.ConfigSyncChannel.register();
+            com.whitecloud233.modid.herobrine_companion.network.TemplateSyncChannel.register();
+            // 可选能力通道（T22）：旧端不协商就整条不启用，主通道与既有工具行为不变。
+            com.whitecloud233.modid.herobrine_companion.network.AgentFeatureChannel.register();
+            com.whitecloud233.modid.herobrine_companion.network.CompanionGuideChannel.register();
+            com.whitecloud233.modid.herobrine_companion.network.HeroContentChannel.register();
         });
 
-        LOGGER.info("DIRT BLOCK >> {}", ForgeRegistries.BLOCKS.getKey(Blocks.DIRT));
+        DebugLog.info(LOGGER, "DIRT BLOCK >> {}", ForgeRegistries.BLOCKS.getKey(Blocks.DIRT));
     }
 
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event) {
-        LOGGER.info("HELLO from server starting");
+        DebugLog.info(LOGGER, "HELLO from server starting");
     }
 
     private static IEventBus resolveModEventBus() {

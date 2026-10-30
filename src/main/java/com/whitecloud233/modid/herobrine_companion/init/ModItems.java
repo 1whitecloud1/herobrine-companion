@@ -63,5 +63,6 @@ public class ModItems {
     public static final RegistryObject<Item> GHOST_ZOMBIE_SPAWN_EGG = ITEMS.register("ghost_zombie_spawn_egg", () -> new ForgeSpawnEggItem(ModEntities.GHOST_ZOMBIE, 0x00AFAF, 0x799C65, new Item.Properties()));
     public static final RegistryObject<Item> GHOST_SKELETON_SPAWN_EGG = ITEMS.register("ghost_skeleton_spawn_egg", () -> new ForgeSpawnEggItem(ModEntities.GHOST_SKELETON, 0xC1C1C1, 0x494949, new Item.Properties()));
     public static final RegistryObject<Item> GHOST_STEVE_SPAWN_EGG = ITEMS.register("ghost_steve_spawn_egg", () -> new ForgeSpawnEggItem(ModEntities.GHOST_STEVE, 0xB07C62, 0x3B3F8E, new Item.Properties()));
-    public static final RegistryObject<Item> DESTRUCTION_GOD_HEROBRINE_SPAWN_EGG = ITEMS.register("destruction_god_herobrine_spawn_egg", () -> new ForgeSpawnEggItem(ModEntities.DESTRUCTION_GOD_HEROBRINE, 0x5E4A43, 0xF4F4F4, new Item.Properties().rarity(Rarity.EPIC)));
+    // 毁灭之神生成蛋：名字在客户端逐帧乱码（见 DestructionGodSpawnEggItem / util.GlitchText），生成行为仍是原版生成蛋
+    public static final RegistryObject<Item> DESTRUCTION_GOD_HEROBRINE_SPAWN_EGG = ITEMS.register("destruction_god_herobrine_spawn_egg", () -> new DestructionGodSpawnEggItem(ModEntities.DESTRUCTION_GOD_HEROBRINE, 0x5E4A43, 0xF4F4F4, new Item.Properties().rarity(Rarity.EPIC)));
 }

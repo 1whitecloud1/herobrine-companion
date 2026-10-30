@@ -12,6 +12,22 @@ public class ModZhCnLangProvider extends LanguageProvider {
 
     @Override
     protected void addTranslations() {
+        add("command.herobrine_companion.recover.blocked", "挑战、演出或末地擂台期间无法进行此操作。");
+        add("command.herobrine_companion.recover.no_space", "附近没有安全落脚点，请前往平坦空地后重试。");
+        add("command.herobrine_companion.recover.failed", "恢复失败，原有同行者和待恢复数据已保留。");
+        add("command.herobrine_companion.recover.recalled", "已召回你的 Herobrine。信任度：%s，已领奖励：%s。");
+        add("command.herobrine_companion.recover.rebuilt", "已从存档重建你的 Herobrine。信任度：%s，已领奖励：%s。");
+        add("command.herobrine_companion.trust.query", "主人：%s；存档信任度：%s；实体信任度：%s。");
+        add("command.herobrine_companion.trust.add", "信任度已更新为 %s，存档已同步。");
+        add("command.herobrine_companion.unloaded", "未加载");
+        add("command.herobrine_companion.no_hero", "未找到已加载的同行者，请先使用 /hc_recover_hero。");
+        add("command.herobrine_companion.state.query", "当前状态：%s（%s）；实体：%s；维度：%s。");
+        add("command.herobrine_companion.state.invalid", "未知状态。请使用八种状态的英文名、中文名或数字 0–7。");
+        add("command.herobrine_companion.state.changed", "已更改为 %s 并保存；状态仍会随游戏行为自然变化。");
+        add("command.herobrine_companion.owners.header", "同行者归属诊断（在线玩家）：");
+        add("book.herobrine_companion.companion_guide.name", "同行手册");
+        add("book.herobrine_companion.companion_guide.subtitle", "模组攻略");
+        add("book.herobrine_companion.companion_guide.landing", "与 Herobrine 同行的攻略。$(br2)了解状态、道具、区域、传说残页、指令和觉醒怪物。$(br2)建议先读$(l:herobrine_companion:key_items/getting_started)初次同行$(/l)。");
         add("item.herobrine_companion.poem_of_the_end.epicfight.input", "§7史诗战斗：短按左键接连招；长按0.35秒重击");
         add("item.herobrine_companion.poem_of_the_end.standalone.input", "无需史诗战斗：左键连按播放当前模式的四段全身普攻");
         add("item.herobrine_companion.poem_of_the_end.standalone.rules", "伤害、命中时机和移动遵循原版规则");
@@ -40,7 +56,7 @@ public class ModZhCnLangProvider extends LanguageProvider {
         add("itemGroup.herobrine_companion", "Herobrine companion");
 
         // Entities
-        add("entity.herobrine_companion.hero", "Hero");
+        add("entity.herobrine_companion.hero", "Herobrine");
         add("entity.herobrine_companion.herobrine", "Herobrine");
         add("entity.herobrine_companion.destruction_god_herobrine", "???");
         add("entity.herobrine_companion.ghost_creeper", "幽灵苦力怕");
@@ -73,17 +89,17 @@ public class ModZhCnLangProvider extends LanguageProvider {
         add("gui.herobrine_companion.void_warning", "§c警告: §7清除你周围 17x17 区块直到基岩。\n§7这会造成地形和结构的不可逆破坏。\n§e请谨慎使用！");
         add("gui.herobrine_companion.void_locked_tooltip", "§c[系统] 你需要先探索 End Ring 维度才能掌握这种力量。");
         add("gui.herobrine_companion.sign_contract", "签署契约");
-        add("gui.herobrine_companion.hero_interaction", "Hero 交互");
+        add("gui.herobrine_companion.hero_interaction", "Herobrine 交互");
         add("gui.herobrine_companion.api_on", "API: 开启");
         add("gui.herobrine_companion.api_off", "API: 关闭");
         add("gui.herobrine_companion.api_toggle_tooltip", "切换 云端 AI / 本地逻辑");
         add("gui.herobrine_companion.system_exit", "离开;");
-        add("gui.herobrine_companion.hero_contract", "与Hero的契约");
+        add("gui.herobrine_companion.hero_contract", "与Herobrine的契约");
         add("gui.herobrine_companion.trust_level", "信任度: %s");
 // Requests
         add("gui.herobrine_companion.requests", "委托");
-        add("gui.herobrine_companion.requests_tooltip", "接受 Hero 的委托以获取奖励。");
-        add("gui.herobrine_companion.requests_title", "Hero 的委托");
+        add("gui.herobrine_companion.requests_tooltip", "接受 Herobrine 的委托以获取奖励。");
+        add("gui.herobrine_companion.requests_title", "Herobrine 的委托");
         add("gui.herobrine_companion.request_accept", "接受");
         add("gui.herobrine_companion.back", "返回");
         add("gui.herobrine_companion.request_name_1", "清理不稳定区域");
@@ -130,7 +146,7 @@ public class ModZhCnLangProvider extends LanguageProvider {
         add("message.herobrine_companion.quest_start_5", "§e[Herobrine] §f四支蜡烛，围成一个圆。第五支会引来不该来的东西。");
         add("message.herobrine_companion.quest_candle_progress", "§7烛火 %s/%s 已在夜色中亮起。");
         add("message.herobrine_companion.quest_candle_fifth", "§c[系统] 第五支蜡烛亮了。风忽然停了……委托失败。");
-        add("message.herobrine_companion.quest_candle_hero_gone", "§c[系统] Hero 离开了。仪式中断。委托失败。");
+        add("message.herobrine_companion.quest_candle_hero_gone", "§c[系统] Herobrine 离开了。仪式中断。委托失败。");
         add("message.herobrine_companion.quest_complete_5", "§e[Herobrine] §f……火光记住你了。现在，黑暗也记住了。");
         add("message.herobrine_companion.quest_start_6", "§e[Herobrine] §f（审判者低语）旗帜是宣言。取下它，就是回应。");
         add("message.herobrine_companion.quest_captain_down", "§a[系统] 队长倒下了。捡起旗帜，带回我身边。");
@@ -151,7 +167,7 @@ public class ModZhCnLangProvider extends LanguageProvider {
         // Messages
         add("message.herobrine_companion.system_cloud_connected", "§b[系统] §f已连接到云端 AI。");
         add("message.herobrine_companion.system_local_mode", "§b[系统] §f本地模式已启用。");
-        add("message.herobrine_companion.summon_success", "§a已召唤Hero！");
+        add("message.herobrine_companion.summon_success", "§a已召唤Herobrine！");
         add("message.herobrine_companion.summon_fail_dimension", "Herobrine 无法在此处被召唤。");
         add("message.herobrine_companion.summon_fail_exists", "Herobrine 已经存在。");
         add("message.herobrine_companion.contract_signed", "契约已签订。信任已建立。");
@@ -183,9 +199,9 @@ public class ModZhCnLangProvider extends LanguageProvider {
         add("message.herobrine_companion.mockery_4", "力量需要耐心，人类。");
         add("message.herobrine_companion.mockery_5", "安静。我很忙。");
         add("message.herobrine_companion.shelter_bound", "§c这个庇护已经绑定到 %s");
-        add("message.herobrine_companion.hero_teleported", "§aHero 已传送到你的位置！");
-        add("message.herobrine_companion.hero_summoned", "§a已召唤Hero！");
-        add("message.herobrine_companion.shelter_empty", "§7这个庇护是无效的。先与 Hero 签订契约。");
+        add("message.herobrine_companion.hero_teleported", "§aHerobrine 已传送到你的位置！");
+        add("message.herobrine_companion.hero_summoned", "§a已召唤Herobrine！");
+        add("message.herobrine_companion.shelter_empty", "§7这个庇护是无效的。先与 Herobrine 签订契约。");
         add("message.herobrine_companion.void_domain_overworld_only", "§c空置域只能在主世界创建。");
         add("message.herobrine_companion.void_domain_limit", "我不能那样做。创建更多的空置域会破坏这个世界的平衡。");
         add("message.herobrine_companion.void_domain_init", "§d正在启动空置域创建... (%s/2)");

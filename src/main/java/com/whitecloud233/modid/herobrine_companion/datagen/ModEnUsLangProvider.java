@@ -12,13 +12,29 @@ public class ModEnUsLangProvider extends LanguageProvider {
 
     @Override
     protected void addTranslations() {
+        add("command.herobrine_companion.recover.blocked", "This action is unavailable during a challenge, cutscene or in the End Ring.");
+        add("command.herobrine_companion.recover.no_space", "No safe ground nearby. Move to an open, flat area and try again.");
+        add("command.herobrine_companion.recover.failed", "Recovery failed. The original companion and pending recovery data were kept.");
+        add("command.herobrine_companion.recover.recalled", "Your Herobrine was recalled. Trust: %s; claimed rewards: %s.");
+        add("command.herobrine_companion.recover.rebuilt", "Your Herobrine was rebuilt from saved data. Trust: %s; claimed rewards: %s.");
+        add("command.herobrine_companion.trust.query", "Owner: %s; saved trust: %s; live trust: %s.");
+        add("command.herobrine_companion.trust.add", "Trust updated to %s and saved.");
+        add("command.herobrine_companion.unloaded", "Unloaded");
+        add("command.herobrine_companion.no_hero", "No loaded companion found. Use /hc_recover_hero first.");
+        add("command.herobrine_companion.state.query", "Current state: %s (%s); entity: %s; dimension: %s.");
+        add("command.herobrine_companion.state.invalid", "Unknown state. Use an English name, Chinese name or number 0–7.");
+        add("command.herobrine_companion.state.changed", "Changed to %s and saved. The state can still evolve through normal gameplay.");
+        add("command.herobrine_companion.owners.header", "Companion ownership diagnostics (online players):");
+        add("book.herobrine_companion.companion_guide.name", "Companion Guide");
+        add("book.herobrine_companion.companion_guide.subtitle", "Java Edition");
+        add("book.herobrine_companion.companion_guide.landing", "Your guide to travelling with Herobrine.$(br2)Explore his states, key items, special areas, lore fragments, commands and awakened mobs.$(br2)Start with $(l:herobrine_companion:key_items/getting_started)First Steps$(/l).");
         add("item.herobrine_companion.poem_of_the_end.epicfight.input", "§7Epic Fight: Tap Attack for combos; hold 0.35s for Heavy");
         add("item.herobrine_companion.poem_of_the_end.standalone.input", "No Epic Fight required: successive attacks play this mode's four full-body strikes");
         add("item.herobrine_companion.poem_of_the_end.standalone.rules", "Damage, hit timing and movement follow vanilla rules");
         add("item.herobrine_companion.poem_of_the_end.mode.usage.3", "§7Attack Combo: Scythe Slashes & Rifts");
 
         // Items
-        add(ModItems.HERO_SHELTER.get(), "Hero Shelter");
+        add(ModItems.HERO_SHELTER.get(), "Herobrine Shelter");
         add(ModItems.ETERNAL_KEY.get(), "Eternal Key");
         add(ModItems.UNSTABLE_GUNPOWDER.get(), "Unstable Gunpowder");
         add(ModItems.CORRUPTED_CODE.get(), "Corrupted Code");
@@ -73,17 +89,17 @@ public class ModEnUsLangProvider extends LanguageProvider {
         add("gui.herobrine_companion.void_warning", "Warning: This will clear a large area!");
         add("gui.herobrine_companion.void_locked_tooltip", "You must visit the Void Domain first");
         add("gui.herobrine_companion.sign_contract", "Sign Contract");
-        add("gui.herobrine_companion.hero_interaction", "Hero Interaction");
+        add("gui.herobrine_companion.hero_interaction", "Herobrine Interaction");
         add("gui.herobrine_companion.api_on", "API: ON");
         add("gui.herobrine_companion.api_off", "API: OFF");
         add("gui.herobrine_companion.api_toggle_tooltip", "Toggle Cloud AI / Local Logic");
         add("gui.herobrine_companion.system_exit", "Exit;");
-        add("gui.herobrine_companion.hero_contract", "Contract with Hero");
+        add("gui.herobrine_companion.hero_contract", "Contract with Herobrine");
         add("gui.herobrine_companion.trust_level", "Trust Level: %s");
 // Requests
         add("gui.herobrine_companion.requests", "Requests");
-        add("gui.herobrine_companion.requests_tooltip", "Accept requests from Hero for rewards.");
-        add("gui.herobrine_companion.requests_title", "Hero's Requests");
+        add("gui.herobrine_companion.requests_tooltip", "Accept requests from Herobrine for rewards.");
+        add("gui.herobrine_companion.requests_title", "Herobrine's Requests");
         add("gui.herobrine_companion.request_accept", "Accept");
         add("gui.herobrine_companion.back", "Back");
         add("gui.herobrine_companion.request_name_1", "Clear Unstable Zone");
@@ -130,7 +146,7 @@ public class ModEnUsLangProvider extends LanguageProvider {
         add("message.herobrine_companion.quest_start_5", "§e[Herobrine] §fFour candles, forming a ring. A fifth will call something that should not come.");
         add("message.herobrine_companion.quest_candle_progress", "§7Candle %s/%s lit in the night.");
         add("message.herobrine_companion.quest_candle_fifth", "§c[System] The fifth candle lit. The wind died all at once... Quest failed.");
-        add("message.herobrine_companion.quest_candle_hero_gone", "§c[System] Hero has left. The rite is broken. Quest failed.");
+        add("message.herobrine_companion.quest_candle_hero_gone", "§c[System] Herobrine has left. The rite is broken. Quest failed.");
         add("message.herobrine_companion.quest_complete_5", "§e[Herobrine] §f...The flame remembers you. Now the dark does too.");
         add("message.herobrine_companion.quest_start_6", "§e[Herobrine] §f(The Judge whispers) A banner is a declaration. Taking it is an answer.");
         add("message.herobrine_companion.quest_captain_down", "§a[System] The captain is down. Pick up the banner and bring it to me.");
@@ -183,9 +199,9 @@ public class ModEnUsLangProvider extends LanguageProvider {
         add("message.herobrine_companion.mockery_4", "Power requires patience, human.");
         add("message.herobrine_companion.mockery_5", "Quiet. I am busy.");
         add("message.herobrine_companion.shelter_bound", "§cThis shelter is already bound to %s");
-        add("message.herobrine_companion.hero_teleported", "§aHero has teleported to your location!");
-        add("message.herobrine_companion.hero_summoned", "§aHero summoned!");
-        add("message.herobrine_companion.shelter_empty", "§7This shelter is invalid. Sign a contract with Hero first.");
+        add("message.herobrine_companion.hero_teleported", "§aHerobrine has teleported to your location!");
+        add("message.herobrine_companion.hero_summoned", "§aHerobrine summoned!");
+        add("message.herobrine_companion.shelter_empty", "§7This shelter is invalid. Sign a contract with Herobrine first.");
         add("message.herobrine_companion.void_domain_overworld_only", "§cVoid Domain can only be created in the Overworld.");
         add("message.herobrine_companion.void_domain_limit", "I cannot do that. Creating more Void Domains would destabilize this world.");
         add("message.herobrine_companion.void_domain_init", "§dInitiating Void Domain creation... (%s/2)");

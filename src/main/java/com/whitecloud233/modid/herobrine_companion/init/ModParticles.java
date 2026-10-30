@@ -12,7 +12,7 @@ import net.minecraftforge.registries.RegistryObject;
  *
  * <p>{@link #GLOW_TRAIL} 是终末之诗的发光刀光拖尾粒子：由 EpicFight 的挥砍轨迹
  * 系统按 item_skins/poem_of_the_end.json 里的 {@code particle_type} 生成，
- * 渲染走本模组自持的加法混合发光通道（见 compat.epicfight.GlowTrailRenderTypes），
+ * 渲染走本模组自持的加法混合发光通道（见 client.render.GlowTrailRenderTypes），
  * 不依赖任何第三方模组的私有实现。</p>
  */
 public final class ModParticles {
