@@ -1,4 +1,4 @@
-package com.whitecloud233.herobrine_companion.mixin.epicfight;
+package com.whitecloud233.herobrine_companion.compat.mixin.epicfight;
 
 import com.whitecloud233.herobrine_companion.client.event.PoemScytheInputEvents;
 import com.whitecloud233.herobrine_companion.combat.PoemAttackInput;
@@ -20,6 +20,7 @@ public abstract class PoemAttackControlMixin {
 
     @Inject(method = "handleEpicFightKeyMappings", at = @At("HEAD"))
     private void herobrineCompanion$resolvePoemAttack(CallbackInfo ci) {
+        if (!com.whitecloud233.herobrine_companion.compat.safety.CompatSafety.allowed("epicfight")) return;
         int control = PoemScytheInputEvents.takeEngineControl();
         if ((control & PoemAttackInput.CLEAR_ENGINE_INPUT) != 0) {
             releaseAllServedKeys();
@@ -32,16 +33,19 @@ public abstract class PoemAttackControlMixin {
 
     @Inject(method = "maybeAttack", at = @At("HEAD"), cancellable = true)
     private void herobrineCompanion$ownCapturedAttack(CallbackInfo ci) {
+        if (!com.whitecloud233.herobrine_companion.compat.safety.CompatSafety.allowed("epicfight")) return;
         if (PoemScytheInputEvents.blocksNativeAttack()) ci.cancel();
     }
 
     @Inject(method = "handleSeparateWeaponInnateSkill", at = @At("HEAD"), cancellable = true)
     private void herobrineCompanion$ownSharedHold(CallbackInfo ci) {
+        if (!com.whitecloud233.herobrine_companion.compat.safety.CompatSafety.allowed("epicfight")) return;
         if (PoemScytheInputEvents.blocksNativeInnate()) ci.cancel();
     }
 
     @Inject(method = "maybeGuard", at = @At("HEAD"), cancellable = true)
     private void herobrineCompanion$deferSharedUse(CallbackInfo ci) {
+        if (!com.whitecloud233.herobrine_companion.compat.safety.CompatSafety.allowed("epicfight")) return;
         if (PoemScytheInputEvents.blocksNativeGuard()) ci.cancel();
     }
 }

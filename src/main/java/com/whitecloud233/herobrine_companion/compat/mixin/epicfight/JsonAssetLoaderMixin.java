@@ -1,4 +1,4 @@
-package com.whitecloud233.herobrine_companion.mixin.epicfight;
+package com.whitecloud233.herobrine_companion.compat.mixin.epicfight;
 
 import net.minecraft.resources.ResourceLocation;
 import org.apache.logging.log4j.Logger;

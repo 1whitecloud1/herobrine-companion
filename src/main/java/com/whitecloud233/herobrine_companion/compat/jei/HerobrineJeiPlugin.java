@@ -28,6 +28,26 @@ import java.util.List;
 
 @JeiPlugin
 public class HerobrineJeiPlugin implements IModPlugin {
+    private static mezz.jei.api.runtime.IJeiRuntime runtime;
+    private static List<HeroRewards.Reward> displayedRewards = List.of();
+    private static List<MerchantOffer> displayedTrades = List.of();
+
+    @Override
+    public void onRuntimeAvailable(mezz.jei.api.runtime.IJeiRuntime value) { runtime = value; refreshContent(); }
+    @Override
+    public void onRuntimeUnavailable() { runtime = null; displayedRewards = List.of(); displayedTrades = List.of(); }
+
+    public static void refreshContent() {
+        if (runtime == null) return;
+        var manager = runtime.getRecipeManager();
+        manager.hideRecipes(HeroRewardCategory.RECIPE_TYPE, displayedRewards);
+        manager.hideRecipes(HeroTradeCategory.RECIPE_TYPE, displayedTrades);
+        displayedRewards = List.copyOf(com.whitecloud233.herobrine_companion.client.network.ClientHeroContent.rewards());
+        displayedTrades = List.copyOf(com.whitecloud233.herobrine_companion.client.network.ClientHeroContent.trades());
+        manager.addRecipes(HeroRewardCategory.RECIPE_TYPE, displayedRewards);
+        manager.addRecipes(HeroTradeCategory.RECIPE_TYPE, displayedTrades);
+    }
+
     private static final Logger LOGGER = LogUtils.getLogger();
 
     @Override
@@ -43,32 +63,12 @@ public class HerobrineJeiPlugin implements IModPlugin {
 
     @Override
     public void registerRecipes(IRecipeRegistration registration) {
-        // 1. 注册交易配方
-        if (Minecraft.getInstance().level != null) {
-            try {
-                HeroEntity dummyHero = new HeroEntity(ModEntities.HERO.get(), Minecraft.getInstance().level);
-                dummyHero.setTrustLevel(100); 
-                
-                MerchantOffers offers = HeroTrades.getOffers(dummyHero);
-                List<MerchantOffer> offerList = new ArrayList<>(offers);
-
-                registration.addRecipes(HeroTradeCategory.RECIPE_TYPE, offerList);
-            } catch (Exception e) {
-                LOGGER.error("Failed to generate Herobrine trades for JEI", e);
-            }
-        }
-
-        // 2. 注册奖励配方
-        // 确保奖励列表已初始化
-        if (HeroRewards.REWARDS.isEmpty()) {
-            LOGGER.warn("HeroRewards list is empty during JEI registration! Forcing reset.");
-            HeroRewards.reset();
-        }
-        
-        LOGGER.info("Registering {} Hero Rewards to JEI.", HeroRewards.REWARDS.size());
+        displayedRewards = List.copyOf(com.whitecloud233.herobrine_companion.client.network.ClientHeroContent.rewards());
+        displayedTrades = List.copyOf(com.whitecloud233.herobrine_companion.client.network.ClientHeroContent.trades());
+        registration.addRecipes(HeroRewardCategory.RECIPE_TYPE, displayedRewards);
+        registration.addRecipes(HeroTradeCategory.RECIPE_TYPE, displayedTrades);
         registerGhostDropInfo(registration);
         registerTreasureInfo(registration);
-        registration.addRecipes(HeroRewardCategory.RECIPE_TYPE, HeroRewards.REWARDS);
     }
 
 

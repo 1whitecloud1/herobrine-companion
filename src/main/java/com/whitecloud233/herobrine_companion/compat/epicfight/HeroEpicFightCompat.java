@@ -1,5 +1,7 @@
 package com.whitecloud233.herobrine_companion.compat.epicfight;
 
+import com.whitecloud233.herobrine_companion.combat.HeroCombatStateMapper;
+
 import com.mojang.logging.LogUtils;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import net.minecraft.world.entity.player.Player;
@@ -41,7 +43,7 @@ public final class HeroEpicFightCompat {
     }
 
     public static boolean isLoaded() {
-        return ModList.get().isLoaded(EPIC_FIGHT_MOD_ID);
+        return com.whitecloud233.herobrine_companion.compat.safety.CompatPreflight.available("epicfight");
     }
 
     public static synchronized void bootstrap(IEventBus modEventBus) {
@@ -53,20 +55,20 @@ public final class HeroEpicFightCompat {
         if (!isLoaded()) {
             bridgeStatus = BridgeStatus.NOT_INSTALLED;
             bridgeInitialized = true;
-            LOGGER.info("Epic Fight not detected; Hero battle mode will continue using the vanilla fallback bridge.");
+            LOGGER.info("Epic Fight not detected; Herobrine battle mode will continue using the vanilla fallback bridge.");
             return;
         }
 
         if (!hasSupportedRuntimeShape()) {
             bridgeStatus = BridgeStatus.API_MISMATCH;
             bridgeInitialized = true;
-            LOGGER.warn("Epic Fight is installed but its runtime API shape was not recognized. Hero will keep the fallback battle renderer without hard failure.");
+            LOGGER.warn("Epic Fight is installed but its runtime API shape was not recognized. Herobrine will keep the fallback battle renderer without hard failure.");
             return;
         }
 
         if (modEventBus != null) {
             if (!registerCommonBridge(modEventBus)) {
-                markBridgeMismatch("Epic Fight bridge registration failed. Hero will keep the fallback battle renderer without hard failure.", null);
+                markBridgeMismatch("Epic Fight bridge registration failed. Herobrine will keep the fallback battle renderer without hard failure.", null);
                 return;
             }
             if (FMLEnvironment.dist == Dist.CLIENT) {
@@ -79,28 +81,22 @@ public final class HeroEpicFightCompat {
 
         bridgeStatus = BridgeStatus.READY;
         bridgeInitialized = true;
-        LOGGER.info("Epic Fight detected. Hero runtime bridge is active. Exported states: {}", HeroEpicFightStateMapper.getExportedStateNames());
+        LOGGER.info("Epic Fight detected. Herobrine runtime bridge is active. Exported states: {}", HeroCombatStateMapper.getExportedStateNames());
     }
 
     public static synchronized void tryRegisterRuntimeBridge() {
-        if (!bridgeInitialized) {
-            bootstrap(null);
-        }
-
         if (bridgeStatus == BridgeStatus.READY) {
             initializeRuntimeBridge();
         }
     }
 
     public static BridgeStatus getBridgeStatus() {
-        if (!bridgeInitialized) {
-            tryRegisterRuntimeBridge();
-        }
+        // Early base renderer queries must not consume registration before the add-on receives its event bus.
         return bridgeStatus;
     }
 
     public static boolean isRuntimeBridgeReady() {
-        return getBridgeStatus() == BridgeStatus.READY;
+        return com.whitecloud233.herobrine_companion.compat.safety.CompatSafety.allowed("epicfight") && getBridgeStatus() == BridgeStatus.READY;
     }
 
     /** Refresh the optional player moveset after the held Poem's mode changes. */
@@ -162,19 +158,19 @@ public final class HeroEpicFightCompat {
     }
 
     public static String getCurrentBattleStateKey(HeroEntity hero) {
-        return HeroEpicFightStateMapper.mapHeroBattleState(hero);
+        return HeroCombatStateMapper.mapHeroBattleState(hero);
     }
 
     public static String getCurrentWeaponStyleKey(HeroEntity hero) {
-        return HeroEpicFightStateMapper.mapWeaponStyle(hero);
+        return HeroCombatStateMapper.mapWeaponStyle(hero);
     }
 
     public static String describeCurrentSnapshot(HeroEntity hero) {
-        return HeroEpicFightStateMapper.describeCurrentSnapshot(hero);
+        return HeroCombatStateMapper.describeCurrentSnapshot(hero);
     }
 
     public static Set<String> getExportedStateNames() {
-        return HeroEpicFightStateMapper.getExportedStateNames();
+        return HeroCombatStateMapper.getExportedStateNames();
     }
 
     public static boolean shouldUseEpicFightPose(HeroEntity hero) {
@@ -266,13 +262,13 @@ public final class HeroEpicFightCompat {
             invokeStatic(BRIDGE_CLASS, "register", new Class<?>[]{IEventBus.class}, modEventBus);
             return true;
         } catch (ReflectiveOperationException | LinkageError exception) {
-            LOGGER.warn("Epic Fight is installed, but Hero common bridge failed to initialize. Falling back to vanilla Hero battle behavior.", exception);
+            LOGGER.warn("Epic Fight is installed, but the Herobrine common bridge failed to initialize. Falling back to vanilla Herobrine battle behavior.", exception);
             return false;
         }
     }
 
     private static synchronized void initializeRuntimeBridge() {
-        if (bridgeStatus != BridgeStatus.READY) {
+        if (bridgeStatus != BridgeStatus.READY || !com.whitecloud233.herobrine_companion.compat.safety.CompatSafety.allowed("epicfight")) {
             return;
         }
 
@@ -280,7 +276,7 @@ public final class HeroEpicFightCompat {
             invokeStatic(BRIDGE_CLASS, "registerArmature", new Class<?>[0]);
             invokeStatic(WEAPON_PROFILES_CLASS, "bootstrap", new Class<?>[0]);
         } catch (ReflectiveOperationException | LinkageError exception) {
-            markBridgeMismatch("Epic Fight runtime bridge initialization failed. Hero will keep fallback battle behavior.", exception);
+            markBridgeMismatch("Epic Fight runtime bridge initialization failed. Herobrine will keep fallback battle behavior.", exception);
         }
     }
 
@@ -289,7 +285,7 @@ public final class HeroEpicFightCompat {
             Object result = invokeStatic(BRIDGE_CLASS, "isPatched", new Class<?>[]{HeroEntity.class}, hero);
             return result instanceof Boolean patched && patched;
         } catch (ReflectiveOperationException | LinkageError exception) {
-            markBridgeMismatch("Epic Fight patch lookup failed. Hero will keep fallback battle behavior.", exception);
+            markBridgeMismatch("Epic Fight patch lookup failed. Herobrine will keep fallback battle behavior.", exception);
             return false;
         }
     }
@@ -300,12 +296,13 @@ public final class HeroEpicFightCompat {
                     new Class<?>[]{HeroEntity.class}, hero);
             return result instanceof Boolean enabled && enabled;
         } catch (ReflectiveOperationException | LinkageError exception) {
-            markBridgeMismatch("Epic Fight weapon profile lookup failed. Hero will keep fallback battle behavior.", exception);
+            markBridgeMismatch("Epic Fight weapon profile lookup failed. Herobrine will keep fallback battle behavior.", exception);
             return false;
         }
     }
 
     private static synchronized void markBridgeMismatch(String message, Throwable throwable) {
+        com.whitecloud233.herobrine_companion.compat.safety.CompatSafety.disable("epicfight", message, throwable);
         bridgeStatus = BridgeStatus.API_MISMATCH;
         bridgeInitialized = true;
         if (throwable == null) {
@@ -323,7 +320,7 @@ public final class HeroEpicFightCompat {
 
     private static void registerClientBridge(IEventBus modEventBus) {
         if (!hasSupportedClientRuntimeShape()) {
-            markBridgeMismatch("Epic Fight is installed but its client renderer bridge API shape was not recognized. Hero will keep vanilla renderer poses.", null);
+            markBridgeMismatch("Epic Fight is installed but its client renderer bridge API shape was not recognized. Herobrine will keep vanilla renderer poses.", null);
             return;
         }
 
@@ -331,7 +328,7 @@ public final class HeroEpicFightCompat {
             Class<?> bridgeClass = Class.forName(CLIENT_BRIDGE_CLASS, false, HeroEpicFightCompat.class.getClassLoader());
             bridgeClass.getMethod("register", IEventBus.class).invoke(null, modEventBus);
         } catch (ReflectiveOperationException | LinkageError exception) {
-            markBridgeMismatch("Epic Fight is installed, but Hero client renderer bridge failed to initialize. Falling back to vanilla Hero renderer poses.", exception);
+            markBridgeMismatch("Epic Fight is installed, but the Herobrine client renderer bridge failed to initialize. Falling back to vanilla Herobrine renderer poses.", exception);
         }
     }
 }

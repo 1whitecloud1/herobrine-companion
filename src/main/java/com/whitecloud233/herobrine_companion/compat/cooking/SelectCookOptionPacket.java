@@ -2,7 +2,7 @@ package com.whitecloud233.herobrine_companion.compat.cooking;
 
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
-import com.whitecloud233.herobrine_companion.entity.logic.data.HeroLogic;
+import com.whitecloud233.herobrine_companion.entity.cooking.CookingService;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -25,7 +25,7 @@ public class SelectCookOptionPacket implements CustomPacketPayload {
 
     public SelectCookOptionPacket(int heroId, BlockPos cookwarePos, ResourceLocation recipeId, int repeatCount) {
         this.heroId = heroId;
-        this.cookwarePos = cookwarePos;
+        this.cookwarePos = cookwarePos.immutable();
         this.recipeId = recipeId;
         this.repeatCount = repeatCount;
     }
@@ -51,16 +51,13 @@ public class SelectCookOptionPacket implements CustomPacketPayload {
 
     public static void handle(SelectCookOptionPacket packet, IPayloadContext context) {
         context.enqueueWork(() -> {
-            com.mojang.logging.LogUtils.getLogger().info(
-                    "[CookDebug] 收到选菜包 hero={} pos={} recipe={} repeat={}",
-                    packet.heroId, packet.cookwarePos, packet.recipeId, packet.repeatCount);
             if (!(context.player() instanceof ServerPlayer player)) {
                 return;
             }
 
             Entity entity = player.level().getEntity(packet.heroId);
             if (entity instanceof HeroEntity hero) {
-                HeroLogic.handleCookSelection(hero, player, packet.cookwarePos, packet.recipeId, packet.repeatCount);
+                CookingService.requestCookSelection(hero, player, packet.cookwarePos, packet.recipeId, packet.repeatCount);
             }
         });
     }

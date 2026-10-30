@@ -3,6 +3,8 @@ package com.whitecloud233.herobrine_companion.mixin;
 import org.objectweb.asm.tree.ClassNode;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -12,6 +14,9 @@ import java.util.List;
 import java.util.Set;
 
 public class HerobrineCompanionMixinPlugin implements IMixinConfigPlugin {
+
+    /** mixin 插件在配置系统加载前运行，只能用 slf4j；debug 级默认不输出。 */
+    private static final Logger LOGGER = LoggerFactory.getLogger("HerobrineCompanion/Mixin");
 
     private boolean isHeroKingAuraEnabled = true;
 
@@ -30,13 +35,13 @@ public class HerobrineCompanionMixinPlugin implements IMixinConfigPlugin {
                         String[] parts = line.split("=");
                         if (parts.length == 2) {
                             this.isHeroKingAuraEnabled = Boolean.parseBoolean(parts[1].trim());
-                            System.out.println("[HerobrineCompanion] Found config: heroKingAuraEnabled = " + this.isHeroKingAuraEnabled);
+                            LOGGER.debug("Found config: heroKingAuraEnabled = {}", this.isHeroKingAuraEnabled);
                         }
                         break;
                     }
                 }
             } catch (IOException e) {
-                e.printStackTrace();
+                LOGGER.warn("读取配置文件失败，heroKingAuraEnabled 回落到默认值 true", e);
             }
         }
     }

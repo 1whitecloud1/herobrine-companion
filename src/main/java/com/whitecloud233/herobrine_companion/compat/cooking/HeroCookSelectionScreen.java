@@ -1,6 +1,10 @@
 package com.whitecloud233.herobrine_companion.compat.cooking;
 
+import com.whitecloud233.herobrine_companion.client.gui.HeroTheme;
+import com.whitecloud233.herobrine_companion.entity.cooking.CookOption;
+import com.whitecloud233.herobrine_companion.entity.cooking.CookingRules;
 import com.whitecloud233.herobrine_companion.client.gui.HeroScreen;
+import com.whitecloud233.herobrine_companion.client.gui.HeroPanelScreen;
 import com.whitecloud233.herobrine_companion.network.PacketHandler;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -14,7 +18,7 @@ import net.minecraft.world.item.ItemStack;
 
 import java.util.List;
 
-public class HeroCookSelectionScreen extends Screen {
+public class HeroCookSelectionScreen extends HeroPanelScreen {
     private static final int PANEL_WIDTH = 248;
     private static final int PANEL_HEIGHT = 212;
     private static final int COL_BG = 0xEE1F1A17;
@@ -24,13 +28,13 @@ public class HeroCookSelectionScreen extends Screen {
 
     private final int heroId;
     private final BlockPos cookwarePos;
-    private final List<HeroCookingCompat.CookOptionView> options;
+    private final List<CookOption> options;
     private final Screen previousScreen;
     private CookOptionList optionList;
-    private int repeatCount = HeroCookingCompat.MIN_COOK_REPEAT_COUNT;
+    private int repeatCount = CookingRules.MIN_COOK_REPEAT_COUNT;
 
     public HeroCookSelectionScreen(int heroId, BlockPos cookwarePos,
-                                   List<HeroCookingCompat.CookOptionView> options,
+                                   List<CookOption> options,
                                    Screen previousScreen) {
         super(Component.translatable("gui.herobrine_companion.cook_select_title"));
         this.heroId = heroId;
@@ -83,11 +87,6 @@ public class HeroCookSelectionScreen extends Screen {
     }
 
     @Override
-    public void renderBackground(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        // 留空：禁用原版自带的世界模糊和黑色背景遮罩，保持和 HeroScreen 视觉一致
-    }
-
-    @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         int[] dims = panelDims();
         int left = dims[0];
@@ -95,10 +94,7 @@ public class HeroCookSelectionScreen extends Screen {
         int panelW = dims[2];
         int panelH = dims[3];
         guiGraphics.fill(left, top, left + panelW, top + panelH, COL_BG);
-        guiGraphics.fill(left, top, left + panelW, top + 1, COL_BORDER);
-        guiGraphics.fill(left, top + panelH - 1, left + panelW, top + panelH, COL_BORDER);
-        guiGraphics.fill(left, top, left + 1, top + panelH, COL_BORDER);
-        guiGraphics.fill(left + panelW - 1, top, left + panelW, top + panelH, COL_BORDER);
+        guiGraphics.renderOutline(left, top, panelW, panelH, COL_BORDER);
 
         guiGraphics.drawString(this.font, this.title, left + 10, top + 8, COL_TEXT, false);
         guiGraphics.drawString(this.font, Component.translatable("gui.herobrine_companion.cook_select_hint"),
@@ -125,15 +121,10 @@ public class HeroCookSelectionScreen extends Screen {
         Minecraft.getInstance().setScreen(this.previousScreen);
     }
 
-    @Override
-    public boolean isPauseScreen() {
-        return false;
-    }
-
     private void adjustRepeatCount(int delta) {
         this.repeatCount = Mth.clamp(this.repeatCount + delta,
-                HeroCookingCompat.MIN_COOK_REPEAT_COUNT,
-                HeroCookingCompat.MAX_COOK_REPEAT_COUNT);
+                CookingRules.MIN_COOK_REPEAT_COUNT,
+                CookingRules.MAX_COOK_REPEAT_COUNT);
         this.refreshOptionList();
     }
 
@@ -170,9 +161,9 @@ public class HeroCookSelectionScreen extends Screen {
             this.addEntry(entry);
         }
 
-        private void rebuild(List<HeroCookingCompat.CookOptionView> options, int repeatCount) {
+        private void rebuild(List<CookOption> options, int repeatCount) {
             this.clearEntries();
-            for (HeroCookingCompat.CookOptionView option : options) {
+            for (CookOption option : options) {
                 if (option.maxRepeatCount() >= repeatCount) {
                     this.addOption(new CookOptionEntry(option));
                 }
@@ -186,9 +177,9 @@ public class HeroCookSelectionScreen extends Screen {
     }
 
     private final class CookOptionEntry extends ObjectSelectionList.Entry<CookOptionEntry> {
-        private final HeroCookingCompat.CookOptionView option;
+        private final CookOption option;
 
-        private CookOptionEntry(HeroCookingCompat.CookOptionView option) {
+        private CookOptionEntry(CookOption option) {
             this.option = option;
         }
 

@@ -1,6 +1,11 @@
 package com.whitecloud233.herobrine_companion.compat.farmersdelight;
 
-import com.whitecloud233.herobrine_companion.compat.cooking.HeroCookingCompat;
+import com.whitecloud233.herobrine_companion.entity.cooking.IngredientMatcher;
+
+import com.whitecloud233.herobrine_companion.entity.cooking.CookSessionState;
+import com.whitecloud233.herobrine_companion.entity.cooking.CookSessionFlow;
+import com.whitecloud233.herobrine_companion.entity.cooking.CookingRules;
+import com.whitecloud233.herobrine_companion.entity.cooking.CookOption;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
@@ -34,15 +39,10 @@ import java.util.*;
 import java.util.function.Predicate;
 
 public final class HeroFarmersDelightCompat {
+    /** 会话状态（选中项/重复份数/区块票据）。前缀固定为农夫乐事专属，与森罗隔离。 */
+    private static final CookSessionState STATE =
+            new CookSessionState(CookingRules.FD_STATE_PREFIX);
     private static final String MOD_ID = "farmersdelight";
-    private static final String COOK_SELECTION_POS_KEY = "HeroFdCookSelectionPos";
-    private static final String COOK_SELECTION_INDEX_KEY = "HeroFdCookSelectionIndex";
-    private static final String COOK_SELECTION_RECIPE_KEY = "HeroFdCookSelectionRecipe";
-    private static final String COOK_REPEAT_POS_KEY = "HeroFdCookRepeatPos";
-    private static final String COOK_REPEAT_REMAINING_KEY = "HeroFdCookRepeatRemaining";
-    private static final String COOK_TICKET_LEVEL_KEY = "HeroFdCookTicketLevel";
-    private static final String COOK_TICKET_CHUNK_KEY = "HeroFdCookTicketChunk";
-    private static final int COOK_TICKET_DISTANCE = 1;
 
     private HeroFarmersDelightCompat() {
     }
@@ -67,7 +67,7 @@ public final class HeroFarmersDelightCompat {
     }
 
     public static ItemStack getCookMainHandDisplay(HeroEntity hero) {
-        if (!isLoaded() || hero == null || hero.getInvitedAction() != HeroCookingCompat.INVITED_ACTION_COOK
+        if (!isLoaded() || hero == null || hero.getInvitedAction() != CookingRules.INVITED_ACTION_COOK
                 || hero.getInvitedPos() == null) {
             return ItemStack.EMPTY;
         }
@@ -75,7 +75,7 @@ public final class HeroFarmersDelightCompat {
     }
 
     public static ItemStack getCookOffhandDisplay(HeroEntity hero) {
-        if (!isLoaded() || hero == null || hero.getInvitedAction() != HeroCookingCompat.INVITED_ACTION_COOK
+        if (!isLoaded() || hero == null || hero.getInvitedAction() != CookingRules.INVITED_ACTION_COOK
                 || hero.getInvitedPos() == null) {
             return ItemStack.EMPTY;
         }
@@ -86,14 +86,10 @@ public final class HeroFarmersDelightCompat {
         if (hero == null || pos == null) {
             return;
         }
-        hero.getPersistentData().putLong(COOK_SELECTION_POS_KEY, pos.asLong());
-        hero.getPersistentData().putInt(COOK_SELECTION_INDEX_KEY, 0);
-        hero.getPersistentData().remove(COOK_SELECTION_RECIPE_KEY);
-        hero.getPersistentData().putLong(COOK_REPEAT_POS_KEY, pos.asLong());
-        hero.getPersistentData().putInt(COOK_REPEAT_REMAINING_KEY, HeroCookingCompat.MIN_COOK_REPEAT_COUNT);
+        STATE.resetSelection(hero, pos);
     }
 
-    public static List<HeroCookingCompat.CookOptionView> getCookOptions(HeroEntity hero, BlockPos pos) {
+    public static List<CookOption> getCookOptions(HeroEntity hero, BlockPos pos) {
         if (!isLoaded() || hero == null || pos == null || hero.level().isClientSide) {
             return List.of();
         }
@@ -129,155 +125,54 @@ public final class HeroFarmersDelightCompat {
     }
 
     public static void setCookRepeatCount(HeroEntity hero, BlockPos pos, int count) {
-        if (hero == null || pos == null) {
-            return;
-        }
-        hero.getPersistentData().putLong(COOK_REPEAT_POS_KEY, pos.asLong());
-        hero.getPersistentData().putInt(COOK_REPEAT_REMAINING_KEY, HeroCookingCompat.clampCookRepeatCount(count));
+        STATE.setRepeatCount(hero, pos, count);
     }
 
     public static void beginCookChunkTicket(HeroEntity hero, BlockPos pos) {
-        if (hero == null || pos == null || hero.level().isClientSide || !(hero.level() instanceof ServerLevel serverLevel)) {
-            return;
-        }
-
-        ChunkPos targetChunk = new ChunkPos(pos);
-        String targetLevelId = serverLevel.dimension().location().toString();
-        String currentLevelId = hero.getPersistentData().getString(COOK_TICKET_LEVEL_KEY);
-        long currentChunkLong = hero.getPersistentData().getLong(COOK_TICKET_CHUNK_KEY);
-        if (targetLevelId.equals(currentLevelId) && currentChunkLong == targetChunk.toLong()) {
-            return;
-        }
-
-        endCookChunkTicket(hero);
-        serverLevel.getChunkSource().addRegionTicket(TicketType.UNKNOWN, targetChunk, COOK_TICKET_DISTANCE, targetChunk);
-        hero.getPersistentData().putString(COOK_TICKET_LEVEL_KEY, targetLevelId);
-        hero.getPersistentData().putLong(COOK_TICKET_CHUNK_KEY, targetChunk.toLong());
+        STATE.beginChunkTicket(hero, pos);
     }
 
     public static void endCookChunkTicket(HeroEntity hero) {
-        if (hero == null || hero.level().isClientSide) {
-            return;
-        }
-
-        String levelId = hero.getPersistentData().getString(COOK_TICKET_LEVEL_KEY);
-        if (!levelId.isBlank() && hero.getServer() != null) {
-            ResourceLocation dimensionId = ResourceLocation.tryParse(levelId);
-            if (dimensionId != null) {
-                ServerLevel ticketLevel = hero.getServer().getLevel(net.minecraft.resources.ResourceKey.create(Registries.DIMENSION, dimensionId));
-                long chunkLong = hero.getPersistentData().getLong(COOK_TICKET_CHUNK_KEY);
-                if (ticketLevel != null) {
-                    ChunkPos chunkPos = new ChunkPos(chunkLong);
-                    ticketLevel.getChunkSource().removeRegionTicket(TicketType.UNKNOWN, chunkPos, COOK_TICKET_DISTANCE, chunkPos);
-                }
-            }
-        }
-
-        hero.getPersistentData().remove(COOK_TICKET_LEVEL_KEY);
-        hero.getPersistentData().remove(COOK_TICKET_CHUNK_KEY);
+        STATE.endChunkTicket(hero);
     }
 
     private static int getCookRepeatCount(HeroEntity hero, BlockPos pos) {
-        if (hero == null || pos == null) {
-            return HeroCookingCompat.MIN_COOK_REPEAT_COUNT;
-        }
-
-        long storedPos = hero.getPersistentData().getLong(COOK_REPEAT_POS_KEY);
-        if (storedPos != pos.asLong()) {
-            setCookRepeatCount(hero, pos, HeroCookingCompat.MIN_COOK_REPEAT_COUNT);
-            return HeroCookingCompat.MIN_COOK_REPEAT_COUNT;
-        }
-
-        int remaining = HeroCookingCompat.clampCookRepeatCount(hero.getPersistentData().getInt(COOK_REPEAT_REMAINING_KEY));
-        hero.getPersistentData().putInt(COOK_REPEAT_REMAINING_KEY, remaining);
-        return remaining;
+        return STATE.repeatCount(hero, pos);
     }
 
     private static boolean consumeCookRepeat(HeroEntity hero, BlockPos pos) {
         if (hero == null || pos == null) {
             return false;
         }
-
-        int remaining = getCookRepeatCount(hero, pos);
-        if (remaining <= HeroCookingCompat.MIN_COOK_REPEAT_COUNT) {
+        if (STATE.consumeRepeat(hero, pos)) {
             stopCooking(hero, pos);
             return true;
         }
-
-        setCookRepeatCount(hero, pos, remaining - 1);
         return true;
     }
 
     private static void stopCooking(HeroEntity hero, BlockPos pos) {
         endCookChunkTicket(hero);
         hero.setInvitedPos(null);
-        hero.setInvitedAction(0);
-        setCookRepeatCount(hero, pos, HeroCookingCompat.MIN_COOK_REPEAT_COUNT);
+        hero.setInvitedAction(CookingRules.ACTION_NONE);
+        setCookRepeatCount(hero, pos, CookingRules.MIN_COOK_REPEAT_COUNT);
     }
 
     @Nullable
     private static ResourceLocation getCookSelectionRecipeId(HeroEntity hero, BlockPos pos) {
-        if (hero == null || pos == null) {
-            return null;
-        }
-
-        long storedPos = hero.getPersistentData().getLong(COOK_SELECTION_POS_KEY);
-        if (storedPos != pos.asLong()) {
-            return null;
-        }
-
-        String recipeId = hero.getPersistentData().getString(COOK_SELECTION_RECIPE_KEY);
-        return recipeId.isBlank() ? null : ResourceLocation.tryParse(recipeId);
+        return STATE.selectedRecipe(hero, pos);
     }
 
     private static int getCookSelectionIndex(HeroEntity hero, BlockPos pos, int optionCount) {
-        if (hero == null || pos == null || optionCount <= 0) {
-            return 0;
-        }
-
-        long storedPos = hero.getPersistentData().getLong(COOK_SELECTION_POS_KEY);
-        if (storedPos != pos.asLong()) {
-            resetCookSelection(hero, pos);
-            return 0;
-        }
-
-        int index = hero.getPersistentData().getInt(COOK_SELECTION_INDEX_KEY);
-        if (index < 0 || index >= optionCount) {
-            index = Math.floorMod(index, optionCount);
-            hero.getPersistentData().putInt(COOK_SELECTION_INDEX_KEY, index);
-        }
-        return index;
+        return STATE.selectionIndex(hero, pos, optionCount);
     }
 
     private static void setCookSelection(HeroEntity hero, BlockPos pos, int index, @Nullable ResourceLocation recipeId) {
-        if (hero == null || pos == null) {
-            return;
-        }
-        hero.getPersistentData().putLong(COOK_SELECTION_POS_KEY, pos.asLong());
-        hero.getPersistentData().putInt(COOK_SELECTION_INDEX_KEY, Math.max(0, index));
-        if (recipeId == null) {
-            hero.getPersistentData().remove(COOK_SELECTION_RECIPE_KEY);
-        } else {
-            hero.getPersistentData().putString(COOK_SELECTION_RECIPE_KEY, recipeId.toString());
-        }
+        STATE.setSelection(hero, pos, index, recipeId);
     }
 
     private static <T extends RecipeCandidate> int resolveSelectedRecipeIndex(HeroEntity hero, BlockPos pos, List<T> options) {
-        if (options.isEmpty()) {
-            return -1;
-        }
-
-        ResourceLocation selectedRecipeId = getCookSelectionRecipeId(hero, pos);
-        if (selectedRecipeId != null) {
-            for (int i = 0; i < options.size(); i++) {
-                if (options.get(i).recipeId().equals(selectedRecipeId)) {
-                    return i;
-                }
-            }
-            return -1;
-        }
-
-        return getCookSelectionIndex(hero, pos, options.size());
+        return STATE.resolveSelectedIndex(hero, pos, options, RecipeCandidate::recipeId);
     }
 
     @Nullable
@@ -308,7 +203,7 @@ public final class HeroFarmersDelightCompat {
                                     int maxRepeatCount) implements RecipeCandidate {
     }
 
-    private record CookOption(ResourceLocation recipeId, ItemStack result, int maxRepeatCount) implements RecipeCandidate {
+    private record BackendCookOption(ResourceLocation recipeId, ItemStack result, int maxRepeatCount) implements RecipeCandidate {
     }
 
     private static final class SafeInvoker {
@@ -387,34 +282,43 @@ public final class HeroFarmersDelightCompat {
             return false;
         }
 
+        /** 会话状态入口：农夫乐事侧走本后端持有的 CookSessionState 实例（键前缀 HeroFd*）。 */
+        private static final CookSessionFlow.SessionAccess SESSION = new CookSessionFlow.SessionAccess() {
+            @Override
+            public void reset(HeroEntity hero, BlockPos pos) {
+                HeroFarmersDelightCompat.resetCookSelection(hero, pos);
+            }
+
+            @Override
+            public void select(HeroEntity hero, BlockPos pos, int index, ResourceLocation recipeId) {
+                setCookSelection(hero, pos, index, recipeId);
+            }
+
+            @Override
+            public int selectedIndex(HeroEntity hero, BlockPos pos, int optionCount) {
+                return getCookSelectionIndex(hero, pos, optionCount);
+            }
+        };
+
+        /** 轮换选中项：通用流程见 {@link CookSessionFlow}；农夫乐事不要求主人在同一维度。 */
         static Component cycleCookSelection(HeroEntity hero, BlockPos pos) {
-            if (!(hero.level() instanceof ServerLevel serverLevel)) {
-                return Component.translatable("message.herobrine_companion.invite_cook_none");
-            }
-
-            ServerPlayer owner = resolveOwner(hero);
-            if (owner == null) {
-                return Component.translatable("message.herobrine_companion.invite_cook_none");
-            }
-
-            BlockEntity blockEntity = serverLevel.getBlockEntity(pos);
-            List<CookOption> options = getCookOptions(serverLevel, owner, blockEntity);
-            if (options.isEmpty()) {
-                resetCookSelection(hero, pos);
-                return Component.translatable("message.herobrine_companion.invite_cook_none");
-            }
-
-            if (options.size() == 1) {
-                setCookSelection(hero, pos, 0, options.get(0).recipeId());
-                return Component.translatable("message.herobrine_companion.invite_cook_single", options.get(0).result().getHoverName());
-            }
-
-            int nextIndex = (getCookSelectionIndex(hero, pos, options.size()) + 1) % options.size();
-            setCookSelection(hero, pos, nextIndex, options.get(nextIndex).recipeId());
-            return Component.translatable("message.herobrine_companion.invite_cook_selected", options.get(nextIndex).result().getHoverName());
+            return CookSessionFlow.cycle(hero, pos, SESSION, resolveOwner(hero), false,
+                    (level, owner, blockEntity) -> mapOptions(getCookOptions(level, owner, blockEntity)));
         }
 
-        static List<HeroCookingCompat.CookOptionView> getCookOptions(HeroEntity hero, BlockPos pos) {
+        /** 后端选项 → 通用选项的包装（两侧各自的结构性适配）。 */
+        private static List<CookOption> mapOptions(List<BackendCookOption> options) {
+            if (options.isEmpty()) {
+                return List.of();
+            }
+            List<CookOption> result = new ArrayList<>(options.size());
+            for (BackendCookOption option : options) {
+                result.add(new CookOption(option.recipeId(), option.result().copy(), option.maxRepeatCount()));
+            }
+            return result;
+        }
+
+        static List<CookOption> getCookOptions(HeroEntity hero, BlockPos pos) {
             if (!(hero.level() instanceof ServerLevel serverLevel)) {
                 return List.of();
             }
@@ -425,14 +329,14 @@ public final class HeroFarmersDelightCompat {
             }
 
             BlockEntity blockEntity = serverLevel.getBlockEntity(pos);
-            List<CookOption> options = getCookOptions(serverLevel, owner, blockEntity);
+            List<BackendCookOption> options = getCookOptions(serverLevel, owner, blockEntity);
             if (options.isEmpty()) {
                 return List.of();
             }
 
-            List<HeroCookingCompat.CookOptionView> result = new ArrayList<>(options.size());
-            for (CookOption option : options) {
-                result.add(new HeroCookingCompat.CookOptionView(option.recipeId(), option.result().copy(), option.maxRepeatCount()));
+            List<CookOption> result = new ArrayList<>(options.size());
+            for (BackendCookOption option : options) {
+                result.add(new CookOption(option.recipeId(), option.result().copy(), option.maxRepeatCount()));
             }
             return result;
         }
@@ -472,7 +376,7 @@ public final class HeroFarmersDelightCompat {
             }
 
             BlockEntity blockEntity = serverLevel.getBlockEntity(pos);
-            List<CookOption> options = getCookOptions(serverLevel, owner, blockEntity);
+            List<BackendCookOption> options = getCookOptions(serverLevel, owner, blockEntity);
             for (int i = 0; i < options.size(); i++) {
                 if (options.get(i).recipeId().equals(recipeId)) {
                     setCookSelection(hero, pos, i, recipeId);
@@ -493,8 +397,8 @@ public final class HeroFarmersDelightCompat {
             }
 
             BlockEntity blockEntity = serverLevel.getBlockEntity(pos);
-            List<CookOption> options = getCookOptions(serverLevel, owner, blockEntity);
-            for (CookOption option : options) {
+            List<BackendCookOption> options = getCookOptions(serverLevel, owner, blockEntity);
+            for (BackendCookOption option : options) {
                 if (option.recipeId().equals(recipeId)) {
                     return option.maxRepeatCount();
                 }
@@ -510,7 +414,7 @@ public final class HeroFarmersDelightCompat {
             return serverLevel.getServer().getPlayerList().getPlayer(hero.getOwnerUUID());
         }
 
-        private static List<CookOption> getCookOptions(ServerLevel level, ServerPlayer owner, @Nullable BlockEntity blockEntity) {
+        private static List<BackendCookOption> getCookOptions(ServerLevel level, ServerPlayer owner, @Nullable BlockEntity blockEntity) {
             if (blockEntity instanceof CookingPotBlockEntity cookingPot) {
                 return mapCookingPotOptions(collectCookingPotPlans(level, owner, cookingPot));
             }
@@ -520,18 +424,18 @@ public final class HeroFarmersDelightCompat {
             return List.of();
         }
 
-        private static List<CookOption> mapCookingPotOptions(List<CookingPotPlan> plans) {
-            List<CookOption> options = new ArrayList<>(plans.size());
+        private static List<BackendCookOption> mapCookingPotOptions(List<CookingPotPlan> plans) {
+            List<BackendCookOption> options = new ArrayList<>(plans.size());
             for (CookingPotPlan plan : plans) {
-                options.add(new CookOption(plan.recipeId(), plan.result().copy(), plan.maxRepeatCount()));
+                options.add(new BackendCookOption(plan.recipeId(), plan.result().copy(), plan.maxRepeatCount()));
             }
             return options;
         }
 
-        private static List<CookOption> mapCuttingBoardOptions(List<CuttingBoardPlan> plans) {
-            List<CookOption> options = new ArrayList<>(plans.size());
+        private static List<BackendCookOption> mapCuttingBoardOptions(List<CuttingBoardPlan> plans) {
+            List<BackendCookOption> options = new ArrayList<>(plans.size());
             for (CuttingBoardPlan plan : plans) {
-                options.add(new CookOption(plan.recipeId(), plan.result().copy(), plan.maxRepeatCount()));
+                options.add(new BackendCookOption(plan.recipeId(), plan.result().copy(), plan.maxRepeatCount()));
             }
             return options;
         }
@@ -755,7 +659,7 @@ public final class HeroFarmersDelightCompat {
                 }
 
                 int containerRepeatLimit = computeCookingPotContainerRepeatLimit(recipe, cookingPot, hasReadyMeal, hasReadyOutput, availableStacks, result);
-                int maxRepeatCount = Math.min(HeroCookingCompat.MAX_COOK_REPEAT_COUNT, Math.min(currentBatchBonus + ingredientRepeatCount, containerRepeatLimit));
+                int maxRepeatCount = Math.min(CookingRules.MAX_COOK_REPEAT_COUNT, Math.min(currentBatchBonus + ingredientRepeatCount, containerRepeatLimit));
                 if (maxRepeatCount <= 0) {
                     continue;
                 }
@@ -775,7 +679,7 @@ public final class HeroFarmersDelightCompat {
                                                                  List<ItemStack> availableStacks, ItemStack recipeResult) {
             ItemStack requiredContainer = recipe.getOutputContainer();
             if (requiredContainer.isEmpty()) {
-                return HeroCookingCompat.MAX_COOK_REPEAT_COUNT;
+                return CookingRules.MAX_COOK_REPEAT_COUNT;
             }
 
             int availableContainerCount = countSameItem(requiredContainer, availableStacks);
@@ -834,13 +738,13 @@ public final class HeroFarmersDelightCompat {
                     if (!recipe.matches(createCuttingBoardInput(currentItem, toolStack), level)) {
                         continue;
                     }
-                    maxRepeatCount = Math.min(HeroCookingCompat.MAX_COOK_REPEAT_COUNT, countMatchingItems(ingredient, availableStacks) + 1);
+                    maxRepeatCount = Math.min(CookingRules.MAX_COOK_REPEAT_COUNT, countMatchingItems(ingredient, availableStacks) + 1);
                 } else {
                     ingredientStack = findMatchingStack(ingredient, 1, availableStacks);
                     if (ingredientStack.isEmpty()) {
                         continue;
                     }
-                    maxRepeatCount = Math.min(HeroCookingCompat.MAX_COOK_REPEAT_COUNT, countMatchingItems(ingredient, availableStacks));
+                    maxRepeatCount = Math.min(CookingRules.MAX_COOK_REPEAT_COUNT, countMatchingItems(ingredient, availableStacks));
                 }
 
                 if (maxRepeatCount <= 0) {
@@ -930,15 +834,7 @@ public final class HeroFarmersDelightCompat {
             owner.getInventory().setChanged();
         }
         private static void addUniqueResult(List<ItemStack> results, ItemStack candidate) {
-            if (candidate.isEmpty()) {
-                return;
-            }
-            for (ItemStack existing : results) {
-                if (ItemStack.isSameItemSameComponents(existing, candidate)) {
-                    return;
-                }
-            }
-            results.add(candidate);
+            IngredientMatcher.addUniqueResult(results, candidate);
         }
 
         private static ItemStack consumeMatchingStack(ServerPlayer owner, ItemStack template, int amount) {
@@ -967,185 +863,52 @@ public final class HeroFarmersDelightCompat {
             return ItemStack.EMPTY;
         }
 
-        private static int computeIngredientCraftCount(List<Ingredient> rawIngredients, List<ItemStack> currentInputs,
-                                                       List<ItemStack> availableStacks) {
-            List<Ingredient> ingredients = normalizeIngredients(rawIngredients);
-            if (ingredients.isEmpty()) {
-                return HeroCookingCompat.MAX_COOK_REPEAT_COUNT;
-            }
-
-            boolean[] usedByCurrent = new boolean[ingredients.size()];
-            if (!matchExistingInputs(currentInputs, ingredients, usedByCurrent, 0)) {
-                return 0;
-            }
-
-            List<Ingredient> firstCycleRemaining = new ArrayList<>();
-            for (int i = 0; i < ingredients.size(); i++) {
-                if (!usedByCurrent[i]) {
-                    firstCycleRemaining.add(ingredients.get(i));
-                }
-            }
-
-            int[] counts = copyStackCounts(availableStacks);
-            if (!firstCycleRemaining.isEmpty() && !consumeIngredientGroup(firstCycleRemaining, availableStacks, counts)) {
-                return 0;
-            }
-
-            int craftCount = 1;
-            while (craftCount < HeroCookingCompat.MAX_COOK_REPEAT_COUNT && consumeIngredientGroup(ingredients, availableStacks, counts)) {
-                craftCount++;
-            }
-            return craftCount;
+        static int computeIngredientCraftCount(List<Ingredient> rawIngredients, List<ItemStack> currentInputs,
+                                                      List<ItemStack> availableStacks) {
+            return IngredientMatcher.computeCraftCount(rawIngredients, currentInputs, availableStacks);
         }
 
-        private static boolean consumeIngredientGroup(List<Ingredient> ingredients, List<ItemStack> availableStacks, int[] counts) {
-            return ingredients.isEmpty() || matchRemainingIngredients(ingredients, availableStacks, counts, new ArrayList<>(), 0);
+        static boolean consumeIngredientGroup(List<Ingredient> ingredients, List<ItemStack> availableStacks, int[] counts) {
+            return IngredientMatcher.consumeIngredientGroup(ingredients, availableStacks, counts);
         }
 
         private static int[] copyStackCounts(List<ItemStack> availableStacks) {
-            int[] counts = new int[availableStacks.size()];
-            for (int i = 0; i < availableStacks.size(); i++) {
-                counts[i] = availableStacks.get(i).getCount();
-            }
-            return counts;
+            return IngredientMatcher.copyStackCounts(availableStacks);
         }
 
         private static int countMatchingItems(Ingredient ingredient, List<ItemStack> availableStacks) {
-            int total = 0;
-            for (ItemStack stack : availableStacks) {
-                if (!stack.isEmpty() && ingredient.test(stack)) {
-                    total += stack.getCount();
-                }
-            }
-            return total;
+            return IngredientMatcher.countMatchingItems(ingredient, availableStacks);
         }
 
         private static int countSameItem(ItemStack target, List<ItemStack> availableStacks) {
-            int total = 0;
-            for (ItemStack stack : availableStacks) {
-                if (!stack.isEmpty() && ItemStack.isSameItem(target, stack)) {
-                    total += stack.getCount();
-                }
-            }
-            return total;
+            return IngredientMatcher.countSameItem(target, availableStacks);
         }
 
         private static List<Ingredient> normalizeIngredients(List<Ingredient> rawIngredients) {
-            List<Ingredient> ingredients = new ArrayList<>();
-            for (Ingredient ingredient : rawIngredients) {
-                if (ingredient != null && !ingredient.isEmpty()) {
-                    ingredients.add(ingredient);
-                }
-            }
-            return ingredients;
+            return IngredientMatcher.normalize(rawIngredients);
         }
 
         @Nullable
         private static IngredientPlan buildIngredientPlan(List<Ingredient> rawIngredients, List<ItemStack> currentInputs,
                                                           List<ItemStack> availableStacks) {
-            List<Ingredient> ingredients = normalizeIngredients(rawIngredients);
-
-            boolean[] usedByCurrent = new boolean[ingredients.size()];
-            if (!matchExistingInputs(currentInputs, ingredients, usedByCurrent, 0)) {
+            IngredientMatcher.IngredientPlanResult plan =
+                    IngredientMatcher.planIngredient(rawIngredients, currentInputs, availableStacks);
+            if (plan == null) {
                 return null;
             }
-
-            List<Ingredient> remainingIngredients = new ArrayList<>();
-            for (int i = 0; i < ingredients.size(); i++) {
-                if (!usedByCurrent[i]) {
-                    remainingIngredients.add(ingredients.get(i));
-                }
-            }
-
-            if (remainingIngredients.isEmpty()) {
-                return new IngredientPlan(null, currentInputs.size(), 0);
-            }
-
-            int[] counts = copyStackCounts(availableStacks);
-            List<ItemStack> chosenStacks = new ArrayList<>();
-            if (!matchRemainingIngredients(remainingIngredients, availableStacks, counts, chosenStacks, 0)) {
-                return null;
-            }
-
-            ItemStack nextIngredient = chosenStacks.isEmpty() ? null : chosenStacks.get(0);
-            return new IngredientPlan(nextIngredient, currentInputs.size(), remainingIngredients.size());
+            return new IngredientPlan(plan.nextIngredient(), plan.matchedCount(), plan.missingCount());
         }
 
-        private static boolean matchExistingInputs(List<ItemStack> currentInputs, List<Ingredient> ingredients, boolean[] used, int index) {
-            if (index >= currentInputs.size()) {
-                return true;
-            }
 
-            ItemStack input = currentInputs.get(index);
-            for (int i = 0; i < ingredients.size(); i++) {
-                if (used[i]) {
-                    continue;
-                }
 
-                Ingredient ingredient = ingredients.get(i);
-                if (!ingredient.test(input)) {
-                    continue;
-                }
 
-                used[i] = true;
-                if (matchExistingInputs(currentInputs, ingredients, used, index + 1)) {
-                    return true;
-                }
-                used[i] = false;
-            }
-            return false;
-        }
-
-        private static boolean matchRemainingIngredients(List<Ingredient> remainingIngredients, List<ItemStack> availableStacks,
-                                                         int[] counts, List<ItemStack> chosenStacks, int index) {
-            if (index >= remainingIngredients.size()) {
-                return true;
-            }
-
-            Ingredient ingredient = remainingIngredients.get(index);
-            for (int i = 0; i < availableStacks.size(); i++) {
-                if (counts[i] <= 0) {
-                    continue;
-                }
-
-                ItemStack candidate = availableStacks.get(i);
-                if (!ingredient.test(candidate)) {
-                    continue;
-                }
-
-                counts[i]--;
-                chosenStacks.add(candidate);
-                if (matchRemainingIngredients(remainingIngredients, availableStacks, counts, chosenStacks, index + 1)) {
-                    return true;
-                }
-                chosenStacks.remove(chosenStacks.size() - 1);
-                counts[i]++;
-            }
-            return false;
-        }
 
         private static ItemStack findMatchingStack(Ingredient ingredient, int minCount, List<ItemStack> availableStacks) {
-            for (ItemStack stack : availableStacks) {
-                if (!stack.isEmpty() && stack.getCount() >= minCount && ingredient.test(stack)) {
-                    return stack;
-                }
-            }
-            return ItemStack.EMPTY;
+            return IngredientMatcher.findMatchingStack(ingredient, minCount, availableStacks);
         }
 
         private static List<ItemStack> collectAccessibleStacks(ServerPlayer owner) {
-            List<ItemStack> stacks = new ArrayList<>(owner.getInventory().items.size() + owner.getInventory().offhand.size());
-            for (ItemStack stack : owner.getInventory().items) {
-                if (!stack.isEmpty()) {
-                    stacks.add(stack);
-                }
-            }
-            for (ItemStack stack : owner.getInventory().offhand) {
-                if (!stack.isEmpty()) {
-                    stacks.add(stack);
-                }
-            }
-            return stacks;
+            return IngredientMatcher.collectAccessibleStacks(owner);
         }
     }
 }

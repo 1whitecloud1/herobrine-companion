@@ -1,5 +1,7 @@
 package com.whitecloud233.herobrine_companion.mixin;
 
+import com.whitecloud233.herobrine_companion.util.NbtKeys;
+
 import com.whitecloud233.herobrine_companion.entity.family.HerobrineFamilyMemberType;
 import com.whitecloud233.herobrine_companion.entity.family.HerobrineFamilyMembers;
 import com.whitecloud233.herobrine_companion.entity.family.JeanCombatResponseService;
@@ -84,6 +86,9 @@ public abstract class JeanUnriddenFlightTuningMixin extends Mob {
     private boolean herobrineCompanion$shouldTuneUnriddenFlight(EnderDragon dragon) {
         return HerobrineFamilyMembers.isFamilyMember(dragon, HerobrineFamilyMemberType.JEAN)
                 && !dragon.isSilent()
+                && !dragon.isNoAi()
+                && !dragon.getPersistentData().hasUUID(NbtKeys.JEAN_FRONT_HERO)
+                && !dragon.getPersistentData().getBoolean(NbtKeys.JEAN_PLAYER_RIDDEN)
                 && !JeanCombatResponseService.shouldUseOriginalUnriddenFlightSpeed(dragon)
                 && !herobrineCompanion$hasPlayerPassenger(dragon);
     }

@@ -42,7 +42,7 @@ final class HeroNightfallAnimationRegistry {
 
    static void onAnimationRegistry(AnimationManager.AnimationRegistryEvent event) {
       if (event != null) {
-         event.newBuilder("herobrine_companion", HeroNightfallAnimationRegistry::buildHeroNightfallAnimations);
+         event.newBuilder("herobrine_companion", builder -> com.whitecloud233.herobrine_companion.compat.safety.CompatSafety.run("epicfight", "build registered animations", () -> buildHeroNightfallAnimations(builder)));
       }
    }
 
@@ -61,7 +61,7 @@ final class HeroNightfallAnimationRegistry {
       HeroScytheComboBehaviors.registerAnimation(builder);
       PoemScythePlayerAnimations.registerAnimations(builder);
 
-      if (!net.neoforged.fml.ModList.get().isLoaded(EFN_MOD_ID)) {
+      if (!com.whitecloud233.herobrine_companion.compat.safety.CompatPreflight.available("efn")) {
          LOGGER.info("[HeroNightfall] EFN ('{}') is not installed: nightfall animation rebinding skipped;"
                  + " the built-in hero scythe combo was registered independently and still works.", EFN_MOD_ID);
          return;
@@ -89,7 +89,8 @@ final class HeroNightfallAnimationRegistry {
                }
             }
          }
-         } catch (Throwable throwable) {
+         } catch (RuntimeException | LinkageError throwable) {
+            com.whitecloud233.herobrine_companion.compat.safety.CompatSafety.disable("efn", "animation rebinding failed", throwable);
             LOGGER.error("[HeroNightfall] rebinding EFN animations onto the hero armature failed;"
                     + " nightfall weapons will fall back to generic motions."
                     + " (the built-in hero scythe combo is unaffected)", throwable);

@@ -2,245 +2,144 @@ package com.whitecloud233.herobrine_companion.compat.kubejs;
 
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.event.HeroRewards;
+import com.whitecloud233.herobrine_companion.event.HeroContentLimits;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.trading.MerchantOffer;
+import net.minecraft.world.item.trading.MerchantOffers;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Consumer;
 import dev.latvian.mods.kubejs.event.EventGroup;
-import dev.latvian.mods.kubejs.event.EventHandler;
 import dev.latvian.mods.kubejs.event.EventGroupRegistry;
+import dev.latvian.mods.kubejs.event.EventHandler;
 import dev.latvian.mods.kubejs.event.KubeEvent;
 import dev.latvian.mods.kubejs.plugin.KubeJSPlugin;
 import dev.latvian.mods.kubejs.script.BindingRegistry;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
+import dev.latvian.mods.kubejs.script.ScriptType;
+import net.minecraft.core.component.DataComponentPredicate;
 import net.minecraft.world.item.trading.ItemCost;
-import net.minecraft.world.item.trading.MerchantOffer;
-import net.minecraft.world.item.trading.MerchantOffers;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.neoforge.event.TagsUpdatedEvent;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Optional;
-import java.util.function.Consumer;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
-// Removed @EventBusSubscriber to prevent loading when KubeJS is missing
-public class HerobrineCompanionKubeJSPlugin implements KubeJSPlugin {
-    private static final Logger LOGGER = LoggerFactory.getLogger("HerobrineCompanionKubeJS");
+public final class HerobrineCompanionKubeJSPlugin implements KubeJSPlugin {
     public static final EventGroup GROUP = EventGroup.of("HerobrineCompanionEvents");
     public static final EventHandler REGISTER_REWARDS = GROUP.server("registerRewards", () -> RegisterRewardsEvent.class);
-    
-    // [新增] 交易事件
     public static final EventHandler REGISTER_TRADES = GROUP.server("registerTrades", () -> HeroTradesEvent.class);
-
-    private static final Pattern COUNT_REGEX = Pattern.compile("^(\\d+)x\\s+(.+)$");
+    private static final ThreadLocal<RegisterRewardsEvent> ACTIVE_REWARDS = new ThreadLocal<>();
 
     @Override
-    public void registerEvents(EventGroupRegistry registry) {
-        registry.register(GROUP);
-    }
+    public void registerEvents(EventGroupRegistry registry) { registry.register(GROUP); }
 
     @Override
     public void registerBindings(BindingRegistry bindings) {
-        // 注册全局对象，方便快速测试，但推荐用事件
-        bindings.add("HeroRewards", new HeroRewardsJS());
+        if (bindings.type() == ScriptType.SERVER) bindings.add("HeroRewards", new HeroRewardsJS());
     }
 
-    /**
-     * 关键步骤：在数据包/标签重载时触发。
-     * 这通常发生在服务器启动完成或执行 /reload 命令时。
-     * 这是触发 KubeJS 修改奖励的最佳时机。
-     */
-    @SubscribeEvent
-    public static void onTagsUpdated(TagsUpdatedEvent event) {
-        // 1.21.1: TagsUpdatedEvent.UpdateCause 可能有所不同，或者直接检查是否是服务器端
-        // 检查是否是从注册表加载的 (通常意味着数据包重载)
-        if (event.getUpdateCause() == TagsUpdatedEvent.UpdateCause.SERVER_DATA_LOAD) {
-            LOGGER.info("Data reloaded, firing HerobrineCompanion reward registration...");
-            
-            // 1. 先重置为默认值，防止重复添加
-            HeroRewards.reset();
-            
-            // 2. 如果 KubeJS 系统已就绪，触发事件让脚本修改列表
-            if (REGISTER_REWARDS.hasListeners()) {
-                REGISTER_REWARDS.post(new RegisterRewardsEvent());
-            }
-        }
-    }
-
-    // [新增] 供 HeroTrades.java 调用的静态钩子
-    public static void fireTradeEvent(MerchantOffers offers, HeroEntity hero) {
-        if (REGISTER_TRADES.hasListeners()) {
-            // 将当前的交易列表和实体传给事件
-            REGISTER_TRADES.post(new HeroTradesEvent(offers, hero));
-        }
-    }
-
-    // --- 工具方法：解析对象为 ItemStack ---
-    public static ItemStack parseItem(Object obj) {
-        if (obj == null) return ItemStack.EMPTY;
-        if (obj instanceof ItemStack) return (ItemStack) obj;
-        
-        // 处理 "3x minecraft:apple" 或 "minecraft:dirt"
-        if (obj instanceof String str) {
-            int count = 1;
-            String itemId = str;
-            Matcher matcher = COUNT_REGEX.matcher(str);
-            if (matcher.find()) {
-                count = Integer.parseInt(matcher.group(1));
-                itemId = matcher.group(2);
-            }
-            ResourceLocation rl = ResourceLocation.tryParse(itemId);
-            if (rl != null) {
-                Item item = BuiltInRegistries.ITEM.get(rl);
-                if (item != Items.AIR) return new ItemStack(item, count);
-            }
-            return ItemStack.EMPTY;
-        }
-
-        // 处理 KubeJS ItemWrapper (Item.of(...))
+    public static void reloadRewards() {
+        RegisterRewardsEvent event = new RegisterRewardsEvent(HeroRewards.defaults());
+        ACTIVE_REWARDS.set(event);
         try {
-            Method getItemStackMethod = obj.getClass().getMethod("getItemStack");
-            Object result = getItemStackMethod.invoke(obj);
-            if (result instanceof ItemStack) return (ItemStack) result;
-        } catch (Exception ignored) {}
-        
-        return ItemStack.EMPTY;
-    }
-
-    // [新增] 辅助方法：解析 ItemCost (输入物品)
-    // Minecraft 1.21 使用 ItemCost 而不是 ItemStack 作为输入
-    public static ItemCost parseCost(Object obj) {
-        ItemStack stack = parseItem(obj);
-        if (stack.isEmpty()) return new ItemCost(Items.AIR);
-        return new ItemCost(stack.getItem(), stack.getCount());
-    }
-
-    // --- 包装类：让 Modify 更安全 ---
-    // 这个类包装了原始的 Java Reward 对象，提供给 JS 使用
-    public static class RewardJS {
-        private final HeroRewards.Reward original;
-
-        public RewardJS(HeroRewards.Reward original) {
-            this.original = original;
-        }
-
-        // 允许 JS 修改信任值: reward.requiredTrust = 50
-        public void setRequiredTrust(int t) { this.original.requiredTrust = t; }
-        public int getRequiredTrust() { return this.original.requiredTrust; }
-
-        // 允许 JS 添加物品: reward.add('minecraft:apple')
-        public void add(Object item) {
-            ItemStack stack = parseItem(item);
-            if (!stack.isEmpty()) {
-                this.original.items.add(stack);
-            } else {
-                LOGGER.warn("Failed to add invalid item to reward ID {}", original.id);
+            if (REGISTER_REWARDS.hasListeners() && REGISTER_REWARDS.post(ScriptType.SERVER, event).type() == dev.latvian.mods.kubejs.event.EventResult.Type.ERROR) {
+                throw new IllegalStateException("Reward script failed; keeping the previous definition");
             }
+            HeroRewards.replaceAll(event.rewards);
+        } finally {
+            ACTIVE_REWARDS.remove();
         }
+    }
 
-        // 允许 JS 清空物品: reward.clearItems()
-        public void clearItems() {
-            this.original.items.clear();
+    public static void fireTradeEvent(MerchantOffers offers, HeroEntity hero) {
+        if (hero == null || hero.level().isClientSide) return;
+        if (REGISTER_TRADES.hasListeners()) {
+            MerchantOffers edited = offers.copy();
+            var result = REGISTER_TRADES.post(ScriptType.SERVER, new HeroTradesEvent(edited, hero));
+            if (result.type() != dev.latvian.mods.kubejs.event.EventResult.Type.ERROR) { offers.clear(); offers.addAll(edited); }
         }
+    }
 
-        // 允许 JS 移除指定索引的物品: reward.remove(0)
+    public static ItemStack parseItem(ItemStack value) {
+        return HeroContentLimits.item(value);
+    }
+
+    public static ItemCost parseCost(ItemStack value) {
+        ItemStack stack = HeroContentLimits.tradeItem(parseItem(value));
+        return new ItemCost(stack.getItemHolder(), stack.getCount(),
+                DataComponentPredicate.allOf(stack.getComponentsPatch().split().added()));
+    }
+
+    public static final class RewardJS {
+        private final HeroRewards.Reward reward;
+        private RewardJS(HeroRewards.Reward reward) { this.reward = reward; }
+
+        public void setRequiredTrust(int value) { reward.requiredTrust = HeroContentLimits.trust(value); }
+        public int getRequiredTrust() { return reward.requiredTrust; }
+        public void add(ItemStack value) {
+            if (reward.items.size() >= HeroContentLimits.MAX_ITEMS_PER_REWARD) throw new IllegalArgumentException("Too many reward items");
+            reward.items.add(parseItem(value));
+        }
+        public void clearItems() { reward.items.clear(); }
         public void remove(int index) {
-            if (index >= 0 && index < this.original.items.size()) {
-                this.original.items.remove(index);
-            }
+            if (index < 0 || index >= reward.items.size()) throw new IllegalArgumentException("Invalid reward item index: " + index);
+            reward.items.remove(index);
         }
-        
-        // 获取只读列表 (可选)
-        public List<ItemStack> getItems() { return new ArrayList<>(this.original.items); }
+        public List<ItemStack> getItems() { return reward.items.stream().map(ItemStack::copy).toList(); }
     }
 
-    // --- 事件类 ---
-    public static class RegisterRewardsEvent implements KubeEvent {
-        public void add(int id, int requiredTrust, Object... itemsIn) {
-            List<ItemStack> stackList = new ArrayList<>();
-            for (Object obj : itemsIn) {
-                ItemStack stack = parseItem(obj);
-                if (!stack.isEmpty()) stackList.add(stack);
-            }
-            HeroRewards.REWARDS.removeIf(r -> r.id == id);
-            HeroRewards.REWARDS.add(new HeroRewards.Reward(id, requiredTrust, stackList.toArray(new ItemStack[0])));
+    public static final class RegisterRewardsEvent implements KubeEvent {
+        private final List<HeroRewards.Reward> rewards;
+        public RegisterRewardsEvent() { this(HeroRewards.snapshot()); }
+        private RegisterRewardsEvent(List<HeroRewards.Reward> rewards) { this.rewards = new ArrayList<>(rewards); }
+
+        public void add(int id, int requiredTrust, ItemStack... values) {
+            HeroContentLimits.rewardId(id);
+            HeroContentLimits.trust(requiredTrust);
+            if (values == null || values.length > HeroContentLimits.MAX_ITEMS_PER_REWARD) throw new IllegalArgumentException("Too many reward items");
+            List<ItemStack> items = new ArrayList<>();
+            for (ItemStack value : values) items.add(parseItem(value));
+            if (rewards.stream().noneMatch(r -> r.id == id) && rewards.size() >= HeroContentLimits.MAX_REWARDS) throw new IllegalArgumentException("Too many rewards");
+            rewards.removeIf(r -> r.id == id);
+            rewards.add(new HeroRewards.Reward(id, requiredTrust, items.toArray(ItemStack[]::new)));
         }
-        
-        public void remove(int id) {
-            HeroRewards.REWARDS.removeIf(r -> r.id == id);
-        }
-        
-        // 这里使用了 RewardJS 包装器！
+        public void remove(int id) { HeroContentLimits.rewardId(id); rewards.removeIf(r -> r.id == id); }
+        public void removeAll() { rewards.clear(); }
         public void modify(int id, Consumer<RewardJS> modifier) {
-            HeroRewards.Reward reward = HeroRewards.getReward(id);
-            if (reward != null) {
-                // 将包装后的对象传给 JS
-                modifier.accept(new RewardJS(reward));
-            }
+            HeroRewards.Reward original = rewards.stream().filter(r -> r.id == id).findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("Unknown reward ID: " + id));
+            if (modifier == null) throw new IllegalArgumentException("Missing reward modifier");
+            HeroRewards.Reward edited = HeroRewards.copy(original);
+            modifier.accept(new RewardJS(edited));
+            rewards.set(rewards.indexOf(original), edited);
         }
     }
 
-    // [新增] 交易事件类
-    public static class HeroTradesEvent implements KubeEvent {
+    public static final class HeroTradesEvent implements KubeEvent {
         private final MerchantOffers offers;
-        public final HeroEntity hero; // 公开给 JS，可以读取 hero.trustLevel
-
-        public HeroTradesEvent(MerchantOffers offers, HeroEntity hero) {
-            this.offers = offers;
-            this.hero = hero;
+        public final HeroEntity hero;
+        public HeroTradesEvent(MerchantOffers offers, HeroEntity hero) { this.offers = offers; this.hero = hero; }
+        public int getTrustLevel() { return hero.getTrustLevel(); }
+        public void removeAll() { offers.clear(); }
+        public void remove(int index) {
+            if (index < 0 || index >= offers.size()) throw new IllegalArgumentException("Invalid trade index: " + index);
+            offers.remove(index);
         }
-
-        // 让 JS 获取信任等级: event.getTrustLevel()
-        public int getTrustLevel() {
-            return hero.getTrustLevel();
-        }
-
-        // 移除所有交易
-        public void removeAll() {
-            offers.clear();
-        }
-        
-        // 简单添加交易: add('5x apple', 'diamond')
-        public void add(Object input, Object output) {
-            add(input, null, output, 10, 5, 0.05f);
-        }
-
-        // 双输入交易: add('5x apple', 'gold_ingot', 'diamond')
-        public void add(Object input1, Object input2, Object output) {
-            add(input1, input2, output, 10, 5, 0.05f);
-        }
-
-        // 完整版添加交易
-        public void add(Object input1, Object input2, Object output, int maxUses, int xp, float priceMult) {
-            ItemCost costA = parseCost(input1);
-            ItemStack result = parseItem(output);
-            
-            Optional<ItemCost> costB = Optional.empty();
-            if (input2 != null) {
-                ItemCost c2 = parseCost(input2);
-                if (c2.item() != Items.AIR) {
-                    costB = Optional.of(c2);
-                }
-            }
-
-            if (costA.item() != Items.AIR && !result.isEmpty()) {
-                MerchantOffer offer = new MerchantOffer(costA, costB, result, maxUses, xp, priceMult);
-                offers.add(offer);
-            } else {
-                LOGGER.warn("Invalid trade skipped: {} + {} -> {}", input1, input2, output);
-            }
+        public void add(ItemStack input, ItemStack output) { add(input, null, output, 10, 5, 0.05f); }
+        public void add(ItemStack input1, ItemStack input2, ItemStack output) { add(input1, input2, output, 10, 5, 0.05f); }
+        public void add(ItemStack input1, ItemStack input2, ItemStack output, int maxUses, int xp, float priceMult) {
+            HeroContentLimits.trade(maxUses, xp, priceMult);
+            if (offers.size() >= HeroContentLimits.MAX_TRADES) throw new IllegalArgumentException("Too many trades");
+            ItemCost first = parseCost(input1);
+            Optional<ItemCost> second = input2 == null ? Optional.empty() : Optional.of(parseCost(input2));
+            MerchantOffer offer = new MerchantOffer(first, second, HeroContentLimits.tradeItem(parseItem(output)), maxUses, xp, priceMult);
+            offers.add(offer);
         }
     }
 
-    // --- 全局对象 (可选，用于调试) ---
-    public static class HeroRewardsJS {
-        public void add(int id, int trust, Object... items) { new RegisterRewardsEvent().add(id, trust, items); }
-        public void remove(int id) { new RegisterRewardsEvent().remove(id); }
+    public static final class HeroRewardsJS {
+        private RegisterRewardsEvent active() {
+            RegisterRewardsEvent event = ACTIVE_REWARDS.get();
+            if (event == null) throw new IllegalStateException("Use HeroRewards inside HerobrineCompanionEvents.registerRewards");
+            return event;
+        }
+        public void add(int id, int trust, ItemStack... items) { active().add(id, trust, items); }
+        public void remove(int id) { active().remove(id); }
     }
 }

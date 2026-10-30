@@ -9,7 +9,7 @@ public final class HeroWaveyCapesCompat {
     }
 
     public static boolean isLoaded() {
-        return ModList.get().isLoaded("waveycapes");
+        return com.whitecloud233.herobrine_companion.compat.safety.CompatPreflight.available("waveycapes");
     }
 
     public static void attachRenderLayer(HeroRenderer renderer) {
@@ -25,7 +25,8 @@ public final class HeroWaveyCapesCompat {
         }
 
         static void attachRenderLayer(HeroRenderer renderer) {
-            renderer.addHeroRenderLayer(new com.whitecloud233.herobrine_companion.compat.waveycapes.HeroWaveyCapeLayer(renderer));
+            renderer.addHeroRenderLayer(new com.whitecloud233.herobrine_companion.compat.safety.GuardedHeroLayer(renderer, "waveycapes",
+                    new HeroWaveyCapeLayer(renderer)));
         }
     }
 }

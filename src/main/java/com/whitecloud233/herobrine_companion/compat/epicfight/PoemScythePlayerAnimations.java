@@ -125,7 +125,10 @@ final class PoemScythePlayerAnimations {
     }
 
     static void registerWeaponPreset(WeaponCapabilityPresetRegistryEvent event) {
+        com.whitecloud233.herobrine_companion.compat.safety.CompatSafety.run("epicfight", "register weapon preset", () -> {
         event.getTypeEntry().put(WEAPON_TYPE, item -> createCapability());
+
+        });
     }
 
     // This pinned EF build retains these public builder methods. A fresh preset

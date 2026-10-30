@@ -1,7 +1,7 @@
-package com.whitecloud233.herobrine_companion.mixin.epicfight;
+package com.whitecloud233.herobrine_companion.compat.mixin.epicfight;
 
 import com.whitecloud233.herobrine_companion.compat.epicfight.AvalonWeaponAccess;
-import com.whitecloud233.herobrine_companion.compat.epicfight.HeroEpicFightDebugLog;
+import com.whitecloud233.herobrine_companion.combat.HeroCombatDebugLog;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -40,12 +40,12 @@ public abstract class RenderAnimationItemMixin {
             if (!stack.isEmpty() && AvalonWeaponAccess.isAvalonItem(stack)) {
                 Armature weaponArmature = AvalonWeaponAccess.weaponArmature(stack);
                 if (weaponArmature != null) {
-                    HeroEpicFightDebugLog.repeatedEvent(hero, "weaponArmatureRedirect", "redirect",
+                    HeroCombatDebugLog.repeatedEvent(hero, "weaponArmatureRedirect", "redirect",
                             "item=" + BuiltInRegistries.ITEM.getKey(stack.getItem()) + ",armatureJoints=" + weaponArmature.getJointNumber());
                     return weaponArmature;
                 } else {
                     // mixin 生效但武器骨架尚未加载/反射失败 —— 与「mixin 未生效」区分开
-                    HeroEpicFightDebugLog.event(hero, "weaponArmatureRedirect",
+                    HeroCombatDebugLog.event(hero, "weaponArmatureRedirect",
                             "weaponArmature=null item=" + BuiltInRegistries.ITEM.getKey(stack.getItem()));
                 }
             }

@@ -1,4 +1,4 @@
-package com.whitecloud233.herobrine_companion.mixin.epicfight;
+package com.whitecloud233.herobrine_companion.compat.mixin.epicfight;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;

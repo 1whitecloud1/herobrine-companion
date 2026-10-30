@@ -131,6 +131,7 @@ final class WaveyCapesRuntime {
             loadedCapePointGetLerpZMethod = loadedCapePointClass.getMethod("getLerpZ", float.class);
             available = true;
         } catch (Throwable ignored) {
+            com.whitecloud233.herobrine_companion.compat.safety.CompatSafety.rethrowFatal(ignored);
         }
 
         AVAILABLE = available;
@@ -300,6 +301,7 @@ final class WaveyCapesRuntime {
         try {
             return Class.forName(className, true, WaveyCapesRuntime.class.getClassLoader()).getConstructor().newInstance();
         } catch (Throwable ignored) {
+            com.whitecloud233.herobrine_companion.compat.safety.CompatSafety.rethrowFatal(ignored);
             return null;
         }
     }
@@ -381,6 +383,7 @@ final class WaveyCapesRuntime {
         try {
             return vector3Constructor.newInstance(x, y, z);
         } catch (Throwable ignored) {
+            com.whitecloud233.herobrine_companion.compat.safety.CompatSafety.rethrowFatal(ignored);
             return null;
         }
     }
@@ -406,6 +409,7 @@ final class WaveyCapesRuntime {
             Object config = modBaseConfigField.get(null);
             return config != null ? field.get(config) : null;
         } catch (Throwable ignored) {
+            com.whitecloud233.herobrine_companion.compat.safety.CompatSafety.rethrowFatal(ignored);
             return null;
         }
     }
@@ -426,6 +430,7 @@ final class WaveyCapesRuntime {
         try {
             return method.invoke(target, args);
         } catch (Throwable ignored) {
+            com.whitecloud233.herobrine_companion.compat.safety.CompatSafety.rethrowFatal(ignored);
             return null;
         }
     }

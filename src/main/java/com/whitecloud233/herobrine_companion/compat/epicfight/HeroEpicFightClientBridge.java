@@ -24,11 +24,17 @@ public final class HeroEpicFightClientBridge {
     }
 
     private static void onRegisterParticleProviders(RegisterParticleProvidersEvent event) {
+        com.whitecloud233.herobrine_companion.compat.safety.CompatSafety.run("epicfight", "onRegisterParticleProviders", () -> {
         event.registerSpriteSet(ModParticles.GLOW_TRAIL.get(), GlowTrailParticle.Provider::new);
+
+        });
     }
 
     private static void onAddPatchedRenderers(RegisterPatchedRenderersEvent.AddEntity event) {
+        com.whitecloud233.herobrine_companion.compat.safety.CompatSafety.run("epicfight", "onAddPatchedRenderers", () -> {
         event.addPatchedEntityRenderer(ModEntities.HERO.get(), entityType -> new HeroPatchedHumanoidRenderer(event.getContext(), entityType).initLayerLast(event.getContext(), entityType));
+
+        });
     }
 }
 

@@ -1,5 +1,7 @@
 package com.whitecloud233.herobrine_companion.compat.epicfight;
 
+import com.whitecloud233.herobrine_companion.combat.HeroCombatDebugLog;
+
 import com.whitecloud233.herobrine_companion.compat.epicfight.effect.HeroBloodCurseStore;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.ai.combat.HeroCombatPlanner;
@@ -25,22 +27,24 @@ final class HeroNightfallBehaviorGates {
       if (hero != null && target != null) {
          if (Math.abs(target.getY() - hero.getY()) > (double)2.5F) {
             maybeFallbackHoverMelee(hero, target, comboRange);
-            HeroEpicFightDebugLog.repeatedEvent(hero, "comboGate", "ground", "comboBlocked=height");
+            HeroCombatDebugLog.repeatedEvent(hero, "comboGate", "ground", "comboBlocked=height");
             return false;
          } else if (hero.isBattleModeActive() && !hero.isBattleHoldAction() && !hero.isBattleReleaseAction()) {
             if (!hero.hasLineOfSight(target)) {
-               HeroEpicFightDebugLog.repeatedEvent(hero, "comboGate", "los", "comboBlocked=los");
+               HeroCombatDebugLog.repeatedEvent(hero, "comboGate", "los", "comboBlocked=los");
                return false;
             } else {
                double reach = Math.max(comboRange, profile.attackRadius() + 0.45) + (double)2.5F;
                int windupTicks = 4 + Math.min(comboIndex, 3);
                double predictedDistanceSqr = HeroCombatPlanner.predictedDistanceSqr(hero, target, windupTicks, (double)0.5F);
                if (predictedDistanceSqr > reach * reach) {
-                  String var12 = String.format(Locale.ROOT, "%.2f", Math.sqrt(predictedDistanceSqr));
-                  HeroEpicFightDebugLog.repeatedEvent(hero, "comboGate", "range", "comboBlocked=range dist=" + var12 + ",reach=" + String.format(Locale.ROOT, "%.2f", reach));
+                  if (HeroCombatDebugLog.enabled()) {
+                     String var12 = String.format(Locale.ROOT, "%.2f", Math.sqrt(predictedDistanceSqr));
+                     HeroCombatDebugLog.repeatedEvent(hero, "comboGate", "range", "comboBlocked=range dist=" + var12 + ",reach=" + String.format(Locale.ROOT, "%.2f", reach));
+                  }
                   return false;
                } else if (!isSoftlyFacingTarget(hero, target, windupTicks)) {
-                  HeroEpicFightDebugLog.repeatedEvent(hero, "comboGate", "facing", "comboBlocked=facing");
+                  HeroCombatDebugLog.repeatedEvent(hero, "comboGate", "facing", "comboBlocked=facing");
                   return false;
                } else {
                   return true;
@@ -48,7 +52,9 @@ final class HeroNightfallBehaviorGates {
             }
          } else {
             boolean var10003 = hero.isBattleModeActive();
-            HeroEpicFightDebugLog.repeatedEvent(hero, "comboGate", "state", "comboBlocked=state battle=" + var10003 + ",hold=" + hero.isBattleHoldAction() + ",release=" + hero.isBattleReleaseAction() + ",action=" + hero.getBattleActionState() + ",shock=" + hero.shockTicks);
+            if (HeroCombatDebugLog.enabled()) {
+               HeroCombatDebugLog.repeatedEvent(hero, "comboGate", "state", "comboBlocked=state battle=" + var10003 + ",hold=" + hero.isBattleHoldAction() + ",release=" + hero.isBattleReleaseAction() + ",action=" + hero.getBattleActionState() + ",shock=" + hero.shockTicks);
+            }
             return false;
          }
       } else {
@@ -81,22 +87,22 @@ final class HeroNightfallBehaviorGates {
       HeroEntity hero = getHero(mobPatch);
       LivingEntity target = getTrackedTarget(hero);
       if (hero != null && target != null) {
-         if (Math.abs(target.getY() - hero.getY()) > (double)2.5F) {
-            HeroEpicFightDebugLog.repeatedEvent(hero, "comboGate", "ground-continue", "comboBlocked=height-continue");
-            return false;
-         } else if (hero.isBattleModeActive() && !hero.isBattleHoldAction() && !hero.isBattleReleaseAction()) {
+         // Authored jumps must not make tryProceed discard a running combo.
+         if (hero.isBattleModeActive() && !hero.isBattleHoldAction() && !hero.isBattleReleaseAction()) {
             if (!hero.hasLineOfSight(target)) {
-               HeroEpicFightDebugLog.repeatedEvent(hero, "comboGate", "los-continue", "comboBlocked=los-continue");
+               HeroCombatDebugLog.repeatedEvent(hero, "comboGate", "los-continue", "comboBlocked=los-continue");
                return false;
             } else {
                double followUpReach = Math.max(comboRange, profile.attackRadius() + (double)0.75F) + (double)2.5F;
                int windupTicks = 3 + Math.min(comboIndex, 2);
                if (HeroCombatPlanner.predictedDistanceSqr(hero, target, windupTicks, (double)0.5F) > followUpReach * followUpReach) {
-                  String var10 = String.format(Locale.ROOT, "%.2f", Math.sqrt(HeroCombatPlanner.predictedDistanceSqr(hero, target, windupTicks, (double)0.5F)));
-                  HeroEpicFightDebugLog.repeatedEvent(hero, "comboGate", "range-continue", "comboBlocked=range-continue dist=" + var10 + ",reach=" + String.format(Locale.ROOT, "%.2f", followUpReach));
+                  if (HeroCombatDebugLog.enabled()) {
+                     String var10 = String.format(Locale.ROOT, "%.2f", Math.sqrt(HeroCombatPlanner.predictedDistanceSqr(hero, target, windupTicks, (double)0.5F)));
+                     HeroCombatDebugLog.repeatedEvent(hero, "comboGate", "range-continue", "comboBlocked=range-continue dist=" + var10 + ",reach=" + String.format(Locale.ROOT, "%.2f", followUpReach));
+                  }
                   return false;
                } else if (!isSoftlyFacingTarget(hero, target, windupTicks)) {
-                  HeroEpicFightDebugLog.repeatedEvent(hero, "comboGate", "facing-continue", "comboBlocked=facing-continue");
+                  HeroCombatDebugLog.repeatedEvent(hero, "comboGate", "facing-continue", "comboBlocked=facing-continue");
                   return false;
                } else {
                   return true;
@@ -104,7 +110,9 @@ final class HeroNightfallBehaviorGates {
             }
          } else {
             boolean var10003 = hero.isBattleModeActive();
-            HeroEpicFightDebugLog.repeatedEvent(hero, "comboGate", "state-continue", "comboBlocked=state-continue battle=" + var10003 + ",hold=" + hero.isBattleHoldAction() + ",release=" + hero.isBattleReleaseAction() + ",action=" + hero.getBattleActionState());
+            if (HeroCombatDebugLog.enabled()) {
+               HeroCombatDebugLog.repeatedEvent(hero, "comboGate", "state-continue", "comboBlocked=state-continue battle=" + var10003 + ",hold=" + hero.isBattleHoldAction() + ",release=" + hero.isBattleReleaseAction() + ",action=" + hero.getBattleActionState());
+            }
             return false;
          }
       } else {

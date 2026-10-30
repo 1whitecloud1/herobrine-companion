@@ -1,13 +1,10 @@
 package com.whitecloud233.herobrine_companion.compat.accessories;
 
-import com.whitecloud233.herobrine_companion.client.render.HeroRenderer;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.logic.data.HeroStateManager;
 import com.whitecloud233.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.herobrine_companion.network.SyncHeroCosmeticsPacket;
 import com.whitecloud233.herobrine_companion.util.AiItemNaming;
-import net.minecraft.client.model.PlayerModel;
-import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -43,9 +40,35 @@ public class HeroAccessoriesCompat {
     };
 
     public static boolean isLoaded() {
-        return ModList.get().isLoaded("accessories");
+        return com.whitecloud233.herobrine_companion.compat.safety.CompatPreflight.available("accessories");
     }
 
+    /**
+     * 判断给定的饰品菜单是否属于 Hero。
+     *
+     * <p>只在 Accessories 存在时由 mixin 调用；这里用接口/反射读取目标实体，
+     * 避免本类对饰品菜单的具体实现类型产生编译期依赖。失败一律返回 false，
+     * mixin 便保持 Accessories 原本的行为。</p>
+     */
+    public static boolean isHeroAccessoriesMenu(Object menu) {
+        if (!isLoaded() || menu == null) {
+            return false;
+        }
+        Object target = invokeNoArg(menu, "targetEntity");
+        return target instanceof HeroEntity;
+    }
+
+    /** 反射调用无参方法；方法缺失或调用失败返回 null。 */
+    private static Object invokeNoArg(Object receiver, String method) {
+        try {
+            java.lang.reflect.Method accessor = receiver.getClass().getMethod(method);
+            accessor.setAccessible(true);
+            return accessor.invoke(receiver);
+        } catch (Throwable ignored) {
+            com.whitecloud233.herobrine_companion.compat.safety.CompatSafety.rethrowFatal(ignored);
+            return null;
+        }
+    }
 
     public static int addSlots(Consumer<Slot> slotConsumer, HeroEntity hero, int startX, int startY, int columns) {
         if (!isLoaded() || slotConsumer == null || hero == null || columns <= 0) {
@@ -300,7 +323,7 @@ public class HeroAccessoriesCompat {
             @Override
             public void setChanged() {
                 super.setChanged();
-                this.hero.isStateDirty = true;
+                this.hero.markEquipmentDirty();
                 if (!this.hero.level().isClientSide) {
                     HeroStateManager.backupToGlobal(this.hero);
                     PacketHandler.sendToTracking(new SyncHeroCosmeticsPacket(this.hero), this.hero);

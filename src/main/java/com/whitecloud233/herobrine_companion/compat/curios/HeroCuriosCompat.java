@@ -1,6 +1,6 @@
 package com.whitecloud233.herobrine_companion.compat.curios;
 
-import com.whitecloud233.herobrine_companion.compat.ArmourerWorkshop.HeroAWCompat;
+import com.whitecloud233.herobrine_companion.api.compat.HeroAWCompat;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.herobrine_companion.network.SyncHeroCosmeticsPacket;
@@ -36,7 +36,7 @@ public class HeroCuriosCompat {
                     @Override
                     public void setChanged() {
                         super.setChanged();
-                        hero.isStateDirty = true; // 触发脏标记！
+                        hero.markEquipmentDirty(); // 触发脏标记！
                         if (!hero.level().isClientSide) {
                             PacketHandler.sendToTracking(new SyncHeroCosmeticsPacket(hero), hero);
                         }
@@ -65,7 +65,7 @@ public class HeroCuriosCompat {
             if (stacksHandler != null) {
                 stacksHandler.getStacks().setStackInSlot(0, stack);
                 // 👇【新增】：代码强行修改饰品时也触发脏标记
-                hero.isStateDirty = true;
+                hero.markEquipmentDirty();
                 if (!hero.level().isClientSide) {
                     PacketHandler.sendToTracking(new SyncHeroCosmeticsPacket(hero), hero);
                 }

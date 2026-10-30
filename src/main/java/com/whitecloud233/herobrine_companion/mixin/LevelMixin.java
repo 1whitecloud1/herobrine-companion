@@ -1,6 +1,8 @@
 package com.whitecloud233.herobrine_companion.mixin;
 
 import com.whitecloud233.herobrine_companion.config.Config;
+import com.whitecloud233.herobrine_companion.config.ServerConfigAccess;
+import com.whitecloud233.herobrine_companion.config.ServerRule;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.ai.learning.HeroBrain;
 import com.whitecloud233.herobrine_companion.event.WorldAnomalyEventHandler;
@@ -51,7 +53,7 @@ public abstract class LevelMixin {
             }
 
             // 【新增】4. 配置判断：如果未开启方块修复，直接 return 结束，不再进行后续的遍历扫描
-            if (!Config.heroBlockRestoration) {
+            if (!ServerConfigAccess.snapshot().enabled(ServerRule.BLOCK_RESTORATION)) {
                 return;
             }
 

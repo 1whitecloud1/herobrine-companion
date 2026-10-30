@@ -27,7 +27,8 @@ public final class AvalonWeaponAccess {
     }
 
     public static boolean isAvalonItem(ItemStack stack) {
-        return stack != null && !stack.isEmpty() && ensureLoaded() && avalonItemInterface.isAssignableFrom(stack.getItem().getClass());
+        return com.whitecloud233.herobrine_companion.compat.safety.CompatPreflight.available("epic_fight_avalon")
+                && stack != null && !stack.isEmpty() && ensureLoaded() && avalonItemInterface.isAssignableFrom(stack.getItem().getClass());
     }
 
     public static boolean shouldUseWeaponArmature(ItemStack stack, int entityId) {

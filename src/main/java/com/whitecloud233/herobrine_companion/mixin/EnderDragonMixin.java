@@ -1,6 +1,7 @@
 package com.whitecloud233.herobrine_companion.mixin;
 
-import com.whitecloud233.herobrine_companion.config.Config;
+import com.whitecloud233.herobrine_companion.config.ServerConfigAccess;
+import com.whitecloud233.herobrine_companion.config.ServerRule;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
@@ -31,7 +32,7 @@ public abstract class EnderDragonMixin extends Mob {
 
         // 0. 检查配置是否启用
         // 注意：这里直接读取静态字段，如果配置热重载可能需要确保 Config 类已更新
-        if (!Config.heroKingAuraEnabled) {
+        if (!ServerConfigAccess.snapshot().enabled(ServerRule.KING_AURA)) {
             return;
         }
 

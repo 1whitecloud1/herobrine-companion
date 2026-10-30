@@ -1,5 +1,7 @@
 package com.whitecloud233.herobrine_companion.compat.epicfight;
 
+import com.whitecloud233.herobrine_companion.client.render.GlowTrailRenderTypes;
+
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.Camera;

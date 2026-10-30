@@ -86,6 +86,7 @@ public final class HeroEpicFightBridge {
     }
 
     public static synchronized void registerArmature() {
+        com.whitecloud233.herobrine_companion.compat.safety.CompatSafety.run("epicfight", "registerArmature", () -> {
         if (armatureRegistered) {
             return;
         }
@@ -94,6 +95,8 @@ public final class HeroEpicFightBridge {
         // 武器模型与命中框能正确绑定，避免模型脱节/技能无命中框
         HeroNightfallArmatureJoints.addNightfallWeaponJoints(HERO_NIGHTFALL_ARMATURE.get());
         Armatures.registerEntityTypeArmature(ModEntities.HERO.get(), HERO_NIGHTFALL_ARMATURE);
+
+        });
     }
 
     public static boolean isPatched(HeroEntity hero) {
@@ -233,10 +236,16 @@ public final class HeroEpicFightBridge {
     }
 
     private static void onEntityPatchRegistry(EntityPatchRegistryEvent event) {
+        com.whitecloud233.herobrine_companion.compat.safety.CompatSafety.run("epicfight", "onEntityPatchRegistry", () -> {
         event.registerEntityPatch(ModEntities.HERO.get(), HeroEpicFightPatch::new);
+
+        });
     }
 
     private static void onAnimationRegistry(AnimationRegistryEvent event) {
+        com.whitecloud233.herobrine_companion.compat.safety.CompatSafety.run("epicfight", "onAnimationRegistry", () -> {
         HeroNightfallAnimationRegistry.onAnimationRegistry(event);
+
+        });
     }
 }

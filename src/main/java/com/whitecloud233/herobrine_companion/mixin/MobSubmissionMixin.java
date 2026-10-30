@@ -1,5 +1,7 @@
 package com.whitecloud233.herobrine_companion.mixin;
 
+import com.whitecloud233.herobrine_companion.util.NbtKeys;
+
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
@@ -20,7 +22,7 @@ public abstract class MobSubmissionMixin extends LivingEntity {
     @Inject(method = "serverAiStep", at = @At("TAIL"))
     private void enforceSubmission(CallbackInfo ci) {
         // 检查 NBT 标记
-        if (this.getPersistentData().getBoolean("HeroSubmission")) {
+        if (this.getPersistentData().getBoolean(NbtKeys.MOB_SUBMISSION)) {
             Mob self = (Mob) (Object) this;
 
             // --- 基础控制 (保持不变) ---
@@ -32,8 +34,8 @@ public abstract class MobSubmissionMixin extends LivingEntity {
             // --- 核心修复：头部旋转锁死 ---
 
             // 1. 读取 Goal 计算好的“看向 Herobrine”的角度
-            if (self.getPersistentData().contains("HeroSubmissionYaw")) {
-                float targetYaw = self.getPersistentData().getFloat("HeroSubmissionYaw");
+            if (self.getPersistentData().contains(NbtKeys.MOB_SUBMISSION_YAW)) {
+                float targetYaw = self.getPersistentData().getFloat(NbtKeys.MOB_SUBMISSION_YAW);
 
                 // 2. 计算战栗抖动
                 float jitter = 0.0F;
