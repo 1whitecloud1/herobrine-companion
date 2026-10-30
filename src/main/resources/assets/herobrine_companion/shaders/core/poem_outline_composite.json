@@ -1,0 +1,8 @@
+{
+  "vertex": "herobrine_companion:poem_outline_screen",
+  "fragment": "herobrine_companion:poem_outline_composite",
+  "samplers": [{"name": "Sampler0"}, {"name": "Sampler1"}],
+  "uniforms": [
+    {"name": "MaskBounds", "type": "float", "count": 4, "values": [0, 0, 1, 1]}
+  ]
+}

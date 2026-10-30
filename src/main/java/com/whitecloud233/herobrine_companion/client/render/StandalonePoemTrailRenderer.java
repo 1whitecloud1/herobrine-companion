@@ -16,6 +16,7 @@ import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.resources.ResourceLocation;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL12;
+import org.lwjgl.opengl.GL13;
 
 /** Full-bright, depth-tested blade ribbons without an Epic Fight or GeckoLib dependency. */
 public final class StandalonePoemTrailRenderer extends RenderType {
@@ -57,8 +58,10 @@ public final class StandalonePoemTrailRenderer extends RenderType {
         if (frame.trail().isEmpty()) return;
         float scroll = scroll();
         enableRepeatOnce();
-        PoemTrailMesh.renderBody(frame, model, stack, buffers.getBuffer(BODY), scroll);
-        PoemTrailMesh.render(frame, model, stack, buffers.getBuffer(TRAIL), scroll);
+        PoemTrailMesh.renderBody(frame, model, stack,
+                PoemEmissiveEffect.buffer(buffers, BODY, TEXTURE, PoemEmissiveEffect.Material.TRAIL_BODY), scroll);
+        PoemTrailMesh.render(frame, model, stack,
+                PoemEmissiveEffect.buffer(buffers, TRAIL, TEXTURE, PoemEmissiveEffect.Material.TRAIL_GLOW), scroll);
     }
 
     /**
@@ -72,10 +75,18 @@ public final class StandalonePoemTrailRenderer extends RenderType {
         AbstractTexture texture = manager.getTexture(TEXTURE);
         int id = texture == null ? -1 : texture.getId();
         if (id < 0 || id == repeatAppliedTo) return;
-        RenderSystem.bindTexture(id);
-        RenderSystem.texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, GL11.GL_REPEAT);
-        RenderSystem.texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T, GL12.GL_CLAMP_TO_EDGE);
-        repeatAppliedTo = id;
+        int activeTexture = GlStateManager._getActiveTexture();
+        RenderSystem.activeTexture(GL13.GL_TEXTURE0);
+        int binding = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D);
+        try {
+            RenderSystem.bindTexture(id);
+            RenderSystem.texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, GL11.GL_REPEAT);
+            RenderSystem.texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T, GL12.GL_CLAMP_TO_EDGE);
+            repeatAppliedTo = id;
+        } finally {
+            RenderSystem.bindTexture(binding);
+            RenderSystem.activeTexture(activeTexture);
+        }
     }
 
     /**

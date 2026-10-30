@@ -1,12 +1,15 @@
 package com.whitecloud233.herobrine_companion.client.render;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.awakened.AwakenedMobAccessor;
 import com.whitecloud233.herobrine_companion.entity.dialogue.SpeechBubbleAccessor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
+import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.RenderType;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.entity.EntityAttachment;
@@ -21,7 +24,10 @@ public final class EntitySpeechBubbleRenderer {
     private static final int MAX_LINE_WIDTH = 140;
     private static final int NAME_COLOR = 0xFFE0C88E;
     private static final int TEXT_COLOR = 0xFFF4F4F4;
+    private static final int BACKGROUND_COLOR = 0xA6000000;
     private static final int LINE_HEIGHT = 10;
+    private static final int GLYPH_HEIGHT = 9;
+    private static final float BACKGROUND_PADDING = 2.0F;
     private static final double DEFAULT_MAX_DISTANCE_SQR = 1024.0D;
     private static final double LARGE_BUBBLE_MAX_DISTANCE_SQR = 4096.0D;
     private static final float DEFAULT_TEXT_SCALE = 0.025F;
@@ -30,6 +36,9 @@ public final class EntitySpeechBubbleRenderer {
     private EntitySpeechBubbleRenderer() {
     }
 
+    /**
+     * @param packedLight 保留仅为兼容既有调用方；气泡统一用全亮光照绘制，见下方说明
+     */
     public static void render(PoseStack poseStack, MultiBufferSource bufferSource, LivingEntity livingEntity, int packedLight) {
         render(poseStack, bufferSource, livingEntity, packedLight, 0.0F);
     }
@@ -66,18 +75,48 @@ public final class EntitySpeechBubbleRenderer {
         poseStack.scale(textScale, -textScale, textScale);
 
         Matrix4f matrix = poseStack.last().pose();
-        int background = ((int) (minecraft.options.getBackgroundOpacity(0.35F) * 255.0F) << 24);
+        // 1.20.1 的 drawInBatch 会把背景四边形追加在全部字形顶点之后；SEE_THROUGH 关闭深度测试、
+        // 按提交顺序叠加，传入背景色等于把黑底盖在字上（0xA6 会把字压暗到约 35%）。
+        // 因此底衬自己先画，drawInBatch 传 0 背景色，保证文字永远在底衬之上。
         float totalHeight = renderedLines.size() * LINE_HEIGHT;
-        float y = -totalHeight;
+        float totalWidth = 0.0F;
+        for (RenderedLine line : renderedLines) {
+            totalWidth = Math.max(totalWidth, line.width());
+        }
+        // 最后一行文字底边恒为 -totalHeight + (n-1)*LINE_HEIGHT + GLYPH_HEIGHT = GLYPH_HEIGHT - LINE_HEIGHT
+        drawBackground(matrix, bufferSource,
+                -totalWidth / 2.0F - BACKGROUND_PADDING,
+                -totalHeight - BACKGROUND_PADDING,
+                totalWidth / 2.0F + BACKGROUND_PADDING,
+                GLYPH_HEIGHT - LINE_HEIGHT + BACKGROUND_PADDING);
 
+        float y = -totalHeight;
         for (RenderedLine line : renderedLines) {
             float x = -line.width() / 2.0F;
-            font.drawInBatch(line.sequence(), x, y, line.color(), false, matrix, bufferSource,
-                    Font.DisplayMode.SEE_THROUGH, background, packedLight);
+            // 全亮光照 + 阴影：光影包与夜晚会把实体自身光照压得很暗，直接导致气泡字看不清。
+            font.drawInBatch(line.sequence(), x, y, line.color(), true, matrix, bufferSource,
+                    Font.DisplayMode.SEE_THROUGH, 0, LightTexture.FULL_BRIGHT);
             y += LINE_HEIGHT;
         }
 
         poseStack.popPose();
+    }
+
+    private static void drawBackground(Matrix4f matrix, MultiBufferSource bufferSource, float x0, float y0, float x1, float y1) {
+        float a = (BACKGROUND_COLOR >>> 24) / 255.0F;
+        float r = (BACKGROUND_COLOR >>> 16 & 0xFF) / 255.0F;
+        float g = (BACKGROUND_COLOR >>> 8 & 0xFF) / 255.0F;
+        float b = (BACKGROUND_COLOR & 0xFF) / 255.0F;
+        // debugQuads：无纹理纯色四边形，与 SEE_THROUGH 文字同为无深度测试的覆盖层表现
+        // 1.21.1 的 VertexConsumer 不再接受 Matrix4f 参数，改用 PoseStack 里的矩阵叠加顶点。
+        PoseStack poseStack = new PoseStack();
+        poseStack.mulPose(matrix);
+        Matrix4f pose = poseStack.last().pose();
+        VertexConsumer vertices = bufferSource.getBuffer(RenderType.debugQuads());
+        vertices.addVertex(pose, x0, y0, 0.0F).setColor(r, g, b, a);
+        vertices.addVertex(pose, x0, y1, 0.0F).setColor(r, g, b, a);
+        vertices.addVertex(pose, x1, y1, 0.0F).setColor(r, g, b, a);
+        vertices.addVertex(pose, x1, y0, 0.0F).setColor(r, g, b, a);
     }
 
     private static List<RenderedLine> buildRenderedLines(LivingEntity entity, Component speech, Font font) {

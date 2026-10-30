@@ -1,5 +1,7 @@
 package com.whitecloud233.herobrine_companion.client.animation;
 
+import net.minecraft.util.Mth;
+
 import com.whitecloud233.herobrine_companion.combat.poem.PoemComboClock;
 import com.whitecloud233.herobrine_companion.combat.poem.PoemBladeTrail;
 import com.whitecloud233.herobrine_companion.combat.poem.PoemMotionLibrary;
@@ -7,6 +9,7 @@ import com.whitecloud233.herobrine_companion.combat.poem.StandalonePoemControlle
 import com.whitecloud233.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.herobrine_companion.network.PoemAnimationPacket;
 import com.whitecloud233.herobrine_companion.network.PoemAnimationRequestPacket;
+import com.whitecloud233.herobrine_companion.network.PoemGesturePacket;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,8 +34,19 @@ public final class StandalonePoemAnimation {
         if (!validLocal(mc)) return;
         context(mc);
         double now = mc.level.getGameTime();
-        if (LOCAL.request(mode, now)) start(mc.player, slot, mode, LOCAL.step(), now);
+        int move = PoemMotionLibrary.basicMove(mc.player.isSprinting(), !mc.player.onGround());
+        if (LOCAL.request(mode, move, now)) start(mc.player, slot, mode, LOCAL.step(), now);
         PacketHandler.sendToServer(new PoemAnimationRequestPacket(slot, mode));
+    }
+
+    public static void gesture(int gesture) {
+        Minecraft mc = Minecraft.getInstance();
+        if (gesture < 0 || gesture >= 3 || !validLocal(mc)) return;
+        context(mc);
+        double now = mc.level.getGameTime();
+        int move = PoemMotionLibrary.extraMove(gesture, !mc.player.onGround());
+        if (LOCAL.request(mode, move, now)) start(mc.player, slot, mode, LOCAL.step(), now);
+        PacketHandler.sendToServer(new PoemGesturePacket(gesture, slot, mode));
     }
 
     public static void cancelLocal() {
@@ -48,6 +62,7 @@ public final class StandalonePoemAnimation {
         Minecraft mc = Minecraft.getInstance();
         if (level != mc.level) {
             PLAYING.clear(); LOCAL.reset(); slot = mode = -1; level = mc.level;
+            PoemLocomotion.clear();
         }
         if (mc.level == null) return;
         if (validLocal(mc)) {
@@ -58,6 +73,7 @@ public final class StandalonePoemAnimation {
             Player player = mc.level.getPlayerByUUID(entry.getKey());
             return player == null || !matches(player, entry.getValue()) || entry.getValue().age(mc.level.getGameTime()) > entry.getValue().timing.duration() + .6f;
         });
+        PoemLocomotion.tick(mc.level);
     }
 
     private static void context(Minecraft mc) {
@@ -88,9 +104,9 @@ public final class StandalonePoemAnimation {
             }
             return;
         }
-        if (packet.mode() < 0 || packet.mode() > 3 || packet.step() < 0 || packet.step() > 3 || packet.slot() < 0 || packet.slot() > 8) return;
+        if (packet.mode() < 0 || packet.mode() > 3 || !PoemMotionLibrary.validMove(packet.step()) || packet.slot() < 0 || packet.slot() > 8) return;
         long age = packet.serverTick() - packet.startTick();
-        if (age < 0 || age > 100) return;
+        if (age < 0 || age > (long) Math.ceil(PoemMotionLibrary.get().timing(packet.mode(), packet.step()).duration() * 20) + 12) return;
         double start = mc.level.getGameTime() - age;
         Playback existing = PLAYING.get(player.getUUID());
         // Do not restart a locally predicted stroke when its server confirmation arrives.
@@ -103,22 +119,67 @@ public final class StandalonePoemAnimation {
     private static void start(Player player, int slot, int mode, int step, double tick) {
         double now = player.level().getGameTime();
         Playback previous = PLAYING.get(player.getUUID());
-        Matrix4f[] from = previous == null || previous.weight(now) == 0 ? null : previous.world(now);
-        float fromWeight = from == null ? 0 : previous.weight(now);
-        PLAYING.put(player.getUUID(), new Playback(player.getId(), slot, mode, step, tick, from, fromWeight));
+        Matrix4f[] from;
+        float fromWeight;
+        boolean locomotion = false;
+        if (previous != null && previous.weight(now) > .0001f && matches(player, previous)) {
+            from = previous.world(now);
+            fromWeight = previous.weight(now);
+        } else {
+            // A cut that starts while idle/running lifts out of the locomotion pose instead of the vanilla rest pose.
+            from = PoemLocomotion.world(player, now);
+            fromWeight = from == null ? 0 : 1;
+            locomotion = from != null;
+        }
+        Playback playback = new Playback(player.getId(), slot, mode, step, tick, from, fromWeight);
+        playback.locomotion = locomotion;
+        PLAYING.put(player.getUUID(), playback);
     }
 
-    public static Frame frame(Player player, float partialTick) {
-        if (!StandalonePoemController.enabled()) return null;
+    /** Third-person body: attacks on top of the idle/run/sprint base layer. */
+    public static Frame frame(Player player, float partialTick) { return compose(player, partialTick, true); }
+
+    /** True while this player's current cut still owns the body; locomotion alone keeps vanilla body-yaw smoothing. */
+    public static boolean attacking(Player player, float partialTick) {
+        if (!StandalonePoemController.enabled()) return false;
         Playback playback = PLAYING.get(player.getUUID());
-        if (playback == null || !matches(player, playback)) return null;
+        return playback != null && matches(player, playback)
+                && playback.weight(player.level().getGameTime() + partialTick) > .0001f;
+    }
+
+    /** First-person viewmodel: only actual cuts, so the vanilla hand keeps idle/run. */
+    public static Frame attackFrame(Player player, float partialTick) { return compose(player, partialTick, false); }
+
+    private static Frame compose(Player player, float partialTick, boolean locomotionBase) {
+        if (!StandalonePoemController.enabled()) return null;
         double now = player.level().getGameTime() + partialTick;
-        float weight = playback.weight(now);
-        if (weight <= .0001f) return null;
-        Matrix4f[] world = playback.world(now);
+        Playback playback = PLAYING.get(player.getUUID());
+        if (playback != null && !matches(player, playback)) {
+            PLAYING.remove(player.getUUID());
+            playback = null;
+        }
+        float attackWeight = playback == null ? 0 : playback.weight(now);
+        // At full attack weight the cut already owns the body; only start sampling the base layer for its recovery fade.
+        Matrix4f[] base = locomotionBase && attackWeight < .999f ? PoemLocomotion.world(player, now) : null;
+        if (attackWeight <= .0001f && base == null) return null;
+        if (player.isInvisible() && player != Minecraft.getInstance().player) return null;
+        Matrix4f[] world;
+        float weight;
+        if (playback != null && attackWeight > .0001f) {
+            Matrix4f[] attackWorld = playback.world(now);
+            world = base == null ? attackWorld : PoemMotionLibrary.blend(base, attackWorld, attackWeight);
+            // The base layer already owns the whole body, so keep the pose fully weighted and fade the cut inside it.
+            weight = base == null ? attackWeight : 1;
+        } else {
+            world = base;
+            weight = 1;
+        }
         boolean left = player.getMainArm() == HumanoidArm.LEFT;
-        List<PoemBladeTrail.Ribbon> trail = PoemBladeTrail.sample(playback.timing, playback.age(now),
-                time -> playback.tool(playback.start + time * 20), time -> playback.weight(playback.start + time * 20));
+        Playback cut = playback;
+        List<PoemBladeTrail.Ribbon> trail = cut != null && attackWeight > .0001f
+                ? PoemBladeTrail.sample(cut.timing, cut.age(now),
+                        time -> cut.tool(cut.start + time * 20), time -> cut.weight(cut.start + time * 20))
+                : List.of();
         return new Frame(world, PoemMotionLibrary.get().deform(world, left), weight, left, trail);
     }
 
@@ -137,29 +198,36 @@ public final class StandalonePoemAnimation {
         final float fromWeight;
         final PoemMotionLibrary.Clip clip;
         final PoemMotionLibrary.Timing timing;
+        boolean locomotion;
         Playback(int entityId, int slot, int mode, int step, double start, Matrix4f[] from, float fromWeight) {
             this.entityId = entityId; this.slot = slot; this.mode = mode; this.step = step; this.start = start; this.from = from; this.fromWeight = fromWeight;
             clip = PoemMotionLibrary.get().clip(mode, step); timing = clip.timing;
         }
         float age(double now) { return Math.max(0, (float) ((now - start) / 20)); }
         float weight(double now) {
-            float age = age(now), enter = smooth(age / PoemBladeTrail.blendTime(timing, from != null));
-            return (fromWeight + (1 - fromWeight) * enter) * (1 - smooth((age - timing.recovery()) / .12f));
+            float age = age(now), enter = smooth(age / blend());
+            // Four ticks back to the held idle/run pose: long enough to read as a transition, short enough to stay responsive.
+            return (fromWeight + (1 - fromWeight) * enter) * (1 - smooth((age - timing.recovery()) / .20f));
+        }
+        /** A locomotion hand-off is a fresh pose, not a same-combo link, so it gets the slower full-body blend. */
+        float blend() {
+            return locomotion ? Mth.clamp(timing.contacts().get(0).start(), .00001f, .1f)
+                    : PoemBladeTrail.blendTime(timing, from != null);
         }
         Matrix4f[] world(double now) {
             float age = age(now);
             Matrix4f[] world = clip.sample(Math.min(age, timing.duration()), true);
-            float blend = PoemBladeTrail.blendTime(timing, true);
+            float blend = blend();
             return from != null && age < blend ? PoemMotionLibrary.blend(from, world, smooth(age / blend)) : world;
         }
         Matrix4f tool(double now) {
             int joint = PoemMotionLibrary.get().joint("Tool_R");
             float age = age(now);
             Matrix4f tool = clip.sampleJoint(joint, Math.min(age, timing.duration()), true);
-            float blend = PoemBladeTrail.blendTime(timing, true);
+            float blend = blend();
             return from != null && age < blend
                     ? PoemMotionLibrary.blend(new Matrix4f[]{from[joint]}, new Matrix4f[]{tool}, smooth(age / blend))[0] : tool;
         }
-        static float smooth(float t) { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); }
+        static float smooth(float t) { t = Mth.clamp(t, 0F, 1F); return t * t * (3 - 2 * t); }
     }
 }

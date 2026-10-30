@@ -5,6 +5,7 @@ import com.whitecloud233.herobrine_companion.client.model.GhostSteveModel;
 import com.whitecloud233.herobrine_companion.entity.GhostSteveEntity;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.AbstractClientPlayer;
+import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.MobRenderer; // 更推荐给怪物使用 MobRenderer
 import net.minecraft.client.renderer.entity.layers.ItemInHandLayer;
@@ -20,6 +21,12 @@ public class GhostSteveRenderer extends MobRenderer<GhostSteveEntity, GhostSteve
 
         // 绑定手持物品渲染层
         this.addLayer(new ItemInHandLayer<>(this, context.getItemInHandRenderer()));
+    }
+
+    @Override
+    protected RenderType getRenderType(GhostSteveEntity entity, boolean bodyVisible, boolean translucent, boolean glowing) {
+        return bodyVisible ? RenderType.entityTranslucent(getTextureLocation(entity))
+                : super.getRenderType(entity, bodyVisible, translucent, glowing);
     }
 
     @Override

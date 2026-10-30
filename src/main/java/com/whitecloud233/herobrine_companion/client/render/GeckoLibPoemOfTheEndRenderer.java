@@ -12,8 +12,10 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import software.bernie.geckolib.cache.object.BakedGeoModel;
+import software.bernie.geckolib.cache.texture.GeoAbstractTexture;
 import software.bernie.geckolib.renderer.GeoObjectRenderer;
 import software.bernie.geckolib.renderer.layer.AutoGlowingGeoLayer;
+import software.bernie.geckolib.renderer.layer.GeoRenderLayer;
 
 /**
  * 终末之诗的 GeckoLib 3D 物品渲染器（仅在玩家安装 GeckoLib 时被创建）。
@@ -71,14 +73,37 @@ public final class GeckoLibPoemOfTheEndRenderer extends BlockEntityWithoutLevelR
     private GeckoLibPoemOfTheEndRenderer() {
         super(Minecraft.getInstance().getBlockEntityRenderDispatcher(),
                 Minecraft.getInstance().getEntityModels());
-        // 自发光层：沿用基岩版的约定 —— 贴图 alpha 不满(0<a<255)的像素为自发光。
-        // poem_of_the_end_geo.png 里 α=0 是空白、α=255 是普通像素，
-        // 另有 231 个半透明像素（青色描边/宝石）才是要发光的部分，
-        // 已在同名 .mcmeta 的 "glowsections" 里列成 59 个矩形。
-        // AutoGlowingGeoLayer 把这些像素抠成独立的 _glowmask 贴图（并从基础贴图里
-        // 清零，避免两层叠加变亮两倍），再用不采样 lightmap 的 geo_glowing_layer
-        // 以 FULL_SKY 亮度重绘一遍。
-        renderer.addRenderLayer(new AutoGlowingGeoLayer<>(renderer));
+        renderer.addRenderLayer(new AutoGlowingGeoLayer<>(renderer) {
+            @Override
+            protected RenderType getRenderType(PoemOfTheEndAnimatable animatable, MultiBufferSource buffers) {
+                // GeckoLib must generate the resource-pack mask and remove it from the base texture first.
+                super.getRenderType(animatable, buffers);
+                return PoemWeaponRenderTypes.glow(GeoAbstractTexture.appendToPath(
+                        getTextureResource(animatable), "_glowmask"));
+            }
+
+            @Override
+            public void render(PoseStack poseStack, PoemOfTheEndAnimatable animatable, BakedGeoModel model,
+                               RenderType renderType, MultiBufferSource buffers, VertexConsumer buffer,
+                               float partialTick, int packedLight, int packedOverlay) {
+                RenderType glowType = getRenderType(animatable, buffers);
+                ResourceLocation texture = GeoAbstractTexture.appendToPath(getTextureResource(animatable), "_glowmask");
+                VertexConsumer glow = PoemWeaponRenderTypes.glowBuffer(buffers, texture);
+                getRenderer().reRender(model, poseStack, ignored -> glow, animatable, glowType, glow,
+                        partialTick, net.minecraft.client.renderer.LightTexture.FULL_BRIGHT, packedOverlay,
+                        getRenderer().getRenderColor(animatable, partialTick, packedLight).argbInt());
+            }
+        });
+        renderer.addRenderLayer(new GeoRenderLayer<>(renderer) {
+            @Override
+            public void render(PoseStack poseStack, PoemOfTheEndAnimatable animatable, BakedGeoModel model,
+                               RenderType renderType, MultiBufferSource buffers, VertexConsumer buffer,
+                               float partialTick, int packedLight, int packedOverlay) {
+                PoemOutlineEffect.render(outline -> getRenderer().reRender(model, poseStack,
+                        ignored -> outline, animatable, renderType, outline,
+                        partialTick, packedLight, packedOverlay, 0xFFFFFFFF));
+            }
+        });
     }
 
     public static BlockEntityWithoutLevelRenderer create() {

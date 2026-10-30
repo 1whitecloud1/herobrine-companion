@@ -3,12 +3,14 @@ package com.whitecloud233.herobrine_companion.client.render;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
+import com.whitecloud233.herobrine_companion.client.animation.HeroPoemAnimation;
 import com.whitecloud233.herobrine_companion.client.animation.PoemSkinMesh;
 import com.whitecloud233.herobrine_companion.client.animation.PoemSkinMesh.Part;
 import com.whitecloud233.herobrine_companion.client.animation.StandalonePoemAnimation;
 import com.whitecloud233.herobrine_companion.client.animation.StandalonePoemAnimation.Frame;
 import com.whitecloud233.herobrine_companion.combat.poem.PoemMotionLibrary;
 import com.whitecloud233.herobrine_companion.combat.poem.PoemBladeTrail;
+import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.item.PoemOfTheEndItem;
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -47,24 +49,58 @@ public final class StandalonePoemRenderer {
     private static final ThreadLocal<Deque<Context>> CONTEXT = ThreadLocal.withInitial(ArrayDeque::new);
     private static final Context EMPTY = new Context(null, null, null);
     private static PlayerModel<AbstractClientPlayer> firstPersonWide, firstPersonSlim;
+
+    /**
+     * 快速路径开关：只有当至少有一个 render 上下文处于激活状态时才可能为 true。
+     *
+     * <p>这是 {@code renderLayer} 的 @Redirect 入口（每帧每个实体每个渲染层都会被拦截）的
+     * 第一道闸门。绝大多数游戏时间里没有任何诗之末连招在进行，此时这里一次 volatile 读
+     * 就能让调用者直接透传给原版 {@code layer.render}，省掉 ThreadLocal 读取、Deque 判空、
+     * peek 以及后续若干 instanceof / 矩阵运算。</p>
+     *
+     * <p>渲染线程是唯一写入方（push/pop 都在 Render thread），volatile 只保证可见性，
+     * 不引入跨线程同步开销。</p>
+     */
+    private static volatile boolean contextActive = false;
+
     private StandalonePoemRenderer() { }
 
     public static void push(LivingEntity entity, EntityModel<?> model, float partial) {
-        Frame frame = entity instanceof Player player && model instanceof PlayerModel<?> ? StandalonePoemAnimation.frame(player, partial) : null;
+        Frame frame = null;
+        if (model instanceof PlayerModel<?>) {
+            if (entity instanceof Player player) frame = StandalonePoemAnimation.frame(player, partial);
+            else if (entity instanceof HeroEntity hero) frame = HeroPoemAnimation.frame(hero, partial);
+        }
         CONTEXT.get().push(frame == null ? EMPTY : new Context(entity, (HumanoidModel<?>) model, frame));
+        contextActive = true;
     }
-    public static void pop() { if (!CONTEXT.get().isEmpty()) CONTEXT.get().pop(); }
-    public static void clearContext() { CONTEXT.get().clear(); }
+    public static void pop() {
+        Deque<Context> deque = CONTEXT.get();
+        if (!deque.isEmpty()) deque.pop();
+        contextActive = !deque.isEmpty();
+    }
+    public static void clearContext() {
+        CONTEXT.get().clear();
+        contextActive = false;
+    }
     private static Context context() { return CONTEXT.get().isEmpty() ? EMPTY : CONTEXT.get().peek(); }
+
+    /** renderLayer 快速路径判断：无任何激活上下文时调用方应直接走原版渲染。 */
+    public static boolean hasActiveContext() { return contextActive; }
 
     public static float attackYaw(LivingEntity entity, float bodyYaw, float partial) {
         Context context = context();
-        return context.frame != null && context.entity == entity
+        if (context.frame == null || context.entity != entity) return bodyYaw;
+        // Locomotion keeps vanilla body-yaw smoothing; only a visible cut snaps the body to the server's attack heading.
+        boolean attacking = entity instanceof Player player && StandalonePoemAnimation.attacking(player, partial)
+                || entity instanceof HeroEntity hero && hero.isBattleTapAction();
+        return attacking
                 ? Mth.rotLerp(partial, entity.yRotO, entity.getYRot()) : bodyYaw;
     }
 
     public static boolean renderModel(Object model, PoseStack stack, VertexConsumer buffer, int light, int overlay, int color) {
         Context context = context();
+        if (context.entity != null && context.entity != Minecraft.getInstance().player && context.entity.isInvisible()) return false;
         if (context.frame == null || !(model instanceof HumanoidModel<?> humanoid)) return false;
         body(humanoid, context.frame, stack, buffer, light, overlay, color, false);
         return true;
@@ -99,6 +135,7 @@ public final class StandalonePoemRenderer {
     public static boolean renderHeld(LivingEntity entity, ItemStack item, ItemDisplayContext display, HumanoidArm arm,
                                      PoseStack stack, MultiBufferSource buffers, int light, ItemInHandRenderer renderer) {
         Context context = context();
+        if (entity != Minecraft.getInstance().player && entity.isInvisible()) return false;
         if (context.frame == null || context.entity != entity) return false;
         held(entity, item, display, arm, stack, buffers, light, renderer, context.model, context.frame);
         return true;
@@ -130,8 +167,16 @@ public final class StandalonePoemRenderer {
     @SuppressWarnings({"rawtypes", "unchecked"})
     public static void renderLayer(RenderLayer layer, PoseStack stack, MultiBufferSource buffers, int light, LivingEntity entity,
                                    float walk, float amount, float partial, float age, float yaw, float pitch) {
+        // [性能] 快速路径：没有任何激活的诗之末上下文时，直接透传原版渲染层。
+        // 这个分支覆盖了绝大部分帧（配合 contextActive 的 volatile 读，开销接近零）。
+        if (!contextActive) {
+            layer.render(stack, buffers, light, entity, walk, amount, partial, age, yaw, pitch);
+            return;
+        }
         Context context = context();
-        if (context.frame == null || context.entity != entity || layer instanceof HumanoidArmorLayer || layer instanceof ItemInHandLayer) {
+        if (context.frame == null || context.entity != entity || entity != Minecraft.getInstance().player && entity.isInvisible()
+                || layer instanceof HumanoidArmorLayer || layer instanceof ItemInHandLayer
+                || layer instanceof HeroEyesLayer || layer instanceof HeroChargedLayer) {
             layer.render(stack, buffers, light, entity, walk, amount, partial, age, yaw, pitch); return;
         }
         boolean head = layer instanceof CustomHeadLayer;
@@ -181,7 +226,8 @@ public final class StandalonePoemRenderer {
                 PoemWeaponRenderTypes.base(), false, item.hasFoil()), light);
         // Finish the base pass before requesting another buffer: callers may use
         // a BufferSource that flushes the previous builder when its type changes.
-        emitWeapon(posed, frame.leftHanded(), buffers.getBuffer(PoemWeaponRenderTypes.glow()), LightTexture.FULL_BRIGHT);
+        emitWeapon(posed, frame.leftHanded(), PoemWeaponRenderTypes.glowBuffer(buffers), LightTexture.FULL_BRIGHT);
+        PoemOutlineEffect.render(outline -> emitWeapon(posed, frame.leftHanded(), outline, LightTexture.FULL_BRIGHT));
     }
 
     /** Both material passes use identical posed vertices; this path has no GPU state. */
@@ -208,7 +254,7 @@ public final class StandalonePoemRenderer {
     public static void renderFirstPerson(RenderHandEvent event) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
-        Frame frame = StandalonePoemAnimation.frame(mc.player, event.getPartialTick());
+        Frame frame = StandalonePoemAnimation.attackFrame(mc.player, event.getPartialTick());
         if (frame == null) return;
         if (!(mc.getEntityRenderDispatcher().getRenderer(mc.player) instanceof PlayerRenderer renderer)) return;
         event.setCanceled(true);
@@ -225,7 +271,7 @@ public final class StandalonePoemRenderer {
         try {
             stack.mulPose(Axis.XP.rotationDegrees(event.getInterpolatedPitch()));
             stack.translate(0, -mc.player.getEyeHeight(), 0);
-            float playerScale = PoemBladeTrail.PLAYER_SCALE * mc.player.getScale();
+            float playerScale = PoemBladeTrail.PLAYER_SCALE;
             stack.scale(-playerScale, -playerScale, playerScale);
             stack.translate(0, -1.501, 0);
             if (!mc.player.isInvisible()) {

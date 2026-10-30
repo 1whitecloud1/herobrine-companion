@@ -3,6 +3,7 @@ package com.whitecloud233.herobrine_companion.client.render;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.logging.LogUtils;
+import com.whitecloud233.herobrine_companion.util.DebugLog;
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.client.model.HeroDragonModel;
 import com.whitecloud233.herobrine_companion.config.Config;
@@ -27,13 +28,13 @@ public class HeroDragonRenderer extends EnderDragonRenderer {
 
     public HeroDragonRenderer(EntityRendererProvider.Context context) {
         super(context);
-        LOGGER.info(">>> [HERO RENDERER] 构造函数被调用！正在初始化自定义模型... <<<");
+        DebugLog.info(LOGGER, ">>> [HERO RENDERER] 构造函数被调用！正在初始化自定义模型... <<<");
         
         HeroDragonModel model = null;
         try {
             // 使用我们自定义的 Layer
             model = new HeroDragonModel(context.bakeLayer(HeroDragonModel.LAYER_LOCATION));
-            LOGGER.error(">>> [HERO RENDERER] 自定义模型初始化完成！ <<<");
+            DebugLog.info(LOGGER, ">>> [HERO RENDERER] 自定义模型初始化完成！ <<<");
         } catch (Exception e) {
             LOGGER.error(">>> [HERO RENDERER] 模型初始化失败！", e);
         }

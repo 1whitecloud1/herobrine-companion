@@ -1,5 +1,6 @@
 package com.whitecloud233.herobrine_companion.client.render;
 
+import com.whitecloud233.herobrine_companion.api.compat.HeroEpicFightCompat;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
 import net.neoforged.fml.ModList;
@@ -29,7 +30,7 @@ public final class PoemOfTheEndGeoCompat {
     }
 
     public static PoemRenderBackend backend() {
-        return PoemRenderBackend.choose(ModList.get().isLoaded("epicfight"), isGeckoLibLoaded());
+        return PoemRenderBackend.choose(HeroEpicFightCompat.isRuntimeBridgeReady(), isGeckoLibLoaded());
     }
 
     /**

@@ -1,5 +1,7 @@
 package com.whitecloud233.herobrine_companion.client.render;
 
+import net.minecraft.util.Mth;
+
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import org.joml.Vector4f;
@@ -22,7 +24,7 @@ public final class VoidRiftProjection {
     }
 
     private static float smooth(float x) {
-        x = Math.max(0, Math.min(1, x));
+        x = Mth.clamp(x, 0F, 1F);
         return x * x * (3 - 2 * x);
     }
 

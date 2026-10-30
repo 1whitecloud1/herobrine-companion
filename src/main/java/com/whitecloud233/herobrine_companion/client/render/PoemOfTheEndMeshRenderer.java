@@ -32,8 +32,10 @@ public final class PoemOfTheEndMeshRenderer extends BlockEntityWithoutLevelRende
             VertexConsumer base = ItemRenderer.getFoilBufferDirect(bufferSource,
                     PoemWeaponRenderTypes.base(), false, stack.hasFoil());
             PoemItemMesh.render(poseStack, base, packedLight, packedOverlay);
-            PoemItemMesh.render(poseStack, bufferSource.getBuffer(PoemWeaponRenderTypes.glow()),
+            PoemItemMesh.render(poseStack, PoemWeaponRenderTypes.glowBuffer(bufferSource),
                     LightTexture.FULL_BRIGHT, packedOverlay);
+            PoemOutlineEffect.render(outline -> PoemItemMesh.render(poseStack, outline,
+                    LightTexture.FULL_BRIGHT, packedOverlay));
         } finally { poseStack.popPose(); }
     }
 }

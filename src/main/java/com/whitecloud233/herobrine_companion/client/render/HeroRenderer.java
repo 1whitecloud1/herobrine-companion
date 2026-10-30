@@ -7,13 +7,12 @@ import com.whitecloud233.herobrine_companion.fight.HeroAfterimage;
 import com.mojang.logging.LogUtils;
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.client.model.HeroModel;
-import com.whitecloud233.herobrine_companion.compat.accessories.HeroAccessoriesClientCompat;
-import com.whitecloud233.herobrine_companion.compat.accessories.HeroAccessoriesCompat;
-import com.whitecloud233.herobrine_companion.compat.simplehats.HeroSimpleHatsCompat;
-import com.whitecloud233.herobrine_companion.compat.waveycapes.HeroWaveyCapesCompat;
+import com.whitecloud233.herobrine_companion.api.compat.HeroAccessoriesClientCompat;
+import com.whitecloud233.herobrine_companion.api.compat.HeroAccessoriesCompat;
+import com.whitecloud233.herobrine_companion.api.compat.HeroSimpleHatsCompat;
+import com.whitecloud233.herobrine_companion.api.compat.HeroWaveyCapesCompat;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.world.structure.ModStructures;
-import com.whitecloud233.herobrine_companion.compat.ArmourerWorkshop.HeroAWCompat;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.model.PlayerModel;
@@ -46,6 +45,7 @@ public class HeroRenderer extends LivingEntityRenderer<HeroEntity, PlayerModel<H
 
     private static final ResourceLocation HERO_TEXTURE = ResourceLocation.tryParse(HerobrineCompanion.MODID + ":textures/entity/hero.png");
     private static final ResourceLocation HEROBRINE_TEXTURE = ResourceLocation.tryParse(HerobrineCompanion.MODID + ":textures/entity/herobrine.png");
+    private static final ResourceLocation HEROBRINE2_TEXTURE = ResourceLocation.tryParse(HerobrineCompanion.MODID + ":textures/entity/herobrine2.png");
 
     // 内置皮肤沿用的固定发光眼睛贴图(白点位置已按内置脸部手工对齐)
     public static final ResourceLocation DEFAULT_EYES = ResourceLocation.fromNamespaceAndPath(HerobrineCompanion.MODID, "textures/entity/hero_eyes.png");
@@ -147,6 +147,7 @@ public class HeroRenderer extends LivingEntityRenderer<HeroEntity, PlayerModel<H
         int variant = entity.getSkinVariant();
         if (variant == HeroEntity.SKIN_HEROBRINE) return HEROBRINE_TEXTURE;
         if (variant == HeroEntity.SKIN_HERO) return HERO_TEXTURE;
+        if (variant == HeroEntity.SKIN_HEROBRINE2) return HEROBRINE2_TEXTURE;
         if (variant == HeroEntity.SKIN_CUSTOM) {
             ResourceLocation syncedSkin = getSyncedSkin(entity.getUUID());
             if (syncedSkin != null) {
@@ -295,8 +296,6 @@ public class HeroRenderer extends LivingEntityRenderer<HeroEntity, PlayerModel<H
 
     @Override
     public void render(HeroEntity entity, float entityYaw, float partialTicks, PoseStack poseStack, MultiBufferSource buffer, int packedLight) {
-
-        HeroAWCompat.syncContext(this, entity);
 
         float floatAmount = entity.getFloatingAmount(partialTicks);
         if (floatAmount > 0.01f) {

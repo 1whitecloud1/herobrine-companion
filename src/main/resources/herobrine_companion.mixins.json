@@ -19,15 +19,10 @@
     "JeanUnriddenFlightTuningMixin",
     "JeanSubmissionStationaryMixin",
     "MobSubmissionMixin",
-    "LevelMixin",
-    "MixinModEntityProfiles",
-    "epicfight.AnimationClipMixin",
-    "epicfight.JsonAssetLoaderMixin",
-    "epicfight.RenderAnimationItemMixin",
-    "epicfight.HeroWomAnimationEventGuardMixin"
+    "LevelMixin"
   ],
   "client": [
-    "epicfight.PoemAttackControlMixin",
+    "client.PoemOutlineFrameMixin",
     "client.PoemLivingRendererMixin",
     "client.PoemHumanoidRenderMixin",
     "client.PoemHeldItemMixin"
