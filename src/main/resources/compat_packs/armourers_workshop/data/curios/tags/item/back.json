@@ -1,0 +1,9 @@
+{
+  "replace": false,
+  "values": [
+    {
+      "id": "armourers_workshop:skin",
+      "required": false
+    }
+  ]
+}
