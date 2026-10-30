@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.entity.gift;
 
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.modid.herobrine_companion.util.DebugLog;
 import com.whitecloud233.modid.herobrine_companion.entity.visual.HeroClip;
 import com.whitecloud233.modid.herobrine_companion.entity.visual.HeroGestureLibrary;
 import net.minecraft.nbt.CompoundTag;
@@ -488,7 +489,7 @@ public final class HeroOfferService {
                     result.code(), offer.kind(), offer.tasteLevel(), mood);
         }
         if (gestureName == null || gestureName.isBlank()) {
-            LOGGER.debug("[HeroGift] offer result={} -> no gesture (no-animation code)", result.code());
+            DebugLog.debug(LOGGER, "[HeroGift] offer result={} -> no gesture (no-animation code)", result.code());
             return;
         }
         HeroClip clip = HeroGestureLibrary.byName(gestureName);
@@ -506,7 +507,7 @@ public final class HeroOfferService {
             hero.setVisualMainHandItem(shown);
         }
         int clipId = HeroGestureLibrary.clipIdOf(clip);
-        LOGGER.debug("[HeroGift] offer result={} -> gesture={} clip={}", result.code(), gestureName, clipId);
+        DebugLog.debug(LOGGER, "[HeroGift] offer result={} -> gesture={} clip={}", result.code(), gestureName, clipId);
         hero.playOfferGesture(clipId);
     }
 

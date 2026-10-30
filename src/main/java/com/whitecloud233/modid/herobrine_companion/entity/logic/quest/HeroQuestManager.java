@@ -29,8 +29,6 @@ import java.util.UUID;
 public final class HeroQuestManager {
 
     public static final String TAG_PLAYER_DOING_QUEST = "player_doing_quest";
-    /** 与旧版共用的持久键：进行中的委托可跨版本延续。 */
-    public static final String TAG_ACTIVE_QUEST_ID = "HeroActiveQuestId";
     public static final String TAG_PENDING_TRUST = "HeroPendingTrustReward";
     public static final String TAG_PENDING_CLEAR = "HeroPendingQuestClear";
 
@@ -166,7 +164,7 @@ public final class HeroQuestManager {
     // ------------------------------------------------ 查询 ------------------------------------------------
 
     public static boolean isPlayerDoingQuest(Player player) {
-        return player.getPersistentData().getInt(TAG_ACTIVE_QUEST_ID) != 0;
+        return QuestProgress.isActive(player);
     }
 
     /** Hero 不应攻击 / 安抚的任务目标（幽灵怪、镜像幽灵等），交给玩家处理。 */

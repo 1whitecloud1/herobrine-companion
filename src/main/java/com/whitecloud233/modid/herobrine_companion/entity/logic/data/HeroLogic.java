@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.entity.logic.data;
 
-import com.whitecloud233.modid.herobrine_companion.compat.cooking.HeroCookingCompat;
+import com.whitecloud233.modid.herobrine_companion.util.DebugLog;
+import com.whitecloud233.modid.herobrine_companion.entity.cooking.CookingService;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.HeroDialogueHandler;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.HeroObserver;
@@ -9,6 +10,8 @@ import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.state.Glit
 import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.state.PranksterStateDefinition;
 import com.whitecloud233.modid.herobrine_companion.entity.logic.HeroInteractionHandler;
 import com.whitecloud233.modid.herobrine_companion.entity.logic.HeroInvitationHelper;
+import com.whitecloud233.modid.herobrine_companion.event.HeroVisuals;
+import com.whitecloud233.modid.herobrine_companion.entity.visual.HeroVisualState;
 import com.whitecloud233.modid.herobrine_companion.world.structure.ModStructures;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -26,68 +29,20 @@ import java.util.List;
 
 public class HeroLogic {
 
-    /**
-     * 一个完整步态环为 2 秒，即 40 游戏刻。
-     * HeroEntity.getImportedWalkAnimationTime 会将这里累计的游戏刻除以 20 转为秒。
-     */
-    private static final float WALK_CYCLE_TICKS = 40.0F;
-
-    /**
-     * Bedrock {@code animation.hero.move} 的 {@code anim_time_update} 系数
-     * ({@code query.modified_distance_moved * 38.17 / 360.0},即每 360/38.17 ≈ 9.43 格推进一个环)。
-     */
-    private static final float WALK_CYCLE_PER_BLOCK = 38.17F / 360.0F;
-
-    /**
-     * 单 tick 计入相位的位移上限(格):超过这个量级只可能是传送/位移包纠偏,
-     * 直接按上限算,避免相位被瞬移拉飞。
-     */
-    private static final float WALK_MAX_STEP_BLOCKS = 4.0F;
+    /** 临时排查埋点（定位「邀请做菜后 Hero 不干活」），问题定位后删除。 */
+    private static final org.slf4j.Logger DIAG = org.slf4j.LoggerFactory.getLogger("HeroCookDiag");
 
     public static void tick(HeroEntity hero) {
         if (hero.level().isClientSide) {
-            clientTick(hero);
+            HeroVisuals.tickClientLocomotion(hero);
         } else {
             serverTick(hero);
         }
     }
 
-    private static void clientTick(HeroEntity hero) {
-        if (!hero.clientSideSetupDone) {
-            setupHiddenTeam(hero);
-            hero.clientSideSetupDone = true;
-        }
-
-        hero.clientFloatingAmountO = hero.clientFloatingAmount;
-        if (hero.isFloating()) {
-            hero.clientFloatingAmount = Math.min(1.0F, hero.clientFloatingAmount + 0.05F);
-        } else {
-            hero.clientFloatingAmount = Math.max(0.0F, hero.clientFloatingAmount - 0.05F);
-        }
-
-        hero.clientImportedWalkTicksO = hero.clientImportedWalkTicks;
-        hero.clientImportedWalkTicks = advanceWalkAnimationTicks(
-                hero.clientImportedWalkTicks, hero.isFloating(), hero.isGroundWalking(),
-                hero.getX() - hero.xOld, hero.getZ() - hero.zOld);
-        if (hero.clientImportedWalkTicks == 0.0F) {
-            hero.clientImportedWalkTicksO = 0.0F;
-        }
-    }
-
     static float advanceWalkAnimationTicks(float ticks, boolean floating, boolean groundWalking,
                                            double movedX, double movedZ) {
-        if (floating) {
-            return 0.0F;
-        }
-        double distance = Math.hypot(movedX, movedZ);
-        float movedBlocks = Double.isFinite(distance)
-                ? (float) Math.min(distance, WALK_MAX_STEP_BLOCKS) : 0.0F;
-        // 渲染端也会根据实际位移播放走路；刚加载旧实体、走路标记尚未同步时不能冻结相位。
-        if (!groundWalking && movedBlocks == 0.0F) {
-            return 0.0F;
-        }
-        // 保持游戏刻单位，常速约 4.3 格/秒时每 2.19 秒完成一个步态环。
-        return ticks + movedBlocks * WALK_CYCLE_PER_BLOCK * WALK_CYCLE_TICKS;
+        return HeroVisualState.advanceWalkAnimationTicks(ticks, floating, groundWalking, movedX, movedZ);
     }
 
     private static void serverTick(HeroEntity hero) {
@@ -121,23 +76,9 @@ public class HeroLogic {
             HeroDataHandler.syncGlobalTrust(hero);
         }
 
-        // ============== [⚡ 重构精简核心：脏标记备份与托底恢复] ==============
-        if (hero.tickCount % 100 == 0) {
-            if (hero.getTrustLevel() > 0) {
-                // 【核心优化】：只有当数据真正发生改变时 (isStateDirty == true)，才执行耗时的 NBT 序列化！
-                if (hero.isStateDirty) {
-                    HeroStateManager.backupToGlobal(hero);
-                    hero.isStateDirty = false; // 备份完成，重置脏标记
-                }
-            } else if (hero.getOwnerUUID() != null) {
-                // 如果信任度为0（可能发生了异常重置），尝试从全局档案托底恢复
-                Player owner = hero.level().getPlayerByUUID(hero.getOwnerUUID());
-                if (owner != null) {
-                    HeroStateManager.restoreFromGlobal(hero, owner);
-                }
-            }
+        if (hero.tickCount % 100 == 0 && hero.getTrustLevel() <= 0) {
+            HeroDataHandler.restoreTrustFromPlayer(hero);
         }
-        // ==========================================================
 
         if (hero.tickCount % 20 == 0) {
             boolean isEndRing = hero.level().dimension() == ModStructures.END_RING_DIMENSION_KEY;
@@ -151,7 +92,7 @@ public class HeroLogic {
         HeroDimensionHandler.handleVoidProtection(hero);
 
         HeroDialogueHandler.tick(hero);
-        HeroCookingCompat.tickVisuals(hero);
+        CookingService.tickVisuals(hero);
         HeroPrankHandler.tick(hero);
         HeroObserver.tick(hero);
         GlitchLordStateDefinition.tickPersistentState(hero);
@@ -227,34 +168,31 @@ public class HeroLogic {
     }
 
     public static void setupHiddenTeam(HeroEntity hero) {
-        net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
-        if (mc.level == null) return;
-        net.minecraft.world.scores.Scoreboard scoreboard = mc.level.getScoreboard();
-        String teamName = "hero_hidden_hud";
-        net.minecraft.world.scores.PlayerTeam team = scoreboard.getPlayerTeam(teamName);
-        if (team == null) {
-            team = scoreboard.addPlayerTeam(teamName);
-            team.setNameTagVisibility(net.minecraft.world.scores.Team.Visibility.NEVER);
-            team.setCollisionRule(net.minecraft.world.scores.Team.CollisionRule.NEVER);
-        }
-        scoreboard.addPlayerToTeam(hero.getStringUUID(), team);
+        HeroVisuals.setupHiddenTeam(hero);
     }
 
-    public static void handlePlayerInvitation(HeroEntity hero, Player player, BlockPos pos, int actionType) {
+    public static void handlePlayerInvitation(HeroEntity hero, Player player, BlockPos clickedPos, int actionType) {
+        // 石磨是九格结构，点哪一格都该落在同一台磨上；不归一化的话换个格子点就会被当成「另一次邀请」。
+        BlockPos pos = actionType == CookingService.INVITED_ACTION_MILLSTONE
+                ? CookingService.millstoneCenter(hero.level(), clickedPos)
+                : clickedPos;
         BlockPos currentInvitedPos = hero.getInvitedPos();
         if (currentInvitedPos != null && currentInvitedPos.equals(pos)) {
-            if (actionType == HeroCookingCompat.INVITED_ACTION_COOK
-                    && hero.getInvitedAction() == HeroCookingCompat.INVITED_ACTION_COOK
+            if (actionType == CookingService.INVITED_ACTION_COOK
+                    && hero.getInvitedAction() == CookingService.INVITED_ACTION_COOK
                     && !player.isShiftKeyDown()) {
-                player.sendSystemMessage(HeroCookingCompat.cycleCookSelection(hero, pos));
+                player.sendSystemMessage(CookingService.cycleCookSelection(hero, pos));
                 return;
             }
 
-            if (hero.getInvitedAction() == HeroCookingCompat.INVITED_ACTION_COOK) {
-                HeroCookingCompat.endCookChunkTicket(hero);
+            if (hero.getInvitedAction() == CookingService.INVITED_ACTION_COOK) {
+                CookingService.endCookChunkTicket(hero);
+            }
+            if (hero.getInvitedAction() == CookingService.INVITED_ACTION_MILLSTONE) {
+                CookingService.releaseMillstone(hero, pos);
             }
             hero.setInvitedPos(null);
-            hero.setInvitedAction(0);
+            hero.setInvitedAction(HeroInvitationHelper.ACTION_NONE);
 
             if (hero.isPassenger()) {
                 hero.stopRiding();
@@ -264,42 +202,59 @@ public class HeroLogic {
             return;
         }
 
-        if (actionType == HeroCookingCompat.INVITED_ACTION_COOK
-                && HeroCookingCompat.getCookOptions(hero, pos).isEmpty()) {
-            player.sendSystemMessage(Component.translatable("message.herobrine_companion.invite_cook_none"));
-            return;
+        if (actionType == CookingService.INVITED_ACTION_COOK) {
+            int optionCount = CookingService.getCookOptions(hero, pos).size();
+            DebugLog.info(DIAG,
+                    "[CookDiag] logic.invite :: pos={} options={}", pos.toShortString(), optionCount);
+            if (optionCount == 0) {
+                player.sendSystemMessage(Component.translatable("message.herobrine_companion.invite_cook_none"));
+                return;
+            }
+        }
+
+        // 石磨只能分给一只生物：先占住的话，Hero 上去会把原来的动物挤掉。
+        if (actionType == CookingService.INVITED_ACTION_MILLSTONE) {
+            if (CookingService.isMillstoneBusy(hero, pos) || !CookingService.canHostMillstone(hero, pos)) {
+                player.sendSystemMessage(Component.translatable("message.herobrine_companion.invite_millstone_busy"));
+                return;
+            }
         }
 
         applyInvitation(hero, player, pos, actionType, false);
     }
 
     public static boolean handleCookSelection(HeroEntity hero, Player player, BlockPos pos, ResourceLocation recipeId, int repeatCount) {
-        int maxRepeatCount = HeroCookingCompat.getCookOptionMaxRepeat(hero, pos, recipeId);
-        if (maxRepeatCount <= 0 || !HeroCookingCompat.selectCookOption(hero, pos, recipeId)) {
-            player.sendSystemMessage(Component.translatable("message.herobrine_companion.invite_cook_none"));
-            return false;
-        }
-
-        HeroCookingCompat.setCookRepeatCount(hero, pos, Math.min(repeatCount, maxRepeatCount));
-        applyInvitation(hero, player, pos, HeroCookingCompat.INVITED_ACTION_COOK, true);
-        return true;
+        return player instanceof ServerPlayer serverPlayer
+                && CookingService.requestCookSelection(hero, serverPlayer, pos, recipeId, repeatCount);
     }
 
     private static void applyInvitation(HeroEntity hero, Player player, BlockPos pos, int actionType, boolean preserveCookSelection) {
-        if (hero.getInvitedAction() == HeroCookingCompat.INVITED_ACTION_COOK
-                && (actionType != HeroCookingCompat.INVITED_ACTION_COOK || !pos.equals(hero.getInvitedPos()))) {
-            HeroCookingCompat.endCookChunkTicket(hero);
+        if (hero.getInvitedAction() == CookingService.INVITED_ACTION_COOK
+                && (actionType != CookingService.INVITED_ACTION_COOK || !pos.equals(hero.getInvitedPos()))) {
+            CookingService.endCookChunkTicket(hero);
+        }
+
+        // 换邀请目标或换动作时先松绑：石磨会一直把 Hero 按在磨盘上，不先松开就走去干别的会一路被拽回来。
+        if (hero.getInvitedAction() == CookingService.INVITED_ACTION_MILLSTONE
+                && (actionType != CookingService.INVITED_ACTION_MILLSTONE || !pos.equals(hero.getInvitedPos()))) {
+            CookingService.releaseMillstone(hero, hero.getInvitedPos());
         }
 
         hero.setInvitedPos(pos);
         hero.setInvitedAction(actionType);
+        hero.setMillstoneBound(false);
 
-        if (actionType == HeroCookingCompat.INVITED_ACTION_COOK && !preserveCookSelection) {
-            HeroCookingCompat.resetCookSelection(hero, pos);
+        if (actionType == CookingService.INVITED_ACTION_COOK && !preserveCookSelection) {
+            CookingService.resetCookSelection(hero, pos);
         }
 
-        if (actionType == HeroCookingCompat.INVITED_ACTION_COOK) {
-            HeroCookingCompat.beginCookChunkTicket(hero, pos);
+        if (actionType == CookingService.INVITED_ACTION_COOK) {
+            CookingService.beginCookChunkTicket(hero, pos);
+        }
+
+        if (actionType == CookingService.INVITED_ACTION_MILLSTONE) {
+            // 石磨区块卸载后绑定就断了，拉磨期间必须把区块钉住。
+            CookingService.beginCookChunkTicket(hero, pos);
         }
 
         if (actionType == HeroInvitationHelper.ACTION_REST) {
@@ -309,6 +264,16 @@ public class HeroLogic {
             }
         }
 
+        if (actionType == CookingService.INVITED_ACTION_MILLSTONE) {
+            // 拉磨要悬在磨台上，石磨每 tick 会把脚底重新摆到磨盘高度；这里先关掉重力，避免落地判定介入。
+            if (hero.isFloating()) {
+                hero.setFloating(false);
+            }
+            hero.setNoGravity(true);
+            hero.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
+            hero.fallDistance = 0.0F;
+        }
+
         hero.playSound(net.minecraft.sounds.SoundEvents.EXPERIENCE_ORB_PICKUP, 1.0F, 1.0F);
 
         String baseKey = switch (actionType) {
@@ -316,6 +281,7 @@ public class HeroLogic {
             case HeroInvitationHelper.ACTION_REST -> "message.herobrine_companion.invite_rest";
             case HeroInvitationHelper.ACTION_GUARD -> "message.herobrine_companion.invite_guard";
             case HeroInvitationHelper.ACTION_COOK -> "message.herobrine_companion.invite_cook";
+            case HeroInvitationHelper.ACTION_MILLSTONE -> "message.herobrine_companion.invite_millstone";
             default -> "message.herobrine_companion.invite_confirm";
         };
 

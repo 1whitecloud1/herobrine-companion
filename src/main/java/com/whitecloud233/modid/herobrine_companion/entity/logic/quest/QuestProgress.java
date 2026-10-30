@@ -2,6 +2,7 @@ package com.whitecloud233.modid.herobrine_companion.entity.logic.quest;
 
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
 
 import java.util.UUID;
 
@@ -12,12 +13,23 @@ import java.util.UUID;
 public class QuestProgress {
 
     /** 与旧版共用的键：已进行中的委托可平滑延续。 */
-    private static final String TAG_ID = "HeroActiveQuestId";
-    private static final String TAG_PROGRESS = "HeroActiveQuestProgress";
+    public static final String TAG_ID = "HeroActiveQuestId";
+    public static final String TAG_PROGRESS = "HeroActiveQuestProgress";
     private static final String TAG_TARGET_UUID = "HeroQuestTargetUUID";
     private static final String TAG_HERO_UUID = "HeroQuestHeroUUID";
     private static final String TAG_POSITIONS = "HeroQuestPositions";
     private static final String TAG_FLAGS = "HeroQuestFlags";
+
+    /** Copy the entire active quest when Minecraft replaces the player entity. */
+    public static void copyTo(CompoundTag original, CompoundTag replacement) {
+        for (String key : new String[]{TAG_ID, TAG_PROGRESS, TAG_TARGET_UUID, TAG_HERO_UUID, TAG_POSITIONS, TAG_FLAGS}) {
+            if (original.contains(key)) {
+                replacement.put(key, original.get(key).copy());
+            } else {
+                replacement.remove(key);
+            }
+        }
+    }
 
     private final ServerPlayer player;
 
@@ -27,6 +39,16 @@ public class QuestProgress {
 
     public static QuestProgress of(ServerPlayer player) {
         return new QuestProgress(player);
+    }
+
+    /**
+     * 「这名玩家是否有进行中的委托」。供只有 {@link Player} 或 {@code CompoundTag} 的调用点使用。
+     *
+     * <p>键名只在 {@link #TAG_ID} 处定义；这里提供静态入口，是为了让
+     * {@code HeroQuestManager} 等外部调用方不必再自己写一遍字面量。</p>
+     */
+    public static boolean isActive(Player player) {
+        return player != null && player.getPersistentData().getInt(TAG_ID) != 0;
     }
 
     public ServerPlayer player() {

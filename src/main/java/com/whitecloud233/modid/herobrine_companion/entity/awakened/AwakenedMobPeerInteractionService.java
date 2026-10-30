@@ -1,11 +1,15 @@
 package com.whitecloud233.modid.herobrine_companion.entity.awakened;
 
+import com.whitecloud233.modid.herobrine_companion.config.ServerConfigAccess;
+import com.whitecloud233.modid.herobrine_companion.config.ServerRule;
+
 import com.whitecloud233.modid.herobrine_companion.config.Config;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.dialogue.ActorDialogueManager;
 import com.whitecloud233.modid.herobrine_companion.entity.dialogue.ActorDialoguePrompts;
 import com.whitecloud233.modid.herobrine_companion.entity.dialogue.ActorDialogueSpec;
 import com.whitecloud233.modid.herobrine_companion.entity.dialogue.SpeechBubbleAccessor;
+import com.whitecloud233.modid.herobrine_companion.entity.dialogue.SpeechBubbleTiming;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.RandomSource;
@@ -26,8 +30,6 @@ public final class AwakenedMobPeerInteractionService {
     private static final double PEER_RANGE = 10.0D;
     private static final double AUDIENCE_RANGE = 14.0D;
     private static final double HERO_AWARENESS_RANGE = 18.0D;
-    private static final int MIN_SPEECH_TICKS = 60;
-    private static final int MAX_SPEECH_TICKS = 120;
     private static final int NORMAL_PEER_MIN_COOLDOWN = 700;
     private static final int NORMAL_PEER_MAX_COOLDOWN = 1200;
     private static final int SCUFFLE_MIN_COOLDOWN = 2400;
@@ -331,7 +333,7 @@ public final class AwakenedMobPeerInteractionService {
     }
 
     private static boolean shouldRequestAiPeerLine(Mob speaker, AwakenedMobPeerScene scene, ServerPlayer audience) {
-        if (!Config.awakenedMobAiDialogueEnabled || audience == null) {
+        if (!ServerConfigAccess.snapshot().enabled(ServerRule.AWAKENED_DIALOGUE) || audience == null) {
             return false;
         }
         float chance = switch (scene) {
@@ -396,8 +398,7 @@ public final class AwakenedMobPeerInteractionService {
     }
 
     private static int computeSpeechDuration(Component component) {
-        int duration = MIN_SPEECH_TICKS + component.getString().length() * 2;
-        return Math.min(MAX_SPEECH_TICKS, Math.max(MIN_SPEECH_TICKS, duration));
+        return SpeechBubbleTiming.durationTicks(component);
     }
 
     private static String randomEntry(List<String> entries, RandomSource random) {

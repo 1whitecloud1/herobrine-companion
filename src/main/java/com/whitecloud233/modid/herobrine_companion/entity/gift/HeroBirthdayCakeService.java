@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.entity.gift;
 
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.modid.herobrine_companion.util.DebugLog;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.Registries;
@@ -182,7 +183,7 @@ public final class HeroBirthdayCakeService {
         long now = player.level().getGameTime();
         Long last = LAST_ACTION_TICK.get(player.getUUID());
         if (last != null && now - last < ACTION_DEDUPE_TICKS) {
-            LOGGER.debug("[HeroGift] cake place request deduped: player={}", player.getName().getString());
+            DebugLog.debug(LOGGER, "[HeroGift] cake place request deduped: player={}", player.getName().getString());
             return;
         }
         LAST_ACTION_TICK.put(player.getUUID(), now);
@@ -239,11 +240,11 @@ public final class HeroBirthdayCakeService {
         prop.setPos(pos.getX() + 0.5D, pos.getY(), pos.getZ() + 0.5D);
         prop.setYRot(yaw);
         if (!level.addFreshEntity(prop)) {
-            LOGGER.warn("[HeroGift] birthday cake prop could not be added to the world at {}", pos);
+            DebugLog.warn(LOGGER, "[HeroGift] birthday cake prop could not be added to the world at {}", pos);
             return -1;
         }
         level.playSound(null, pos, SoundEvents.ITEM_FRAME_ADD_ITEM, SoundSource.BLOCKS, 0.7F, 1.1F);
-        LOGGER.info("[HeroGift] birthday cake prop spawned: entityId={} pos={} dim={}",
+        DebugLog.info(LOGGER, "[HeroGift] birthday cake prop spawned: entityId={} pos={} dim={}",
                 prop.getId(), pos, level.dimension().location());
         return prop.getId();
     }

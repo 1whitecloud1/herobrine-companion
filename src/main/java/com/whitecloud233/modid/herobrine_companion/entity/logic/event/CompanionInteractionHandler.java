@@ -3,6 +3,7 @@ package com.whitecloud233.modid.herobrine_companion.entity.logic.event;
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.state.PranksterStateDefinition;
+import com.whitecloud233.modid.herobrine_companion.entity.logic.HeroInvitationHelper;
 import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroLogic;
 import com.whitecloud233.modid.herobrine_companion.item.HeroSummonItem;
 import net.minecraft.core.BlockPos;
@@ -70,11 +71,12 @@ public class CompanionInteractionHandler {
         for (HeroEntity hero : com.whitecloud233.modid.herobrine_companion.entity.ai.learning.HeroBrain.ACTIVE_HEROES) {
             if (hero.level() == level && hero.isAlive() && hero.isCompanionMode()) {
                 BlockPos invitedPos = hero.getInvitedPos();
-                if (invitedPos != null && invitedPos.equals(pos) && hero.getInvitedAction() == 2) {
+                if (invitedPos != null && invitedPos.equals(pos)
+                        && hero.getInvitedAction() == HeroInvitationHelper.ACTION_REST) {
                     if (hero.isPassenger()) {
                         if (player.getMainHandItem().getItem() instanceof HeroSummonItem && player.isShiftKeyDown()) {
                             if (hero.getOwnerUUID() == null || hero.getOwnerUUID().equals(player.getUUID())) {
-                                HeroLogic.handlePlayerInvitation(hero, player, pos, 0);
+                                HeroLogic.handlePlayerInvitation(hero, player, pos, HeroInvitationHelper.ACTION_NONE);
                                 event.setCanceled(true);
                                 event.setCancellationResult(InteractionResult.SUCCESS);
                                 return;

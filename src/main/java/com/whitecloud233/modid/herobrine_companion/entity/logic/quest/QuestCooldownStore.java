@@ -19,6 +19,14 @@ public final class QuestCooldownStore {
     private QuestCooldownStore() {
     }
 
+    public static void copyTo(CompoundTag original, CompoundTag replacement) {
+        if (original.contains(TAG_COOLDOWNS)) {
+            replacement.put(TAG_COOLDOWNS, original.get(TAG_COOLDOWNS).copy());
+        } else {
+            replacement.remove(TAG_COOLDOWNS);
+        }
+    }
+
     /** 记录某委托的冷却结束时刻（世界绝对游戏刻）。已过期的记录顺手清理。 */
     public static void setCooldown(ServerPlayer player, int questId, long endGameTime) {
         CompoundTag data = player.getPersistentData();

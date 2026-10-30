@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.entity.awakened.containment;
 
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.modid.herobrine_companion.util.NbtKeys;
 import com.whitecloud233.modid.herobrine_companion.entity.family.HerobrineFamilyMemberType;
 import com.whitecloud233.modid.herobrine_companion.entity.family.HerobrineFamilyMembers;
 import net.minecraft.core.BlockPos;
@@ -35,12 +36,12 @@ public final class JeanSubmissionReleaseEffect {
         AwakenedMobTransportSanitizer.sanitizePersistentData(dragon.getPersistentData());
         dragon.ejectPassengers();
         dragon.stopRiding();
-        dragon.addTag("herobrine_companion_jean");
+        dragon.addTag(NbtKeys.JEAN_ENTITY_TAG);
         dragon.setNoAi(false);
         dragon.setDragonFight(null);
         dragon.setFightOrigin(BlockPos.containing(releasePos));
         dragon.getPhaseManager().setPhase(EnderDragonPhase.SITTING_SCANNING);
-        dragon.getPersistentData().putBoolean("HeroSubmission", true);
+        dragon.getPersistentData().putBoolean(NbtKeys.MOB_SUBMISSION, true);
         dragon.setSilent(true);
         dragon.setTarget(null);
         dragon.setDeltaMovement(Vec3.ZERO);
@@ -48,7 +49,7 @@ public final class JeanSubmissionReleaseEffect {
 
         Entity lookTarget = findLookTarget(level, dragon, player);
         float yaw = lookTarget == null ? dragon.getYRot() : yawToward(dragon, lookTarget);
-        dragon.getPersistentData().putFloat("HeroSubmissionYaw", yaw);
+        dragon.getPersistentData().putFloat(NbtKeys.MOB_SUBMISSION_YAW, yaw);
         dragon.setYRot(yaw);
         dragon.setYBodyRot(yaw);
         dragon.setYHeadRot(yaw);

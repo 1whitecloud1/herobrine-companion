@@ -41,6 +41,10 @@ public class HeroOtherProtection {
     }
     // [新增方法] 检测脚底是否悬空并自动切换飞行状态
     private static void checkAutoFly(HeroEntity hero, Level level) {
+        // 拉磨时位置由石磨直接搬运，这里若判定成「悬空」会打开浮空并顺手关掉无重力，Hero 会从磨盘上掉下去。
+        if (hero.isMillstoneHarnessed()) {
+            return;
+        }
         if (hero.isBattleModeActive()) {
             // 战斗模式浮空由 HeroCombatPursuit 的飞行追击统一管理（startFlight 起飞 / land 落地、
             // aiStep 水里浮空）。这里不再每 tick 强制取消浮空，否则 Hero 在水里 / 高位追击中

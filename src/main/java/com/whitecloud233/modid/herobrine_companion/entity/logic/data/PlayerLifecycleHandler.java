@@ -23,7 +23,6 @@ public class PlayerLifecycleHandler {
             CompoundTag data = player.getPersistentData();
 
             // [委托] 登录时补发一次委托状态，保证客户端开屏拦截缓存新鲜
-            com.whitecloud233.modid.herobrine_companion.entity.logic.quest.HeroQuestManager.syncQuestStateTo(player);
 
             // 检查玩家登录时的维度
             if (player.level().dimension() == com.whitecloud233.modid.herobrine_companion.world.structure.ModStructures.END_RING_DIMENSION_KEY) {
@@ -44,7 +43,7 @@ public class PlayerLifecycleHandler {
                 }
 
                 // 如果没有上面的标记，说明是正常的剧情回归者。
-                // 代码执行到这里就结束了，随后的 EndRingDimensionHandler.onPlayerJoinWorld 会自动把他安全地拉回擂台中心！
+                // EndRingDimensionHandler 的登录监听会把虚空剧情回归者拉回基岩内环。
             }
 
             syncVisitState(player);
@@ -100,10 +99,12 @@ public class PlayerLifecycleHandler {
         }
 
         // ================= [4. 批量继承任务、进度与系统标记 (NBT)] =================
+        // 委托相关键直接引用 QuestProgress 里的定义，避免玩家重生后因键名不一致丢进度。
         String[] keysToCopy = {
+                com.whitecloud233.modid.herobrine_companion.guide.CompanionGuideService.RECEIVED_TAG,
                 "ChallengeFailedMessagePending", "HeroRespawnData", "HeroPendingRespawn", "HeroCombatRespawnData",
                 "HasSeenUnstableZoneIntro", "EnteredEndRingTime", "WakeUpStage",
-                "HasSimulatedCrash", "HeroActiveQuestId", "HeroActiveQuestProgress",
+                "HasSimulatedCrash", com.whitecloud233.modid.herobrine_companion.entity.logic.event.EndRingStoryState.RETURN_PENDING,
                 "HeroPendingTrustReward", "HeroPendingQuestClear", "HasReceivedFragment4",
                 "HasReceivedFragment6", "HasVisitedHeroDimension", "VoidDomainUsageCount"
         };
@@ -113,6 +114,8 @@ public class PlayerLifecycleHandler {
                 curData.put(key, origData.get(key).copy());
             }
         }
+        com.whitecloud233.modid.herobrine_companion.entity.logic.quest.QuestProgress.copyTo(origData, curData);
+        com.whitecloud233.modid.herobrine_companion.entity.logic.quest.QuestCooldownStore.copyTo(origData, curData);
     }
 
     /**
@@ -155,6 +158,8 @@ public class PlayerLifecycleHandler {
     }
 
     private static void syncVisitState(ServerPlayer player) {
+        com.whitecloud233.modid.herobrine_companion.entity.logic.quest.HeroQuestManager.syncQuestStateTo(player);
+        PeacefulProtection.syncToPlayer(player);
         boolean visited = player.getPersistentData().getBoolean("HasVisitedHeroDimension");
         PacketHandler.sendToPlayer(new SyncHeroVisitPacket(visited), player);
         HeroCrossChatManager.INSTANCE.syncClientState(player);

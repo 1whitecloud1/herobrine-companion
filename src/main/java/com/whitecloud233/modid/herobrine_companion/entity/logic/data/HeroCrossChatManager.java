@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.entity.logic.data;
 
 import com.whitecloud233.modid.herobrine_companion.item.HeroSummonItem;
+import com.whitecloud233.modid.herobrine_companion.util.LanguageCodes;
 import com.whitecloud233.modid.herobrine_companion.network.ai.AppendCrossChatHistoryPacket;
 import com.whitecloud233.modid.herobrine_companion.network.ai.HeroCrossChatPromptPacket;
 import com.whitecloud233.modid.herobrine_companion.network.ai.OpenHeroChatPacket;
@@ -23,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.Locale;
 
 public final class HeroCrossChatManager {
     public static final HeroCrossChatManager INSTANCE = new HeroCrossChatManager();
@@ -446,7 +446,7 @@ public final class HeroCrossChatManager {
         if (player == null) {
             return;
         }
-        getWorldData(player).setClientLanguageCode(player.getUUID(), normalizeLanguageCode(languageCode));
+        getWorldData(player).setClientLanguageCode(player.getUUID(), LanguageCodes.normalize(languageCode));
     }
 
     public synchronized void syncClientState(ServerPlayer player) {
@@ -624,7 +624,7 @@ public final class HeroCrossChatManager {
         if (sanitizedSpeaker.isEmpty() || sanitizedContent.isEmpty()) {
             return;
         }
-        String normalizedSourceLanguageCode = normalizeLanguageCode(sourceLanguageCode);
+        String normalizedSourceLanguageCode = LanguageCodes.normalize(sourceLanguageCode);
         for (ServerPlayer player : getParticipants(session)) {
             String peerName = resolvePlayerName(session.server, session.getPeer(player.getUUID()));
             if (peerName == null || peerName.isBlank()) {
@@ -712,14 +712,6 @@ public final class HeroCrossChatManager {
 
     private int normalizeAutoHbTurnLimit(int turnLimit) {
         return Math.max(HeroWorldData.MIN_AUTO_HB_TURN_LIMIT, Math.min(HeroWorldData.MAX_AUTO_HB_TURN_LIMIT, turnLimit));
-    }
-
-    private String normalizeLanguageCode(String languageCode) {
-        if (languageCode == null) {
-            return "en_us";
-        }
-        String normalized = languageCode.trim().toLowerCase(Locale.ROOT).replace('-', '_');
-        return normalized.isEmpty() ? "en_us" : normalized;
     }
 
     private static String sanitize(String rawMessage) {

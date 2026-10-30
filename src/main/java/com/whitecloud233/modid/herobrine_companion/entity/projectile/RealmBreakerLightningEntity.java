@@ -1,5 +1,8 @@
 package com.whitecloud233.modid.herobrine_companion.entity.projectile;
 
+import com.whitecloud233.modid.herobrine_companion.config.ServerConfigAccess;
+import com.whitecloud233.modid.herobrine_companion.config.ServerRule;
+
 import com.whitecloud233.modid.herobrine_companion.config.Config;
 import com.whitecloud233.modid.herobrine_companion.init.ModEntities;
 import net.minecraft.core.BlockPos;
@@ -167,7 +170,7 @@ public class RealmBreakerLightningEntity extends Projectile {
             serverLevel.playSound(null, pos, SoundEvents.TRIDENT_THUNDER, SoundSource.WEATHER, 5.0F, 1.0F);
 
             // 4. 方块破坏 (如果配置启用)
-            if (Config.poemOfTheEndExplosion) {
+            if (ServerConfigAccess.snapshot().enabled(ServerRule.POEM_EXPLOSION)) {
                 int r = (int) Math.ceil(radius);
                 for (int x = -r; x <= r; x++) {
                     for (int y = -r; y <= r; y++) {
