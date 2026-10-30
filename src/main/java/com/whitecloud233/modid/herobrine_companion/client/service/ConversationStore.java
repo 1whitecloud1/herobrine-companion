@@ -3,9 +3,8 @@ package com.whitecloud233.modid.herobrine_companion.client.service;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
-import net.minecraft.client.Minecraft;
-import net.minecraft.network.chat.Component;
-import net.minecraftforge.fml.loading.FMLPaths;
+import com.whitecloud233.modid.herobrine_companion.client.memory.ImportedMemory;
+import com.whitecloud233.modid.herobrine_companion.client.memory.ConversationFileWriter;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -29,14 +28,23 @@ import java.util.UUID;
 public class ConversationStore {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Type STORE_TYPE = new TypeToken<StoreData>() {}.getType();
-    private static final ConversationStore INSTANCE = new ConversationStore();
+    private static final ConversationStore INSTANCE = new ConversationStore(new MinecraftConversationEnvironment());
     private static final DateTimeFormatter EXPORT_FILE_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss");
     private static final DateTimeFormatter EXPORT_LINE_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final Object lock = new Object();
+    private final ConversationEnvironment environment;
+    private long sessionGeneration;
     private String loadedSessionKey;
     private File loadedFile;
+    private boolean writableSession = true;
     private StoreData storeData = new StoreData();
+
+    public ConversationStore() { this(new MinecraftConversationEnvironment()); }
+
+    ConversationStore(ConversationEnvironment environment) {
+        this.environment = Objects.requireNonNull(environment);
+    }
 
     public static ConversationStore getInstance() {
         return INSTANCE;
@@ -55,17 +63,19 @@ public class ConversationStore {
 
             this.saveLocked();
             this.loadedSessionKey = sessionKey;
+            this.sessionGeneration++;
             this.loadedFile = this.resolveSessionFile(sessionKey);
             this.storeData = new StoreData();
+            this.writableSession = true;
 
             if (this.loadedFile.exists()) {
                 try {
                     StoreData loaded = this.readStoreData(this.loadedFile);
-                    if (loaded != null) {
-                        this.storeData = loaded;
-                    }
+                    if (loaded == null) throw new java.io.IOException("Conversation file cannot be parsed; original file kept unchanged");
+                    this.storeData = loaded;
                 } catch (Exception e) {
                     e.printStackTrace();
+                    this.writableSession = false;
                     this.storeData = new StoreData();
                 }
             }
@@ -79,6 +89,7 @@ public class ConversationStore {
         synchronized (this.lock) {
             this.saveLocked();
             this.loadedSessionKey = null;
+            this.sessionGeneration++;
             this.loadedFile = null;
             this.storeData = new StoreData();
         }
@@ -126,6 +137,53 @@ public class ConversationStore {
                     .comparingInt(ConversationSearchResult::matchCount).reversed()
                     .thenComparing(result -> result.summary().updatedAt(), Comparator.reverseOrder()));
             return results;
+        }
+    }
+
+    public record ImportTarget(String sessionKey, UUID playerId, long generation) { }
+
+    public ImportTarget captureImportTarget(UUID playerId) {
+        synchronized (lock) {
+            ensureSessionLoadedLocked();
+            if (playerId == null || loadedFile == null || loadedSessionKey == null) return null;
+            return new ImportTarget(loadedSessionKey, playerId, sessionGeneration);
+        }
+    }
+
+    public ConversationSummary importMemory(ImportTarget target, ImportedMemory memory) throws java.io.IOException {
+        synchronized (lock) {
+            if (target == null || target.playerId() == null || memory == null || loadedFile == null
+                    || target.generation() != sessionGeneration || !Objects.equals(target.sessionKey(), resolveSessionKey())
+                    || !Objects.equals(target.sessionKey(), loadedSessionKey)) {
+                throw new java.io.IOException("The game session changed; reopen the import screen");
+            }
+            if (!writableSession) throw new java.io.IOException("Existing conversation file is unreadable; import cannot overwrite it");
+            PlayerConversationState state = ensurePlayerStateLocked(target.playerId());
+            String previousActive = state.activeConversationId;
+            ConversationThread imported = new ConversationThread();
+            imported.id = UUID.randomUUID().toString();
+            imported.title = memory.title().isBlank() ? fallbackConversationPrefix() : memory.title();
+            imported.autoTitle = false;
+            imported.createdAt = System.currentTimeMillis();
+            imported.updatedAt = imported.createdAt;
+            imported.messages = new ArrayList<>();
+            imported.importedMemory = memory;
+            state.conversations.add(0, imported);
+            state.activeConversationId = imported.id;
+            try {
+                ConversationFileWriter.write(loadedFile.toPath(), GSON.toJson(storeData));
+            } catch (java.io.IOException | RuntimeException e) {
+                state.conversations.remove(imported);
+                state.activeConversationId = previousActive;
+                throw e;
+            }
+            return toSummary(imported, true);
+        }
+    }
+
+    public ImportedMemory getActiveImportedMemory(UUID playerId) {
+        synchronized (lock) {
+            return getActiveConversationLocked(ensurePlayerStateLocked(playerId)).importedMemory;
         }
     }
 
@@ -255,6 +313,9 @@ public class ConversationStore {
             PlayerConversationState state = this.ensurePlayerStateLocked(playerUUID);
             ConversationThread active = this.getActiveConversationLocked(state);
             active.messages.clear();
+            active.importedMemory = null;
+            active.summary = null;
+            active.summaryMessageCount = 0;
             active.updatedAt = System.currentTimeMillis();
             active.autoTitle = true;
             active.title = this.buildDefaultConversationTitle(state);
@@ -374,7 +435,8 @@ public class ConversationStore {
         return new ConversationSummary(
                 conversation.id,
                 conversation.title,
-                conversation.messages == null ? 0 : conversation.messages.size(),
+                (conversation.messages == null ? 0 : conversation.messages.size())
+                        + (conversation.importedMemory == null ? 0 : Math.max(1, conversation.importedMemory.messages().size())),
                 conversation.updatedAt,
                 active
         );
@@ -394,6 +456,12 @@ public class ConversationStore {
                 if (this.containsNormalized(message.content, normalizedQuery)) {
                     hits++;
                 }
+            }
+        }
+        if (conversation.importedMemory != null) {
+            if (this.containsNormalized(conversation.importedMemory.notes(), normalizedQuery)) hits++;
+            for (ImportedMemory.Message message : conversation.importedMemory.messages()) {
+                if (this.containsNormalized(message.content(), normalizedQuery)) hits++;
             }
         }
         return hits;
@@ -416,6 +484,24 @@ public class ConversationStore {
 
         String fileName = this.buildExportFileName(conversation);
         File output = new File(exportDir, fileName);
+        if (conversation.importedMemory != null) {
+            List<ImportedMemory.Message> history = new ArrayList<>(conversation.importedMemory.messages());
+            for (ConversationMessage message : conversation.messages) {
+                if (("user".equals(message.role) || "assistant".equals(message.role)) && message.content != null && !message.content.isBlank()) {
+                    history.add(new ImportedMemory.Message(message.role, message.content));
+                }
+            }
+            output = new File(exportDir, fileName.substring(0, fileName.length() - 4) + ".json");
+            try {
+                String document = com.whitecloud233.modid.herobrine_companion.client.memory.MemoryDocumentWriter.encode(
+                        conversation.title, conversation.importedMemory.notes(), history);
+                Files.writeString(output.toPath(), document, StandardCharsets.UTF_8);
+                return output;
+            } catch (Exception e) {
+                e.printStackTrace();
+                return null;
+            }
+        }
 
         try (BufferedWriter writer = Files.newBufferedWriter(output.toPath(), StandardCharsets.UTF_8)) {
             writer.write("Herobrine Companion Conversation Export");
@@ -454,7 +540,7 @@ public class ConversationStore {
     }
 
     private File resolveExportDirectory() {
-        return FMLPaths.CONFIGDIR.get().resolve("herobrine_companion").resolve("conversation_exports").toFile();
+        return environment.exportDirectory().toFile();
     }
 
     private String buildExportFileName(ConversationThread conversation) {
@@ -511,13 +597,7 @@ public class ConversationStore {
         return prefix + " " + nextIndex;
     }
 
-    private String fallbackConversationPrefix() {
-        Minecraft mc = Minecraft.getInstance();
-        if (mc != null) {
-            return Component.translatable("gui.herobrine_companion.conversation_manager.default_name").getString();
-        }
-        return "Conversation";
-    }
+    private String fallbackConversationPrefix() { return environment.defaultTitle(); }
 
     private String makeConversationTitle(String content) {
         String normalized = content.replaceAll("\\s+", " ").trim();
@@ -531,33 +611,9 @@ public class ConversationStore {
         return normalized.substring(0, maxLength - 1).trim() + "…";
     }
 
-    private String resolveSessionKey() {
-        Minecraft mc = Minecraft.getInstance();
-        if (mc == null) {
-            return null;
-        }
+    private String resolveSessionKey() { return environment.sessionKey(); }
 
-        String worldIdentifier = null;
-        if (mc.getSingleplayerServer() != null) {
-            worldIdentifier = "local_" + mc.getSingleplayerServer().getWorldData().getLevelName();
-        } else if (mc.getCurrentServer() != null && mc.getCurrentServer().ip != null && !mc.getCurrentServer().ip.isBlank()) {
-            worldIdentifier = "server_" + mc.getCurrentServer().ip;
-        }
-
-        if (worldIdentifier == null || worldIdentifier.isBlank()) {
-            return null;
-        }
-
-        return worldIdentifier.replaceAll("[^a-zA-Z0-9\\-_]", "_").toLowerCase(Locale.ROOT);
-    }
-
-    private File resolveSessionFile(String sessionKey) {
-        File dir = FMLPaths.CONFIGDIR.get().resolve("herobrine_companion").resolve("conversations").toFile();
-        if (!dir.exists()) {
-            dir.mkdirs();
-        }
-        return new File(dir, sessionKey + ".json");
-    }
+    private File resolveSessionFile(String sessionKey) { return environment.sessionFile(sessionKey).toFile(); }
 
     private StoreData readStoreData(File file) throws Exception {
         byte[] raw = Files.readAllBytes(file.toPath());
@@ -579,7 +635,12 @@ public class ConversationStore {
 
     private StoreData tryParseStoreData(byte[] raw, Charset charset) {
         try {
-            return GSON.fromJson(new String(raw, charset), STORE_TYPE);
+            String json = new String(raw, charset);
+            var parsed = com.google.gson.JsonParser.parseString(json);
+            if (!parsed.isJsonObject()) return null;
+            var root = parsed.getAsJsonObject();
+            if (!root.has("players") || !root.get("players").isJsonObject()) return null;
+            return GSON.fromJson(root, STORE_TYPE);
         } catch (Exception ignored) {
             return null;
         }
@@ -627,12 +688,12 @@ public class ConversationStore {
     }
 
     private void saveLocked() {
-        if (this.loadedFile == null) {
+        if (this.loadedFile == null || !this.writableSession) {
             return;
         }
 
-        try (var writer = Files.newBufferedWriter(this.loadedFile.toPath(), StandardCharsets.UTF_8)) {
-            GSON.toJson(this.storeData, writer);
+        try {
+            ConversationFileWriter.write(this.loadedFile.toPath(), GSON.toJson(this.storeData));
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -654,6 +715,7 @@ public class ConversationStore {
         long createdAt;
         long updatedAt;
         List<ConversationMessage> messages = new ArrayList<>();
+        ImportedMemory importedMemory;
         /** 滚动摘要:最近一次已生成/注入的会话要点(空 = 尚无摘要)。 */
         String summary;
         /** 上次摘要已涵盖的条数(用于决定何时再触发一次滚动摘要)。缺省 0 = 尚未归纳。 */

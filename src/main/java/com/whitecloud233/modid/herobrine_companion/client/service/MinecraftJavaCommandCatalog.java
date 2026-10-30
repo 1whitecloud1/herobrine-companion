@@ -1,5 +1,6 @@
 package com.whitecloud233.modid.herobrine_companion.client.service;
 
+import com.whitecloud233.modid.herobrine_companion.util.JsonInputs;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -166,10 +167,7 @@ final class MinecraftJavaCommandCatalog {
     }
 
     private static String getString(JsonObject object, String propertyName) {
-        if (object == null || !object.has(propertyName) || object.get(propertyName).isJsonNull()) {
-            return "";
-        }
-        return object.get(propertyName).getAsString().trim();
+        return JsonInputs.optionalString(object, propertyName, "").trim();
     }
 
     private static String shortenSyntaxLine(String line) {

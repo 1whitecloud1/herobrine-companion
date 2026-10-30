@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.client.service;
 
 import com.google.gson.Gson;
+import com.whitecloud233.modid.herobrine_companion.util.AtomicFiles;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -91,10 +92,7 @@ public final class LLMContextWindow {
     private static final Pattern MAX_TOKENS_ALLOWED =
             Pattern.compile("maximum number of tokens allowed[^0-9]{0,20}\\(?([0-9][0-9,_]*)\\)?", Pattern.CASE_INSENSITIVE);
 
-    private static final HttpClient CLIENT = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(8))
-            .proxy(SystemProxy.SELECTOR)
-            .build();
+    private static final HttpClient CLIENT = HttpClients.shared(8);
 
     private static final Map<String, CachedEntry> CACHE = new ConcurrentHashMap<>();
     private static final Map<String, Long> LAST_ATTEMPT = new ConcurrentHashMap<>();
@@ -310,11 +308,12 @@ public final class LLMContextWindow {
     /** Ollama：POST /api/show → model_info 里的 *.context_length。 */
     private static CompletableFuture<ProbeResult> probeOllamaShowAsync(LlmSettings settings) {
         String url = serverRoot(settings.endpoint()) + "/api/show";
-        String payload = "{\"model\":" + jsonString(settings.model()) + "}";
+        JsonObject payload = new JsonObject();
+        payload.addProperty("model", settings.model());
         try {
             HttpRequest request = authorized(url, settings)
                     .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(payload, StandardCharsets.UTF_8))
+                    .POST(HttpRequest.BodyPublishers.ofString(payload.toString(), StandardCharsets.UTF_8))
                     .build();
             return sendAsync(request)
                     .thenApply(body -> {
@@ -400,20 +399,31 @@ public final class LLMContextWindow {
         if (model.isBlank()) {
             return null;
         }
-        String modelJson = jsonString(model);
+        JsonObject payload = new JsonObject();
+        payload.addProperty("model", model);
         switch (settings.format()) {
             case OPENAI_RESPONSES:
-                return "{\"model\":" + modelJson + ",\"input\":\"ping\",\"max_output_tokens\":" + PROBE_MAX_TOKENS
-                        + ",\"stream\":false}";
+                payload.addProperty("input", "ping");
+                payload.addProperty("max_output_tokens", PROBE_MAX_TOKENS);
+                payload.addProperty("stream", false);
+                break;
             case ANTHROPIC:
-                return "{\"model\":" + modelJson + ",\"max_tokens\":" + PROBE_MAX_TOKENS
-                        + ",\"messages\":[{\"role\":\"user\",\"content\":\"ping\"}]}";
             case OPENAI_CHAT:
-                return "{\"model\":" + modelJson + ",\"max_tokens\":" + PROBE_MAX_TOKENS
-                        + ",\"messages\":[{\"role\":\"user\",\"content\":\"ping\"}],\"stream\":false}";
+                payload.addProperty("max_tokens", PROBE_MAX_TOKENS);
+                JsonObject message = new JsonObject();
+                message.addProperty("role", "user");
+                message.addProperty("content", "ping");
+                JsonArray messages = new JsonArray();
+                messages.add(message);
+                payload.add("messages", messages);
+                if (settings.format() == LLMConfig.EndpointFormat.OPENAI_CHAT) {
+                    payload.addProperty("stream", false);
+                }
+                break;
             default:
                 return null;
         }
+        return payload.toString();
     }
 
     // ---------- 错误报文解析 ----------
@@ -493,7 +503,8 @@ public final class LLMContextWindow {
      * 由各探测方法自己判断（解析失败自然返回 0）。
      */
     private static CompletableFuture<String> sendAsync(HttpRequest request) {
-        return CLIENT.sendAsync(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
+        HttpClient client = LocalModelEndpoint.isLoopback(request.uri().toString()) ? HttpClients.direct(8) : CLIENT;
+        return client.sendAsync(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
                 .orTimeout(HTTP_TIMEOUT.toMillis() + 2000L, TimeUnit.MILLISECONDS)
                 .thenApply(response -> response.body() == null ? "" : response.body());
     }
@@ -659,10 +670,6 @@ public final class LLMContextWindow {
         }
     }
 
-    private static String jsonString(String value) {
-        return "\"" + (value == null ? "" : value.replace("\\", "\\\\").replace("\"", "\\\"")) + "\"";
-    }
-
     private static String trimTrailingSlash(String value) {
         String trimmed = value;
         while (trimmed.endsWith("/")) {
@@ -787,9 +794,7 @@ public final class LLMContextWindow {
             }
             Map<String, Object> root = new LinkedHashMap<>();
             root.put("entries", new LinkedHashMap<>(CACHE));
-            try (Writer writer = new OutputStreamWriter(new FileOutputStream(file), StandardCharsets.UTF_8)) {
-                GSON.toJson(root, writer);
-            }
+            AtomicFiles.writeJson(file.toPath(), GSON, root);
         } catch (Exception e) {
             LOGGER.warn("[ContextWindow] 缓存写入失败", e);
         }

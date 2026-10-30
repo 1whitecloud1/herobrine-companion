@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.client.service;
 
 import com.google.gson.JsonObject;
+import com.whitecloud233.modid.herobrine_companion.client.llm.LlmOneShot;
 import com.google.gson.JsonParser;
 import com.whitecloud233.modid.herobrine_companion.client.llm.LlmFormatAdapter;
 import com.whitecloud233.modid.herobrine_companion.client.llm.LlmFormats;
@@ -46,10 +47,7 @@ public final class ConversationSummaryService {
 
     private static final int MAX_OUTPUT_TOKENS = 320;
 
-    private static final HttpClient CLIENT = HttpClient.newBuilder()
-            .connectTimeout(java.time.Duration.ofSeconds(10))
-            .proxy(SystemProxy.SELECTOR)
-            .build();
+    private static final HttpClient CLIENT = HttpClients.shared(10);
 
     /** 正在生成摘要的 scope(去重,避免并发触发同会话多次调用)。 */
     private static final Set<UUID> IN_FLIGHT = ConcurrentHashMap.newKeySet();
@@ -125,19 +123,16 @@ public final class ConversationSummaryService {
         HttpRequest request = adapter.buildSimpleRequest(settings, systemPrompt, userPrompt,
                 0.3D, LLMConfig.getConfiguredTopP(), MAX_OUTPUT_TOKENS);
 
-        return CLIENT.sendAsync(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
-                .thenApply(response -> {
-                    if (response.statusCode() != 200 || response.body() == null || response.body().isBlank()) {
+        // 发送与"状态码 → LlmResponse"的归一交给 LlmOneShot；本类只保留自己
+        // "失败即静默、绝不影响主对话"的策略（因此不写 AIDebugLog）。
+        return LlmOneShot.send(CLIENT, request, adapter)
+                .thenApply(result -> {
+                    if (!result.successful()) {
                         return null;
                     }
-                    JsonObject json;
-                    try {
-                        json = JsonParser.parseString(response.body()).getAsJsonObject();
-                    } catch (Exception e) {
-                        return null;
-                    }
-                    String summary = adapter.extractText(json, "");
-                    if (summary == null || summary.isBlank()) {
+                    // SUMMARY 可使用独立凭据；后台成功不能清除主聊天的鉴权失败状态。
+                    String summary = result.text();
+                    if (summary.isBlank()) {
                         return null;
                     }
                     store.setActiveConversationSummary(scopeId, summary);

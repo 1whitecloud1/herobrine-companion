@@ -1,5 +1,6 @@
 package com.whitecloud233.modid.herobrine_companion.client.service;
 
+import com.whitecloud233.modid.herobrine_companion.util.JsonInputs;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.whitecloud233.modid.herobrine_companion.client.llm.LlmToolSpec;
@@ -58,7 +59,7 @@ public final class RegistryLookupSupport {
 
     /** 解析并校验模型给的参数；不合法返回带原因的 error。 */
     static ParseResult parseAction(JsonObject args) {
-        String query = getString(args, "query").trim();
+        String query = JsonInputs.string(args, "query", "").trim();
         if (query.isEmpty()) {
             return ParseResult.error("query 不能为空");
         }
@@ -66,7 +67,7 @@ public final class RegistryLookupSupport {
             return ParseResult.error("query 过长（最多 " + MAX_QUERY_LENGTH + " 字符）");
         }
         // category 是可选的：未传/为空时默认 any（与 schema 声明一致，勿误判为非法参数）。
-        String categoryId = getString(args, "category");
+        String categoryId = JsonInputs.string(args, "category", "");
         Category category = categoryId.isEmpty() ? Category.ANY : Category.fromId(categoryId);
         if (category == null) {
             return ParseResult.error("category 只能是 " + Category.ids());
@@ -80,6 +81,8 @@ public final class RegistryLookupSupport {
      * 优先查本地索引 {@link ModContentIndex}；索引未就绪时直接扫注册表兜底。
      */
     static String search(RegistryLookupRequest request) {
+        if (request.category() == Category.TEMPLATE) return TemplateLookupSupport.search(request.query(), request.limit(), true);
+        String templates = request.category() == Category.ANY ? TemplateLookupSupport.search(request.query(), request.limit(), false) : "";
         String queryNorm = MinecraftJavaIdResolver.normalizeLookupText(request.query());
         if (MOD_LIST_QUERIES.contains(queryNorm)) {
             return ModContentIndex.modsSummary(40, 2000);
@@ -87,13 +90,17 @@ public final class RegistryLookupSupport {
 
         ModContentIndex.ensureReady();
         if (ModContentIndex.isComplete()) {
-            return formatIndexResults(request, ModContentIndex.search(
+            var result = ModContentIndex.search(
                     queryNorm,
                     request.category() == Category.ANY ? "" : request.category().id(),
-                    Math.max(request.limit(), FALLBACK_SCAN_CAP)));
+                    Math.max(request.limit(), FALLBACK_SCAN_CAP));
+            if (!templates.isEmpty() && result.hits().isEmpty()) return templates;
+            return templates + (templates.isEmpty() ? "" : "\n") + formatIndexResults(request, result);
         }
         // 索引未就绪或不完整（构建时存档未加载，缺维度/结构）：直接扫注册表，保证可用性。
-        return scanRegistriesFallback(request, queryNorm);
+        String registryResults = scanRegistriesFallback(request, queryNorm);
+        if (!templates.isEmpty() && registryResults.equals(noMatchText(request.query()))) return templates;
+        return templates + (templates.isEmpty() ? "" : "\n") + registryResults;
     }
 
     private static String formatIndexResults(RegistryLookupRequest request, ModContentIndex.SearchResult result) {
@@ -254,6 +261,7 @@ public final class RegistryLookupSupport {
                 + "or a fuzzy name/id fragment (e.g. 'ak', 'copper ingot', 'twilight', '钻石') to resolve the EXACT registered id. "
                 + "ALWAYS call this BEFORE filling item_id / entity_id / block_id / effect_id / enchantment_id / dimension_id / structure_id "
                 + "when you are not 100% certain of the exact id, especially for modded content. "
+                + "For player-uploaded buildings (.nbt/.litematic/.schem/.schematic), use category='template' and a name/id fragment; query='*' lists imported templates in this world. Results give exact template_id, dimensions and block count for place_template. "
                 + "Never guess or invent a mod id — unregistered ids are rejected by the command validator. "
                 + "It never changes the game and never executes anything.";
     }
@@ -293,17 +301,6 @@ public final class RegistryLookupSupport {
         return schema;
     }
 
-    private static String getString(JsonObject args, String name) {
-        if (args == null || !args.has(name) || args.get(name).isJsonNull() || !args.get(name).isJsonPrimitive()) {
-            return "";
-        }
-        try {
-            return args.get(name).getAsString();
-        } catch (RuntimeException ignored) {
-            return "";
-        }
-    }
-
     private static int getInt(JsonObject args, String name, int fallback) {
         if (args == null || !args.has(name) || args.get(name).isJsonNull() || !args.get(name).isJsonPrimitive()) {
             return fallback;
@@ -326,7 +323,8 @@ public final class RegistryLookupSupport {
         PARTICLE("particle", BuiltInRegistries.PARTICLE_TYPE, null),
         SOUND("sound", BuiltInRegistries.SOUND_EVENT, null),
         DIMENSION("dimension", null, null),
-        STRUCTURE("structure", null, null);
+        STRUCTURE("structure", null, null),
+        TEMPLATE("template", null, null);
 
         private final String id;
         private final Registry<?> registry;

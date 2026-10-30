@@ -1,6 +1,8 @@
 package com.whitecloud233.modid.herobrine_companion.client.service;
 
+import com.whitecloud233.modid.herobrine_companion.util.NumberInputs;
 import com.google.gson.Gson;
+import com.whitecloud233.modid.herobrine_companion.util.AtomicFiles;
 import com.google.gson.GsonBuilder;
 import com.mojang.logging.LogUtils;
 import com.whitecloud233.modid.herobrine_companion.BuildFlags;
@@ -14,7 +16,6 @@ import java.io.*;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.EnumMap;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -48,7 +49,6 @@ public class LLMConfig {
     // 1. 公开配置：放在 config 文件夹，会被整合包打包
     private static final File PUBLIC_CONFIG = FMLPaths.CONFIGDIR.get().resolve("herobrine_companion")
             .resolve("herobrine_companion_ai.json").toFile();
-
 
     private static final File PRIVATE_SECRETS = FMLPaths.GAMEDIR.get()
             .resolve("herobrine_ai_secrets.json").toFile();
@@ -193,9 +193,8 @@ public class LLMConfig {
     /**
      * 模组内所有外部 HTTP 请求是否跟随 Windows 系统代理（默认关）。
      *
-     * <p>Java 默认不读系统代理，直连 huggingface.co 在国内必然超时。开启后云端 LLM 对话、
-     * 模型列表发现、上下文窗口探测与本地模型下载都走系统代理（见 {@link SystemProxy}）。
-     * 回环地址（本地 llama 服务 127.0.0.1）永远直连。</p>
+     * <p>开启后云端 LLM 对话、模型列表发现与上下文窗口探测跟随系统代理
+     * （见 {@link SystemProxy}）；本机回环服务始终直连。</p>
      */
     public static volatile boolean aiUseSystemProxy = false;
     public static CommandMode aiCommandMode = CommandMode.NORMAL;
@@ -204,14 +203,14 @@ public class LLMConfig {
     /** 本地模型槽位（与云端 Provider 完全独立，不占用/覆盖任何云端档案）。 */
     public static String localModelEndpoint = "";
     public static String localModelId = "";
+    private static String localModelApiKey = "";
     /** 虚拟路由 id：任务路由指向它时使用本地模型槽位。 */
     public static final String LOCAL_ROUTE_ID = "local";
-    /** 本地服务固定 API Key（llama.cpp 需要 Bearer，内容任意）。 */
+    /** 无需认证的本地服务使用占位 Key，以兼容统一请求格式。 */
     public static final String LOCAL_MODEL_KEY = "sk-local";
     public static double aiTemperature = DEFAULT_TEMPERATURE;
     public static double aiTopP = DEFAULT_TOP_P;
     public static int aiMaxOutputTokens = DEFAULT_MAX_OUTPUT_TOKENS;
-    public static Map<String, String> nbtStructures = new HashMap<>();
     private static final Map<LlmTask, TaskRoute> taskRoutes = new EnumMap<>(LlmTask.class);
     private static final Map<String, ProviderProfile> providerProfiles = new LinkedHashMap<>();
 
@@ -525,7 +524,7 @@ public class LLMConfig {
         return !BuildFlags.CF_SAFE && aiJvmCodeSkillEnabled;
     }
 
-    /** 是否跟随系统代理（玩家在"更多开关"页手动开启，默认关）：云端 LLM + 本地模型下载都受影响。 */
+    /** 是否跟随系统代理（玩家手动开启，默认关）；本机服务不受影响。 */
     public static boolean isUseSystemProxy() {
         ensureLoaded();
         return aiUseSystemProxy;
@@ -561,7 +560,7 @@ public class LLMConfig {
     }
 
     private static double getConfiguredTemperatureUnchecked() {
-        return clampDouble(aiTemperature, 0.0D, 2.0D, DEFAULT_TEMPERATURE);
+        return NumberInputs.finite(aiTemperature, 0.0D, 2.0D, DEFAULT_TEMPERATURE);
     }
 
     public static double getConfiguredTopP() {
@@ -570,7 +569,7 @@ public class LLMConfig {
     }
 
     private static double getConfiguredTopPUnchecked() {
-        return clampDouble(aiTopP, 0.1D, 1.0D, DEFAULT_TOP_P);
+        return NumberInputs.finite(aiTopP, 0.1D, 1.0D, DEFAULT_TOP_P);
     }
 
     public static int getConfiguredMaxOutputTokens() {
@@ -579,7 +578,7 @@ public class LLMConfig {
     }
 
     private static int getConfiguredMaxOutputTokensUnchecked() {
-        return clampInt(aiMaxOutputTokens, 64, 4096, DEFAULT_MAX_OUTPUT_TOKENS);
+        return NumberInputs.positive(aiMaxOutputTokens, 64, 4096, DEFAULT_MAX_OUTPUT_TOKENS);
     }
 
     /**
@@ -601,31 +600,17 @@ public class LLMConfig {
 
     /** 是否为回环端点（本机 llama.cpp / Ollama 等本地服务）。 */
     public static boolean isLoopbackEndpoint(String endpoint) {
-        if (endpoint == null || endpoint.isBlank()) {
-            return false;
-        }
-        try {
-            String host = URI.create(endpoint).getHost();
-            if (host == null || host.isBlank()) {
-                return false;
-            }
-            String normalized = host.toLowerCase(Locale.ROOT);
-            return "localhost".equals(normalized)
-                    || "127.0.0.1".equals(normalized)
-                    || "::1".equals(normalized)
-                    || "0.0.0.0".equals(normalized);
-        } catch (Exception e) {
-            return false;
-        }
+        return LocalModelEndpoint.isLoopback(endpoint);
     }
 
     // ---------- 本地模型槽位（独立于云端 Provider） ----------
 
-    /** 本地模型端点是否已配置（含模型名；Key 为固定常量）。 */
+    /** 本地模型是否已手动配置；不代表外部服务当前在线。 */
     public static boolean isLocalModelConnected() {
         ensureLoaded();
-        return localModelEndpoint != null && !localModelEndpoint.isBlank()
-                && localModelId != null && !localModelId.isBlank();
+        return !LocalModelEndpoint.normalize(localModelEndpoint).isEmpty()
+                && localModelId != null && !localModelId.isBlank()
+                && LocalModelConnector.isValidApiKey(localModelApiKey);
     }
 
     public static String getLocalModelEndpoint() {
@@ -638,23 +623,33 @@ public class LLMConfig {
         return localModelId == null ? "" : localModelId;
     }
 
-    /** 写入本地模型槽位（不改动任何云端/自定义档案），随后落盘。 */
-    public static void setLocalModel(String endpoint, String modelId) {
+    public static String getLocalModelApiKey() {
         ensureLoaded();
-        localModelEndpoint = normalizeEndpoint(endpoint);
-        localModelId = modelId == null ? "" : modelId.trim();
-        save();
-        // 槽位变化 → 异步探测真实上下文窗口（llama.cpp /props 或 Ollama /api/show）。
-        LLMContextWindow.probeIfStale(getLocalLlmSettings());
+        return localModelApiKey == null ? "" : localModelApiKey.trim();
     }
 
-    /** 本地模型的一次调用设置（固定 OpenAI Chat 格式；未连接返回 null）。 */
+    /** 写入独立本地槽位；密钥仅保存在游戏根目录的私密配置中。 */
+    public static void setLocalModel(String endpoint, String modelId, String apiKey) {
+        ensureLoaded();
+        String normalized = LocalModelEndpoint.normalize(endpoint);
+        if (normalized.isEmpty() || modelId == null || modelId.isBlank()
+                || !LocalModelConnector.isValidApiKey(apiKey)) {
+            throw new IllegalArgumentException("Invalid local model configuration");
+        }
+        localModelEndpoint = normalized;
+        localModelId = modelId.trim();
+        localModelApiKey = apiKey == null ? "" : apiKey.trim();
+        save();
+    }
+
+    /** 本地模型的一次调用设置（OpenAI Chat 格式；未配置返回 null）。 */
     public static LlmSettings getLocalLlmSettings() {
         ensureLoaded();
         if (!isLocalModelConnected()) {
             return null;
         }
-        return LlmSettings.of(localModelEndpoint, LOCAL_MODEL_KEY, localModelId,
+        String key = getLocalModelApiKey().isBlank() ? LOCAL_MODEL_KEY : getLocalModelApiKey();
+        return LlmSettings.of(localModelEndpoint, key, localModelId,
                 Provider.CUSTOM, EndpointFormat.OPENAI_CHAT);
     }
 
@@ -676,7 +671,7 @@ public class LLMConfig {
     /**
      * 清除聊天类任务指向本地槽位的路由（任务重新跟随全局激活 provider）。
      *
-     * <p>API Key 设置页保存云端模型时调用：本地一键连接把聊天路由切到本地槽位后，
+     * <p>API Key 设置页保存云端模型时调用：本地配置把聊天路由切到本地槽位后，
      * 仅保存云端档案不会自动切回，导致"保存了云端模型，对话却仍走本地模型"。
      * 注意：本方法只改内存路由表，调用方负责 {@link #save()} 落盘。</p>
      */
@@ -690,11 +685,12 @@ public class LLMConfig {
         }
     }
 
-    /** 完全关闭本地模型：清空槽位 + 清除本地聊天路由 + 落盘（配合停止 llama 进程使用）。 */
+    /** 清空本地槽位和聊天路由；不控制外部推理服务。 */
     public static void clearLocalModel() {
         ensureLoaded();
         localModelEndpoint = "";
         localModelId = "";
+        localModelApiKey = "";
         clearLocalChatRoutes();
         save();
     }
@@ -703,7 +699,7 @@ public class LLMConfig {
      * 按本次实际主模型设置计算上下文窗口，避免全局云端 Provider 影响本地路由。
      *
      * <p>真实值由 {@link LLMContextWindow} 提供（按 endpoint+model 缓存并落盘）；
-     * 本地回环在探测未返回时用启动器实际下发的 {@code -c} 参数兜底。</p>
+     * 本地回环在探测未返回时使用保守的默认窗口。</p>
      */
     public static int getContextWindowForSettings(LlmSettings settings) {
         return LLMContextWindow.resolve(settings);
@@ -715,7 +711,7 @@ public class LLMConfig {
         }
         // 本地 3B 模型在超长历史 + 大工具目录下容易退化为固定短句；
         // 16k 是服务器容量，不是必须塞满的提示词预算。保留足够历史，同时给模型留出推理空间。
-        if (contextWindow <= LocalModelLauncher.LOCAL_CTX) {
+        if (contextWindow <= LLMContextWindow.LOCAL_FALLBACK_WINDOW) {
             return 4_096;
         }
         return Math.max(4_096, Math.min(16_384, contextWindow / 3));
@@ -740,7 +736,7 @@ public class LLMConfig {
 
     public static int getEffectiveConversationHistoryTokenBudget() {
         int contextWindow = getContextWindowTokens();
-        return clampInt(contextWindow / 3, 4_096, 16_384, 8_192);
+        return NumberInputs.positive(contextWindow / 3, 4_096, 16_384, 8_192);
     }
 
     public static int getEffectiveConversationHistoryMessageLimit() {
@@ -771,13 +767,9 @@ public class LLMConfig {
         if (aiCommandMode == null) {
             aiCommandMode = CommandMode.NORMAL;
         }
-        aiTemperature = clampDouble(aiTemperature, 0.0D, 2.0D, DEFAULT_TEMPERATURE);
-        aiTopP = clampDouble(aiTopP, 0.1D, 1.0D, DEFAULT_TOP_P);
-        aiMaxOutputTokens = clampInt(aiMaxOutputTokens, 64, 4096, DEFAULT_MAX_OUTPUT_TOKENS);
-
-        if (nbtStructures == null) {
-            nbtStructures = new HashMap<>();
-        }
+        aiTemperature = NumberInputs.finite(aiTemperature, 0.0D, 2.0D, DEFAULT_TEMPERATURE);
+        aiTopP = NumberInputs.finite(aiTopP, 0.1D, 1.0D, DEFAULT_TOP_P);
+        aiMaxOutputTokens = NumberInputs.positive(aiMaxOutputTokens, 64, 4096, DEFAULT_MAX_OUTPUT_TOKENS);
     }
 
     private static void resetProviderProfiles() {
@@ -875,10 +867,10 @@ public class LLMConfig {
         customApiFormat = "";
         localModelEndpoint = "";
         localModelId = "";
+        localModelApiKey = "";
         aiTemperature = DEFAULT_TEMPERATURE;
         aiTopP = DEFAULT_TOP_P;
         aiMaxOutputTokens = DEFAULT_MAX_OUTPUT_TOKENS;
-        nbtStructures = new HashMap<>();
         taskRoutes.clear();
         resetProviderProfiles();
         apiKeyMarkedInvalid = false;
@@ -978,7 +970,8 @@ public class LLMConfig {
                     if (data.aiTopP != null) aiTopP = data.aiTopP;
                     if (data.aiMaxOutputTokens != null) aiMaxOutputTokens = data.aiMaxOutputTokens;
 
-                    if (data.nbtStructures != null) nbtStructures = data.nbtStructures;
+                    // 旧字段 nbtStructures（手写模板映射，已废弃）仍可出现在旧配置里，读取时忽略：
+                    // 建筑目录现在以服务器确认的当前世界模板为准，见 AIGameContextSupport。
                     if (data.localModelEndpoint != null) localModelEndpoint = data.localModelEndpoint;
                     if (data.localModelId != null) localModelId = data.localModelId;
                     if (data.taskRoutes != null) {
@@ -1014,6 +1007,7 @@ public class LLMConfig {
                         applyProfilesFromData(data.providers);
                     }
                     if (data.aiApiKey != null) aiApiKey = data.aiApiKey;
+                    if (data.localModelApiKey != null) localModelApiKey = data.localModelApiKey;
                     if (data.aiEndpoint != null) aiEndpoint = data.aiEndpoint;
                     if (data.aiModel != null) aiModel = data.aiModel;
                     if (data.aiModelName != null) {
@@ -1063,28 +1057,23 @@ public class LLMConfig {
         pData.aiTemperature = aiTemperature;
         pData.aiTopP = aiTopP;
         pData.aiMaxOutputTokens = aiMaxOutputTokens;
-        pData.nbtStructures = nbtStructures;
         pData.localModelEndpoint = localModelEndpoint;
         pData.localModelId = localModelId;
         pData.taskRoutes = copyTaskRoutesForSave();
-        try (Writer writer = new OutputStreamWriter(new FileOutputStream(PUBLIC_CONFIG), StandardCharsets.UTF_8)) {
-            GSON.toJson(pData, writer);
-        }
+        AtomicFiles.writeJson(PUBLIC_CONFIG.toPath(), GSON, pData);
     }
-
     private static void savePrivateSecrets() throws IOException {
         PRIVATE_SECRETS.getParentFile().mkdirs();
         SecretData sData = new SecretData();
         sData.aiApiKey = aiApiKey;
+        sData.localModelApiKey = localModelApiKey;
         sData.aiEndpoint = getResolvedEndpointUnchecked();
         sData.aiProvider = getStoredProviderIdUnchecked();
         sData.aiModel = aiModel;
         sData.aiModelName = aiModelName;
         sData.activeProvider = getProviderUnchecked().getId();
         sData.providers = copyProfilesForSave();
-        try (Writer writer = new OutputStreamWriter(new FileOutputStream(PRIVATE_SECRETS), StandardCharsets.UTF_8)) {
-            GSON.toJson(sData, writer);
-        }
+        AtomicFiles.writeJson(PRIVATE_SECRETS.toPath(), GSON, sData);
     }
 
     private static void applyProfilesFromData(Map<String, ProviderProfile> savedProfiles) {
@@ -1121,21 +1110,6 @@ public class LLMConfig {
             }
         }
         return routesForSave.isEmpty() ? null : routesForSave;
-    }
-
-
-    private static double clampDouble(double value, double min, double max, double fallback) {
-        if (Double.isNaN(value) || Double.isInfinite(value)) {
-            return fallback;
-        }
-        return Math.max(min, Math.min(max, value));
-    }
-
-    private static int clampInt(int value, int min, int max, int fallback) {
-        if (value <= 0) {
-            return fallback;
-        }
-        return Math.max(min, Math.min(max, value));
     }
 
     private static String normalizeCustomProviderId(String providerId) {
@@ -1242,6 +1216,7 @@ public class LLMConfig {
         Double aiTemperature;
         Double aiTopP;
         Integer aiMaxOutputTokens;
+        /** 已废弃：旧版手写模板映射；保留字段只为读取旧配置时不因未知字段报错，不再使用也不再写入。 */
         Map<String, String> nbtStructures;
         String localModelEndpoint;
         String localModelId;
@@ -1250,6 +1225,7 @@ public class LLMConfig {
 
     } private static class SecretData {
         String aiApiKey;
+        String localModelApiKey;
         String aiEndpoint;
         String aiProvider;
         String aiModel;

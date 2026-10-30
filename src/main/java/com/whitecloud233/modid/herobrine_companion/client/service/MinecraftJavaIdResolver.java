@@ -139,13 +139,21 @@ final class MinecraftJavaIdResolver {
 
     /**
      * 判断一个 "namespace:path" 令牌是否指向当前客户端<b>已真实注册</b>的模组内容资源
-     * （物品/方块/实体/效果/附魔/粒子/音效/属性）。用于 AI 命令安全校验：
+     * （物品/方块/实体/效果/附魔/粒子/音效/属性/维度/结构/建筑模板）。用于 AI 命令安全校验：
      * 非原版命名空间只放行真实注册的资源，防止幻觉 ID 或命令注入。
+     *
+     * <p>建筑模板是<b>资源文件</b>而不是注册表条目，只以服务器确认过的当前世界上传快照为准
+     * （{@code ClientTemplateLibrary}）。早先这里漏了模板分支，先执行的命令预检会把合法的
+     * {@code place template herobrine_companion:uploaded/...} 判成“未注册资源 ID”拦下。</p>
      */
     static boolean isRegisteredModResource(String token) {
         ResourceLocation id = ResourceLocation.tryParse(token);
         if (id == null) {
             return false;
+        }
+        // 模板先判：它是资源文件而不是注册表条目，判定不需要（也可能没有）注册表上下文。
+        if (com.whitecloud233.modid.herobrine_companion.client.network.ClientTemplateLibrary.has(id.toString())) {
+            return true;
         }
         return BuiltInRegistries.ITEM.getOptional(id).isPresent()
                 || BuiltInRegistries.BLOCK.getOptional(id).isPresent()
@@ -158,6 +166,26 @@ final class MinecraftJavaIdResolver {
                 || isRegisteredDimension(id)
                 || isRegisteredStructure(id);
     }
+
+    /**
+     * 命令级预检：把一条已生成命令里的每个 {@code ns:path} 令牌过一遍资源校验。
+     * 供 {@code AIGameCommandExecutor} 与回归测试共用，避免两处判定漂移。
+     */
+    static boolean hasOnlyRegisteredModResources(String command) {
+        java.util.regex.Matcher matcher = RESOURCE_TOKEN.matcher(command == null ? "" : command.toLowerCase(Locale.ROOT));
+        while (matcher.find()) {
+            if (VANILLA_NAMESPACE.equals(matcher.group(1))) {
+                continue;
+            }
+            if (!isRegisteredModResource(matcher.group())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static final java.util.regex.Pattern RESOURCE_TOKEN =
+            java.util.regex.Pattern.compile("(?<![a-z0-9_.-])([a-z0-9_.-]+):[a-z0-9_/.-]+");
 
     private static <T> String normalizeRegisteredId(String raw, Registry<T> registry, NameIndexSupplier nameIndexSupplier) {
         String direct = normalizeDirectId(raw, registry);

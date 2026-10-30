@@ -3,6 +3,7 @@ package com.whitecloud233.modid.herobrine_companion.client.service;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
+import com.whitecloud233.modid.herobrine_companion.util.AtomicFiles;
 import net.minecraft.client.Minecraft;
 import net.minecraftforge.fml.loading.FMLPaths;
 
@@ -390,9 +391,7 @@ public class CrossChatHistoryStore {
             if (parent != null && !parent.exists()) {
                 parent.mkdirs();
             }
-            try (var writer = Files.newBufferedWriter(this.loadedFile.toPath(), StandardCharsets.UTF_8)) {
-                GSON.toJson(this.storeData, writer);
-            }
+            AtomicFiles.writeJson(this.loadedFile.toPath(), GSON, this.storeData);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -498,9 +497,7 @@ public class CrossChatHistoryStore {
             if (parent != null && !parent.exists()) {
                 parent.mkdirs();
             }
-            try (var writer = Files.newBufferedWriter(file.toPath(), StandardCharsets.UTF_8)) {
-                GSON.toJson(normalizeStore(data), writer);
-            }
+            AtomicFiles.writeJson(file.toPath(), GSON, normalizeStore(data));
         } catch (Exception e) {
             e.printStackTrace();
         }

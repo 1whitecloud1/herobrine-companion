@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.client.service;
 
 import com.whitecloud233.modid.herobrine_companion.util.LegacyFormattingText;
+import com.whitecloud233.modid.herobrine_companion.util.LanguageCodes;
 import net.minecraft.client.Minecraft;
 
 import java.util.ArrayDeque;
@@ -161,19 +162,14 @@ public final class AIReplyGuard {
     }
 
     static String resolveOutputLanguageCode(String outputLanguageCode) {
-        String normalized = normalizeLanguageCode(outputLanguageCode);
+        // 这里必须用保留空值语义的版本：空串代表「玩家未显式指定语言」，
+        // 需要回退到客户端当前语言；若用 normalize 会被提前变成 en_us。
+        String normalized = LanguageCodes.normalizeOptional(outputLanguageCode);
         if (!normalized.isEmpty()) {
             return normalized;
         }
         Minecraft mc = Minecraft.getInstance();
-        return mc == null || mc.options == null ? "en_us" : normalizeLanguageCode(mc.options.languageCode);
-    }
-
-    private static String normalizeLanguageCode(String rawLanguageCode) {
-        if (rawLanguageCode == null) {
-            return "";
-        }
-        return rawLanguageCode.trim().toLowerCase(Locale.ROOT).replace('-', '_');
+        return mc == null || mc.options == null ? LanguageCodes.DEFAULT : LanguageCodes.normalize(mc.options.languageCode);
     }
 
     static String appendNoActionNotice(String reply, String outputLanguageCode) {

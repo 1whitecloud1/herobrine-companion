@@ -70,6 +70,12 @@ public final class AIGameCommandExecutor {
                 return;
             }
 
+            var templatePlacement = com.whitecloud233.modid.herobrine_companion.client.network.ClientTemplatePlacement.execute(command);
+            if (templatePlacement != null) {
+                templatePlacement.whenComplete((ok, error) -> future.complete(error == null && Boolean.TRUE.equals(ok)));
+                return;
+            }
+
             if (ACTION_MASSIVE_LIGHTNING.equals(command)) {
                 if (mc.hasSingleplayerServer() && mc.getSingleplayerServer() != null) {
                     mc.getSingleplayerServer().execute(() -> {
@@ -128,7 +134,8 @@ public final class AIGameCommandExecutor {
                                 return;
                             }
 
-                            serverPlayer.connection.disconnect(Component.literal("Herobrine has cast you out."));
+                            serverPlayer.connection.disconnect(
+                                    Component.translatable("message.herobrine_companion.punishment.kicked"));
                             future.complete(true);
                         } catch (Exception e) {
                             future.complete(false);
@@ -382,7 +389,7 @@ public final class AIGameCommandExecutor {
             if (VANILLA_NAMESPACE.equals(namespace)) {
                 continue;
             }
-            // 模组内容只放行“真实注册”的资源：物品/方块/实体/效果/附魔/粒子/音效/属性。
+            // 模组内容只放行“真实注册”的资源：物品/方块/实体/效果/附魔/粒子/音效/属性/维度/结构/建筑模板。
             // 未安装的模组、拼错的 ID、URL 等一律拒绝，防止幻觉 ID 或命令注入。
             if (!MinecraftJavaIdResolver.isRegisteredModResource(matcher.group())) {
                 return false;
