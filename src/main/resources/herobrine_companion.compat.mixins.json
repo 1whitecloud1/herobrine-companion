@@ -1,0 +1,24 @@
+{
+  "required": true,
+  "package": "com.whitecloud233.modid.herobrine_companion.compat.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "herobrine_companion.refmap.json",
+  "mixins": [
+    "AccessoriesHeroEquipmentMixin",
+    "ArmourersWorkshopHeroWardrobeRangeMixin",
+    "epicfight.JsonAssetLoaderMixin",
+    "epicfight.AnimationClipMixin",
+    "epicfight.EffekUnitsVfxMixin",
+    "epicfight.HeroWomAnimationEventGuardMixin",
+    "epicfight.WomAntitheusLapseMixin"
+  ],
+  "client": [
+    "epicfight.PoemAttackControlMixin",
+    "epicfight.RenderAnimationItemMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "minVersion": "0.8",
+  "plugin": "com.whitecloud233.modid.herobrine_companion.compat.safety.CompatMixinPlugin"
+}

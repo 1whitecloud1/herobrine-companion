@@ -18,16 +18,11 @@
     "MobSubmissionMixin",
     "AwakenedMobMixin",
     "AwakenedEntityRemovalMixin",
-    "LevelMixin",
-    "epicfight.JsonAssetLoaderMixin",
-    "epicfight.AnimationClipMixin",
-    "epicfight.RenderAnimationItemMixin",
-    "epicfight.EffekUnitsVfxMixin",
-    "epicfight.HeroWomAnimationEventGuardMixin",
-    "epicfight.WomAntitheusLapseMixin"
+    "LevelMixin"
   ],
   "client": [
-    "epicfight.PoemAttackControlMixin",
+    "client.BlendModeAccessor",
+    "client.PoemOutlineFrameMixin",
     "client.PoemLivingRendererMixin",
     "client.PoemHumanoidRenderMixin",
     "client.PoemHeldItemMixin"
