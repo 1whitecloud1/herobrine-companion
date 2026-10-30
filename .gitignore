@@ -91,3 +91,4 @@ hs_err_pid*
 /net/
 /.acl-repair/
 /.sonar-inspect/
+/documentation/
