@@ -1,0 +1,262 @@
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
+
+public class ClientSyncAuditProbe {
+    private static int checks;
+    public static void verify() {
+        rewardSnapshotsAndButtons();
+        rewardAcknowledgements();
+        fullQuestCopy();
+        connectionCleanup();
+        liveQuestCooldown();
+        System.out.println("ClientSyncAuditChecks: " + checks + " checks passed");
+    }
+
+    private static void rewardSnapshotsAndButtons() {
+        HeroEntity hero = new HeroEntity(7, new World());
+        Minecraft.getInstance().level = hero.world;
+        hero.world.entities.put(7, hero);
+        HeroRewardScreen screen = new HeroRewardScreen(hero);
+        check(!screen.needsStateRefresh(), "An unchanged reward screen does not rebuild");
+        ClientStateSync.applySyncRewards(7, Set.of(1, 2));
+        check(hero.hasClaimedReward(1) && hero.hasClaimedReward(2) && screen.needsStateRefresh(), "An incoming snapshot refreshes the reward buttons");
+        screen.capture();
+        ClientStateSync.applySyncRewards(7, Set.of(2));
+        check(!hero.hasClaimedReward(1) && hero.hasClaimedReward(2), "A removed claim is removed from the client mirror");
+        ClientStateSync.applySyncRewards(7, Set.of());
+        check(!hero.hasClaimedReward(2), "An empty server snapshot clears all old client claims");
+        screen.capture();
+        hero.trust = 50;
+        check(screen.needsStateRefresh(), "Trust changes refresh locked/unlocked buttons without reopening the screen");
+        screen.capture();
+        ClientHeroContent.revision++;
+        check(screen.needsStateRefresh(), "Content reload still refreshes reward definitions");
+        screen.capture();
+        HeroRewards.Reward reward = new HeroRewards.Reward(1, 50);
+        Button pending = new Button();
+        PacketHandler.requests.clear();
+        screen.requestReward(reward, pending);
+        check(PacketHandler.requests.size() == 1 && !pending.active && pending.label.equals("claim"),
+                "Sending a claim waits for server acknowledgement without pretending it was granted");
+        ClientStateSync.applySyncRewards(7, Set.of());
+        check(screen.needsStateRefresh() && !hero.hasClaimedReward(1), "A rejected claim reply refreshes the pending button even when the set is unchanged");
+        screen.capture();
+        hero.trust = 0;
+        PacketHandler.requests.clear();
+        screen.requestReward(reward, new Button());
+        check(PacketHandler.requests.isEmpty(), "The request callback rechecks current trust");
+        hero.trust = 50;
+        ClientStateSync.applySyncRewards(7, Set.of(1));
+        screen.requestReward(reward, new Button());
+        check(PacketHandler.requests.isEmpty(), "The request callback rechecks current claimed state");
+        hero.world.entities.remove(7);
+        check(screen.needsStateRefresh(), "Entity disappearance cannot leave old buttons enabled");
+    }
+
+    private static void rewardAcknowledgements() {
+        ServerLevel level = new ServerLevel();
+        HeroEntity hero = new HeroEntity(9, level);
+        level.entities.put(9, hero);
+        ServerPlayer player = new ServerPlayer(level);
+        HeroRewards.definitions.put(1, new HeroRewards.Reward(1, 50));
+        hero.trust = 0;
+        PacketHandler.replies.clear();
+        PacketHandler.broadcasts.clear();
+        ClaimRewardPacket.invoke(player, 9, 1);
+        check(player.inventory.items == 0 && PacketHandler.replies.size() == 1 && PacketHandler.broadcasts.isEmpty(),
+                "Insufficient trust returns authoritative state without granting or broadcasting a claim");
+        check(PacketHandler.replies.get(0).claimedRewards().isEmpty(), "A denied request cannot mark its reward claimed");
+        hero.trust = 50;
+        PacketHandler.replies.clear();
+        ClaimRewardPacket.invoke(player, 9, 1);
+        check(player.inventory.items == 2 && hero.hasClaimedReward(1), "An eligible claim grants its actual items once");
+        check(PacketHandler.replies.size() == 1 && PacketHandler.broadcasts.size() == 1,
+                "The claimant and other tracking viewers receive the new claimed state");
+        check(PacketHandler.replies.get(0).claimedRewards().equals(Set.of(1)), "The acknowledgement contains the canonical server snapshot");
+        PacketHandler.replies.clear();
+        PacketHandler.broadcasts.clear();
+        ClaimRewardPacket.invoke(player, 9, 1);
+        check(player.inventory.items == 2 && PacketHandler.replies.size() == 1 && PacketHandler.broadcasts.isEmpty(),
+                "A duplicate request gets a reply without duplicate items or redundant observer broadcasts");
+        PacketHandler.replies.clear();
+        ClaimRewardPacket.invoke(player, 9, 999);
+        check(PacketHandler.replies.size() == 1 && PacketHandler.replies.get(0).claimedRewards().equals(Set.of(1)),
+                "An obsolete reward definition still receives an accurate reply");
+    }
+
+    private static void fullQuestCopy() {
+        String[] keys = {"HeroActiveQuestId", "HeroActiveQuestProgress", "HeroQuestTargetUUID", "HeroQuestHeroUUID",
+                "HeroQuestPositions", "HeroQuestFlags", "HeroQuestCooldowns"};
+        CompoundTag original = new CompoundTag(), replacement = new CompoundTag();
+        replacement.put("Unrelated", new ValueTag("keep"));
+        for (String key : keys) {
+            CompoundTag nested = new CompoundTag();
+            nested.put("value", new ValueTag(key));
+            original.put(key, nested);
+        }
+        QuestProgress.copyTo(original, replacement);
+        QuestCooldownStore.copyTo(original, replacement);
+        for (String key : keys) {
+            check(replacement.contains(key) && replacement.get(key) != original.get(key), "Respawn copies every quest field without aliasing: " + key);
+            CompoundTag copied = (CompoundTag) replacement.get(key);
+            copied.put("later", new ValueTag("changed"));
+            check(!((CompoundTag) original.get(key)).contains("later"), "Replacement quest state must not mutate the old player");
+        }
+        QuestProgress.copyTo(new CompoundTag(), replacement);
+        QuestCooldownStore.copyTo(new CompoundTag(), replacement);
+        for (String key : keys) check(!replacement.contains(key), "Missing source fields clear stale replacement state");
+        check(replacement.contains("Unrelated"), "Copying quest state preserves other player data");
+    }
+
+    private static void connectionCleanup() {
+        for (boolean login : new boolean[]{false, true}) {
+            ClientQuestState.setQuestState(8, Map.of(3, 5000L));
+            ClientMemoryDigest.accept("previous world's hero memory");
+            ClientAgentStatusStore.accept(new AgentStatusSnapshot("old server"));
+            CompletableFuture<ClientAgentToolRequestStore.AgentToolResultRecord> pending = new CompletableFuture<>();
+            ClientAgentToolRequestStore.track(UUID.randomUUID(), pending);
+            ClientAgentToolRequestStore.complete(UUID.randomUUID(), "old_tool", true, "old result");
+            if (login) ClientForgeEvents.onClientPlayerLogin(new ClientPlayerNetworkEvent.LoggingIn());
+            else ClientForgeEvents.onClientPlayerLogout(new ClientPlayerNetworkEvent.LoggingOut());
+            check(ClientQuestState.activeQuestId() == 0 && ClientQuestState.cooldownEnd(3) == 0, "Connection transitions clear old quests and cooldowns");
+            check(ClientMemoryDigest.get().isEmpty(), "Old hero memory is never injected into the next world's chat");
+            check(!ClientAgentStatusStore.hasData() && ClientAgentStatusStore.ageSeconds() == -1, "Old agent status is not presented as current");
+            check(ClientAgentToolRequestStore.pendingCount() == 0 && pending.isDone() && pending.join() == null,
+                    "Disconnect/login releases pending tool requests instead of carrying them into the next server");
+            check(ClientAgentToolRequestStore.recentResult() == null, "Old tool results are cleared");
+        }
+        PacketHandler.requests.clear();
+        ClientMemoryDigest.ensureFresh();
+        check(PacketHandler.requests.size() == 1 && PacketHandler.requests.get(0) instanceof RequestHeroMemoryDigestPacket,
+                "The new session requests a fresh memory digest immediately");
+    }
+
+    private static void liveQuestCooldown() {
+        HeroRequestScreen screen = new HeroRequestScreen();
+        ClientQuestState.setQuestState(0, Map.of(3, 10L));
+        screen.now = 9;
+        screen.refreshAcceptState();
+        check(!screen.acceptButton.active, "An unexpired cooldown disables acceptance");
+        screen.now = 10;
+        screen.refreshAcceptState();
+        check(screen.acceptButton.active, "The open screen enables acceptance when the cooldown expires");
+        ClientQuestState.setQuestState(8, Map.of());
+        screen.refreshAcceptState();
+        check(!screen.acceptButton.active, "An active quest prevents starting another quest");
+    }
+
+    private static void check(boolean value, String message) { if (!value) throw new AssertionError(message); checks++; }
+
+    static class HeroOwnerProfile { /* PROFILE */ }
+    static class HeroEntity extends Entity {
+        /* ENTITY */
+        final World world;
+        final HeroOwnerProfile ownerProfile = new HeroOwnerProfile(this);
+        final UUID owner = UUID.randomUUID();
+        int trust;
+        HeroEntity(int id, World world) { this.id = id; this.world = world; }
+        UUID getOwnerUUID() { return owner; }
+        World level() { return world; }
+        int getTrustLevel() { return trust; }
+    }
+    static class ClientStateSync { /* CLIENT */ }
+    static class HeroRewardScreen {
+        /* SCREEN */
+        final Minecraft minecraft = Minecraft.getInstance();
+        final int entityId;
+        HeroEntity hero;
+        long contentRevision, rewardsRevision;
+        int trustLevel;
+        HeroRewardScreen(HeroEntity hero) { this.hero = hero; entityId = hero.id; capture(); }
+        void capture() { contentRevision = ClientHeroContent.revision(); rewardsRevision = hero.getClaimedRewardsRevision(); trustLevel = hero.getTrustLevel(); }
+    }
+    static class ClaimRewardPacket {
+        final int entityId, rewardId;
+        ClaimRewardPacket(int entityId, int rewardId) { this.entityId = entityId; this.rewardId = rewardId; }
+        int entityId() { return entityId; }
+        int rewardId() { return rewardId; }
+        /* CLAIM */
+        static void invoke(ServerPlayer player, int entityId, int rewardId) { /* CLAIM_INVOKE */ }
+    }
+    static class QuestProgress { /* QUEST */ }
+    static class QuestCooldownStore { /* COOLDOWN */ }
+    static class ClientQuestState { /* QUEST_CLIENT */ }
+    static class ClientMemoryDigest { /* DIGEST */ }
+    static class ClientAgentStatusStore { /* AGENT */ }
+    static class ClientAgentToolRequestStore { /* TOOLS */ }
+    static class ClientForgeEvents {
+        /* EVENTS */
+        static String lastSyncedLanguageCode;
+    }
+    static class HeroRequestScreen {
+        /* REQUEST */
+        Button acceptButton = new Button();
+        long now;
+        QuestDefinition currentQuest() { return new QuestDefinition(3); }
+        long cooldownRemaining(int quest) { return ClientQuestState.cooldownRemaining(quest, now); }
+    }
+    record QuestDefinition(int id) { }
+    static class Entity { int id; int getId() { return id; } }
+    static class World { final Map<Integer, Entity> entities = new HashMap<>(); Entity getEntity(int id) { return entities.get(id); } }
+    static class ServerLevel extends World { final HeroWorldData data = new HeroWorldData(); }
+    static class Player { }
+    static class ServerPlayer extends Player {
+        final ServerLevel world;
+        final Inventory inventory = new Inventory();
+        ServerPlayer(ServerLevel world) { this.world = world; }
+        World level() { return world; }
+        Inventory getInventory() { return inventory; }
+        void drop(ItemStack stack, boolean random) { inventory.items += stack.count; }
+    }
+    static class Inventory { int items; boolean add(ItemStack stack) { items += stack.count; return true; } }
+    static class ItemStack { int count = 2; ItemStack copy() { ItemStack copy = new ItemStack(); copy.count = count; return copy; } }
+    static class HeroWorldData {
+        final Map<UUID, Set<Integer>> rewards = new HashMap<>();
+        static HeroWorldData get(ServerLevel level) { return level.data; }
+        Set<Integer> getClaimedRewards(UUID owner) { return Set.copyOf(rewards.getOrDefault(owner, Set.of())); }
+        boolean isRewardClaimed(UUID owner, int id) { return getClaimedRewards(owner).contains(id); }
+        void setRewardClaimed(UUID owner, int id, boolean value) {
+            Set<Integer> claims = rewards.computeIfAbsent(owner, ignored -> new HashSet<>());
+            if (value) claims.add(id); else claims.remove(id);
+        }
+    }
+    static class HeroDataHandler { static void updateGlobalTrust(HeroEntity hero) { } }
+    static class HeroRewards {
+        static final Map<Integer, Reward> definitions = new HashMap<>();
+        static Reward getReward(int id) { return definitions.get(id); }
+        static class Reward { final int id, requiredTrust; final List<ItemStack> items = List.of(new ItemStack()); Reward(int id, int trust) { this.id = id; requiredTrust = trust; } }
+    }
+    static class Button { boolean active = true; String label = "claim"; }
+    static class Minecraft { static final Minecraft INSTANCE = new Minecraft(); World level; static Minecraft getInstance() { return INSTANCE; } }
+    static class ClientHeroContent { static long revision; static long revision() { return revision; } }
+    record SyncRewardsPacket(int entityId, Set<Integer> claimedRewards) { }
+    static class PacketHandler {
+        static final List<Object> requests = new ArrayList<>();
+        static final List<SyncRewardsPacket> replies = new ArrayList<>(), broadcasts = new ArrayList<>();
+        static void sendToServer(Object packet) { requests.add(packet); }
+        static void sendToPlayer(SyncRewardsPacket packet, ServerPlayer player) { replies.add(packet); }
+        static void sendToTracking(SyncRewardsPacket packet, HeroEntity hero) { broadcasts.add(packet); }
+    }
+    static class NetworkEvent { record Context(ServerPlayer sender) { ServerPlayer getSender() { return sender; } } }
+    static class PacketDispatch { static void enqueueServer(NetworkEvent.Context context, Runnable action) { action.run(); } }
+    record IPayloadContext(ServerPlayer sender) { Player player() { return sender; } void enqueueWork(Runnable action) { action.run(); } }
+    @interface SubscribeEvent { }
+    static class ClientPlayerNetworkEvent { static class LoggingIn { } static class LoggingOut { } }
+    static class LocalChatService { static LocalChatService getInstance() { return new LocalChatService(); } void loadChatRules() { } }
+    static class ConversationStore { static ConversationStore getInstance() { return new ConversationStore(); } void loadForCurrentSession() { } }
+    static class LLMConfig { static boolean isSetupIncompleteOrInvalid() { return true; } }
+    static class ClientHooks { static void setApiEnabled(boolean value) { } }
+    record AgentStatusSnapshot(String state) { static AgentStatusSnapshot empty() { return new AgentStatusSnapshot(""); } }
+    static class RequestHeroMemoryDigestPacket { }
+    interface Tag { Tag copy(); }
+    record ValueTag(String value) implements Tag { public Tag copy() { return new ValueTag(value); } }
+    static class CompoundTag implements Tag {
+        final Map<String, Tag> values = new HashMap<>();
+        boolean contains(String key) { return values.containsKey(key); }
+        Tag get(String key) { return values.get(key); }
+        void put(String key, Tag value) { values.put(key, value); }
+        void remove(String key) { values.remove(key); }
+        public Tag copy() { CompoundTag copy = new CompoundTag(); values.forEach((key, value) -> copy.put(key, value.copy())); return copy; }
+    }
+}

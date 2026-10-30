@@ -1,0 +1,134 @@
+public class TerrainBudgetHarness {
+    static int checks;
+    static void check(String name,boolean value){if(!value)throw new AssertionError(name);checks++;}
+    public static int run() {
+        clearContracts(); faultContracts(); directContracts(); schedulerContracts();
+        return checks;
+    }
+    static void clearContracts() {
+        ServerLevel world=new ServerLevel();
+        List<BlockPos> input=new ArrayList<>();
+        for(int i=0;i<11;i++){input.add(new BlockPos(i));world.states.put(i,BlockState.STONE);}
+        world.unloaded.add(2);world.states.put(4,BlockState.PROTECTED);world.states.put(5,BlockState.AIR);
+        TerrainMutationBatch batch=clearBlocksBatch(world,input,DestructionMode.DIVINE,true);
+        input.clear();
+        check("immutable input retained",!batch.drain(new TickBudget(3)) && world.changes.size()==3);
+        int ticks=1;
+        while(true){int before=world.changes.size();boolean done=batch.drain(new TickBudget(3));check("clear hard budget",world.changes.size()-before<=3);ticks++;if(done)break;if(ticks>10)throw new AssertionError("clear stuck");}
+        check("all eligible blocks eventually cleared",world.changes.size()==8);
+        check("unloaded skipped",world.states.get(2)==BlockState.STONE);
+        check("protected retained",world.states.get(4)==BlockState.PROTECTED);
+        check("air does not cost mutation",!world.changes.contains(5));
+        check("partial chunks flushed",world.flushes>=3 && world.dirty.isEmpty());
+        check("block entities removed before changing",world.removed.size()==8);
+        ServerLevel visual=new ServerLevel();visual.states.put(1,BlockState.STONE);
+        check("visual no writes",clearBlocksBatch(visual,List.of(new BlockPos(1)),DestructionMode.VISUAL,true).drain(new TickBudget(1)) && visual.changes.isEmpty());
+    }
+    static void faultContracts() {
+        ServerLevel world=new ServerLevel();
+        List<BlockPos> clear=new ArrayList<>(List.of(new BlockPos(1),new BlockPos(1),new BlockPos(2)));
+        List<BlockPos> annihilate=new ArrayList<>(List.of(new BlockPos(2),new BlockPos(3),new BlockPos(9)));
+        Map<BlockPos,BlockState> placements=new LinkedHashMap<>();
+        for(int i=1;i<=5;i++)world.states.put(i,BlockState.STONE);
+        world.states.put(9,BlockState.PROTECTED);
+        placements.put(new BlockPos(1),BlockState.GOLD);placements.put(new BlockPos(4),BlockState.GOLD);
+        placements.put(new BlockPos(9),BlockState.GOLD);
+        TerrainMutationBatch batch=faultChangesBatch(world,clear,annihilate,placements,DestructionMode.DIVINE);
+        clear.clear();annihilate.clear();placements.clear();
+        for(int tick=0;tick<5;tick++){
+            int before=world.changes.size();boolean done=batch.drain(new TickBudget(1));
+            check("clear annihilate and place share cap",world.changes.size()-before==1);
+            if(tick<4)check("placement cannot run before clears",!done);
+        }
+        check("finish protected placement without write",batch.drain(new TickBudget(1)));
+        check("fault order and dedup preserved",world.changes.equals(List.of(1,2,3,1,4)));
+        check("source can be restored after later ticks",world.states.get(1)==BlockState.GOLD);
+        check("target placed",world.states.get(4)==BlockState.GOLD);
+        check("protected placement unchanged",world.states.get(9)==BlockState.PROTECTED);
+        int count=world.changes.size();
+        check("same state is a no-op",faultChangesBatch(world,List.of(),List.of(),Map.of(new BlockPos(4),BlockState.GOLD),DestructionMode.DIVINE).drain(new TickBudget(1)) && world.changes.size()==count);
+    }
+    static void directContracts() {
+        ServerLevel world=new ServerLevel();
+        for(int i=0;i<8;i++)world.states.put(i,BlockState.STONE);
+        TickBudget shared=new TickBudget(4);
+        destroyBlock(world,new BlockPos(0),shared,DestructionMode.DIVINE,true);
+        TerrainMutationBatch batch=clearBlocksBatch(world,List.of(new BlockPos(1),new BlockPos(2),new BlockPos(3),new BlockPos(4)),DestructionMode.DIVINE,true);
+        check("direct and fast writes share cap",!batch.drain(shared) && world.changes.size()==4);
+        destroyBlock(world,new BlockPos(6),shared,DestructionMode.DIVINE,true);
+        check("direct path cannot exceed cap",world.changes.size()==4);
+        check("pending fast write resumes",batch.drain(new TickBudget(1)) && world.changes.size()==5);
+        TickBudget failed=new TickBudget(1);world.failSet=true;
+        destroyBlock(world,new BlockPos(7),failed,DestructionMode.DIVINE,true);
+        check("failed set does not consume write quota",failed.hasBudget() && world.changes.size()==5);
+    }
+    static void schedulerContracts() {
+        ServerLevel a=new ServerLevel(),b=new ServerLevel();
+        TerrainTask first=new TerrainTask(a,10000),second=new TerrainTask(a,10000),other=new TerrainTask(b,10);
+        TerrainRuntimeScheduler.scheduleTask(first);TerrainRuntimeScheduler.scheduleTask(second);TerrainRuntimeScheduler.scheduleTask(other);
+        TerrainRuntimeScheduler.tick(a);
+        check("dimension cap across tasks",first.writes+second.writes==4096 && other.writes==0);
+        TerrainRuntimeScheduler.tick(a);
+        check("duplicate tick grants no budget",first.writes+second.writes==4096);
+        TerrainRuntimeScheduler.tick(b);
+        check("dimensions have independent quota",other.writes==10);
+        a.time++;TerrainRuntimeScheduler.tick(a);
+        check("rotating service prevents starvation",second.writes==4096);
+        check("one-shot phase is not retriggered",first.effects==1 && second.effects==1);
+        TerrainTask child=new TerrainTask(a,2),parent=new TerrainTask(a,1);
+        parent.onFirst=()->TerrainRuntimeScheduler.scheduleTask(child);
+        TerrainRuntimeScheduler.scheduleTask(parent);
+        for(int i=0;i<12 && parent.writes==0;i++){a.time++;TerrainRuntimeScheduler.tick(a);}
+        check("reentrant scheduling is safe",parent.writes==1);
+        check("new tasks wait for following tick",child.writes==0);
+        for(int i=0;i<12 && TerrainRuntimeScheduler.hasWork();i++){a.time++;TerrainRuntimeScheduler.tick(a);}
+        check("pending task eventually runs",child.writes==2);
+        check("all tasks finish without loss",first.writes==10000 && second.writes==10000 && !TerrainRuntimeScheduler.hasWork());
+    }
+    // MANAGER_METHODS
+    static boolean canBreak(ServerLevel w,BlockPos p,BlockState s,DestructionMode m,boolean absolute){return s!=BlockState.PROTECTED;}
+    static boolean canFaultClear(ServerLevel w,BlockPos p,BlockState s){return s!=BlockState.AIR && s!=BlockState.PROTECTED;}
+    static boolean canAnnihilate(ServerLevel w,BlockPos p,BlockState s){return canFaultClear(w,p,s);}
+    static void updateTouchedChunks(ServerLevel w,Set<ChunkPos> touched,LevelLightEngine light){if(!touched.isEmpty())w.flushes++;w.dirty.removeAll(touched);}
+}
+class DestructionTuning {static final boolean TERRAIN_DAMAGE_ENABLED=true;static final int MAX_BROKEN_BLOCKS_PER_TICK=4096;}
+enum DestructionMode {DIVINE,VISUAL;}
+record BlockPos(int key) {BlockPos immutable(){return new BlockPos(key);}long asLong(){return key;}int getX(){return key;}int getY(){return 0;}int getZ(){return 0;}}
+record ChunkPos(int key) {}
+enum BlockState {AIR,STONE,GOLD,PROTECTED;boolean isAir(){return this==AIR;}boolean hasBlockEntity(){return this!=AIR;}}
+class Blocks {static final Blocks AIR=new Blocks();BlockState defaultBlockState(){return BlockState.AIR;}}
+class Block {static final int UPDATE_CLIENTS=2,UPDATE_INVISIBLE=4;}
+class ParticleTypes {static final int POOF=0;}
+class LevelLightEngine {void checkBlock(BlockPos p){}}
+class ServerLevel {
+    long time;boolean failSet;int flushes;
+    final Map<Integer,BlockState> states=new HashMap<>();final Set<Integer> unloaded=new HashSet<>();
+    final List<Integer> changes=new ArrayList<>(),removed=new ArrayList<>();final Set<ChunkPos> dirty=new HashSet<>();
+    long getGameTime(){return time;}boolean isLoaded(BlockPos p){return !unloaded.contains(p.key());}
+    BlockState getBlockState(BlockPos p){return states.getOrDefault(p.key(),BlockState.AIR);}
+    Object getBlockEntity(BlockPos p){return null;}LevelLightEngine getLightEngine(){return new LevelLightEngine();}
+    LevelChunk getChunkAt(BlockPos p){return new LevelChunk(this,p);}
+    boolean setBlock(BlockPos p,BlockState s,int flags){if(failSet)return false;states.put(p.key(),s);changes.add(p.key());return true;}
+    void sendParticles(Object...ignored){}
+}
+class LevelChunk {
+    final ServerLevel world;final BlockPos pos;
+    LevelChunk(ServerLevel w,BlockPos p){world=w;pos=p;}
+    int getSectionIndex(int y){return 0;}LevelChunkSection[] getSections(){return new LevelChunkSection[]{new LevelChunkSection(world,pos)};}
+    void removeBlockEntity(BlockPos p){world.removed.add(p.key());}ChunkPos getPos(){ChunkPos p=new ChunkPos(pos.key()>>4);world.dirty.add(p);return p;}
+}
+class LevelChunkSection {
+    final ServerLevel world;final BlockPos pos;
+    LevelChunkSection(ServerLevel w,BlockPos p){world=w;pos=p;}
+    void setBlockState(int x,int y,int z,BlockState state){world.states.put(pos.key(),state);world.changes.add(pos.key());}
+}
+class TerrainTask {
+    final ServerLevel level;int remaining,writes,effects;Runnable onFirst;
+    TerrainTask(ServerLevel level,int remaining){this.level=level;this.remaining=remaining;}
+    boolean tick(TickBudget budget){
+        if(!budget.hasBudget())return false;
+        if(effects==0){effects++;if(onFirst!=null)onFirst.run();}
+        while(remaining>0 && budget.tryVisit()){remaining--;writes++;budget.consume();}
+        return remaining==0;
+    }
+}

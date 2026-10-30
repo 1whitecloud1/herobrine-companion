@@ -1,0 +1,97 @@
+架构优化：第三批（烹饪业务与兼容后端）
+=================================
+
+完成范围
+--------
+entity/cooking/CookingService 承接原 HeroCookingCompat 的自主烹饪生命周期、进食计时、
+分享目标、治疗/效果/台词和邀请菜谱编排。业务层不再引用 Farmer's Delight、Kaleidoscope
+实现或其具体模组类型。HeroCookingCompat 缩为弃用转发入口，保留旧静态方法和视图类型。
+
+CookingBackend 提供厨具识别、tick、手持展示、菜谱选择/重复次数、区块票据和自主烹饪
+显示快照能力。CookingCompatBootstrap 在模组初始化时显式注册 Farmer's Delight、
+Kaleidoscope 两个适配器，保持原先前者优先的顺序；无匹配后端返回空/false，不再任意
+落入第二种后端的状态写入方法。
+
+CookOption 是中性的防御性 ItemStack 快照。UI、网络桥、选菜包、实体 Goal、模型、
+手持层和契约物品均使用业务服务/中性视图，不再依赖旧 HeroCookingCompat 的内部类型。
+两种具体模组原有配方消耗、厨具操作和反射实现继续保留在各自兼容代码中。
+
+行为约束
+--------
+- 自主烹饪持续 90..169 tick；进食 36 tick；物品/粒子/声音保持原行为。
+- 分享权重未改：自己吃 3；附近怪物 2；主人在同维度 10 格内、信任>=20 时权重1，
+  信任>=50为2，信任>=80为4。通过枚举所有roll的测试锁定分布，不是随机统计估算。
+- 后端查找统一经过 CookingBackendRegistry，首个匹配获选，编号重复拒绝。
+- 结束烹饪时仍释放所有后端可能遗留的票据，不能只释放当前识别出的后端。
+- 新自主显示快照保存 backendId+不透明NBT，业务层不解释模组私有字段。
+- Kaleidoscope 后端负责识别/清理旧 HeroAutoCookKaleidoscopeSnapshot 键。新快照增加
+  原方块类型标识，方块被替换成不同类型时不再将旧 BlockEntity NBT灌回新方块。
+- 正常选菜与旧 HeroLogic.handleCookSelection 均转入 requestCookSelection。
+  执行前重新校验主线程、存活、同维度、厨具所在区块已加载、有效配方与重复上限。
+- 所有权规则允许真正主人，或手持绑定该 Hero 主人的有效契约物品；保留借用契约的
+  原有委托语义，不机械改成“只有主人可以用契约”。未授权外人不能靠猜entityId选菜。
+- 从自主烹饪接管为玩家选菜时先恢复旧展示；旧自主 Goal.stop 不取消已被接管的新邀请。
+- Open/Select 烹饪网络包的注册 ID、编码顺序、协议号不变；BlockPos 输入改成不可变副本。
+
+检查
+----
+已加入 Gradle check：
+- CookingChecks：102 项，分享权重/分布、次数边界、主人/契约授权、后端优先级、缺省
+  路由、重复ID、快照深拷贝与清理。
+- CookingLegacyChecks：4 项，旧键识别、空快照清理、保留其他NBT。不代表真实厨具恢复
+  集成测试；实际后端恢复需要游戏和可选模组。
+- CookingPacketChecks：8 项，选菜请求字节布局/往返与可变坐标隔离。
+- CookingArchitectureChecks：23 个源码文件，禁止业务反向依赖具体兼容/UI/反射，
+  固定显式后端顺序、保证选菜入口调用统一业务校验、禁止分享规则回流后端。
+
+此前两批的379项检查保持运行，本轮新增114项，累计493项业务/数据/编解码检查。
+端侧、AI边界和78消息编号检查仍全部保留，不把源码文件数混入用例计数。
+反向测试在临时源码副本中分别引入后端依赖泄漏、颠倒后端顺序、绕过选菜服务、把治疗
+放回后端，四类均被架构检查拒绝。临时副本已删除。
+
+本轮曾出现两次编译失败，均为内部 CookOption 与公共视图同名/泛型迁移范围错误；
+已经区分 BackendCookOption（私有规划候选）与 CookOption（公共只读视图）并修复，
+不是通过排除文件或关闭检查绕过。
+
+构建
+----
+Java 17，项目根目录：
+  gradlew.bat --offline --no-daemon --console=plain -Pfull=true check build
+  gradlew.bat --offline --no-daemon --console=plain check build
+Git Bash 使用 ./gradlew；不修改已有本机JDK路径、模型/密钥配置与用户版本号。
+两种产物仍执行 reobfJar，测试类不入发布JAR。
+
+限制
+----
+没有启动 Minecraft、联机或专用服务器；未实测两种烹饪模组各版本/完全缺席的运行加载。
+本轮没有重写每种厨具的配方消耗、结算和区块票据底层策略；这些具体后端内部仍有部分
+重复/邀请清理逻辑，不声称整个烹饪系统已完全去耦。
+新快照只校验方块类型；同类型方块在烹饪期间被替换/玩家并发修改的冲突未完整解决。
+未把其他交互或全部网络请求统一鉴权；选菜的校验只针对本轮入口。
+整体配置快照、剩余 AI工具执行器分离、完整客户端动画状态封装与可复现依赖构建
+仍属后续批次，不在本轮完成范围。
+
+厨房兼容层职责拆分
+------------------
+HeroKaleidoscopeCompat 从 2188 行收敛为 146 行的公共入口，只保留原公共 API、
+可选模组/参数检查和转发；AutonomousCookOption 的公开类型保持原位置。
+
+- KitchenSession：保留原 NBT 键、选菜、重复次数与区块票据生命周期。
+- KitchenStations：厨具识别、操作路由及公共选菜视图转换。
+- Pot/Stockpot/ChoppingBoard/Steamer/TeapotKitchenStation：各自的规划与操作流程。
+- KitchenRecipes：共享规划数据、库存视图、重复次数计算与候选比较。
+- KitchenIngredientMatcher：不依赖 Minecraft 启动的配料回溯分配。
+- KitchenRecipeCatalog：自主烹饪菜谱及去重后的产物预览。
+- KitchenAutonomousDisplay：厨具展示、NBT 快照及恢复。
+- KitchenReflection/KitchenDiagnostics：跨版本字段访问与诊断。
+
+茶壶实现位于 TeapotKitchenStation.Available 内，外层先按类名检查版本支持；
+入口、会话状态和共享规划数据不直接引用厨房模组类型。除原公共入口外，新增类
+均仅在兼容包内可见。两次既有修复仍由 KitchenActionCooldown 和
+KitchenActorInteraction 统一处理，所有实际厨具调用继续以 Hero 为操作者。
+
+新增检查：KitchenRecipeChecks 的 49 项检查覆盖回溯、数量分配与失败回滚；
+KitchenCompatibilityChecks 的 8 项检查以隔离类加载器模拟可选模组缺席，验证
+公共入口/会话/规划类型及茶壶延迟加载。CookingArchitectureChecks 继续检查
+18 处操作者身份，并限制公共入口只能检查和转发。
+这些检查不代表已经完成游戏内的全部厨具/版本组合测试。

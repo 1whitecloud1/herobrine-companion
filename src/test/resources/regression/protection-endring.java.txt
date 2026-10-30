@@ -1,0 +1,269 @@
+import java.util.*;
+
+public final class ProtectionAndEndRingProbe {
+    private static int checks;
+
+    public static void verify() {
+        protectionLifecycle();
+        fixedCenterDuringAndAfterIntroduction();
+        challengeAndOverworldRemainMobile();
+        System.out.println("ProtectionAndEndRingChecks: " + checks + " checks passed");
+    }
+
+    private static void protectionLifecycle() {
+        ServerPlayer server = new ServerPlayer();
+        ServerPlayer otherServer = new ServerPlayer();
+        Player client = new Player();
+        Minecraft.getInstance().player = client;
+        client.addTag("unrelated");
+        check(!PeacefulProtection.isEnabled(null) && !PeacefulProtection.isEnabled(client), "An unprotected or absent player starts disabled");
+
+        PeacefulProtection.setEnabled(server, true);
+        check(PeacefulProtection.isEnabled(server), "Enabling protection updates the server");
+        check(!PeacefulProtection.isEnabled(client), "The client waits for the authoritative reply");
+        deliver(server);
+        check(PeacefulProtection.isEnabled(client), "The reply changes HeroScreen's protection state to enabled");
+        int sentBefore = PacketHandler.sent.size();
+        CombatMobsHandler.onPlayerAttack(new AttackEntityEvent(server, new Object()));
+        check(PeacefulProtection.isEnabled(server) && PacketHandler.sent.size() == sentBefore,
+                "Attacking a nonliving object must not break or resync the pact");
+
+        Mob observer = new Mob();
+        server.world.mobs.add(observer);
+        CombatMobsHandler.onPlayerAttack(new AttackEntityEvent(server, new LivingEntity()));
+        check(!PeacefulProtection.isEnabled(server), "Attacking a living entity breaks server protection");
+        check(observer.target == server, "Existing aggro feedback is preserved");
+        deliver(server);
+        check(!PeacefulProtection.isEnabled(client), "Breaking the pact immediately restores the enable-protection button");
+        check(client.getTags().contains("unrelated"), "Applying a protection reply preserves unrelated player tags");
+        int brokenMessages = server.messages.size();
+        CombatMobsHandler.onPlayerAttack(new AttackEntityEvent(server, new LivingEntity()));
+        check(server.messages.size() == brokenMessages && PacketHandler.sent.isEmpty(), "An already broken pact must not repeat its penalty");
+
+        PeacefulProtection.setEnabled(server, true);
+        deliver(server);
+        check(PeacefulProtection.isEnabled(client), "Protection can be enabled again after the pact is broken");
+        PeacefulProtection.setEnabled(server, false);
+        deliver(server);
+        check(!PeacefulProtection.isEnabled(client), "Manual disable sends the same authoritative state");
+
+        server.addTag(PeacefulProtection.TAG);
+        PeacefulProtection.syncToPlayer(server);
+        deliver(server);
+        check(PeacefulProtection.isEnabled(client), "Login/respawn/dimension sync restores saved protection");
+        server.removeTag(PeacefulProtection.TAG);
+        PeacefulProtection.syncToPlayer(server);
+        deliver(server);
+        check(!PeacefulProtection.isEnabled(client), "Lifecycle sync also clears stale client protection");
+        PeacefulProtection.setEnabled(otherServer, true);
+        check(PacketHandler.sent.size() == 1 && PacketHandler.sent.get(0).recipient == otherServer,
+                "Protection state is sent only to its owning player");
+        PacketHandler.sent.clear();
+        Minecraft.getInstance().player = null;
+        ClientStateSync.applyPeacefulProtection(false);
+        check(true, "A late reply is harmless without a client player");
+    }
+
+    private static void deliver(ServerPlayer recipient) {
+        for (var delivery : List.copyOf(PacketHandler.sent)) {
+            check(delivery.recipient == recipient, "A transition must not update another player's UI");
+            ClientStateSync.applyPeacefulProtection(delivery.packet.peaceful);
+        }
+        PacketHandler.sent.clear();
+    }
+
+    private static void fixedCenterDuringAndAfterIntroduction() {
+        HeroEntity hero = new HeroEntity();
+        Player observer = new Player();
+        observer.x = EndRingContext.SAFE_X;
+        hero.world.nearest = observer;
+        hero.addTag(EndRingContext.TAG_INTRO);
+        for (int tick = 0; tick < 180; tick++) {
+            hero.x = tick + 5;
+            hero.y = tick % 3 == 0 ? -20 : 104;
+            hero.z = -tick - 3;
+            hero.floating = true;
+            hero.passenger = true;
+            hero.navigation.active = hero.control.active = true;
+            hero.velocity = new Vec3(.7, -.4, .2);
+            hero.target = new LivingEntity();
+            if (hero.getTags().contains(EndRingContext.TAG_INTRO)) HeroEndringEvent.runIntroSequence(hero);
+            HeroDimensionHandler.handleVoidProtection(hero);
+            check(hero.x == EndRingContext.CENTER_X && hero.y == EndRingContext.CENTER_Y && hero.z == EndRingContext.CENTER_Z,
+                    "Introduction and later AI ticks must keep exactly the same center position");
+            check(hero.velocity.equals(new Vec3(0, 0, 0)) && !hero.navigation.active && !hero.control.active,
+                    "Navigation and stale flight commands must not move the fixed actor");
+            check(!hero.passenger && !hero.floating && hero.target == null && hero.isNoGravity(),
+                    "Fixed presentation has no mount, chase target or gravity drift");
+        }
+        check(!hero.getTags().contains(EndRingContext.TAG_INTRO) && hero.getTags().contains(EndRingContext.TAG_FIXED),
+                "Completing the intro keeps the fixed-center state");
+        check(observer.data.getBoolean("HasSeenHeroIntro"), "A player on the safe inner ring can receive the introduction");
+        int teleports = hero.teleports;
+        HeroDimensionHandler.handleVoidProtection(hero);
+        check(hero.teleports == teleports, "An actor already at the center does not send redundant teleports");
+
+        hero.tags.clear();
+        hero.x = EndRingContext.SAFE_X + 2;
+        HeroDimensionHandler.handleVoidProtection(hero);
+        check(hero.x == EndRingContext.CENTER_X && hero.tags.contains(EndRingContext.TAG_FIXED),
+                "An existing save with the old post-intro position is repaired");
+        HeroEntity clientHero = new HeroEntity();
+        clientHero.world.isClientSide = true;
+        check(clientHero.isNoGravity(), "Client gravity does not depend on unsynchronized entity tags");
+        clientHero.x = 12;
+        HeroDimensionHandler.handleVoidProtection(clientHero);
+        check(clientHero.x == 12, "Client-side code must not authoritatively teleport the actor");
+    }
+
+    private static void challengeAndOverworldRemainMobile() {
+        for (boolean challenge : new boolean[]{false, true}) {
+            for (boolean endRing : new boolean[]{false, true}) {
+                if (endRing && !challenge) continue;
+                HeroEntity hero = new HeroEntity();
+                hero.challenge = challenge;
+                hero.world.dimension = endRing ? ModStructures.END_RING_DIMENSION_KEY : new Object();
+                hero.addTag(EndRingContext.TAG_INTRO);
+                hero.addTag(EndRingContext.TAG_FIXED);
+                hero.x = 9;
+                hero.y = 105;
+                hero.z = 7;
+                hero.velocity = new Vec3(.5, .3, -.2);
+                hero.navigation.active = hero.control.active = true;
+                HeroDimensionHandler.handleVoidProtection(hero);
+                check(hero.x == 9 && hero.y == 105 && hero.z == 7 && hero.velocity.y == .3,
+                        "Challenge and overworld movement must not be pinned to the story anchor");
+                check(hero.navigation.active && hero.control.active && !hero.isNoGravity(),
+                        "Challenge/overworld actors retain normal movement and gravity");
+                if (challenge) {
+                    HeroEndringEvent.runIntroSequence(hero);
+                    check(hero.data.getInt("IntroTick") == 0 && hero.x == 9,
+                            "An old intro tag cannot pull a challenge actor back to the center");
+                }
+            }
+        }
+    }
+
+    private static void check(boolean condition, String message) {
+        if (!condition) throw new AssertionError(message);
+        checks++;
+    }
+
+    static final class PeacefulProtection { /* PROTECTION */ }
+    static final class CombatMobsHandler { /* COMBAT */ }
+    static final class ClientStateSync { /* CLIENT */ }
+    static final class HeroDimensionHandler { /* ANCHOR */ }
+    static final class HeroEndringEvent { /* INTRO */ }
+    static final class EndRingContext { /* CONTEXT */ }
+    static class HeroEntity extends LivingEntity {
+        /* GRAVITY */
+        final Set<String> tags = new HashSet<>();
+        final World world = new World();
+        final CompoundTag data = new CompoundTag();
+        final Navigation navigation = new Navigation();
+        final HeroMoveControl control = new HeroMoveControl();
+        boolean challenge, floating, passenger;
+        Vec3 velocity = new Vec3(0, 0, 0);
+        LivingEntity target;
+        int teleports;
+        Set<String> getTags() { return tags; }
+        void addTag(String tag) { tags.add(tag); }
+        void removeTag(String tag) { tags.remove(tag); }
+        World level() { return world; }
+        boolean isFloating() { return floating; }
+        void setFloating(boolean value) { floating = value; }
+        boolean isPassenger() { return passenger; }
+        void stopRiding() { passenger = false; }
+        Navigation getNavigation() { return navigation; }
+        MoveControl getMoveControl() { return control; }
+        void setTarget(LivingEntity value) { target = value; }
+        void setSprinting(boolean value) { }
+        void teleportTo(double x, double y, double z) { this.x = x; this.y = y; this.z = z; teleports++; }
+        double distanceToSqr(double x, double y, double z) { return Math.pow(this.x-x, 2) + Math.pow(this.y-y, 2) + Math.pow(this.z-z, 2); }
+        void setDeltaMovement(double x, double y, double z) { velocity = new Vec3(x, y, z); }
+        void setFallDistance(float value) { }
+        CompoundTag getPersistentData() { return data; }
+        void lookAt(Player player, int yaw, int pitch) { }
+    }
+    static class LivingEntity {
+        double x, y, z;
+        public boolean isNoGravity() { return false; }
+    }
+    static class Player extends LivingEntity {
+        final Set<String> tags = new HashSet<>();
+        final CompoundTag data = new CompoundTag();
+        Set<String> getTags() { return tags; }
+        void addTag(String tag) { tags.add(tag); }
+        void removeTag(String tag) { tags.remove(tag); }
+        CompoundTag getPersistentData() { return data; }
+        Component getName() { return new Component("player"); }
+        void displayClientMessage(Component message, boolean overlay) { }
+    }
+    static class ServerPlayer extends Player {
+        final World world = new World();
+        final List<String> messages = new ArrayList<>();
+        World level() { return world; }
+        void sendSystemMessage(Component message) { messages.add(message.key); }
+        Object blockPosition() { return null; }
+        Box getBoundingBox() { return new Box(); }
+        void addEffect(MobEffectInstance effect) { }
+    }
+    static class Mob extends LivingEntity {
+        Player target;
+        Player getTarget() { return target; }
+        void setTarget(Player value) {
+            check(!PeacefulProtection.isEnabled(value), "Revoke protection before redirecting hostile targets");
+            target = value;
+        }
+    }
+    record AttackEntityEvent(Player player, Object target) {
+        Player getEntity() { return player; }
+        Object getTarget() { return target; }
+    }
+    @interface SubscribeEvent { }
+    static class World {
+        boolean isClientSide;
+        Object dimension = ModStructures.END_RING_DIMENSION_KEY;
+        Player nearest;
+        final List<Mob> mobs = new ArrayList<>();
+        Object dimension() { return dimension; }
+        List<Mob> getEntitiesOfClass(Class<Mob> type, Box box) { return mobs; }
+        void playSound(Object player, Object position, Object sound, SoundSource source, float volume, float pitch) { }
+        Player getNearestPlayer(HeroEntity hero, int range) {
+            return nearest != null && Math.abs(nearest.x - hero.x) < range ? nearest : null;
+        }
+    }
+    static class CompoundTag {
+        final Map<String, Object> values = new HashMap<>();
+        int getInt(String key) { return (Integer) values.getOrDefault(key, 0); }
+        void putInt(String key, int value) { values.put(key, value); }
+        boolean getBoolean(String key) { return (Boolean) values.getOrDefault(key, false); }
+        void putBoolean(String key, boolean value) { values.put(key, value); }
+    }
+    static class Navigation { boolean active; void stop() { active = false; } }
+    static class MoveControl { }
+    static class HeroMoveControl extends MoveControl { boolean active; void stopMoving() { active = false; } }
+    record Vec3(double x, double y, double z) { }
+    record Component(String key) {
+        static Component translatable(String key, Object... arguments) { return new Component(key); }
+        String getString() { return key; }
+    }
+    record MobEffectInstance(Object effect, int ticks, int amplifier) { }
+    static class MobEffects { static final Object GLOWING = new Object(); }
+    static class SoundEvents { static final Object GLASS_BREAK = new Object(), BEACON_DEACTIVATE = new Object(); }
+    enum SoundSource { PLAYERS }
+    static class Box { Box inflate(double amount) { return this; } }
+    static class Minecraft {
+        static final Minecraft INSTANCE = new Minecraft();
+        Player player;
+        static Minecraft getInstance() { return INSTANCE; }
+    }
+    record SyncPeacefulPacket(boolean peaceful) { }
+    record Delivery(SyncPeacefulPacket packet, ServerPlayer recipient) { }
+    static class PacketHandler {
+        static final List<Delivery> sent = new ArrayList<>();
+        static void sendToPlayer(SyncPeacefulPacket packet, ServerPlayer player) { sent.add(new Delivery(packet, player)); }
+    }
+    static class ChallengeSession { static boolean isHeroInChallenge(HeroEntity hero) { return hero.challenge; } }
+    static class ModStructures { static final Object END_RING_DIMENSION_KEY = new Object(); }
+}
