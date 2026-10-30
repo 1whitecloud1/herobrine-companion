@@ -1,5 +1,6 @@
 package com.whitecloud233.modid.herobrine_companion.client.render;
 
+import com.whitecloud233.modid.herobrine_companion.api.compat.HeroEpicFightCompat;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
 import net.minecraftforge.fml.ModList;
@@ -25,7 +26,7 @@ public final class PoemOfTheEndGeoCompat {
             // 防御：仅客户端会查询自定义渲染器
             return null;
         }
-        boolean epicFight = ModList.get().isLoaded("epicfight");
+        boolean epicFight = HeroEpicFightCompat.isRuntimeBridgeReady();
         PoemRenderBackend backend = PoemRenderBackend.choose(epicFight, ModList.get().isLoaded("geckolib"));
         if (backend == PoemRenderBackend.GECKOLIB) {
             LOGGER.info("[poem] geckolib 已加载 -> 使用 GeckoLib 3D 渲染器");

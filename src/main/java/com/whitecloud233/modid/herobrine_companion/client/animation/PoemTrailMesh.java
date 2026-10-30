@@ -8,6 +8,7 @@ import com.whitecloud233.modid.herobrine_companion.combat.poem.PoemMotionLibrary
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.renderer.LightTexture;
+import net.minecraft.client.renderer.texture.OverlayTexture;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
@@ -73,6 +74,10 @@ public final class PoemTrailMesh {
                                float width, float u, float v, float alpha) {
         Vector3f p = new Vector3f(point).sub(opposite).mul((width - 1) * .5f).add(point);
         pose.transformPosition(p);
-        buffer.vertex(p.x, p.y, p.z).color(1f, 1f, 1f, alpha).uv(u, v).uv2(LightTexture.FULL_BRIGHT).endVertex();
+        // NEW_ENTITY is understood by Iris/Oculus. Supply every attribute even though
+        // vanilla's unlit eyes shader does not use the overlay, lightmap or normal.
+        buffer.vertex(p.x, p.y, p.z).color(1f, 1f, 1f, alpha).uv(u, v)
+                .overlayCoords(OverlayTexture.NO_OVERLAY).uv2(LightTexture.FULL_BRIGHT)
+                .normal(0, 1, 0).endVertex();
     }
 }

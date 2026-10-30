@@ -3,6 +3,7 @@ package com.whitecloud233.modid.herobrine_companion.client.render;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.logging.LogUtils;
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.modid.herobrine_companion.util.DebugLog;
 import com.whitecloud233.modid.herobrine_companion.entity.BirthdayCakePropEntity;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -59,11 +60,11 @@ public class BirthdayCakePropRenderer extends EntityRenderer<BirthdayCakePropEnt
         boolean missing = model == modelManager.getMissingModel();
         if (!renderLogged) {
             renderLogged = true;
-            LOGGER.info("[HeroGift] birthday cake prop render called: model={} missing={}", MODEL, missing);
+            DebugLog.info(LOGGER, "[HeroGift] birthday cake prop render called: model={} missing={}", MODEL, missing);
         }
         if (missing && !missingModelWarned) {
             missingModelWarned = true;
-            LOGGER.warn("[HeroGift] birthday cake prop model {} was not baked; "
+            DebugLog.warn(LOGGER, "[HeroGift] birthday cake prop model {} was not baked; "
                     + "falling back to the vanilla cake block model. "
                     + "Check that ModelEvent.RegisterAdditional ran and that the model json exists.",
                     MODEL);

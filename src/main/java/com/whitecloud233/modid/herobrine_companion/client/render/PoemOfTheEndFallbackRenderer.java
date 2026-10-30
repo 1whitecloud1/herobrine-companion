@@ -7,6 +7,7 @@ import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.entity.ItemRenderer;
+import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.client.resources.model.ModelManager;
 import net.minecraft.client.resources.model.ModelResourceLocation;
@@ -49,6 +50,13 @@ public final class PoemOfTheEndFallbackRenderer extends BlockEntityWithoutLevelR
             for (RenderType renderType : pass.getRenderTypes(stack, false)) {
                 VertexConsumer vertexConsumer = ItemRenderer.getFoilBufferDirect(bufferSource, renderType, true, stack.hasFoil());
                 itemRenderer.renderModelLists(pass, stack, packedLight, packedOverlay, poseStack, vertexConsumer);
+            }
+        }
+        // The GUI keeps its existing small icon. World/hand fallback models use the block atlas UVs.
+        if (context != ItemDisplayContext.GUI && PoemOutlineEffect.enabled()) {
+            VertexConsumer outline = PoemOutlineEffect.buffer(bufferSource, TextureAtlas.LOCATION_BLOCKS);
+            for (BakedModel pass : baseModel.getRenderPasses(stack, false)) {
+                itemRenderer.renderModelLists(pass, stack, packedLight, packedOverlay, poseStack, outline);
             }
         }
         poseStack.popPose();

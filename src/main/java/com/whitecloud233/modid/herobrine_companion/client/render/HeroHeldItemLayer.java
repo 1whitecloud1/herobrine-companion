@@ -3,11 +3,11 @@ package com.whitecloud233.modid.herobrine_companion.client.render;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import com.whitecloud233.modid.herobrine_companion.init.ModItems;
-import com.whitecloud233.modid.herobrine_companion.compat.epicfight.HeroEpicFightCompat;
-import com.whitecloud233.modid.herobrine_companion.compat.cooking.HeroCookingCompat;
+import com.whitecloud233.modid.herobrine_companion.api.compat.HeroEpicFightCompat;
+import com.whitecloud233.modid.herobrine_companion.entity.cooking.CookingService;
 import com.whitecloud233.modid.herobrine_companion.client.model.HeroModel;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
-import com.whitecloud233.modid.herobrine_companion.compat.ArmourerWorkshop.HeroAWCompat;
+import com.whitecloud233.modid.herobrine_companion.api.compat.HeroAWCompat;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.PlayerModel;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -58,8 +58,8 @@ public class HeroHeldItemLayer extends RenderLayer<HeroEntity, PlayerModel<HeroE
         boolean isRightHanded = entity.getMainArm() == HumanoidArm.RIGHT;
         ItemStack rightHandItem = isRightHanded ? entity.getMainHandItem() : entity.getOffhandItem();
         ItemStack leftHandItem = isRightHanded ? entity.getOffhandItem() : entity.getMainHandItem();
-        ItemStack cookMainHandItem = HeroCookingCompat.getCookMainHandDisplay(entity);
-        ItemStack cookOffhandItem = HeroCookingCompat.getCookOffhandDisplay(entity);
+        ItemStack cookMainHandItem = CookingService.getCookMainHandDisplay(entity);
+        ItemStack cookOffhandItem = CookingService.getCookOffhandDisplay(entity);
         ItemStack visualMainHandItem = entity.getVisualMainHandItem();
         ItemStack visualOffHandItem = entity.getVisualOffHandItem();
         if (!cookMainHandItem.isEmpty()) {
@@ -79,6 +79,16 @@ public class HeroHeldItemLayer extends RenderLayer<HeroEntity, PlayerModel<HeroE
             else rightHandItem = visualOffHandItem;
         }
 
+        // 战斗模式自动镰刀：主手为空时虚拟持镰（不占装备栏位，玩家给的物品已在上面优先取用）
+        if (entity.isAutoBattleScythe() && entity.getMainHandItem().isEmpty()) {
+            ItemStack autoScythe = new ItemStack(ModItems.POEM_OF_THE_END.get());
+            if (isRightHanded) {
+                if (rightHandItem.isEmpty()) rightHandItem = autoScythe;
+            } else {
+                if (leftHandItem.isEmpty()) leftHandItem = autoScythe;
+            }
+        }
+
         if (!rightHandItem.isEmpty()) {
             this.renderArmWithItem(entity, rightHandItem, ItemDisplayContext.THIRD_PERSON_RIGHT_HAND, HumanoidArm.RIGHT, poseStack, buffer, packedLight);
         }
@@ -88,6 +98,10 @@ public class HeroHeldItemLayer extends RenderLayer<HeroEntity, PlayerModel<HeroE
     }
 
     private void renderArmWithItem(HeroEntity entity, ItemStack itemStack, ItemDisplayContext displayContext, HumanoidArm arm, PoseStack poseStack, MultiBufferSource buffer, int packedLight) {
+        if (StandalonePoemRenderer.renderHeld(entity, itemStack, displayContext, arm, poseStack, buffer,
+                packedLight, Minecraft.getInstance().gameRenderer.itemInHandRenderer)) {
+            return;
+        }
         poseStack.pushPose();
 
         if (shouldUseCookAnchor(entity, itemStack) && this.getParentModel() instanceof HeroModel heroModel) {
@@ -137,16 +151,16 @@ public class HeroHeldItemLayer extends RenderLayer<HeroEntity, PlayerModel<HeroE
     }
 
     private boolean shouldUseCookAnchor(HeroEntity entity, ItemStack itemStack) {
-        if (entity.getInvitedAction() != HeroCookingCompat.INVITED_ACTION_COOK || itemStack.isEmpty()) {
+        if (entity.getInvitedAction() != CookingService.INVITED_ACTION_COOK || itemStack.isEmpty()) {
             return false;
         }
 
-        ItemStack cookMainHandItem = HeroCookingCompat.getCookMainHandDisplay(entity);
+        ItemStack cookMainHandItem = CookingService.getCookMainHandDisplay(entity);
         if (!cookMainHandItem.isEmpty() && ItemStack.isSameItemSameTags(itemStack, cookMainHandItem)) {
             return true;
         }
 
-        ItemStack cookOffhandItem = HeroCookingCompat.getCookOffhandDisplay(entity);
+        ItemStack cookOffhandItem = CookingService.getCookOffhandDisplay(entity);
         return !cookOffhandItem.isEmpty() && ItemStack.isSameItemSameTags(itemStack, cookOffhandItem);
     }
 }

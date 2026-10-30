@@ -7,6 +7,7 @@ import com.whitecloud233.modid.herobrine_companion.entity.GhostSteveEntity;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.client.renderer.entity.layers.ItemInHandLayer;
@@ -22,6 +23,12 @@ public class GhostSteveRenderer extends LivingEntityRenderer<GhostSteveEntity, G
 
         // 渲染手持物品，独立模型已实现 ArmedModel 接口，这部分代码可以完美工作
         this.addLayer(new ItemInHandLayer<>(this, context.getItemInHandRenderer()));
+    }
+
+    @Override
+    protected RenderType getRenderType(GhostSteveEntity entity, boolean bodyVisible, boolean translucent, boolean glowing) {
+        return bodyVisible ? RenderType.entityTranslucent(getTextureLocation(entity))
+                : super.getRenderType(entity, bodyVisible, translucent, glowing);
     }
 
     @Override

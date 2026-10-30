@@ -1,5 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.client.animation;
 
+import net.minecraft.util.Mth;
+
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.whitecloud233.modid.herobrine_companion.combat.poem.PoemMotionLibrary;
@@ -118,7 +120,7 @@ public final class PoemSkinMesh {
 
     public Vector3f position(Vertex vertex, Matrix4f[] skin, Matrix4f vanilla, float weight) {
         Vector3f dcc = MODEL_TO_DCC.transformPosition(vertex.point, new Vector3f());
-        float lowerWeight = upper == lower ? 0 : Math.max(0, Math.min(1, (hinge + .018f - dcc.z) / .036f));
+        float lowerWeight = upper == lower ? 0 : Mth.clamp((hinge + .018f - dcc.z) / .036f, 0F, 1F);
         Vector3f animated = skin[upper].transformPosition(dcc, new Vector3f());
         if (lowerWeight > 0) animated.lerp(skin[lower].transformPosition(dcc, new Vector3f()), lowerWeight);
         DCC_TO_MODEL.transformPosition(animated);

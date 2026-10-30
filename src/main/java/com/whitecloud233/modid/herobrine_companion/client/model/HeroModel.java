@@ -1,18 +1,20 @@
 package com.whitecloud233.modid.herobrine_companion.client.model;
 
+import com.whitecloud233.modid.herobrine_companion.client.animation.HeroPoemAnimation;
+
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
-import com.whitecloud233.modid.herobrine_companion.compat.cooking.HeroCookingCompat;
-import com.whitecloud233.modid.herobrine_companion.compat.epicfight.HeroEpicFightCompat;
+import com.whitecloud233.modid.herobrine_companion.entity.cooking.CookingService;
+import com.whitecloud233.modid.herobrine_companion.api.compat.HeroEpicFightCompat;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.HeroCombatWeaponHelper;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.SimpleNeuralNetwork;
 import com.whitecloud233.modid.herobrine_companion.entity.visual.HeroClip;
+import com.whitecloud233.modid.herobrine_companion.entity.visual.HeroScytheComboLibrary;
 import com.whitecloud233.modid.herobrine_companion.entity.visual.HeroGestureLibrary;
 import com.whitecloud233.modid.herobrine_companion.entity.visual.HeroIdleClips;
 import com.whitecloud233.modid.herobrine_companion.entity.visual.HeroLocomotion;
+import com.whitecloud233.modid.herobrine_companion.entity.visual.HeroVisualState;
 import com.whitecloud233.modid.herobrine_companion.fight.animation.HeroChallengeAnimations;
-import com.whitecloud233.modid.herobrine_companion.item.PoemOfTheEndItem;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.PlayerModel;
 import net.minecraft.client.model.geom.ModelLayerLocation;
 import net.minecraft.client.model.geom.ModelPart;
@@ -45,6 +47,15 @@ public class HeroModel extends PlayerModel<HeroEntity> {
     private final float[] microBuf = new float[32];
     private final float[] walkBuf = new float[32];
     private final boolean[] clipTouched = new boolean[HeroClip.CANONICAL_JOINTS];
+
+    /**
+     * 磨盘转一圈，腿要迈几个行走环。
+     *
+     * <p>石磨把 Hero 摆在半径 2 格的圆周上 → 周长 4π ≈ 12.57 格；
+     * {@code HeroVisualState} 的行走环每循环前进约 9.43 格（{@code WALK_CYCLE_PER_BLOCK} 的倒数）。
+     * 两者相除 ≈ 1.33，按这个比例驱动相位，脚底位移才和圆周位移一致、不打滑。
+     */
+    private static final float MILLSTONE_CYCLES_PER_LAP = 1.33F;
 
     private static final float[][] FLYING_POSE = new float[][] {
             {0.0F, 0.0F, 0.0F},
@@ -84,28 +95,30 @@ public class HeroModel extends PlayerModel<HeroEntity> {
         rightArm.addOrReplaceChild("right_arm_lower", CubeListBuilder.create().texOffs(40, 22).addBox(-3.0F, -0.25F, -2.0F, 4.0F, 6.25F, 4.0F), PartPose.offset(0.0F, 4.0F, 0.0F));
 
         PartDefinition rightSleeve = partdefinition.addOrReplaceChild("right_sleeve", CubeListBuilder.create().texOffs(40, 32).addBox(-3.0F, -2.0F, -2.0F, 4.0F, 6.25F, 4.0F, new CubeDeformation(0.25F)), PartPose.offset(-5.0F, 2.0F, 0.0F));
-        rightSleeve.addOrReplaceChild("right_sleeve_lower", CubeListBuilder.create().texOffs(40, 38).addBox(-3.0F, -0.25F, -2.0F, 4.0F, 6.25F, 4.0F, new CubeDeformation(0.25F)), PartPose.offset(0.0F, 4.0F, 0.0F));
+        // 下半段 overlay 高度收到 5.75：外扩 0.25 后底面缩回肢体底端之上 0.25，藏进实体方块内部，
+        // 否则底面悬在手脚下方 0.25 处、且采样到分段 UV 里常见的深色/半透明像素，表现为手脚底下多出的黑线。
+        rightSleeve.addOrReplaceChild("right_sleeve_lower", CubeListBuilder.create().texOffs(40, 38).addBox(-3.0F, -0.25F, -2.0F, 4.0F, 5.75F, 4.0F, new CubeDeformation(0.25F)), PartPose.offset(0.0F, 4.0F, 0.0F));
 
         // 2. 左臂
         PartDefinition leftArm = partdefinition.addOrReplaceChild("left_arm", CubeListBuilder.create().texOffs(32, 48).addBox(-1.0F, -2.0F, -2.0F, 4.0F, 6.25F, 4.0F), PartPose.offset(5.0F, 2.0F, 0.0F));
         leftArm.addOrReplaceChild("left_arm_lower", CubeListBuilder.create().texOffs(32, 54).addBox(-1.0F, -0.25F, -2.0F, 4.0F, 6.25F, 4.0F), PartPose.offset(0.0F, 4.0F, 0.0F));
 
         PartDefinition leftSleeve = partdefinition.addOrReplaceChild("left_sleeve", CubeListBuilder.create().texOffs(48, 48).addBox(-1.0F, -2.0F, -2.0F, 4.0F, 6.25F, 4.0F, new CubeDeformation(0.25F)), PartPose.offset(5.0F, 2.0F, 0.0F));
-        leftSleeve.addOrReplaceChild("left_sleeve_lower", CubeListBuilder.create().texOffs(48, 54).addBox(-1.0F, -0.25F, -2.0F, 4.0F, 6.25F, 4.0F, new CubeDeformation(0.25F)), PartPose.offset(0.0F, 4.0F, 0.0F));
+        leftSleeve.addOrReplaceChild("left_sleeve_lower", CubeListBuilder.create().texOffs(48, 54).addBox(-1.0F, -0.25F, -2.0F, 4.0F, 5.75F, 4.0F, new CubeDeformation(0.25F)), PartPose.offset(0.0F, 4.0F, 0.0F));
 
         // 3. 右腿
         PartDefinition rightLeg = partdefinition.addOrReplaceChild("right_leg", CubeListBuilder.create().texOffs(0, 16).addBox(-2.0F, 0.0F, -2.0F, 4.0F, 6.25F, 4.0F), PartPose.offset(-1.9F, 12.0F, 0.0F));
         rightLeg.addOrReplaceChild("right_leg_lower", CubeListBuilder.create().texOffs(0, 22).addBox(-2.0F, -0.25F, -2.0F, 4.0F, 6.25F, 4.0F), PartPose.offset(0.0F, 6.0F, 0.0F));
 
         PartDefinition rightPants = partdefinition.addOrReplaceChild("right_pants", CubeListBuilder.create().texOffs(0, 32).addBox(-2.0F, 0.0F, -2.0F, 4.0F, 6.25F, 4.0F, new CubeDeformation(0.25F)), PartPose.offset(-1.9F, 12.0F, 0.0F));
-        rightPants.addOrReplaceChild("right_pants_lower", CubeListBuilder.create().texOffs(0, 38).addBox(-2.0F, -0.25F, -2.0F, 4.0F, 6.25F, 4.0F, new CubeDeformation(0.25F)), PartPose.offset(0.0F, 6.0F, 0.0F));
+        rightPants.addOrReplaceChild("right_pants_lower", CubeListBuilder.create().texOffs(0, 38).addBox(-2.0F, -0.25F, -2.0F, 4.0F, 5.75F, 4.0F, new CubeDeformation(0.25F)), PartPose.offset(0.0F, 6.0F, 0.0F));
 
         // 4. 左腿
         PartDefinition leftLeg = partdefinition.addOrReplaceChild("left_leg", CubeListBuilder.create().texOffs(16, 48).addBox(-2.0F, 0.0F, -2.0F, 4.0F, 6.25F, 4.0F), PartPose.offset(1.9F, 12.0F, 0.0F));
         leftLeg.addOrReplaceChild("left_leg_lower", CubeListBuilder.create().texOffs(16, 54).addBox(-2.0F, -0.25F, -2.0F, 4.0F, 6.25F, 4.0F), PartPose.offset(0.0F, 6.0F, 0.0F));
 
         PartDefinition leftPants = partdefinition.addOrReplaceChild("left_pants", CubeListBuilder.create().texOffs(0, 48).addBox(-2.0F, 0.0F, -2.0F, 4.0F, 6.25F, 4.0F, new CubeDeformation(0.25F)), PartPose.offset(1.9F, 12.0F, 0.0F));
-        leftPants.addOrReplaceChild("left_pants_lower", CubeListBuilder.create().texOffs(0, 54).addBox(-2.0F, -0.25F, -2.0F, 4.0F, 6.25F, 4.0F, new CubeDeformation(0.25F)), PartPose.offset(0.0F, 6.0F, 0.0F));
+        leftPants.addOrReplaceChild("left_pants_lower", CubeListBuilder.create().texOffs(0, 54).addBox(-2.0F, -0.25F, -2.0F, 4.0F, 5.75F, 4.0F, new CubeDeformation(0.25F)), PartPose.offset(0.0F, 6.0F, 0.0F));
 
         return LayerDefinition.create(meshdefinition, 64, 64);
     }
@@ -146,9 +159,10 @@ public class HeroModel extends PlayerModel<HeroEntity> {
         // 赠礼手势 / 待机变体不再"硬接管"姿态,而是按权重叠加在基础姿态之上,进出各有一段淡入淡出;
         // 权重由 HeroVisuals.tickBlendWeights 每 tick 步进,这里按 partial tick 插值取用。
         float partialTick = ageInTicks - entity.tickCount;
-        float offerBlend = entity.getOfferBlend(partialTick);
-        float variantBlend = entity.getVariantBlend(partialTick);
-        boolean gestureDriving = offerBlend > 0.001F && entity.gestureLocalClipId != 0;
+        HeroVisualState visualState = entity.getVisualState();
+        float offerBlend = visualState.getOfferBlend(partialTick);
+        float variantBlend = visualState.getVariantBlend(partialTick);
+        boolean gestureDriving = offerBlend > 0.001F && visualState.getGestureClipId() != 0;
 
         // --- 姿势编辑器接管渲染(手工姿势优先级最高,不参与手势混合)---
         if (entity.isPoseEditing && !entity.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE)) {
@@ -215,6 +229,17 @@ public class HeroModel extends PlayerModel<HeroEntity> {
             return;
         }
 
+        if (HeroPoemAnimation.shouldAnimate(entity, partialTick)) {
+            // Native skinning uses the rig's complete transforms, not the legacy Euler-angle battle pose.
+            this.head.resetPose(); this.body.resetPose();
+            this.rightArm.resetPose(); this.leftArm.resetPose();
+            this.rightLeg.resetPose(); this.leftLeg.resetPose();
+            this.rightArmLower.resetPose(); this.leftArmLower.resetPose();
+            this.rightLegLower.resetPose(); this.leftLegLower.resetPose();
+            copyAllModelProperties();
+            return;
+        }
+
         // --- 以下是原有的战斗/浮空等原生动画逻辑 ---
         if (!gestureDriving && entity.isInspectingScythe()) {
             setupScytheInspectAnim(entity, ageInTicks);
@@ -226,10 +251,6 @@ public class HeroModel extends PlayerModel<HeroEntity> {
             return;
         }
 
-        if (!gestureDriving && entity.isCastingThunder()) {
-            setupThunderAnim(entity, ageInTicks);
-            return;
-        }
 
         // 赠礼手势进行中时不让 EpicFight 姿势接管(手势优先级最高)
         if (!gestureDriving && HeroEpicFightCompat.shouldUseEpicFightPose(entity)) {
@@ -251,6 +272,12 @@ public class HeroModel extends PlayerModel<HeroEntity> {
 
         if (!gestureDriving && isCookingPoseActive(entity)) {
             setupCookAnim(entity, ageInTicks);
+            return;
+        }
+
+        // 推磨：整个人压在磨杆上往前推，比走路的摆臂幅度更大也更沉。
+        if (!gestureDriving && entity.isMillstoneBound()) {
+            setupMillstonePushAnim(entity, ageInTicks);
             return;
         }
 
@@ -335,13 +362,13 @@ public class HeroModel extends PlayerModel<HeroEntity> {
 
         // --- 裁剪叠加层(赠礼手势 / 待机变体):按权重混合到基础姿态上,替代原来的硬接管 ---
         if (gestureDriving) {
-            applyClipOverlay(HeroGestureLibrary.byClipId(entity.gestureLocalClipId),
-                    entity.gestureLocalStartTick, offerBlend, ageInTicks);
+            applyClipOverlay(HeroGestureLibrary.byClipId(visualState.getGestureClipId()),
+                    visualState.getGestureStartTick(), offerBlend, ageInTicks);
         } else if (variantBlend > 0.001F
-                && entity.idleVariantClip >= 0
-                && entity.idleVariantClip < HeroIdleClips.IDLE_VARIANTS.length) {
-            applyClipOverlay(HeroIdleClips.IDLE_VARIANTS[entity.idleVariantClip],
-                    entity.idleVariantStartTick, variantBlend, ageInTicks);
+                && visualState.getIdleVariantClip() >= 0
+                && visualState.getIdleVariantClip() < HeroIdleClips.IDLE_VARIANTS.length) {
+            applyClipOverlay(HeroIdleClips.IDLE_VARIANTS[visualState.getIdleVariantClip()],
+                    visualState.getIdleVariantStartTick(), variantBlend, ageInTicks);
         }
 
         copyAllModelProperties();
@@ -423,7 +450,17 @@ public class HeroModel extends PlayerModel<HeroEntity> {
         if (clip == null || weight <= 0.001F) {
             return;
         }
-        float t = Mth.clamp((ageInTicks - startTick) / 20.0F, 0.0F, clip.duration);
+        applyClipPose(clip, Mth.clamp((ageInTicks - startTick) / 20.0F, 0.0F, clip.duration), weight);
+    }
+
+    /**
+     * 在裁剪内时间 t（秒）处以权重 weight 应用规范姿势。
+     * 战斗镰刀裁剪按服务端攻击进度换算出 t 后直接走这里（真实时钟驱动的手势仍用上面的重载）。
+     */
+    private void applyClipPose(HeroClip clip, float t, float weight) {
+        if (clip == null || weight <= 0.001F) {
+            return;
+        }
         HeroClip.samplePose(clip, t, clipPoseBuf);
         buildTouched(clip);
         float w = Mth.clamp(weight, 0.0F, 1.0F);
@@ -589,11 +626,11 @@ public class HeroModel extends PlayerModel<HeroEntity> {
     }
 
     private boolean isCookingPoseActive(HeroEntity entity) {
-        if (entity.getInvitedAction() != HeroCookingCompat.INVITED_ACTION_COOK || entity.getInvitedPos() == null) {
+        if (entity.getInvitedAction() != CookingService.INVITED_ACTION_COOK || entity.getInvitedPos() == null) {
             return false;
         }
 
-        if (!HeroCookingCompat.isCookwareStation(entity.level(), entity.getInvitedPos())) {
+        if (!CookingService.isCookwareStation(entity.level(), entity.getInvitedPos())) {
             return false;
         }
 
@@ -607,9 +644,9 @@ public class HeroModel extends PlayerModel<HeroEntity> {
     }
 
     private void setupCookAnim(HeroEntity entity, float ageInTicks) {
-        ItemStack mainDisplay = HeroCookingCompat.getCookMainHandDisplay(entity);
+        ItemStack mainDisplay = CookingService.getCookMainHandDisplay(entity);
         ItemStack visualOffDisplay = entity.getVisualOffHandItem();
-        ItemStack offDisplay = !visualOffDisplay.isEmpty() ? visualOffDisplay : HeroCookingCompat.getCookOffhandDisplay(entity);
+        ItemStack offDisplay = !visualOffDisplay.isEmpty() ? visualOffDisplay : CookingService.getCookOffhandDisplay(entity);
         String mainPath = getItemPath(mainDisplay);
         boolean chopping = mainPath.contains("knife");
         boolean stirring = mainPath.contains("shovel");
@@ -664,6 +701,63 @@ public class HeroModel extends PlayerModel<HeroEntity> {
         this.leftLeg.xRot = -0.04F;
         this.rightLeg.zRot = 0.02F;
         this.leftLeg.zRot = -0.02F;
+
+        copyAllModelProperties();
+    }
+
+    /**
+     * 推磨姿态。
+     *
+     * <p>要点是「绕圈走」而不是「原地踏步」：石磨每 tick 把 Hero 摆到圆周上（半径 2 格）并让它
+     * 面朝切线方向，所以真实位移是圆周。这里直接复用行走环的腿部数学，只把相位绑到实际线速度上，
+     * 再让上身压低前倾、双手扶住磨杆——看起来就是人被磨带着走，而不是僵尸式前伸。
+     *
+     * <p>步频按「圆周周长 ÷ 行走环每圈覆盖的距离」算，脚底位移与行走动画一致，不会打滑：
+     * 半径 2 → 周长约 12.57 格，行走环一圈约 9.43 格，因此磨一圈腿要迈约 1.33 个循环。
+     */
+    private void setupMillstonePushAnim(HeroEntity entity, float ageInTicks) {        // 每条腿每 tick 前进多少"步态环"：与石磨摆位的真实线速度对齐。
+        float lapsPerTick = 1.0F / Math.max(1.0F, CookingService.MILLSTONE_ROT_SPEED_TICK);
+        float phase = positiveModulo(ageInTicks * lapsPerTick * MILLSTONE_CYCLES_PER_LAP, 1.0F);
+        HeroLocomotion.computeWalkPose(phase, this.walkBuf);
+
+        // 腿部：直接接管行走环，这是"像在走路"的关键。
+        this.rightLeg.xRot = deg2rad(this.walkBuf[18]);
+        this.leftLeg.xRot = deg2rad(this.walkBuf[21]);
+        this.rightLegLower.xRot = deg2rad(this.walkBuf[24]);
+        this.leftLegLower.xRot = deg2rad(this.walkBuf[27]);
+
+        // 上身：压低前倾，重心压在磨杆上。躯干小幅左右摆，像在跟磨较劲。
+        // 正 xRot = 前倾（与 vanilla 潜行 body.xRot = 0.5 同向）。
+        float effort = Mth.sin(phase * (float) (Math.PI * 4.0));
+        this.body.xRot = deg2rad(16.0F + this.walkBuf[3] * 0.5F);
+        this.body.yRot = deg2rad(this.walkBuf[4] * 0.35F);
+        this.body.zRot = deg2rad(this.walkBuf[5] * 0.5F + effort * 1.2F);
+
+        // 头：由于躯干压低了，头要抬回来一点，保持看向前方（这是"不像僵尸"的关键）。
+        this.head.xRot = deg2rad(-10.0F + this.walkBuf[0] * 0.4F);
+        this.head.yRot = deg2rad(this.walkBuf[1] * 0.5F);
+        this.head.zRot = deg2rad(this.walkBuf[2] * 0.4F);
+
+        // 双臂：扶住磨杆的固定姿势（不是前伸僵直）。肘部明显弯下去，手落在胸口高度，
+        // 这样读起来是"双手压着杆子被磨带着走"，而不是僵尸伸手。
+        // 只有很小的推拉起伏——人靠腿在走，手臂主要是稳住杆子。
+        float push = Mth.sin(phase * (float) (Math.PI * 2.0)) * 0.035F;
+        this.rightArm.xRot = deg2rad(-49.0F + push * 3.0F);
+        this.rightArm.yRot = deg2rad(-7.0F);
+        this.rightArm.zRot = deg2rad(12.0F);
+        this.rightArmLower.xRot = deg2rad(20.0F - push * 4.0F);
+
+        this.leftArm.xRot = deg2rad(-49.0F - push * 3.0F);
+        this.leftArm.yRot = deg2rad(7.0F);
+        this.leftArm.zRot = deg2rad(-12.0F);
+        this.leftArmLower.xRot = deg2rad(20.0F + push * 4.0F);
+
+        // 躯干随步伐轻微上下起伏（走路的重量感）。
+        float bob = this.walkBuf[31] * 0.35F;
+        this.body.y += bob;
+        this.head.y += bob;
+        this.rightArm.y += bob;
+        this.leftArm.y += bob;
 
         copyAllModelProperties();
     }
@@ -736,17 +830,43 @@ public class HeroModel extends PlayerModel<HeroEntity> {
         this.rightArmLower.xRot = Mth.lerp(guardBlend, this.rightArmLower.xRot, -0.35F);
         this.leftArmLower.xRot = Mth.lerp(guardBlend, this.leftArmLower.xRot, -0.18F);
 
-        if (HeroCombatWeaponHelper.isRangedLoadout(entity.getMainHandItem())) {
+        // 远程武器（弓/弩/枪）：瞄准姿势只在「真的在拉弓/开火」时接管，
+        // 平时战斗待机与走位一律使用终末之诗的骨架（动作资源只有这一套）。
+        if (HeroCombatWeaponHelper.isRangedLoadout(entity.getMainHandItem()) && entity.isUsingItem()) {
             applyRangedBattlePose(entity, limbSwing, walkAmount, ageInTicks);
             syncBattleTorsoAnchors();
             copyAllModelProperties();
             return;
         }
 
-        switch (entity.getBattleActionState()) {
+        // 无 Epic Fight 的战斗攻击段一律由终末之诗动作库驱动（主手武器不参与判断）：
+        // 按攻击序号轮换库内全部普攻裁剪；接近/待机段仍走下方基础姿势。
+        // 原先「非终末之诗武器 → 程序化挥砍」的回退动作已废弃并删除。
+        int battleAction = entity.getBattleActionState();
+        if (battleAction == HeroEntity.BATTLE_ACTION_LIGHT_COMBO_1
+                || battleAction == HeroEntity.BATTLE_ACTION_LIGHT_COMBO_2) {
+            HeroClip poemClip = HeroScytheComboLibrary.shouldDriveBattlePose(entity)
+                    ? HeroScytheComboLibrary.clipForSerial(entity.getBattleActionSerial())
+                    : null;
+            if (poemClip != null) {
+                float partialTick = ageInTicks - entity.tickCount;
+                float elapsed = entity.getBattleActionTicks() + Math.max(0.0F, partialTick);
+                int durationTicks = HeroScytheComboLibrary.actionDurationTicks(entity, battleAction);
+                float progress = durationTicks <= 0 ? 1.0F : Mth.clamp(elapsed / durationTicks, 0.0F, 1.0F);
+                // 前两 tick 从基础战斗架势淡入，连招切换不跳变
+                float weight = Mth.clamp(elapsed / 2.0F, 0.0F, 1.0F);
+                applyClipPose(poemClip, progress * poemClip.duration, weight);
+            } else {
+                // 动作库不可用：保持战斗架势，不再用程序化挥砍顶替
+                applyBattleIdlePose(ageInTicks);
+            }
+            syncBattleTorsoAnchors();
+            copyAllModelProperties();
+            return;
+        }
+
+        switch (battleAction) {
             case HeroEntity.BATTLE_ACTION_APPROACH -> applyApproachPose(limbSwing, walkAmount, ageInTicks);
-            case HeroEntity.BATTLE_ACTION_LIGHT_COMBO_1 -> applyComboPose(entity, true, ageInTicks);
-            case HeroEntity.BATTLE_ACTION_LIGHT_COMBO_2 -> applyComboPose(entity, false, ageInTicks);
             default -> applyBattleIdlePose(ageInTicks);
         }
 
@@ -819,68 +939,11 @@ public class HeroModel extends PlayerModel<HeroEntity> {
         this.head.yRot *= 0.6F;
     }
 
-    private void applyComboPose(HeroEntity entity, boolean firstCombo, float ageInTicks) {
-        float progress = Mth.clamp(entity.getBattleActionTicks() / (float)getBattleActionDuration(entity, firstCombo), 0.0F, 1.0F);
-        float windup = smoothWindow(progress, 0.0F, 0.24F);
-        float strike = smoothWindow(progress, 0.22F, 0.68F);
-        float recovery = smoothWindow(progress, 0.60F, 1.0F);
-        float torsoTwist = firstCombo ? -0.55F : 0.42F;
-        float followThrough = firstCombo ? 0.95F : 1.08F;
-        float weaponShake = Mth.sin(ageInTicks * 1.6F + (firstCombo ? 0.0F : 0.7F)) * 0.035F * strike;
-
-        applyBattleHeight(-1.6F + strike * 0.18F);
-        this.body.xRot += 0.12F * windup + 0.22F * strike - 0.14F * recovery;
-        this.body.yRot += torsoTwist * strike - torsoTwist * 0.35F * recovery;
-        this.head.yRot += -torsoTwist * 0.35F * strike;
-        this.head.xRot += -0.10F * strike + 0.08F * recovery;
-
-        this.rightArm.xRot = Mth.lerp(windup, this.rightArm.xRot, firstCombo ? -1.8F : -1.55F);
-        this.rightArm.yRot = Mth.lerp(windup, this.rightArm.yRot, firstCombo ? -0.95F : 0.55F);
-        this.rightArm.zRot = Mth.lerp(windup, this.rightArm.zRot, firstCombo ? 0.24F : -0.32F);
-
-        this.rightArm.xRot = Mth.lerp(strike, this.rightArm.xRot, firstCombo ? 0.55F : -0.10F);
-        this.rightArm.yRot = Mth.lerp(strike, this.rightArm.yRot, followThrough);
-        this.rightArm.zRot = Mth.lerp(strike, this.rightArm.zRot, firstCombo ? -0.78F : 0.62F);
-        this.rightArm.xRot += weaponShake;
-        this.rightArm.zRot += weaponShake * 0.7F;
-
-        this.leftArm.xRot = Mth.lerp(windup + strike * 0.35F, this.leftArm.xRot, firstCombo ? -0.35F : -0.65F);
-        this.leftArm.yRot = Mth.lerp(windup + strike * 0.35F, this.leftArm.yRot, firstCombo ? 0.55F : -0.18F);
-        this.leftArm.zRot = Mth.lerp(windup + strike * 0.35F, this.leftArm.zRot, firstCombo ? -0.32F : -0.42F);
-
-        this.rightArmLower.xRot = Mth.lerp(windup + strike, this.rightArmLower.xRot, firstCombo ? -1.05F : -0.82F);
-        this.leftArmLower.xRot = Mth.lerp(windup + strike * 0.45F, this.leftArmLower.xRot, -0.35F);
-
-        this.rightLeg.xRot = Mth.lerp(strike, this.rightLeg.xRot, firstCombo ? -0.48F : 0.32F);
-        this.leftLeg.xRot = Mth.lerp(strike, this.leftLeg.xRot, firstCombo ? 0.38F : -0.42F);
-        this.rightLegLower.xRot = Mth.lerp(strike, this.rightLegLower.xRot, firstCombo ? 0.24F : 0.12F);
-        this.leftLegLower.xRot = Mth.lerp(strike, this.leftLegLower.xRot, firstCombo ? 0.12F : 0.28F);
-        this.rightLeg.zRot = Mth.lerp(strike, this.rightLeg.zRot, firstCombo ? 0.08F : -0.05F);
-        this.leftLeg.zRot = Mth.lerp(strike, this.leftLeg.zRot, firstCombo ? -0.05F : 0.08F);
-
-        this.rightArm.xRot = Mth.lerp(recovery, this.rightArm.xRot, -0.92F);
-        this.rightArm.yRot = Mth.lerp(recovery, this.rightArm.yRot, -0.16F);
-        this.rightArm.zRot = Mth.lerp(recovery, this.rightArm.zRot, 0.08F);
-        this.leftArm.xRot = Mth.lerp(recovery, this.leftArm.xRot, -0.52F);
-        this.leftArm.yRot = Mth.lerp(recovery, this.leftArm.yRot, 0.20F);
-        this.leftArm.zRot = Mth.lerp(recovery, this.leftArm.zRot, -0.15F);
-    }
+    // 原先的 applyComboPose（按进度程序化挥砍的轻击连段）与 getBattleActionDuration
+    // 属于「非终末之诗武器」的默认回退攻击动作，已随动作统一到终末之诗而废弃删除。
 
     private void applyBattleHeight(float offsetY) {
-        this.body.y = offsetY;
-        this.head.y = offsetY;
-        this.hat.y = this.head.y;
-
-        this.rightArm.y = 2.0F + offsetY;
-        this.leftArm.y = 2.0F + offsetY;
-        this.rightLeg.y = 12.0F + offsetY;
-        this.leftLeg.y = 12.0F + offsetY;
-
-        this.jacket.y = this.body.y;
-        this.rightSleeve.y = this.rightArm.y;
-        this.leftSleeve.y = this.leftArm.y;
-        this.rightPants.y = this.rightLeg.y;
-        this.leftPants.y = this.leftLeg.y;
+        PlayerModelParts.anchorY(this, offsetY);
     }
 
     private void syncBattleTorsoAnchors() {
@@ -901,28 +964,6 @@ public class HeroModel extends PlayerModel<HeroEntity> {
         this.leftSleeve.setPos(this.leftArm.x, this.leftArm.y, this.leftArm.z);
         this.rightPants.setPos(this.rightLeg.x, this.rightLeg.y, this.rightLeg.z);
         this.leftPants.setPos(this.leftLeg.x, this.leftLeg.y, this.leftLeg.z);
-    }
-
-    private int getBattleActionDuration(HeroEntity entity, boolean firstCombo) {
-        if (entity.getMainHandItem().getItem() instanceof PoemOfTheEndItem poem) {
-            return switch (poem.getMode(entity.getMainHandItem())) {
-                case PoemOfTheEndItem.MODE_VOID_SHATTER -> firstCombo ? 7 : 8;
-                case PoemOfTheEndItem.MODE_REALM_BREAKER, PoemOfTheEndItem.MODE_THUNDER_CALL -> firstCombo ? 14 : 16;
-                default -> firstCombo ? 10 : 12;
-            };
-        }
-        return firstCombo ? 8 : 10;
-    }
-
-    private float smoothWindow(float value, float start, float end) {
-        if (end <= start) {
-            return value >= end ? 1.0F : 0.0F;
-        }
-        return smoothStep(Mth.clamp((value - start) / (end - start), 0.0F, 1.0F));
-    }
-
-    private float smoothStep(float value) {
-        return value * value * (3.0F - 2.0F * value);
     }
 
     private void setupScytheInspectAnim(HeroEntity entity, float ageInTicks) {
@@ -985,46 +1026,8 @@ public class HeroModel extends PlayerModel<HeroEntity> {
         copyAllModelProperties();
     }
 
-    private void setupThunderAnim(HeroEntity entity, float ageInTicks) {
-        float progress = entity.getThunderProgress(Minecraft.getInstance().getPartialTick());
-        if (progress <= 0.01F) return;
-
-        float smooth = progress * progress * (3.0F - 2.0F * progress);
-
-        this.rightArm.xRot = Mth.lerp(smooth, this.rightArm.xRot, -3.2F);
-        this.rightArm.zRot = Mth.lerp(smooth, this.rightArm.zRot, 0.2F);
-        this.rightArm.yRot = Mth.lerp(smooth, this.rightArm.yRot, 0.0F);
-
-        this.leftArm.xRot = Mth.lerp(smooth, this.leftArm.xRot, 0.8F);
-        this.leftArm.zRot = Mth.lerp(smooth, this.leftArm.zRot, -0.4F);
-
-        this.head.xRot = Mth.lerp(smooth, this.head.xRot, -1.2F);
-        this.head.yRot = Mth.lerp(smooth, this.head.yRot, 0.0F);
-
-        this.body.xRot = Mth.lerp(smooth, this.body.xRot, -0.3F);
-        this.body.y = Mth.lerp(smooth, this.body.y, -2.0F);
-
-        if (progress > 0.6F) {
-            float shakeIntensity = (progress - 0.6F) * 0.05F;
-            float shakeX = Mth.sin(ageInTicks * 2.5F) * shakeIntensity;
-            float shakeZ = Mth.cos(ageInTicks * 2.5F) * shakeIntensity;
-
-            this.rightArm.xRot += shakeX * 2.0F;
-            this.rightArm.zRot += shakeZ;
-            this.head.yRot += shakeX;
-            this.body.xRot += shakeX * 0.5F;
-        }
-
-        copyAllModelProperties();
-    }
-
     private void copyAllModelProperties() {
-        this.hat.copyFrom(this.head);
-        this.jacket.copyFrom(this.body);
-        this.leftSleeve.copyFrom(this.leftArm);
-        this.rightSleeve.copyFrom(this.rightArm);
-        this.leftPants.copyFrom(this.leftLeg);
-        this.rightPants.copyFrom(this.rightLeg);
+        PlayerModelParts.syncOverlays(this);
 
         this.rightSleeveLower.copyFrom(this.rightArmLower);
         this.leftSleeveLower.copyFrom(this.leftArmLower);

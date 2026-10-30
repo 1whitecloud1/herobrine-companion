@@ -3,12 +3,14 @@ package com.whitecloud233.modid.herobrine_companion.client.render;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
+import com.whitecloud233.modid.herobrine_companion.client.animation.HeroPoemAnimation;
 import com.whitecloud233.modid.herobrine_companion.client.animation.PoemSkinMesh;
 import com.whitecloud233.modid.herobrine_companion.client.animation.PoemSkinMesh.Part;
 import com.whitecloud233.modid.herobrine_companion.client.animation.StandalonePoemAnimation;
 import com.whitecloud233.modid.herobrine_companion.client.animation.StandalonePoemAnimation.Frame;
 import com.whitecloud233.modid.herobrine_companion.combat.poem.PoemMotionLibrary;
 import com.whitecloud233.modid.herobrine_companion.combat.poem.PoemBladeTrail;
+import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.item.PoemOfTheEndItem;
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -47,25 +49,72 @@ public final class StandalonePoemRenderer {
     private static final ThreadLocal<Deque<Context>> CONTEXT = ThreadLocal.withInitial(ArrayDeque::new);
     private static final Context EMPTY = new Context(null, null, null);
     private static PlayerModel<AbstractClientPlayer> firstPersonWide, firstPersonSlim;
+
+    /**
+     * 快速路径开关：只有当至少有一个 render 上下文处于激活状态时才可能为 true。
+     *
+     * <p>这是 {@code renderLayer} 的 @Redirect 入口（每帧每个实体每个渲染层都会被拦截）的
+     * 第一道闸门。绝大多数游戏时间里没有任何诗之末连招在进行，此时这里一次 volatile 读
+     * 就能让调用者直接透传给原版 {@code layer.render}，省掉 ThreadLocal 读取、Deque 判空、
+     * peek 以及后续若干 instanceof / 矩阵运算。</p>
+     *
+     * <p>渲染线程是唯一写入方（push/pop 都在 Render thread），volatile 只保证可见性，
+     * 不引入跨线程同步开销。</p>
+     */
+    private static volatile boolean contextActive = false;
+
     private StandalonePoemRenderer() { }
 
     public static void push(LivingEntity entity, EntityModel<?> model, float partial) {
-        Frame frame = entity instanceof Player player && model instanceof PlayerModel<?> ? StandalonePoemAnimation.frame(player, partial) : null;
-        CONTEXT.get().push(frame == null ? EMPTY : new Context(entity, (HumanoidModel<?>) model, frame));
+        Frame frame = null;
+        if (model instanceof PlayerModel<?>) {
+            if (entity instanceof Player player) frame = StandalonePoemAnimation.frame(player, partial);
+            else if (entity instanceof HeroEntity hero) frame = HeroPoemAnimation.frame(hero, partial);
+        }
+        Deque<Context> deque = CONTEXT.get();
+        // Keep the camera entity identity even without an animation frame: GeckoLib
+        // idle items can also be rendered by an auxiliary first-person body pass.
+        boolean cameraBody = entity == Minecraft.getInstance().getCameraEntity();
+        deque.push(frame == null ? (cameraBody ? new Context(entity, null, null) : EMPTY)
+                : new Context(entity, (HumanoidModel<?>) model, frame));
+        contextActive = true;
     }
-    public static void pop() { if (!CONTEXT.get().isEmpty()) CONTEXT.get().pop(); }
-    public static void clearContext() { CONTEXT.get().clear(); }
+    public static void pop() {
+        Deque<Context> deque = CONTEXT.get();
+        if (!deque.isEmpty()) deque.pop();
+        contextActive = !deque.isEmpty();
+    }
+    public static void clearContext() {
+        CONTEXT.get().clear();
+        contextActive = false;
+    }
     private static Context context() { return CONTEXT.get().isEmpty() ? EMPTY : CONTEXT.get().peek(); }
+
+    public static boolean auxiliaryFirstPersonBody() {
+        LivingEntity entity = context().entity;
+        if (entity == null) return false;
+        Minecraft mc = Minecraft.getInstance();
+        return entity == mc.getCameraEntity() && mc.options.getCameraType().isFirstPerson()
+                && PoemShaderCompat.shadersEnabled();
+    }
+
+    /** renderLayer 快速路径判断：无任何激活上下文时调用方应直接走原版渲染。 */
+    public static boolean hasActiveContext() { return contextActive; }
 
     public static float attackYaw(LivingEntity entity, float bodyYaw, float partial) {
         Context context = context();
-        return context.frame != null && context.entity == entity
+        if (context.frame == null || context.entity != entity) return bodyYaw;
+        // Locomotion keeps vanilla body-yaw smoothing; only a visible cut snaps the body to the server's attack heading.
+        boolean attacking = entity instanceof Player player && StandalonePoemAnimation.attacking(player, partial)
+                || entity instanceof HeroEntity hero && hero.isBattleTapAction();
+        return context.frame != null && context.entity == entity && attacking
                 ? Mth.rotLerp(partial, entity.yRotO, entity.getYRot()) : bodyYaw;
     }
 
     public static boolean renderModel(Object model, PoseStack stack, VertexConsumer buffer, int light, int overlay, int color) {
         Context context = context();
         if (context.frame == null || !(model instanceof HumanoidModel<?> humanoid)) return false;
+        if (context.entity != null && context.entity != Minecraft.getInstance().player && context.entity.isInvisible()) return false;
         body(humanoid, context.frame, stack, buffer, light, overlay, color, false);
         return true;
     }
@@ -100,6 +149,7 @@ public final class StandalonePoemRenderer {
                                      PoseStack stack, MultiBufferSource buffers, int light, ItemInHandRenderer renderer) {
         Context context = context();
         if (context.frame == null || context.entity != entity) return false;
+        if (entity != Minecraft.getInstance().player && entity.isInvisible()) return false;
         held(entity, item, display, arm, stack, buffers, light, renderer, context.model, context.frame);
         return true;
     }
@@ -109,8 +159,14 @@ public final class StandalonePoemRenderer {
                              HumanoidModel<?> model, Frame frame) {
         if (item.isEmpty()) return;
         if (arm == entity.getMainArm() && item.getItem() instanceof PoemOfTheEndItem) {
-            weapon(item, frame, model, stack, buffers, light);
-            StandalonePoemTrailRenderer.render(frame, model, stack, buffers);
+            Minecraft mc = Minecraft.getInstance();
+            // Auxiliary self-body renders (shadows/reflections/other render mods) are
+            // not the first-person hand. Keep their materials inside the caller's
+            // pipeline instead of replaying a second, world-space blade over the view.
+            boolean auxiliarySelf = PoemShaderCompat.shadersEnabled()
+                    && entity == mc.getCameraEntity() && mc.options.getCameraType().isFirstPerson();
+            weapon(item, frame, model, stack, buffers, light, auxiliarySelf);
+            if (!auxiliarySelf) StandalonePoemTrailRenderer.render(frame, model, stack, buffers);
             return;
         }
         ModelPart modelArm = arm == HumanoidArm.RIGHT ? model.rightArm : model.leftArm;
@@ -130,8 +186,16 @@ public final class StandalonePoemRenderer {
     @SuppressWarnings({"rawtypes", "unchecked"})
     public static void renderLayer(RenderLayer layer, PoseStack stack, MultiBufferSource buffers, int light, LivingEntity entity,
                                    float walk, float amount, float partial, float age, float yaw, float pitch) {
+        // [性能] 快速路径：没有任何激活的诗之末上下文时，直接透传原版渲染层。
+        // 这个分支覆盖了绝大部分帧（配合 contextActive 的 volatile 读，开销接近零）。
+        if (!contextActive) {
+            layer.render(stack, buffers, light, entity, walk, amount, partial, age, yaw, pitch);
+            return;
+        }
         Context context = context();
-        if (context.frame == null || context.entity != entity || layer instanceof HumanoidArmorLayer || layer instanceof ItemInHandLayer) {
+        if (context.frame == null || context.entity != entity || entity != Minecraft.getInstance().player && entity.isInvisible()
+                || layer instanceof HumanoidArmorLayer || layer instanceof ItemInHandLayer
+                || layer instanceof HeroHeldItemLayer || layer instanceof HeroEyesLayer || layer instanceof HeroChargedLayer) {
             layer.render(stack, buffers, light, entity, walk, amount, partial, age, yaw, pitch); return;
         }
         boolean head = layer instanceof CustomHeadLayer;
@@ -168,7 +232,8 @@ public final class StandalonePoemRenderer {
 
     public record WeaponData(String texture, float[][] vertices, int[][] faces, float[][] uv) { }
 
-    private static void weapon(ItemStack item, Frame frame, HumanoidModel<?> model, PoseStack stack, MultiBufferSource buffers, int light) {
+    private static void weapon(ItemStack item, Frame frame, HumanoidModel<?> model, PoseStack stack, MultiBufferSource buffers, int light,
+                               boolean auxiliarySelf) {
         PoemMotionLibrary lib = PoemMotionLibrary.get();
         Matrix4f mirror = frame.leftHanded() ? new Matrix4f().scaling(-1, 1, 1) : new Matrix4f();
         Matrix4f animated = new Matrix4f(PoemSkinMesh.DCC_TO_MODEL).mul(mirror).mul(frame.world()[lib.joint("Tool_R")]).mul(Weapon.TO_TOOL);
@@ -181,10 +246,13 @@ public final class StandalonePoemRenderer {
                 PoemWeaponRenderTypes.base(), false, item.hasFoil()), light);
         // Finish the base pass before requesting another buffer: callers may use
         // a BufferSource that flushes the previous builder when its type changes.
-        emitWeapon(posed, frame.leftHanded(), buffers.getBuffer(PoemWeaponRenderTypes.glow()), LightTexture.FULL_BRIGHT);
+        emitWeapon(posed, frame.leftHanded(), auxiliarySelf ? buffers.getBuffer(PoemWeaponRenderTypes.glow())
+                : PoemWeaponRenderTypes.glowBuffer(buffers), LightTexture.FULL_BRIGHT);
+        if (!auxiliarySelf && PoemOutlineEffect.enabled())
+            emitWeapon(posed, frame.leftHanded(), PoemWeaponRenderTypes.outlineBuffer(buffers), LightTexture.FULL_BRIGHT);
     }
 
-    /** Both material passes use identical posed vertices; this path has no GPU state. */
+    /** All material passes use identical posed vertices; this path has no GPU state. */
     public static void emitWeapon(Matrix4f posed, boolean leftHanded, VertexConsumer buffer, int light) {
         Vector3f[] p = {new Vector3f(), new Vector3f(), new Vector3f(), new Vector3f()};
         Vector3f normal = new Vector3f(), edge = new Vector3f();
@@ -208,7 +276,7 @@ public final class StandalonePoemRenderer {
     public static void renderFirstPerson(RenderHandEvent event) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
-        Frame frame = StandalonePoemAnimation.frame(mc.player, event.getPartialTick());
+        Frame frame = StandalonePoemAnimation.attackFrame(mc.player, event.getPartialTick());
         if (frame == null) return;
         if (!(mc.getEntityRenderDispatcher().getRenderer(mc.player) instanceof PlayerRenderer renderer)) return;
         event.setCanceled(true);
@@ -231,7 +299,7 @@ public final class StandalonePoemRenderer {
                 body(model, frame, stack, event.getMultiBufferSource().getBuffer(RenderType.entityCutoutNoCull(renderer.getTextureLocation(mc.player))),
                         event.getPackedLight(), OverlayTexture.NO_OVERLAY, -1, true);
             }
-            weapon(mc.player.getMainHandItem(), frame, model, stack, event.getMultiBufferSource(), event.getPackedLight());
+            weapon(mc.player.getMainHandItem(), frame, model, stack, event.getMultiBufferSource(), event.getPackedLight(), false);
             StandalonePoemTrailRenderer.render(frame, model, stack, event.getMultiBufferSource());
             HumanoidArm offhand = mc.player.getMainArm().getOpposite();
             held(mc.player, mc.player.getOffhandItem(), offhand == HumanoidArm.RIGHT ? ItemDisplayContext.THIRD_PERSON_RIGHT_HAND : ItemDisplayContext.THIRD_PERSON_LEFT_HAND,

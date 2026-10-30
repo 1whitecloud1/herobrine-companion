@@ -34,14 +34,14 @@ public final class StandalonePoemTrailRenderer extends RenderType {
         RenderSystem.defaultBlendFunc();
     });
     private static final RenderType BODY = create("herobrine_companion:standalone_poem_trail_body",
-            DefaultVertexFormat.POSITION_COLOR_TEX_LIGHTMAP, VertexFormat.Mode.QUADS, 4096, false, true,
-            CompositeState.builder().setShaderState(POSITION_COLOR_TEX_LIGHTMAP_SHADER)
+            DefaultVertexFormat.NEW_ENTITY, VertexFormat.Mode.QUADS, 4096, false, true,
+            CompositeState.builder().setShaderState(RENDERTYPE_EYES_SHADER)
                     .setTextureState(new TextureStateShard(TEXTURE, true, false))
                     .setTransparencyState(TRANSLUCENT_TRANSPARENCY).setCullState(NO_CULL).setLightmapState(LIGHTMAP)
                     .setDepthTestState(LEQUAL_DEPTH_TEST).setWriteMaskState(COLOR_WRITE).createCompositeState(false));
     private static final RenderType TRAIL = create("herobrine_companion:standalone_poem_trail",
-            DefaultVertexFormat.POSITION_COLOR_TEX_LIGHTMAP, VertexFormat.Mode.QUADS, 4096, false, false,
-            CompositeState.builder().setShaderState(POSITION_COLOR_TEX_LIGHTMAP_SHADER)
+            DefaultVertexFormat.NEW_ENTITY, VertexFormat.Mode.QUADS, 4096, false, false,
+            CompositeState.builder().setShaderState(RENDERTYPE_EYES_SHADER)
                     .setTextureState(new TextureStateShard(TEXTURE, true, false))
                     .setTransparencyState(GLOW).setCullState(NO_CULL).setLightmapState(LIGHTMAP)
                     .setDepthTestState(LEQUAL_DEPTH_TEST).setWriteMaskState(COLOR_WRITE).createCompositeState(false));
@@ -49,16 +49,20 @@ public final class StandalonePoemTrailRenderer extends RenderType {
     private static int repeatAppliedTo = -1;
 
     private StandalonePoemTrailRenderer() {
-        super("poem_trail", DefaultVertexFormat.POSITION_COLOR_TEX_LIGHTMAP, VertexFormat.Mode.QUADS,
+        super("poem_trail", DefaultVertexFormat.NEW_ENTITY, VertexFormat.Mode.QUADS,
                 4096, false, false, () -> { }, () -> { });
     }
 
     public static void render(Frame frame, HumanoidModel<?> model, PoseStack stack, MultiBufferSource buffers) {
-        if (frame.trail().isEmpty()) return;
+        // Shader packs replay ribbons after their final composite; without a pack the
+        // vanilla eyes material remains full-bright. Neither path casts opaque shadows.
+        if (frame.trail().isEmpty() || PoemShaderCompat.shadowPass()) return;
         float scroll = scroll();
         enableRepeatOnce();
-        PoemTrailMesh.renderBody(frame, model, stack, buffers.getBuffer(BODY), scroll);
-        PoemTrailMesh.render(frame, model, stack, buffers.getBuffer(TRAIL), scroll);
+        PoemTrailMesh.renderBody(frame, model, stack, PoemEmissiveEffect.buffer(buffers, BODY, TEXTURE,
+                PoemEmissiveEffect.Material.TRAIL_BODY), scroll);
+        PoemTrailMesh.render(frame, model, stack, PoemEmissiveEffect.buffer(buffers, TRAIL, TEXTURE,
+                PoemEmissiveEffect.Material.TRAIL_GLOW), scroll);
     }
 
     /**
