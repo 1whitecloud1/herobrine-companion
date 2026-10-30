@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.client.event;
 
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.modid.herobrine_companion.util.DebugLog;
 
 import com.mojang.logging.LogUtils;
 import com.whitecloud233.modid.herobrine_companion.client.gui.HeroContractScreen;
@@ -13,8 +14,6 @@ import com.whitecloud233.modid.herobrine_companion.client.model.GhostSteveModel;
 import com.whitecloud233.modid.herobrine_companion.client.model.HeroDragonModel;
 import com.whitecloud233.modid.herobrine_companion.client.model.HeroModel;
 import com.whitecloud233.modid.herobrine_companion.client.render.*;
-import com.whitecloud233.modid.herobrine_companion.compat.ArmourerWorkshop.HeroAWCompat;
-import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.init.ModBlockEntities;
 import com.whitecloud233.modid.herobrine_companion.init.ModEntities;
 import com.whitecloud233.modid.herobrine_companion.world.inventory.ModMenus;
@@ -43,12 +42,12 @@ public class ClientEvents {
     private static final Logger LOGGER = LogUtils.getLogger();
 
     static {
-        LOGGER.info(">>> [CLIENT EVENTS] 类加载确认！ <<<");
+        DebugLog.info(LOGGER, ">>> [CLIENT EVENTS] 类加载确认！ <<<");
     }
 
     @SubscribeEvent
     public static void registerRenderers(EntityRenderersEvent.RegisterRenderers event) {
-        LOGGER.info(">>> [RENDERER REGISTER] 正在注册渲染器... <<<");
+        DebugLog.info(LOGGER, ">>> [RENDERER REGISTER] 正在注册渲染器... <<<");
 
         event.registerEntityRenderer(ModEntities.HERO.get(), HeroRenderer::new);
         event.registerEntityRenderer(ModEntities.DESTRUCTION_GOD_HEROBRINE.get(), DestructionGodHerobrineRenderer::new);
@@ -81,58 +80,6 @@ public class ClientEvents {
     }
 
     @SubscribeEvent
-    public static void addRendererLayers(EntityRenderersEvent.AddLayers event) {
-        if (!HeroAWCompat.isLoaded()) {
-            return;
-        }
-
-        var heroRenderer = event.getRenderer(ModEntities.HERO.get());
-        var playerRenderer = event.getSkin("default");
-        if (playerRenderer == null) {
-            playerRenderer = event.getSkin("slim");
-        }
-
-        boolean attached = HeroAWCompat.attachAW(heroRenderer, playerRenderer);
-        if (!attached) {
-            LOGGER.warn(">>> [AW INIT] 未能在 AddLayers 阶段为 Hero 绑定 Armourer's Workshop 渲染上下文。 <<<");
-        }
-    }
-
-    private static boolean ensureHeroAwRendererAttached(Minecraft mc) {
-        if (mc == null || mc.level == null || !HeroAWCompat.isLoaded()) {
-            return false;
-        }
-
-        HeroEntity hero = null;
-        for (var entity : mc.level.entitiesForRendering()) {
-            if (entity instanceof HeroEntity heroEntity) {
-                hero = heroEntity;
-                break;
-            }
-        }
-        if (hero == null) {
-            return false;
-        }
-
-        var dispatcher = mc.getEntityRenderDispatcher();
-        var heroRenderer = dispatcher.getRenderer(hero);
-        if (HeroAWCompat.isAttached(heroRenderer)) {
-            return true;
-        }
-
-        var playerRenderer = dispatcher.getSkinMap().get("default");
-        if (playerRenderer == null) {
-            playerRenderer = dispatcher.getSkinMap().get("slim");
-        }
-
-        boolean attached = HeroAWCompat.attachAW(heroRenderer, playerRenderer);
-        if (attached) {
-            LOGGER.info(">>> [AW INIT] 已在客户端 tick 兜底阶段为 Hero 绑定 Armourer's Workshop 渲染上下文。 <<<");
-        }
-        return attached;
-    }
-
-    @SubscribeEvent
     public static void onClientSetup(FMLClientSetupEvent event) {
         event.enqueueWork(() -> {
             MenuScreens.register(ModMenus.HERO_CONTRACT_MENU.get(), HeroContractScreen::new);
@@ -156,9 +103,8 @@ public class ClientEvents {
             
             Minecraft mc = Minecraft.getInstance();
 
-            if (mc.level != null && mc.player != null && mc.player.tickCount % 40 == 0) {
-                ensureHeroAwRendererAttached(mc);
-            }
+            // 处理「装扮栏里的第三方快捷按钮」排队的动作（等本模组菜单关闭后再打开目标界面）
+            com.whitecloud233.modid.herobrine_companion.compat.screens.ExternalScreenShortcuts.tick();
 
             // === 实时检查并注入渲染器 ===
             if (mc.level != null) {
@@ -205,7 +151,7 @@ public class ClientEvents {
                     return; // 已经是我们的了
                 }
 
-                LOGGER.info(">>> [RENDERER INJECTION] 检测到渲染器丢失或未注入，正在执行注入... <<<");
+                DebugLog.info(LOGGER, ">>> [RENDERER INJECTION] 检测到渲染器丢失或未注入，正在执行注入... <<<");
 
                 // 创建新的可变 Map
                 Map<EntityType<?>, net.minecraft.client.renderer.entity.EntityRenderer<?>> newRenderers =
@@ -218,7 +164,7 @@ public class ClientEvents {
                 // 把新 Map 赋值回字段
                 renderersField.set(dispatcher, newRenderers);
 
-                LOGGER.info(">>> [RENDERER INJECTION] 成功替换了 renderers 实例！(通过新建 Map) <<<");
+                DebugLog.info(LOGGER, ">>> [RENDERER INJECTION] 成功替换了 renderers 实例！(通过新建 Map) <<<");
             }
 
             if (providersField != null) {
@@ -235,7 +181,7 @@ public class ClientEvents {
                 // 把新 Map 赋值回字段
                 providersField.set(dispatcher, newProviders);
 
-                LOGGER.info(">>> [RENDERER INJECTION] 成功替换了 providers 工厂！(通过新建 Map) <<<");
+                DebugLog.info(LOGGER, ">>> [RENDERER INJECTION] 成功替换了 providers 工厂！(通过新建 Map) <<<");
             }
 
         } catch (Exception e) {

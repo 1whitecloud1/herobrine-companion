@@ -28,7 +28,12 @@ public class ClientHooks {
     private static int crossChatAutoHbTurnLimit = 8;
 
     public static void openHeroScreen(int entityId) {
-        Minecraft.getInstance().setScreen(new HeroScreen(entityId));
+        Minecraft mc = Minecraft.getInstance();
+        mc.setScreen(new HeroScreen(entityId));
+        if (mc.screen instanceof HeroScreen && mc.getConnection() != null) {
+            com.whitecloud233.modid.herobrine_companion.network.CompanionGuideChannel
+                    .notifyScreenOpened(mc.getConnection().getConnection(), entityId);
+        }
     }
 
     public static void enableChat() {

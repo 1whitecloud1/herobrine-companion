@@ -4,7 +4,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.modid.herobrine_companion.client.render.AwakenedMobNameplateRenderer;
 import com.whitecloud233.modid.herobrine_companion.client.render.EntitySpeechBubbleRenderer;
-import com.whitecloud233.modid.herobrine_companion.compat.epicfight.HeroEpicFightCompat;
+import com.whitecloud233.modid.herobrine_companion.api.compat.HeroEpicFightCompat;
 import com.whitecloud233.modid.herobrine_companion.entity.awakened.AwakenedMobAccessor;
 import com.whitecloud233.modid.herobrine_companion.entity.dialogue.SpeechBubbleAccessor;
 import net.minecraft.client.Minecraft;

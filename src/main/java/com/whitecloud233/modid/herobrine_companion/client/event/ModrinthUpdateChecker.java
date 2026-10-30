@@ -4,6 +4,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.modid.herobrine_companion.client.service.HttpClients;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.ClickEvent;
@@ -64,9 +65,7 @@ public class ModrinthUpdateChecker {
             String url = "https://api.modrinth.com/v2/project/" + PROJECT_SLUG +
                     "/version?loaders=%5B%22forge%22%5D&game_versions=%5B%221.20.1%22%5D";
 
-            HttpClient client = HttpClient.newBuilder()
-                    .connectTimeout(Duration.ofSeconds(10)) // 设置超时，防止网络不好卡住
-                    .build();
+            HttpClient client = HttpClients.shared(10);
 
             // Modrinth 官方要求必须提供自定义的 User-Agent，否则可能会被拒绝请求
             HttpRequest request = HttpRequest.newBuilder()

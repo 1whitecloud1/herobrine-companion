@@ -7,6 +7,7 @@ import com.whitecloud233.modid.herobrine_companion.client.service.AIService;
 import com.whitecloud233.modid.herobrine_companion.client.service.ConversationStore;
 import com.whitecloud233.modid.herobrine_companion.client.service.LLMConfig;
 import com.whitecloud233.modid.herobrine_companion.client.service.LocalChatService;
+import com.whitecloud233.modid.herobrine_companion.client.tts.TtsSpeechService;
 import com.whitecloud233.modid.herobrine_companion.client.gui.HeroChatScreen;
 import com.whitecloud233.modid.herobrine_companion.client.gui.crosschat.CrossChatScreen;
 import com.whitecloud233.modid.herobrine_companion.network.AgentChatOutcomePacket;
@@ -38,7 +39,7 @@ public class ClientChatHandler {
 
     // 本地模式默认回复的翻译键和兜底文本
     private static final String DEFAULT_RESPONSE_KEY = "chat.herobrine_companion.default_silence";
-    private static final String DEFAULT_RESPONSE_FALLBACK = "§7[Hero stares at you silently...]";
+    private static final String DEFAULT_RESPONSE_FALLBACK = "§7[Herobrine stares at you silently...]";
 
     @SubscribeEvent
     public static void onClientChat(ClientChatEvent event) {
@@ -124,6 +125,8 @@ public class ClientChatHandler {
                                     mc.gui.getChat().addMessage(
                                             Component.translatable("message.herobrine_companion.chat_hero", Component.literal(reply))
                                     );
+                                    // 玩家发起的聊天 → 回复接入 TTS 语音（总开关/引擎由 TTS 设置页控制）
+                                    TtsSpeechService.getInstance().speakChatReply(reply);
                                 });
                             });
                         } else {
@@ -134,6 +137,8 @@ public class ClientChatHandler {
                                     mc.gui.getChat().addMessage(
                                             Component.translatable("message.herobrine_companion.chat_hero", Component.literal(reply))
                                     );
+                                    // 玩家发起的聊天 → 回复接入 TTS 语音
+                                    TtsSpeechService.getInstance().speakChatReply(reply);
                                 });
                             });
                         }
@@ -152,6 +157,8 @@ public class ClientChatHandler {
                                 mc.gui.getChat().addMessage(
                                         Component.translatable("message.herobrine_companion.chat_hero", Component.literal(reply))
                                 );
+                                // 玩家发起的聊天 → 回复接入 TTS 语音（本地模型分支）
+                                TtsSpeechService.getInstance().speakChatReply(reply);
                             });
                         });
                     } else {
@@ -186,6 +193,8 @@ public class ClientChatHandler {
                         mc.gui.getChat().addMessage(
                                 Component.translatable("message.herobrine_companion.chat_hero", heroMessage)
                         );
+                        // 词库兜底回复同样属于玩家发起的聊天，一并接入 TTS 语音
+                        TtsSpeechService.getInstance().speakChatReply(heroMessage.getString());
                     }
                 }
 
