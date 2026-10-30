@@ -1,5 +1,8 @@
 package com.whitecloud233.modid.herobrine_companion.compat.cooking;
 
+import com.whitecloud233.modid.herobrine_companion.client.gui.HeroTheme;
+import com.whitecloud233.modid.herobrine_companion.entity.cooking.CookOption;
+import com.whitecloud233.modid.herobrine_companion.entity.cooking.CookingRules;
 import com.whitecloud233.modid.herobrine_companion.client.gui.HeroScreen;
 import com.whitecloud233.modid.herobrine_companion.network.PacketHandler;
 import net.minecraft.client.Minecraft;
@@ -21,16 +24,18 @@ public class HeroCookSelectionScreen extends Screen {
     private static final int COL_BORDER = 0xFF8B6A3D;
     private static final int COL_TEXT = 0xFFF3E6C8;
     private static final int COL_SUBTEXT = 0xFFBCA47B;
+    private static final int COL_LIST_BG = 0x44000000;
+    private static final int COL_LIST_BORDER = 0xFF5C4730;
 
     private final int heroId;
     private final BlockPos cookwarePos;
-    private final List<HeroCookingCompat.CookOptionView> options;
+    private final List<CookOption> options;
     private final Screen previousScreen;
     private CookOptionList optionList;
-    private int repeatCount = HeroCookingCompat.MIN_COOK_REPEAT_COUNT;
+    private int repeatCount = CookingRules.MIN_COOK_REPEAT_COUNT;
 
     public HeroCookSelectionScreen(int heroId, BlockPos cookwarePos,
-                                   List<HeroCookingCompat.CookOptionView> options,
+                                   List<CookOption> options,
                                    Screen previousScreen) {
         super(Component.translatable("gui.herobrine_companion.cook_select_title"));
         this.heroId = heroId;
@@ -41,9 +46,9 @@ public class HeroCookSelectionScreen extends Screen {
 
     /** 面板几何：宽高钳制到窗口内，居中。返回 {left, top, w, h}。 */
     private int[] panelDims() {
-        int w = Math.min(PANEL_WIDTH, Math.max(220, this.width - 16));
-        int h = Math.min(PANEL_HEIGHT, Math.max(180, this.height - 16));
-        return new int[]{(this.width - w) / 2, Math.max(4, (this.height - h) / 2), w, h};
+        HeroTheme.Frame frame = HeroTheme.frame(this.width, this.height,
+                PANEL_WIDTH, PANEL_HEIGHT, 220, 180, 8);
+        return new int[]{frame.left(), frame.top(), frame.width(), frame.height()};
     }
 
     @Override
@@ -92,10 +97,16 @@ public class HeroCookSelectionScreen extends Screen {
         int panelW = dims[2];
         int panelH = dims[3];
         guiGraphics.fill(left, top, left + panelW, top + panelH, COL_BG);
-        guiGraphics.fill(left, top, left + panelW, top + 1, COL_BORDER);
-        guiGraphics.fill(left, top + panelH - 1, left + panelW, top + panelH, COL_BORDER);
-        guiGraphics.fill(left, top, left + 1, top + panelH, COL_BORDER);
-        guiGraphics.fill(left + panelW - 1, top, left + panelW, top + panelH, COL_BORDER);
+        guiGraphics.renderOutline(left, top, panelW, panelH, COL_BORDER);
+
+        // 列表区域底色（替代原版列表的泥土贴图，避免盖住面板文字）
+        if (this.optionList != null) {
+            int listLeft = this.optionList.getLeft();
+            int listTop = this.optionList.getTop();
+            int listBottom = this.optionList.getBottom();
+            guiGraphics.fill(listLeft, listTop, listLeft + this.optionList.getWidth(), listBottom, COL_LIST_BG);
+            guiGraphics.renderOutline(listLeft, listTop, this.optionList.getWidth(), listBottom - listTop, COL_LIST_BORDER);
+        }
 
         guiGraphics.drawString(this.font, this.title, left + 10, top + 8, COL_TEXT, false);
         guiGraphics.drawString(this.font, Component.translatable("gui.herobrine_companion.cook_select_hint"),
@@ -129,8 +140,8 @@ public class HeroCookSelectionScreen extends Screen {
 
     private void adjustRepeatCount(int delta) {
         this.repeatCount = Mth.clamp(this.repeatCount + delta,
-                HeroCookingCompat.MIN_COOK_REPEAT_COUNT,
-                HeroCookingCompat.MAX_COOK_REPEAT_COUNT);
+                CookingRules.MIN_COOK_REPEAT_COUNT,
+                CookingRules.MAX_COOK_REPEAT_COUNT);
         this.refreshOptionList();
     }
 
@@ -151,6 +162,9 @@ public class HeroCookSelectionScreen extends Screen {
         private CookOptionList(Minecraft minecraft, int width, int height, int top, int itemHeight) {
             super(minecraft, width, height, top, top + height, itemHeight);
             this.setRenderHeader(false, 0);
+            // 关掉原版列表自带的泥土背景与上下补齐，否则会盖住面板标题与说明文字
+            this.setRenderBackground(false);
+            this.setRenderTopAndBottom(false);
         }
 
         @Override
@@ -167,9 +181,9 @@ public class HeroCookSelectionScreen extends Screen {
             this.addEntry(entry);
         }
 
-        private void rebuild(List<HeroCookingCompat.CookOptionView> options, int repeatCount) {
+        private void rebuild(List<CookOption> options, int repeatCount) {
             this.clearEntries();
-            for (HeroCookingCompat.CookOptionView option : options) {
+            for (CookOption option : options) {
                 if (option.maxRepeatCount() >= repeatCount) {
                     this.addOption(new CookOptionEntry(option));
                 }
@@ -183,9 +197,9 @@ public class HeroCookSelectionScreen extends Screen {
     }
 
     private final class CookOptionEntry extends ObjectSelectionList.Entry<CookOptionEntry> {
-        private final HeroCookingCompat.CookOptionView option;
+        private final CookOption option;
 
-        private CookOptionEntry(HeroCookingCompat.CookOptionView option) {
+        private CookOptionEntry(CookOption option) {
             this.option = option;
         }
 

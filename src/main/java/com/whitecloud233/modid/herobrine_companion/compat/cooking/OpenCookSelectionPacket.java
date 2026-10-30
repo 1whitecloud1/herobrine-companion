@@ -1,5 +1,6 @@
 package com.whitecloud233.modid.herobrine_companion.compat.cooking;
 
+import com.whitecloud233.modid.herobrine_companion.entity.cooking.CookOption;
 import com.whitecloud233.modid.herobrine_companion.network.NetworkClientBridge;
 import com.whitecloud233.modid.herobrine_companion.network.PacketDispatch;
 import net.minecraft.core.BlockPos;
@@ -15,11 +16,11 @@ import java.util.function.Supplier;
 public class OpenCookSelectionPacket {
     private final int heroId;
     private final BlockPos cookwarePos;
-    private final List<HeroCookingCompat.CookOptionView> options;
+    private final List<CookOption> options;
 
-    public OpenCookSelectionPacket(int heroId, BlockPos cookwarePos, List<HeroCookingCompat.CookOptionView> options) {
+    public OpenCookSelectionPacket(int heroId, BlockPos cookwarePos, List<CookOption> options) {
         this.heroId = heroId;
-        this.cookwarePos = cookwarePos;
+        this.cookwarePos = cookwarePos.immutable();
         this.options = List.copyOf(options);
     }
 
@@ -27,12 +28,12 @@ public class OpenCookSelectionPacket {
         this.heroId = buf.readInt();
         this.cookwarePos = buf.readBlockPos();
         int size = buf.readVarInt();
-        List<HeroCookingCompat.CookOptionView> values = new ArrayList<>(size);
+        List<CookOption> values = new ArrayList<>(size);
         for (int i = 0; i < size; i++) {
             ResourceLocation recipeId = buf.readResourceLocation();
             ItemStack result = buf.readItem();
             int maxRepeatCount = buf.readVarInt();
-            values.add(new HeroCookingCompat.CookOptionView(recipeId, result, maxRepeatCount));
+            values.add(new CookOption(recipeId, result, maxRepeatCount));
         }
         this.options = values;
     }
@@ -41,7 +42,7 @@ public class OpenCookSelectionPacket {
         buf.writeInt(this.heroId);
         buf.writeBlockPos(this.cookwarePos);
         buf.writeVarInt(this.options.size());
-        for (HeroCookingCompat.CookOptionView option : this.options) {
+        for (CookOption option : this.options) {
             buf.writeResourceLocation(option.recipeId());
             buf.writeItem(option.result());
             buf.writeVarInt(option.maxRepeatCount());
@@ -50,8 +51,6 @@ public class OpenCookSelectionPacket {
 
     public void handle(Supplier<NetworkEvent.Context> contextSupplier) {
         NetworkEvent.Context context = contextSupplier.get();
-        PacketDispatch.assertClient(context);
-        context.enqueueWork(() -> NetworkClientBridge.openCookSelection(this.heroId, this.cookwarePos, this.options));
-        context.setPacketHandled(true);
+        PacketDispatch.enqueueClient(context, () -> NetworkClientBridge.openCookSelection(this.heroId, this.cookwarePos, this.options));
     }
 }

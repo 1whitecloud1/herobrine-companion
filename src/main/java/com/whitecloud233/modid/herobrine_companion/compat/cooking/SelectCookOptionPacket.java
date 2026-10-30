@@ -1,7 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.compat.cooking;
 
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
-import com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroLogic;
+import com.whitecloud233.modid.herobrine_companion.entity.cooking.CookingService;
 import com.whitecloud233.modid.herobrine_companion.network.PacketDispatch;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
@@ -20,7 +20,7 @@ public class SelectCookOptionPacket {
 
     public SelectCookOptionPacket(int heroId, BlockPos cookwarePos, ResourceLocation recipeId, int repeatCount) {
         this.heroId = heroId;
-        this.cookwarePos = cookwarePos;
+        this.cookwarePos = cookwarePos.immutable();
         this.recipeId = recipeId;
         this.repeatCount = repeatCount;
     }
@@ -49,7 +49,7 @@ public class SelectCookOptionPacket {
 
             Entity entity = player.level().getEntity(this.heroId);
             if (entity instanceof HeroEntity hero) {
-                HeroLogic.handleCookSelection(hero, player, this.cookwarePos, this.recipeId, this.repeatCount);
+                CookingService.requestCookSelection(hero, player, this.cookwarePos, this.recipeId, this.repeatCount);
             }
         });
     }
