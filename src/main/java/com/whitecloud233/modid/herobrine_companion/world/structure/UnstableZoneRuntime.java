@@ -76,6 +76,28 @@ public final class UnstableZoneRuntime {
         return SavedZones.get(level).isTracked(pos);
     }
 
+    /**
+     * 是否完全没有被追踪的异常方块。
+     * 供 AI 扫描逻辑零成本早退——没有任何异常方块时不必做任何范围查询。
+     */
+    public static boolean hasNoTrackedAnomalyBlocks(ServerLevel level) {
+        return level == null || SavedZones.get(level).hasNoTrackedPositions();
+    }
+
+    /**
+     * 收集 center 周围 radius 内已被追踪的异常方块坐标（最多 max 个）。
+     *
+     * <p>取代「遍历整个立方体逐个 {@code getBlockState} + isTracked」的做法：
+     * 复杂度从 O((2r+1)^3) 降到 O(已追踪方块数)，且每次命中都不会重复查询同一 chunk。</p>
+     */
+    public static List<BlockPos> collectTrackedAnomalyBlocks(ServerLevel level, BlockPos center, int radius, int max) {
+        if (level == null || center == null || max <= 0) {
+            return List.of();
+        }
+        return SavedZones.get(level).collectTrackedWithin(
+                center.getX(), center.getY(), center.getZ(), radius, max);
+    }
+
     public static void registerGeneratedBlocks(ServerLevel level, BoundingBox bounds, Collection<BlockPos> positions) {
         if (level == null || bounds == null || positions == null || positions.isEmpty()) {
             return;
@@ -287,6 +309,59 @@ public final class UnstableZoneRuntime {
 
         public boolean isTracked(BlockPos pos) {
             return trackedPositions.contains(pos.asLong());
+        }
+
+        /** 是否完全没有被追踪的异常方块（供调用方零成本早退）。 */
+        public boolean hasNoTrackedPositions() {
+            return trackedPositions.isEmpty();
+        }
+
+        /**
+         * 收集落在以 center 为中心、半径 radius（三轴独立，等价于边长 2r+1 的立方体）内的
+         * 已追踪异常方块坐标。最多返回 max 个。
+         *
+         * <p><b>为什么用集合反查而不是全量扫描</b>：{@link #isTracked(BlockPos)} 的语义等价于
+         * {@code trackedPositions.contains(pos)}，所以「立方体内哪些位置被追踪」只需要遍历
+         * {@code trackedPositions}（通常几十到几百个），而不是遍历 27 万个坐标逐个查询。
+         * 调用方（如 {@code HeroAnomalySupport}）原本每 10 tick 做 274,625 次
+         * {@code getBlockState}，改造后复杂度只与已追踪方块数量成正比。</p>
+         *
+         * @return 命中坐标；当命中数超过 max 时按「到中心的平方距离」由近到远取前 max 个，
+         *         否则原样返回全部命中项。无命中时返回空列表
+         */
+        public List<BlockPos> collectTrackedWithin(int centerX, int centerY, int centerZ, int radius, int max) {
+            if (trackedPositions.isEmpty() || max <= 0) {
+                return List.of();
+            }
+            int minX = centerX - radius, maxX = centerX + radius;
+            int minY = centerY - radius, maxY = centerY + radius;
+            int minZ = centerZ - radius, maxZ = centerZ + radius;
+            // 先收集命中项再按「到中心的平方距离」排序：HashSet 的遍历顺序是哈希序，
+            // 直接取前 max 个会让 Hero 在不同方块之间无规律跳转（而且同一世界重启后顺序还会变）。
+            // 排序保证最近优先，行为确定，代价只有命中项数量级的 n log n（通常是个位数到几十）。
+            List<BlockPos> found = new ArrayList<>();
+            for (long packed : trackedPositions) {
+                BlockPos pos = BlockPos.of(packed);
+                if (pos.getX() < minX || pos.getX() > maxX) continue;
+                if (pos.getY() < minY || pos.getY() > maxY) continue;
+                if (pos.getZ() < minZ || pos.getZ() > maxZ) continue;
+                found.add(pos);
+            }
+            if (found.size() <= 1) {
+                return found;
+            }
+            // max 远大于命中数时（例如 AOE 净化要清掉范围内全部异常方块）不需要排序，
+            // 排序只服务于「只要最近 max 个」的调用方。
+            if (found.size() > max) {
+                found.sort(java.util.Comparator.comparingLong(p -> {
+                    long dx = (long) p.getX() - centerX;
+                    long dy = (long) p.getY() - centerY;
+                    long dz = (long) p.getZ() - centerZ;
+                    return dx * dx + dy * dy + dz * dz;
+                }));
+                return new ArrayList<>(found.subList(0, max));
+            }
+            return found;
         }
 
         public Collection<ZoneRecord> getZones() {
