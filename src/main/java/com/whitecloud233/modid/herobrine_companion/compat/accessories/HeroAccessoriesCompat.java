@@ -40,7 +40,7 @@ public class HeroAccessoriesCompat {
     };
 
     public static boolean isLoaded() {
-        return ModList.get().isLoaded("accessories");
+        return com.whitecloud233.modid.herobrine_companion.compat.safety.CompatPreflight.available("accessories");
     }
 
     public static int addSlots(Consumer<Slot> slotConsumer, HeroEntity hero, int startX, int startY, int columns) {
@@ -292,7 +292,7 @@ public class HeroAccessoriesCompat {
             @Override
             public void setChanged() {
                 super.setChanged();
-                this.hero.isStateDirty = true;
+                this.hero.markEquipmentDirty();
                 if (!this.hero.level().isClientSide) {
                     HeroStateManager.backupToGlobal(this.hero);
                     PacketHandler.sendToTracking(new SyncHeroCosmeticsPacket(this.hero), this.hero);

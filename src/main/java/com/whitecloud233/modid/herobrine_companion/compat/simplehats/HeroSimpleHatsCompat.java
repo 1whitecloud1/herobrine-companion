@@ -9,7 +9,7 @@ import net.minecraftforge.fml.ModList;
 public class HeroSimpleHatsCompat {
 
     public static boolean isLoaded() {
-        return ModList.get().isLoaded("simplehats");
+        return com.whitecloud233.modid.herobrine_companion.compat.safety.CompatPreflight.available("simplehats");
     }
 
     public static void attachRenderLayer(HeroRenderer renderer) {
@@ -23,7 +23,8 @@ public class HeroSimpleHatsCompat {
     private static class SimpleHatsSafeInvoker {
 
         static void attachRenderLayer(LivingEntityRenderer<HeroEntity, PlayerModel<HeroEntity>> renderer) {
-            renderer.addLayer(new fonnymunkey.simplehats.client.hat.HatLayer<>(renderer));
+            renderer.addLayer(new com.whitecloud233.modid.herobrine_companion.compat.safety.GuardedHeroLayer(renderer, "simplehats",
+                    new fonnymunkey.simplehats.client.hat.HatLayer<>(renderer)));
         }
     }
 }
