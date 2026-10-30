@@ -2,9 +2,15 @@ package com.whitecloud233.herobrine_companion.entity.logic;
 
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.family.HerobrineFamilySummonManager;
+import com.whitecloud233.herobrine_companion.entity.ai.learning.HeroBrain;
+import com.whitecloud233.herobrine_companion.entity.ai.combat.HeroCombatPower;
+import com.whitecloud233.herobrine_companion.entity.gift.HeroGiftReturnService;
+import com.whitecloud233.herobrine_companion.entity.logic.data.HeroDimensionHandler;
+import com.whitecloud233.herobrine_companion.entity.logic.data.HeroLogic;
 import com.whitecloud233.herobrine_companion.entity.logic.data.HeroLifecycleHandler;
 import com.whitecloud233.herobrine_companion.entity.logic.data.HeroStateManager;
 import com.whitecloud233.herobrine_companion.entity.logic.data.HeroWorldData;
+import com.whitecloud233.herobrine_companion.world.structure.ModStructures;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.server.level.ServerLevel;
 
@@ -12,7 +18,43 @@ import java.util.UUID;
 
 public class HeroServerTick {
 
+    public static boolean tickBehavior(HeroEntity hero) {
+        if (hero.level().isClientSide) return true;
+        // 试炼擂台不运行陪伴 AI，但本体仍须参与唯一性检查。
+        if (hero.isAlive() && !hero.isRemoved()) HeroBrain.ACTIVE_HEROES.add(hero);
+        if (hero.level().dimension() == ModStructures.END_RING_DIMENSION_KEY) {
+            if (hero.tickCount == 1 || hero.tickCount % 20 == 0) HeroLifecycleHandler.checkUniqueness(hero);
+            if (hero.isRemoved() || !maintainPersistence(hero, (ServerLevel) hero.level())) return false;
+            HeroDimensionHandler.handleVoidProtection(hero);
+            return true;
+        }
+
+        HeroLogic.tick(hero);
+        if (hero.isRemoved()) return false;
+        HeroGiftReturnService.tick(hero);
+        hero.holdForGiftGesture();
+        if (hero.isAlive()) {
+            HeroBrain brain = hero.getHeroBrain();
+            brain.tick();
+            hero.getHeroAgent().tick(hero);
+            hero.getHeroAgent().tickTasks(hero);
+            if (hero.getMindState() != brain.getState()) hero.setMindState(brain.getState());
+            if (hero.level() instanceof ServerLevel serverLevel) {
+                return handleTick(hero, serverLevel);
+            }
+        }
+        return true;
+    }
+
     public static boolean handleTick(HeroEntity hero, ServerLevel serverLevel) {
+        if (!maintainPersistence(hero, serverLevel)) return false;
+
+        HeroCombatPower.applyTo(hero);
+        HerobrineFamilySummonManager.serverTick(hero, serverLevel);
+        return true;
+    }
+
+    private static boolean maintainPersistence(HeroEntity hero, ServerLevel serverLevel) {
         if (hero.isRemoved() || !hero.isAlive()) return false;
         UUID ownerUUID = hero.getOwnerUUID();
 
@@ -47,12 +89,9 @@ public class HeroServerTick {
                     hero.setCustomSkinName(customName);
                 }
             }
-            data.setEquipment(ownerUUID, hero.getArmorItemsTag(), hero.getHandItemsTag());
-            data.setCuriosBackItem(ownerUUID, hero.getCuriosBackItemTag());
-            data.setAccessoriesData(ownerUUID, hero.getAccessoriesDataTag());
+            HeroStateManager.backupDirtyState(hero);
         }
 
-        HerobrineFamilySummonManager.serverTick(hero, serverLevel);
         return true;
     }
 }

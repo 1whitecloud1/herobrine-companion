@@ -28,9 +28,15 @@ public class VoidRiftEntity extends Entity {
 
     private static final EntityDataAccessor<Float> ROTATION = SynchedEntityData.defineId(VoidRiftEntity.class, EntityDataSerializers.FLOAT);
 
+    private static final EntityDataAccessor<Integer> TARGET_ID =
+            SynchedEntityData.defineId(VoidRiftEntity.class, EntityDataSerializers.INT);
+
+    private static final EntityDataAccessor<Boolean> VISUAL_ONLY =
+            SynchedEntityData.defineId(VoidRiftEntity.class, EntityDataSerializers.BOOLEAN);
+
     private UUID ownerUUID;
     private int lifeTime = 0;
-    private static final int MAX_LIFE_TIME = 31; // 1.5秒
+    private static final int MAX_LIFE_TIME = 24;
 
     public VoidRiftEntity(EntityType<?> entityType, Level level) {
         super(entityType, level);
@@ -48,6 +54,8 @@ public class VoidRiftEntity extends Entity {
     @Override
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         builder.define(ROTATION, 0.0F);
+        builder.define(TARGET_ID, -1);
+        builder.define(VISUAL_ONLY, false);
     }
 
     public float getRotation() {
@@ -56,6 +64,30 @@ public class VoidRiftEntity extends Entity {
 
     public int getVisualLifetime() {
         return MAX_LIFE_TIME;
+    }
+
+    public void setTarget(Entity target) {
+        if (target == null) {
+            this.entityData.set(TARGET_ID, -1);
+        } else {
+            this.entityData.set(TARGET_ID, target.getId());
+        }
+    }
+
+    public Entity getTarget() {
+        int id = this.entityData.get(TARGET_ID);
+        if (id < 0 || this.level() == null) {
+            return null;
+        }
+        return this.level().getEntity(id);
+    }
+
+    public void setVisualOnly(boolean visualOnly) {
+        this.entityData.set(VISUAL_ONLY, visualOnly);
+    }
+
+    public boolean isVisualOnly() {
+        return this.entityData.get(VISUAL_ONLY);
     }
 
     @Override
@@ -67,6 +99,12 @@ public class VoidRiftEntity extends Entity {
         if (compound.contains("RiftRotation")) {
             this.entityData.set(ROTATION, compound.getFloat("RiftRotation"));
         }
+        if (compound.contains("TargetId")) {
+            this.entityData.set(TARGET_ID, compound.getInt("TargetId"));
+        }
+        if (compound.contains("VisualOnly")) {
+            this.entityData.set(VISUAL_ONLY, compound.getBoolean("VisualOnly"));
+        }
     }
 
     @Override
@@ -76,6 +114,8 @@ public class VoidRiftEntity extends Entity {
             compound.putUUID("Owner", this.ownerUUID);
         }
         compound.putFloat("RiftRotation", this.getRotation());
+        compound.putInt("TargetId", this.entityData.get(TARGET_ID));
+        compound.putBoolean("VisualOnly", this.isVisualOnly());
     }
 
     @Override
@@ -96,6 +136,11 @@ public class VoidRiftEntity extends Entity {
             this.lifeTime++;
             if (this.lifeTime >= MAX_LIFE_TIME) {
                 this.discard();
+                return;
+            }
+
+            // 纯视觉裂隙不造成伤害（受击特效等复用同一实体）。
+            if (this.isVisualOnly()) {
                 return;
             }
 
@@ -138,12 +183,16 @@ public class VoidRiftEntity extends Entity {
             }
         } else {
             // 客户端粒子效果
-            if (this.random.nextFloat() < 0.3F) {
-                this.level().addParticle(ParticleTypes.ELECTRIC_SPARK, 
-                        this.getX() + (this.random.nextDouble() - 0.5), 
-                        this.getY() + (this.random.nextDouble() * 2.0), 
-                        this.getZ() + (this.random.nextDouble() - 0.5), 
-                        0, 0, 0);
+            if (this.random.nextFloat() < 0.65F) {
+                this.level().addParticle(
+                        ParticleTypes.ELECTRIC_SPARK,
+                        this.getX() + (this.random.nextDouble() - 0.5D) * 1.8D,
+                        this.getY() + (this.random.nextDouble() - 0.5D) * 2.4D,
+                        this.getZ() + (this.random.nextDouble() - 0.5D) * 1.8D,
+                        0.0D,
+                        0.015D,
+                        0.0D
+                );
             }
         }
     }

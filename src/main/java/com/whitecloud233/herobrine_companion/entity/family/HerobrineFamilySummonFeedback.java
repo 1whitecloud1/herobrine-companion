@@ -4,6 +4,7 @@ import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.awakened.AwakenedMobProfile;
 import com.whitecloud233.herobrine_companion.entity.awakened.AwakenedMobProfiles;
 import com.whitecloud233.herobrine_companion.entity.dialogue.SpeechBubbleAccessor;
+import com.whitecloud233.herobrine_companion.entity.dialogue.SpeechBubbleTiming;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Mob;
@@ -12,9 +13,6 @@ import net.minecraft.world.entity.player.Player;
 import java.util.List;
 
 public final class HerobrineFamilySummonFeedback {
-    private static final int MIN_SPEECH_TICKS = 60;
-    private static final int MAX_SPEECH_TICKS = 120;
-
     private HerobrineFamilySummonFeedback() {
     }
 
@@ -106,7 +104,6 @@ public final class HerobrineFamilySummonFeedback {
     }
 
     private static int computeSpeechDuration(Component component) {
-        int duration = MIN_SPEECH_TICKS + component.getString().length() * 2;
-        return Math.min(MAX_SPEECH_TICKS, Math.max(MIN_SPEECH_TICKS, duration));
+        return SpeechBubbleTiming.durationTicks(component);
     }
 }

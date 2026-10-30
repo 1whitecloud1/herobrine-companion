@@ -1,5 +1,7 @@
 package com.whitecloud233.herobrine_companion.entity.logic.event;
 
+import com.whitecloud233.herobrine_companion.fight.ChallengeSession;
+
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.ai.goal.HeroObserveAndRescueGoal;
@@ -38,8 +40,8 @@ public class CombatAndChallengeHandler {
 
         // 玩家死亡（挑战失败逻辑）
         if (event.getEntity() instanceof ServerPlayer deadPlayer) {
-            if (deadPlayer.getPersistentData().getBoolean("IsChallengeActive")) {
-                com.whitecloud233.herobrine_companion.client.fight.HeroChallengeManager.failChallenge(deadPlayer);
+            if (ChallengeSession.isPlayerInChallenge(deadPlayer)) {
+                com.whitecloud233.herobrine_companion.fight.HeroChallengeManager.failChallenge(deadPlayer);
             }
         }
     }

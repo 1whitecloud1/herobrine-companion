@@ -1,8 +1,10 @@
 package com.whitecloud233.herobrine_companion.entity.logic;
 
-import com.whitecloud233.herobrine_companion.compat.cooking.HeroCookingCompat;
+import com.whitecloud233.herobrine_companion.entity.cooking.CookingRules;
+import com.whitecloud233.herobrine_companion.entity.cooking.CookingService;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.TagKey;
@@ -11,11 +13,13 @@ import net.minecraft.world.level.block.*;
 import net.minecraft.world.level.block.state.BlockState;
 
 public final class HeroInvitationHelper {
-    public static final int ACTION_NONE = 0;
+    /** 无邀请。逻辑侧清除邀请统一写这个常量，别再写字面量 0。 */
+    public static final int ACTION_NONE = CookingRules.ACTION_NONE;
     public static final int ACTION_INSPECT = 1;
     public static final int ACTION_REST = 2;
     public static final int ACTION_GUARD = 3;
-    public static final int ACTION_COOK = HeroCookingCompat.INVITED_ACTION_COOK;
+    public static final int ACTION_COOK = CookingService.INVITED_ACTION_COOK;
+    public static final int ACTION_MILLSTONE = CookingService.INVITED_ACTION_MILLSTONE;
 
     private static final TagKey<Block> FORGE_CHAIRS = BlockTags.create(ResourceLocation.fromNamespaceAndPath("forge", "chairs"));
     private static final TagKey<Block> COMMON_CHAIRS = BlockTags.create(ResourceLocation.fromNamespaceAndPath("c", "chairs"));
@@ -31,8 +35,13 @@ public final class HeroInvitationHelper {
         BlockState state = level.getBlockState(pos);
         Block block = state.getBlock();
 
-        if (HeroCookingCompat.isCookwareStation(level, pos)) {
+        if (CookingService.isCookwareStation(level, pos)) {
             return ACTION_COOK;
+        }
+
+        // 石磨不是锅具，必须排在做饭判定之后：它会先被做成「厨具站点」再被排除。
+        if (CookingService.isMillstoneStation(level, pos)) {
+            return ACTION_MILLSTONE;
         }
 
         if (state.is(BlockTags.BEDS) || block instanceof BedBlock) {
@@ -88,5 +97,31 @@ public final class HeroInvitationHelper {
 
     public static boolean isCookTarget(Level level, BlockPos pos) {
         return getInteractionType(level, pos) == ACTION_COOK;
+    }
+
+    public static boolean isMillstoneTarget(Level level, BlockPos pos) {
+        return getInteractionType(level, pos) == ACTION_MILLSTONE;
+    }
+
+    /** 厨具类邀请（做饭、拉磨）都靠石磨/锅具自身状态维持，取消时要一起释放。 */
+    public static boolean isStationAction(int action) {
+        return action == ACTION_COOK || action == ACTION_MILLSTONE;
+    }
+
+    /**
+     * 座位上方净空检查：坐姿模型向上延伸约 1.5 格，座位方块上方两格内若有碰撞体
+     * （屋檐、楼梯下沿、吊灯等），坐下去模型会插进方块。随机选座时要求上方连续
+     * 两格无碰撞，宁缺毋滥；地毯、火把、花草等无碰撞方块不受影响。
+     */
+    public static boolean hasRestHeadroom(Level level, BlockPos seatPos) {
+        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos(seatPos.getX(), seatPos.getY(), seatPos.getZ());
+        for (int i = 0; i < 2; i++) {
+            cursor.move(Direction.UP);
+            BlockState state = level.getBlockState(cursor);
+            if (!state.getCollisionShape(level, cursor).isEmpty()) {
+                return false;
+            }
+        }
+        return true;
     }
 }

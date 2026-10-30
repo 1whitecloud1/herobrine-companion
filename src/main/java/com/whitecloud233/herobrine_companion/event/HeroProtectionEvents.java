@@ -1,5 +1,11 @@
 package com.whitecloud233.herobrine_companion.event;
 
+import com.whitecloud233.herobrine_companion.entity.logic.data.DamageSources;
+
+import com.whitecloud233.herobrine_companion.entity.logic.data.AttackConfirmation;
+
+import com.whitecloud233.herobrine_companion.fight.ChallengeSession;
+
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import net.minecraft.network.chat.Component;
@@ -19,9 +25,6 @@ import net.neoforged.neoforge.event.tick.EntityTickEvent;
 
 @EventBusSubscriber(modid = HerobrineCompanion.MODID)
 public class HeroProtectionEvents {
-    private static final String PENDING_ATTACK_CONFIRM_PLAYER = "PendingAttackConfirmPlayer";
-    private static final String PENDING_ATTACK_CONFIRM_UNTIL = "PendingAttackConfirmUntil";
-    private static final long ATTACK_CONFIRM_WINDOW_TICKS = 100L;
 
     // 1. 仇恨锁定保护
     @SubscribeEvent
@@ -33,6 +36,12 @@ public class HeroProtectionEvents {
         }
         if (event.getEntity() instanceof HeroEntity hero
                 && hero.shouldPreventFriendlyFire(newTarget)) {
+            event.setCanceled(true);
+            return;
+        }
+        // 战斗模式不认领原版生物/觉醒怪物：拦在赋值入口，比事后清理更早一步。
+        if (event.getEntity() instanceof HeroEntity hero
+                && hero.shouldPreventProtectedBattleHit(newTarget)) {
             event.setCanceled(true);
             return;
         }
@@ -59,6 +68,11 @@ public class HeroProtectionEvents {
 
     HeroEntity attackingHero = getHeroAttacker(event.getSource());
         if (attackingHero != null && attackingHero.shouldPreventFriendlyFire(event.getEntity())) {
+        event.setCanceled(true);
+        return;
+    }
+        // 战斗模式只讨伐模组生物：技能特效是直接 hurt() 的，绕过了 canAttack，在这里统一兜住。
+        if (attackingHero != null && attackingHero.shouldPreventProtectedBattleHit(event.getEntity())) {
         event.setCanceled(true);
         return;
     }
@@ -100,8 +114,7 @@ public class HeroProtectionEvents {
         }
     }
     private static boolean canHeroBeAttacked(HeroEntity hero) {
-        return hero.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE)
-                || hero.getPersistentData().getBoolean("IsChallengeActive")
+        return ChallengeSession.isHeroInChallenge(hero)
                 || hero.isBattleModeActive();
     }
 
@@ -162,46 +175,19 @@ public class HeroProtectionEvents {
     }
 
     private static boolean hasConfirmedAttackIntent(HeroEntity hero, Player player) {
-        if (hero.level().isClientSide) {
-            return false;
-        }
-
-        long currentGameTime = hero.level().getGameTime();
-        long confirmUntil = hero.getPersistentData().getLong(PENDING_ATTACK_CONFIRM_UNTIL);
-        if (confirmUntil < currentGameTime) {
-            clearPendingAttackConfirmation(hero);
-            return false;
-        }
-
-        return hero.getPersistentData().hasUUID(PENDING_ATTACK_CONFIRM_PLAYER)
-                && player.getUUID().equals(hero.getPersistentData().getUUID(PENDING_ATTACK_CONFIRM_PLAYER));
+        return AttackConfirmation.isConfirmed(hero, player);
     }
 
     private static void rememberAccidentalHit(HeroEntity hero, Player player) {
-        hero.getPersistentData().putUUID(PENDING_ATTACK_CONFIRM_PLAYER, player.getUUID());
-        hero.getPersistentData().putLong(PENDING_ATTACK_CONFIRM_UNTIL, hero.level().getGameTime() + ATTACK_CONFIRM_WINDOW_TICKS);
+        AttackConfirmation.remember(hero, player);
     }
 
     private static void clearPendingAttackConfirmation(HeroEntity hero) {
-        hero.getPersistentData().remove(PENDING_ATTACK_CONFIRM_PLAYER);
-        hero.getPersistentData().remove(PENDING_ATTACK_CONFIRM_UNTIL);
+        AttackConfirmation.clear(hero);
     }
 
     private static Player getPlayerAttacker(DamageSource source) {
-        if (source == null) {
-            return null;
-        }
-
-        if (source.getEntity() instanceof Player player) {
-            return player;
-        }
-
-        Entity direct = source.getDirectEntity();
-        if (direct instanceof Projectile projectile && projectile.getOwner() instanceof Player player) {
-            return player;
-        }
-
-        return null;
+        return DamageSources.playerAttacker(source);
     }
 
     private enum PlayerHitDecision {

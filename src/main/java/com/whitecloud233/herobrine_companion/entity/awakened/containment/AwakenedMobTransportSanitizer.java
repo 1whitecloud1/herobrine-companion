@@ -1,5 +1,7 @@
 package com.whitecloud233.herobrine_companion.entity.awakened.containment;
 
+import com.whitecloud233.herobrine_companion.util.NbtKeys;
+
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.world.entity.Entity;
@@ -11,16 +13,16 @@ import net.minecraft.world.phys.Vec3;
 public final class AwakenedMobTransportSanitizer {
     private static final String FORGE_DATA_TAG = "NeoForgeData";
     private static final String LEGACY_FORGE_DATA_TAG = "ForgeData";
-    private static final String HERO_SUBMISSION_TAG = "HeroSubmission";
-    private static final String HERO_SUBMISSION_YAW_TAG = "HeroSubmissionYaw";
-    private static final String HERO_SUBMISSION_STATIONARY_TAG = "HeroSubmissionStationary";
-    private static final String HERO_SUBMISSION_ANCHOR_X_TAG = "HeroSubmissionAnchorX";
-    private static final String HERO_SUBMISSION_ANCHOR_Y_TAG = "HeroSubmissionAnchorY";
-    private static final String HERO_SUBMISSION_ANCHOR_Z_TAG = "HeroSubmissionAnchorZ";
-    private static final String JEAN_FRONT_HERO_TAG = "HerobrineCompanionJeanFrontHero";
-    private static final String JEAN_FRONT_HERO_TIME_TAG = "HerobrineCompanionJeanFrontHeroTime";
-    private static final String JEAN_PLAYER_RIDDEN_TAG = "HerobrineCompanionJeanPlayerRidden";
-    private static final String JEAN_MOUNT_NO_AI_TAG = "HerobrineCompanionJeanMountNoAi";
+    private static final String HERO_SUBMISSION_TAG = NbtKeys.MOB_SUBMISSION;
+    private static final String HERO_SUBMISSION_YAW_TAG = NbtKeys.MOB_SUBMISSION_YAW;
+    private static final String HERO_SUBMISSION_STATIONARY_TAG = NbtKeys.DRAGON_ANCHORED;
+    private static final String HERO_SUBMISSION_ANCHOR_X_TAG = NbtKeys.DRAGON_ANCHOR_X;
+    private static final String HERO_SUBMISSION_ANCHOR_Y_TAG = NbtKeys.DRAGON_ANCHOR_Y;
+    private static final String HERO_SUBMISSION_ANCHOR_Z_TAG = NbtKeys.DRAGON_ANCHOR_Z;
+    private static final String JEAN_FRONT_HERO_TAG = NbtKeys.JEAN_FRONT_HERO;
+    private static final String JEAN_FRONT_HERO_TIME_TAG = NbtKeys.JEAN_FRONT_HERO_TIME;
+    private static final String JEAN_PLAYER_RIDDEN_TAG = NbtKeys.JEAN_PLAYER_RIDDEN;
+    private static final String JEAN_MOUNT_NO_AI_TAG = NbtKeys.JEAN_MOUNT_NO_AI;
 
     private AwakenedMobTransportSanitizer() {
     }

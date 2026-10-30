@@ -1,5 +1,7 @@
 package com.whitecloud233.herobrine_companion.entity.logic.data;
 
+import com.whitecloud233.herobrine_companion.util.LanguageCodes;
+
 import com.whitecloud233.herobrine_companion.item.HeroSummonItem;
 import com.whitecloud233.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.herobrine_companion.network.ai.*;
@@ -432,7 +434,7 @@ public final class HeroCrossChatManager {
         if (player == null) {
             return;
         }
-        getWorldData(player).setClientLanguageCode(player.getUUID(), normalizeLanguageCode(languageCode));
+        getWorldData(player).setClientLanguageCode(player.getUUID(), LanguageCodes.normalize(languageCode));
     }
 
     public synchronized void syncClientState(ServerPlayer player) {
@@ -610,7 +612,7 @@ public final class HeroCrossChatManager {
         if (sanitizedSpeaker.isEmpty() || sanitizedContent.isEmpty()) {
             return;
         }
-        String normalizedSourceLanguageCode = normalizeLanguageCode(sourceLanguageCode);
+        String normalizedSourceLanguageCode = LanguageCodes.normalize(sourceLanguageCode);
         for (ServerPlayer player : getParticipants(session)) {
             String peerName = resolvePlayerName(session.server, session.getPeer(player.getUUID()));
             if (peerName == null || peerName.isBlank()) {
@@ -700,13 +702,7 @@ public final class HeroCrossChatManager {
         return Math.max(HeroWorldData.MIN_AUTO_HB_TURN_LIMIT, Math.min(HeroWorldData.MAX_AUTO_HB_TURN_LIMIT, turnLimit));
     }
 
-    private String normalizeLanguageCode(String languageCode) {
-        if (languageCode == null) {
-            return "en_us";
-        }
-        String normalized = languageCode.trim().toLowerCase(Locale.ROOT).replace('-', '_');
-        return normalized.isEmpty() ? "en_us" : normalized;
-    }
+
 
     private static String sanitize(String rawMessage) {
         if (rawMessage == null) {
@@ -748,11 +744,11 @@ public final class HeroCrossChatManager {
                 + " 请直接以 Herobrine 的身份作出回应，只输出你的台词。";
     }
     private static Component system(String key, Object... args) {
-        return Component.translatable(key, args);
+        return Component.translatableEscape(key, args);
     }
 
     private static Component chat(String key, Object... args) {
-        return Component.translatable(key, args);
+        return Component.translatableEscape(key, args);
     }
 
     private static Component toggleText(boolean enabled) {

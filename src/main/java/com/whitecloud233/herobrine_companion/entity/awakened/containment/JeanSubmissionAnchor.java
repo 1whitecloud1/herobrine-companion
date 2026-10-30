@@ -1,17 +1,19 @@
 package com.whitecloud233.herobrine_companion.entity.awakened.containment;
 
+import com.whitecloud233.herobrine_companion.util.NbtKeys;
+
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.entity.boss.enderdragon.phases.EnderDragonPhase;
 import net.minecraft.world.phys.Vec3;
 
 public final class JeanSubmissionAnchor {
-    private static final String HERO_SUBMISSION_TAG = "HeroSubmission";
-    private static final String STATIONARY_TAG = "HeroSubmissionStationary";
-    private static final String ANCHOR_X_TAG = "HeroSubmissionAnchorX";
-    private static final String ANCHOR_Y_TAG = "HeroSubmissionAnchorY";
-    private static final String ANCHOR_Z_TAG = "HeroSubmissionAnchorZ";
-    private static final String ANCHOR_YAW_TAG = "HeroSubmissionYaw";
+    private static final String HERO_SUBMISSION_TAG = NbtKeys.MOB_SUBMISSION;
+    private static final String STATIONARY_TAG = NbtKeys.DRAGON_ANCHORED;
+    private static final String ANCHOR_X_TAG = NbtKeys.DRAGON_ANCHOR_X;
+    private static final String ANCHOR_Y_TAG = NbtKeys.DRAGON_ANCHOR_Y;
+    private static final String ANCHOR_Z_TAG = NbtKeys.DRAGON_ANCHOR_Z;
+    private static final String ANCHOR_YAW_TAG = NbtKeys.MOB_SUBMISSION_YAW;
 
     private JeanSubmissionAnchor() {
     }

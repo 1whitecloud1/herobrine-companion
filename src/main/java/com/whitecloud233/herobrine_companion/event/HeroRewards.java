@@ -41,37 +41,60 @@ public class HeroRewards {
         }
     }
 
-    public static final List<Reward> REWARDS = new ArrayList<>();
+    public static volatile List<Reward> REWARDS = List.of();
 
     // 静态块只在类加载时运行一次，我们改为调用 reset
     static {
-        reset(); 
+        reset();
     }
 
     /**
      * 重置奖励列表为默认值。
-     * KubeJS 插件将在每次脚本重载前调用此方法，防止奖励重复叠加。
+     * 无 KubeJS 时在资源重载后恢复默认定义。
      */
-    public static void reset() {
-        REWARDS.clear();
-        
+    public static void reset() { replaceAll(defaults()); }
+
+    public static List<Reward> defaults() {
+        List<Reward> rewards = new ArrayList<>();
+
+
         // --- 信任度 2 奖励 ---
         ItemStack handbook = new ItemStack(ModItems.LORE_HANDBOOK.get());
         ItemStack fragment1 = new ItemStack(ModItems.LORE_FRAGMENT.get());
         CompoundTag tag = new CompoundTag();
         tag.putString(LoreFragmentItem.LORE_ID_KEY, "fragment_1");
         fragment1.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
-        REWARDS.add(new Reward(6, 2, handbook, fragment1));
+        rewards.add(new Reward(6, 2, handbook, fragment1));
 
         // --- 其他奖励 ---
-        REWARDS.add(new Reward(0, 10, new ItemStack(Items.TOTEM_OF_UNDYING, 2)));
-        REWARDS.add(new Reward(1, 20, new ItemStack(ModItems.ABYSSAL_GAZE.get(), 1)));
-        REWARDS.add(new Reward(2, 30, new ItemStack(Items.DIAMOND, 32)));
-        REWARDS.add(new Reward(3, 50, new ItemStack(ModItems.SOUL_BOUND_PACT.get(), 1)));
-        REWARDS.add(new Reward(4, 75, new ItemStack(ModItems.TRANSCENDENCE_PERMIT.get(), 1)));
-        REWARDS.add(new Reward(5, 100, new ItemStack(ModItems.POEM_OF_THE_END.get(), 1)));
-        
-        LOGGER.info("HeroRewards reset to defaults. Count: {}", REWARDS.size());
+        rewards.add(new Reward(0, 10, new ItemStack(Items.TOTEM_OF_UNDYING, 2)));
+        rewards.add(new Reward(1, 20, new ItemStack(ModItems.ABYSSAL_GAZE.get(), 1)));
+        rewards.add(new Reward(2, 30, new ItemStack(Items.DIAMOND, 32)));
+        rewards.add(new Reward(3, 50, new ItemStack(ModItems.SOUL_BOUND_PACT.get(), 1)));
+        rewards.add(new Reward(4, 75, new ItemStack(ModItems.TRANSCENDENCE_PERMIT.get(), 1)));
+        rewards.add(new Reward(5, 100, new ItemStack(ModItems.POEM_OF_THE_END.get(), 1)));
+
+        return rewards;
+    }
+
+    public static Reward copy(Reward reward) {
+        return new Reward(reward.id, reward.requiredTrust, reward.items.stream().map(ItemStack::copy).toArray(ItemStack[]::new));
+    }
+
+    public static List<Reward> snapshot() { return REWARDS.stream().map(HeroRewards::copy).toList(); }
+
+    public static void replaceAll(List<Reward> rewards) {
+        if (rewards.size() > HeroContentLimits.MAX_REWARDS) throw new IllegalArgumentException("Too many rewards");
+        java.util.Set<Integer> ids = new java.util.HashSet<>();
+        List<Reward> checked = new ArrayList<>();
+        for (Reward reward : rewards) {
+            HeroContentLimits.rewardId(reward.id);
+            HeroContentLimits.trust(reward.requiredTrust);
+            if (!ids.add(reward.id)) throw new IllegalArgumentException("Duplicate reward ID: " + reward.id);
+            if (reward.items.size() > HeroContentLimits.MAX_ITEMS_PER_REWARD) throw new IllegalArgumentException("Too many reward items");
+            checked.add(new Reward(reward.id, reward.requiredTrust, reward.items.stream().map(HeroContentLimits::item).toArray(ItemStack[]::new)));
+        }
+        REWARDS = List.copyOf(checked);
     }
 
     public static Reward getReward(int id) {

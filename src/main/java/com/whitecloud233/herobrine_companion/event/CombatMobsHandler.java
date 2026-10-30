@@ -1,5 +1,7 @@
 package com.whitecloud233.herobrine_companion.event;
 
+import com.whitecloud233.herobrine_companion.entity.logic.data.PeacefulProtection;
+
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -32,7 +34,7 @@ public class CombatMobsHandler {
                 if (player.getTags().contains(PEACEFUL_TAG)) {
                     
                     // 1. 移除标签 (核心：立刻破除和平)
-                    player.removeTag(PEACEFUL_TAG);
+                    PeacefulProtection.setEnabled(player, false);
                     
                     // 2. 发送提示消息
                     player.sendSystemMessage(Component.translatable("message.herobrine_companion.peace_broken"));

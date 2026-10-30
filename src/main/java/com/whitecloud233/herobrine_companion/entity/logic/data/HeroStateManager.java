@@ -1,7 +1,7 @@
 package com.whitecloud233.herobrine_companion.entity.logic.data;
 
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
-import com.whitecloud233.herobrine_companion.compat.accessories.HeroAccessoriesCompat;
+import com.whitecloud233.herobrine_companion.api.compat.HeroAccessoriesCompat;
 import com.whitecloud233.herobrine_companion.entity.logic.HeroEquipment;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
@@ -18,38 +18,42 @@ public class HeroStateManager {
      * 将当前 Hero 的关键数据（皮肤、信任度、装备）备份到全局存档
      */
     public static void backupToGlobal(HeroEntity hero) {
-        if (hero.isRemoved() || !hero.isAlive() || !(hero.level() instanceof ServerLevel serverLevel)) return;
+        backupToGlobal(hero, true);
+    }
 
-        // 【修复】：必须先获取并判断 ownerUUID，再执行后续依赖 UUID 的操作
+    public static void backupDirtyState(HeroEntity hero) {
+        backupToGlobal(hero, false);
+    }
+
+    private static void backupToGlobal(HeroEntity hero, boolean force) {
+        if (hero.isRemoved() || !hero.isAlive() || !(hero.level() instanceof ServerLevel serverLevel)) return;
         UUID ownerUUID = hero.getOwnerUUID();
         if (ownerUUID == null) return;
-
-        HeroWorldData data = HeroWorldData.get(serverLevel);
         HeroEntity activeHero = HeroLifecycleHandler.findActiveHero(serverLevel, ownerUUID);
         if (activeHero != null && activeHero != hero) return;
         restoreEquipmentFromGlobal(hero);
 
-        if (hero.getSkinVariant() == HeroEntity.SKIN_CUSTOM && !hero.getCustomSkinName().isEmpty()) {
-            data.setSkinVariant(ownerUUID, HeroEntity.SKIN_CUSTOM);
-            data.setCustomSkinName(ownerUUID, hero.getCustomSkinName());
-        } else {
+        HeroPersistenceState state = hero.getPersistenceState();
+        HeroWorldData data = HeroWorldData.get(serverLevel);
+        if (force || state.needsEquipmentBackup(hero.tickCount)) {
+            data.setEquipmentSnapshot(ownerUUID, hero.getArmorItemsTag(), hero.getHandItemsTag(),
+                    hero.getCuriosBackItemTag(), hero.getAccessoriesDataTag());
+            state.equipmentSaved(hero.tickCount);
+        }
+        if (force || state.isAppearanceDirty()) {
             data.setSkinVariant(ownerUUID, hero.getSkinVariant());
-            data.setCustomSkinName(ownerUUID, "");
-            data.setCustomSkinData(ownerUUID, new byte[0]);
+            if (hero.getSkinVariant() == HeroEntity.SKIN_CUSTOM && !hero.getCustomSkinName().isEmpty()) {
+                data.setCustomSkinName(ownerUUID, hero.getCustomSkinName());
+            } else {
+                data.setCustomSkinName(ownerUUID, "");
+                data.setCustomSkinData(ownerUUID, new byte[0]);
+            }
+            if (hero.getTrustLevel() > 0) data.setTrust(ownerUUID, hero.getTrustLevel());
+            CompoundTag poseTag = new CompoundTag();
+            HeroDataHandler.savePoseData(hero, poseTag);
+            data.setPoseData(ownerUUID, poseTag);
+            state.appearanceSaved();
         }
-
-        // 同步信任度与装备
-        if (hero.getTrustLevel() > 0) {
-            data.setTrust(ownerUUID, hero.getTrustLevel());
-        }
-        data.setEquipment(ownerUUID, hero.getArmorItemsTag(), hero.getHandItemsTag());
-        data.setCuriosBackItem(ownerUUID, hero.getCuriosBackItemTag());
-        data.setAccessoriesData(ownerUUID, hero.getAccessoriesDataTag());
-
-        // 同步姿势数据到全局存档
-        CompoundTag poseTag = new CompoundTag();
-        HeroDataHandler.savePoseData(hero, poseTag);
-        data.setPoseData(ownerUUID, poseTag);
     }
 
     /**
@@ -104,7 +108,7 @@ public class HeroStateManager {
     /** 首次备份前完成装备恢复，即使主人离线或不在当前维度也不能写空旧备份。 */
     public static void restoreEquipmentFromGlobal(HeroEntity hero) {
         UUID ownerUUID = hero.getOwnerUUID();
-        if (hero.equipmentStateRestored || hero.isRemoved() || ownerUUID == null
+        if (hero.getPersistenceState().isEquipmentRestored() || hero.isRemoved() || ownerUUID == null
                 || !(hero.level() instanceof ServerLevel level)) return;
         HeroWorldData data = HeroWorldData.get(level);
         HeroEquipment.loadMissingEquipmentFromTag(hero, data.getArmorItems(ownerUUID), data.getHandItems(ownerUUID));
@@ -113,7 +117,7 @@ public class HeroStateManager {
             hero.setCuriosBackItemFromTag(savedCurios.copy());
         }
         HeroAccessoriesCompat.loadMissingItemsFromTag(hero, data.getAccessoriesData(ownerUUID));
-        hero.equipmentStateRestored = true;
+        hero.getPersistenceState().markEquipmentRestored();
     }
 
     /**
@@ -225,10 +229,10 @@ public class HeroStateManager {
             target.loadEquipmentFromTag(source.getArmorItemsTag(), source.getHandItemsTag());
             target.setCuriosBackItemFromTag(source.getCuriosBackItemTag().copy());
             target.setAccessoriesDataFromTag(source.getAccessoriesDataTag().copy());
-        } else if (activeHero != target && !target.equipmentStateRestored) {
+        } else if (activeHero != target && !target.getPersistenceState().isEquipmentRestored()) {
             HeroEquipment.copyMissingEquipment(source, target);
         }
-        target.equipmentStateRestored = true;
+        target.getPersistenceState().markEquipmentRestored();
 
         // 👇 [新增] 转移姿势数据
         target.isPoseEditing = source.isPoseEditing;

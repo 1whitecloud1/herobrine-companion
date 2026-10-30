@@ -1,5 +1,7 @@
 package com.whitecloud233.herobrine_companion.entity.logic.data;
 
+import com.whitecloud233.herobrine_companion.util.LanguageCodes;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.core.HolderLookup;
@@ -12,54 +14,46 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.saveddata.SavedData;
+import org.jetbrains.annotations.NotNull;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
+import java.util.function.BiConsumer;
+import java.util.function.Function;
 
-
-/**
- * ⚡ 核心架构升级：Facade (外观模式) 分流存储
- * ----------------------------------------------------
- * 该类对外保持了原有的所有 API 调用格式 (无需修改其他文件的代码)
- * 对内则将原先臃肿的“上帝对象”拆分为：
- * 1. 独立玩家专属数据文件 (herobrine_companion_player_UUID.dat)
- * 2. 全局轻量级状态文件 (herobrine_companion_global.dat)
- * 大幅度降低磁盘 I/O 瓶颈并解决服务器 TPS 卡顿问题。
- */
+/** 玩家档案统一保存在主世界；调用方只能通过受控方法更新，不持有存档的可变成员。 */
 public class HeroWorldData {
     public static final int DEFAULT_AUTO_HB_TURN_LIMIT = 8;
     public static final int MIN_AUTO_HB_TURN_LIMIT = 1;
     public static final int MAX_AUTO_HB_TURN_LIMIT = 20;
 
-    // ==========================================
-    // 1. 数据结构分离：个人档案 (PlayerProfile)
-    // 继承 SavedData，现在每个玩家拥有极其轻量的独立存档！
-    // ==========================================
     public static class PlayerProfile extends SavedData {
-        public int trust = 0;
-        public Set<Integer> claimedRewards = new HashSet<>();
-        public CompoundTag brainMemory = new CompoundTag();
-        public CompoundTag heroMemory = new CompoundTag();
-        public ListTag armorItems = new ListTag();
-        public ListTag handItems = new ListTag();
-        public CompoundTag curiosBackItem = new CompoundTag();
-        public CompoundTag accessoriesData = new CompoundTag();
-        public CompoundTag poseData = new CompoundTag();
-        public CompoundTag giftProfile = new CompoundTag();
-        /** 无名之蛋糕再吃发奖冷却(到期 game time tick;0 = 无冷却)。 */
-        public long birthdayCakeRewardTick = 0L;
-
-        public UUID activeHeroUUID = null;
-        public GlobalPos lastKnownHeroPos = null;
-        public boolean hasSpawnedFromChat = false;
-        public int skinVariant = 0;
-        public byte[] customSkinData = new byte[0];
-
-        public String customSkinName = "";
-        public CompoundTag tempBrainData = null;
-        public long respawnReadyTime = 0;
-        public boolean allowIncomingCrossChat = true;
-        public String clientLanguageCode = "en_us";
-        public int autoHbTurnLimit = DEFAULT_AUTO_HB_TURN_LIMIT;
+        private int trust;
+        private final Set<Integer> claimedRewards = new HashSet<>();
+        private CompoundTag brainMemory = new CompoundTag();
+        private CompoundTag heroMemory = new CompoundTag();
+        private ListTag armorItems = new ListTag();
+        private ListTag handItems = new ListTag();
+        private CompoundTag curiosBackItem = new CompoundTag();
+        private CompoundTag accessoriesData = new CompoundTag();
+        private CompoundTag poseData = new CompoundTag();
+        private CompoundTag giftProfile = new CompoundTag();
+        private long birthdayCakeRewardTick;
+        private UUID activeHeroUUID;
+        private GlobalPos lastKnownHeroPos;
+        private boolean hasSpawnedFromChat;
+        private int skinVariant = com.whitecloud233.herobrine_companion.entity.HeroEntity.DEFAULT_SKIN_VARIANT;
+        private String customSkinName = "";
+        private byte[] customSkinData = new byte[0];
+        private CompoundTag tempBrainData;
+        private long respawnReadyTime;
+        private boolean allowIncomingCrossChat = true;
+        private String clientLanguageCode = "en_us";
+        private int autoHbTurnLimit = DEFAULT_AUTO_HB_TURN_LIMIT;
 
 
         // 1.21.1：必须显式传入 HolderLookup.Provider
@@ -67,27 +61,25 @@ public class HeroWorldData {
         public CompoundTag save(CompoundTag tag, HolderLookup.Provider provider) {
             tag.putInt("Trust", trust);
             tag.putIntArray("ClaimedRewards", claimedRewards.stream().mapToInt(i -> i).toArray());
-            tag.put("BrainMemory", brainMemory);
-            tag.put("HeroMemory", heroMemory);
-            tag.put("ArmorItems", armorItems);
-            tag.put("HandItems", handItems);
-            tag.put("CuriosBackItem", curiosBackItem);
-            tag.put("AccessoriesData", accessoriesData);
-            tag.put("PoseData", poseData);
-            tag.put("GiftProfile", giftProfile);
+            tag.put("BrainMemory", brainMemory.copy());
+            tag.put("HeroMemory", heroMemory.copy());
+            tag.put("ArmorItems", armorItems.copy());
+            tag.put("HandItems", handItems.copy());
+            tag.put("CuriosBackItem", curiosBackItem.copy());
+            tag.put("AccessoriesData", accessoriesData.copy());
+            tag.put("PoseData", poseData.copy());
+            tag.put("GiftProfile", giftProfile.copy());
             tag.putLong("BirthdayCakeRewardTick", birthdayCakeRewardTick);
-
             if (activeHeroUUID != null) tag.putUUID("ActiveHeroUUID", activeHeroUUID);
             if (lastKnownHeroPos != null) tag.put("LastKnownHeroPos", writeGlobalPos(lastKnownHeroPos));
             tag.putBoolean("HasSpawnedFromChat", hasSpawnedFromChat);
             tag.putInt("SkinVariant", skinVariant);
-            tag.putByteArray("CustomSkinData", customSkinData);
-
             tag.putString("CustomSkinName", customSkinName);
-            if (tempBrainData != null) tag.put("TempBrainData", tempBrainData);
+            tag.putByteArray("CustomSkinData", customSkinData.clone());
+            if (tempBrainData != null) tag.put("TempBrainData", tempBrainData.copy());
             tag.putLong("RespawnReadyTime", respawnReadyTime);
             tag.putBoolean("AllowIncomingCrossChat", allowIncomingCrossChat);
-            tag.putString("ClientLanguageCode", normalizeLanguageCode(clientLanguageCode));
+            tag.putString("ClientLanguageCode", LanguageCodes.normalize(clientLanguageCode));
             tag.putInt("AutoHbTurnLimit", normalizeAutoHbTurnLimit(autoHbTurnLimit));
             return tag;
         }
@@ -96,39 +88,30 @@ public class HeroWorldData {
         public static PlayerProfile load(CompoundTag tag, HolderLookup.Provider provider) {
             PlayerProfile profile = new PlayerProfile();
             profile.trust = tag.getInt("Trust");
-            int[] rewards = tag.getIntArray("ClaimedRewards");
-            for (int id : rewards) profile.claimedRewards.add(id);
-            if (tag.contains("BrainMemory")) profile.brainMemory = tag.getCompound("BrainMemory");
-            if (tag.contains("HeroMemory", 10)) profile.heroMemory = tag.getCompound("HeroMemory");
-            if (tag.contains("ArmorItems", 9)) profile.armorItems = tag.getList("ArmorItems", 10);
-            if (tag.contains("HandItems", 9)) profile.handItems = tag.getList("HandItems", 10);
-            if (tag.contains("CuriosBackItem", 10)) profile.curiosBackItem = tag.getCompound("CuriosBackItem");
-            if (tag.contains("AccessoriesData", 10)) profile.accessoriesData = tag.getCompound("AccessoriesData");
-            if (tag.contains("PoseData", 10)) profile.poseData = tag.getCompound("PoseData");
-            if (tag.contains("GiftProfile", 10)) profile.giftProfile = tag.getCompound("GiftProfile");
-            if (tag.contains("BirthdayCakeRewardTick")) profile.birthdayCakeRewardTick = tag.getLong("BirthdayCakeRewardTick");
-
+            for (int id : tag.getIntArray("ClaimedRewards")) profile.claimedRewards.add(id);
+            profile.brainMemory = tag.getCompound("BrainMemory").copy();
+            profile.heroMemory = tag.getCompound("HeroMemory").copy();
+            profile.armorItems = tag.getList("ArmorItems", Tag.TAG_COMPOUND).copy();
+            profile.handItems = tag.getList("HandItems", Tag.TAG_COMPOUND).copy();
+            profile.curiosBackItem = tag.getCompound("CuriosBackItem").copy();
+            profile.accessoriesData = tag.getCompound("AccessoriesData").copy();
+            profile.poseData = tag.getCompound("PoseData").copy();
+            profile.giftProfile = tag.getCompound("GiftProfile").copy();
+            profile.birthdayCakeRewardTick = Math.max(0L, tag.getLong("BirthdayCakeRewardTick"));
             if (tag.hasUUID("ActiveHeroUUID")) profile.activeHeroUUID = tag.getUUID("ActiveHeroUUID");
             if (tag.contains("LastKnownHeroPos")) profile.lastKnownHeroPos = readGlobalPos(tag.getCompound("LastKnownHeroPos"));
-            if (tag.contains("HasSpawnedFromChat")) profile.hasSpawnedFromChat = tag.getBoolean("HasSpawnedFromChat");
-            if (tag.contains("SkinVariant")) profile.skinVariant = tag.getInt("SkinVariant");
-            if (tag.contains("CustomSkinData", Tag.TAG_BYTE_ARRAY)) profile.customSkinData = tag.getByteArray("CustomSkinData");
-
-            if (tag.contains("CustomSkinName")) profile.customSkinName = tag.getString("CustomSkinName");
-            if (tag.contains("TempBrainData")) profile.tempBrainData = tag.getCompound("TempBrainData");
-            if (tag.contains("RespawnReadyTime")) profile.respawnReadyTime = tag.getLong("RespawnReadyTime");
+            profile.hasSpawnedFromChat = tag.getBoolean("HasSpawnedFromChat");
+            profile.skinVariant = tag.getInt("SkinVariant");
+            profile.customSkinName = tag.getString("CustomSkinName");
+            profile.customSkinData = tag.getByteArray("CustomSkinData").clone();
+            if (tag.contains("TempBrainData", Tag.TAG_COMPOUND)) profile.tempBrainData = tag.getCompound("TempBrainData").copy();
+            profile.respawnReadyTime = tag.getLong("RespawnReadyTime");
             if (tag.contains("AllowIncomingCrossChat")) profile.allowIncomingCrossChat = tag.getBoolean("AllowIncomingCrossChat");
             if (tag.contains("AutoHbTurnLimit")) profile.autoHbTurnLimit = normalizeAutoHbTurnLimit(tag.getInt("AutoHbTurnLimit"));
-            if (tag.contains("ClientLanguageCode")) profile.clientLanguageCode = normalizeLanguageCode(tag.getString("ClientLanguageCode"));
+            if (tag.contains("ClientLanguageCode")) profile.clientLanguageCode = LanguageCodes.normalize(tag.getString("ClientLanguageCode"));
             return profile;
         }
-        private static String normalizeLanguageCode(String rawLanguageCode) {
-            if (rawLanguageCode == null) {
-                return "en_us";
-            }
-            String normalized = rawLanguageCode.trim().toLowerCase(Locale.ROOT).replace('-', '_');
-            return normalized.isEmpty() ? "en_us" : normalized;
-        }
+
         private static int normalizeAutoHbTurnLimit(int turnLimit) {
             return Math.max(MIN_AUTO_HB_TURN_LIMIT, Math.min(MAX_AUTO_HB_TURN_LIMIT, turnLimit));
         }
@@ -154,16 +137,15 @@ public class HeroWorldData {
                 CompoundTag posTag = tag.getCompound("Pos");
                 BlockPos pos = new BlockPos(posTag.getInt("X"), posTag.getInt("Y"), posTag.getInt("Z"));
                 return GlobalPos.of(dimKey, pos);
-            } catch (Exception e) { return null; }
+            } catch (Exception e) {
+                return null;
+            }
         }
     }
 
-    // ==========================================
-    // 2. 数据结构分离：全局公共数据 (GlobalData)
-    // ==========================================
     public static class GlobalData extends SavedData {
-        public UUID activeChallengerUUID = null;
-        public boolean migrated = false;
+        private UUID activeChallengerUUID;
+        private boolean migrated;
 
         @Override
         public CompoundTag save(CompoundTag tag, HolderLookup.Provider provider) {
@@ -180,212 +162,185 @@ public class HeroWorldData {
         }
     }
 
-    // 用于读取旧版 God Object 数据的临时类，实现无损热迁移
-    public static class LegacyData extends SavedData {
-        public CompoundTag rawData;
-        @Override public CompoundTag save(CompoundTag t, HolderLookup.Provider provider) { return rawData; }
-        public static LegacyData load(CompoundTag t, HolderLookup.Provider provider) {
-            LegacyData l = new LegacyData();
-            l.rawData = t;
-            return l;
+    private static class LegacyData extends SavedData {
+        private CompoundTag rawData;
+        @Override public @NotNull CompoundTag save(@NotNull CompoundTag tag, HolderLookup.Provider provider) { return rawData.copy(); }
+        static LegacyData load(CompoundTag tag, HolderLookup.Provider provider) {
+            LegacyData data = new LegacyData();
+            data.rawData = tag.copy();
+            return data;
         }
     }
 
-    // ==========================================
-    // 3. 核心控制器封装 (分发器)
-    // ==========================================
-    private final ServerLevel overworld;
+    private final Function<UUID, PlayerProfile> profileLookup;
     private final GlobalData globalData;
 
     private HeroWorldData(ServerLevel overworld) {
-        this.overworld = overworld;
-        // 1.21.1：使用 SavedData.Factory 包装
-        SavedData.Factory<GlobalData> factory = new SavedData.Factory<>(GlobalData::new, GlobalData::load, null);
-        this.globalData = overworld.getDataStorage().computeIfAbsent(factory, "herobrine_companion_global");
-        migrateIfNecessary(); // 启动时检查并执行数据平滑过渡
+        // 1.21.1：使用 SavedData.Factory 包装（load 需要 HolderLookup.Provider）
+        this(uuid -> overworld.getDataStorage().computeIfAbsent(
+                        new SavedData.Factory<>(PlayerProfile::new, PlayerProfile::load, null), profileKey(uuid)),
+                overworld.getDataStorage().computeIfAbsent(
+                        new SavedData.Factory<>(GlobalData::new, GlobalData::load, null), "herobrine_companion_global"));
+        migrateIfNecessary(overworld);
+    }
+
+    HeroWorldData(Function<UUID, PlayerProfile> profileLookup, GlobalData globalData) {
+        this.profileLookup = Objects.requireNonNull(profileLookup);
+        this.globalData = Objects.requireNonNull(globalData);
     }
 
     public static HeroWorldData get(ServerLevel level) {
-        // 确保所有数据统一绑定在主世界 (Overworld)
         ServerLevel overworld = Objects.requireNonNull(level.getServer().getLevel(Level.OVERWORLD));
         return new HeroWorldData(overworld);
     }
 
-    /**
-     * 自动将玩家的旧存档拆分到独立的小文件中
-     */
-    private void migrateIfNecessary() {
+    private static String profileKey(UUID uuid) {
+        return "herobrine_companion_player_" + uuid;
+    }
+
+    private void migrateIfNecessary(ServerLevel overworld) {
         if (globalData.migrated) return;
-
-        // 1.21.1：使用 SavedData.Factory 读取老存档
         SavedData.Factory<LegacyData> legacyFactory = new SavedData.Factory<>(LegacyData::new, LegacyData::load, null);
-        LegacyData legacy = overworld.getDataStorage().computeIfAbsent(legacyFactory, "herobrine_companion_data");
-
-        if (legacy != null && legacy.rawData != null) {
-            CompoundTag compound = legacy.rawData;
-
-            // 拆分玩家个人数据
-            if (compound.contains("PlayerProfiles", Tag.TAG_LIST)) {
-                ListTag profilesTag = compound.getList("PlayerProfiles", Tag.TAG_COMPOUND);
-                for (int i = 0; i < profilesTag.size(); i++) {
-                    CompoundTag profileTag = profilesTag.getCompound(i);
-                    if (!profileTag.hasUUID("UUID")) {
-                        continue; // 旧档条目缺失/损坏：跳过该条目，避免迁移时崩溃
-                    }
-                    UUID uuid = profileTag.getUUID("UUID");
-                    PlayerProfile profile = getProfile(uuid);
-
-                    // 旧档案迁移（传入空的Provider环境即可）
-                    PlayerProfile oldData = PlayerProfile.load(profileTag, overworld.registryAccess());
-                    profile.trust = oldData.trust;
-                    profile.claimedRewards = oldData.claimedRewards;
-                    profile.brainMemory = oldData.brainMemory;
-                    profile.heroMemory = oldData.heroMemory;
-                    profile.armorItems = oldData.armorItems;
-                    profile.handItems = oldData.handItems;
-                    profile.curiosBackItem = oldData.curiosBackItem;
-                    profile.accessoriesData = oldData.accessoriesData;
-                    profile.poseData = oldData.poseData;
-                    profile.activeHeroUUID = oldData.activeHeroUUID;
-                    profile.lastKnownHeroPos = oldData.lastKnownHeroPos;
-                    profile.hasSpawnedFromChat = oldData.hasSpawnedFromChat;
-                    profile.skinVariant = oldData.skinVariant;
-                    profile.customSkinName = oldData.customSkinName;
-                    profile.customSkinData = oldData.customSkinData;
-                    profile.tempBrainData = oldData.tempBrainData;
-                    profile.respawnReadyTime = oldData.respawnReadyTime;
-                    profile.allowIncomingCrossChat = oldData.allowIncomingCrossChat;
-                    profile.clientLanguageCode = oldData.clientLanguageCode;
-                    profile.autoHbTurnLimit = oldData.autoHbTurnLimit;
-
-                    profile.setDirty(); // 保存为独立文件
-                }
-            }
-
-            // 转移全局擂台锁
-            if (compound.hasUUID("ActiveChallengerUUID")) {
-                globalData.activeChallengerUUID = compound.getUUID("ActiveChallengerUUID");
+        LegacyData legacy = overworld.getDataStorage().get(legacyFactory, "herobrine_companion_data");
+        if (legacy != null) {
+            SavedData.Factory<PlayerProfile> profileFactory = new SavedData.Factory<>(PlayerProfile::new, PlayerProfile::load, null);
+            migrateProfiles(legacy.rawData,
+                    uuid -> overworld.getDataStorage().get(profileFactory, profileKey(uuid)),
+                    (uuid, profile) -> overworld.getDataStorage().set(profileKey(uuid), profile),
+                    overworld.registryAccess());
+            if (globalData.activeChallengerUUID == null && legacy.rawData.hasUUID("ActiveChallengerUUID")) {
+                globalData.activeChallengerUUID = legacy.rawData.getUUID("ActiveChallengerUUID");
             }
         }
-
         globalData.migrated = true;
         globalData.setDirty();
     }
 
-    /**
-     * 获取玩家独立数据，时间复杂度 O(1)
-     */
-    public PlayerProfile getProfile(UUID uuid) {
-        if (uuid == null) return new PlayerProfile(); // 容错处理
-        // 1.21.1：使用 SavedData.Factory 包装
-        SavedData.Factory<PlayerProfile> factory = new SavedData.Factory<>(PlayerProfile::new, PlayerProfile::load, null);
-        return overworld.getDataStorage().computeIfAbsent(factory, "herobrine_companion_player_" + uuid.toString());
+    static void migrateProfiles(CompoundTag legacy, Function<UUID, PlayerProfile> existing,
+                                BiConsumer<UUID, PlayerProfile> store, HolderLookup.Provider provider) {
+        ListTag profiles = legacy.getList("PlayerProfiles", Tag.TAG_COMPOUND);
+        for (int i = 0; i < profiles.size(); i++) {
+            CompoundTag tag = profiles.getCompound(i);
+            if (!tag.hasUUID("UUID")) continue;
+            UUID uuid = tag.getUUID("UUID");
+            // 已有独立档案优先，迁移中断后重试也不能用旧档覆盖它。
+            if (existing.apply(uuid) != null) continue;
+            PlayerProfile profile = PlayerProfile.load(tag, provider);
+            profile.setDirty();
+            store.accept(uuid, profile);
+        }
     }
 
-    // ==========================================
-    // 4. API 接口 (100% 兼容你原来的外部调用格式)
-    // ==========================================
+    private PlayerProfile getProfile(UUID uuid) {
+        return uuid == null ? new PlayerProfile() : profileLookup.apply(uuid);
+    }
 
     public UUID getActiveChallengerUUID() { return globalData.activeChallengerUUID; }
-    public void setActiveChallengerUUID(UUID uuid) { globalData.activeChallengerUUID = uuid; globalData.setDirty(); }
+    public void setActiveChallengerUUID(UUID uuid) {
+        if (Objects.equals(globalData.activeChallengerUUID, uuid)) return;
+        globalData.activeChallengerUUID = uuid;
+        globalData.setDirty();
+    }
 
     public int getTrust(UUID uuid) { return getProfile(uuid).trust; }
     public void setTrust(UUID uuid, int trust) {
         if (uuid == null) return;
         PlayerProfile profile = getProfile(uuid);
+        if (profile.trust == trust) return;
         profile.trust = trust;
         profile.setDirty();
     }
 
-    public void addClaimedReward(UUID uuid, int rewardId) {
-        if (uuid == null) return;
-        PlayerProfile profile = getProfile(uuid);
-        profile.claimedRewards.add(rewardId);
-        profile.setDirty();
-    }
-
-    public java.util.Set<Integer> getClaimedRewards(UUID uuid) { return getProfile(uuid).claimedRewards; }
-
+    public void addClaimedReward(UUID uuid, int rewardId) { setRewardClaimed(uuid, rewardId, true); }
+    public Set<Integer> getClaimedRewards(UUID uuid) { return Set.copyOf(getProfile(uuid).claimedRewards); }
     public boolean isRewardClaimed(UUID uuid, int id) { return getProfile(uuid).claimedRewards.contains(id); }
-
     public void setRewardClaimed(UUID uuid, int id, boolean claimed) {
         if (uuid == null) return;
         PlayerProfile profile = getProfile(uuid);
-        if (claimed) profile.claimedRewards.add(id);
-        else profile.claimedRewards.remove(id);
-        profile.setDirty();
+        boolean changed = claimed ? profile.claimedRewards.add(id) : profile.claimedRewards.remove(id);
+        if (changed) profile.setDirty();
     }
 
-    public CompoundTag getBrainMemory(UUID uuid) { return getProfile(uuid).brainMemory; }
-    public void setBrainMemory(UUID uuid, CompoundTag memory) {
+    private void setCompound(UUID uuid, CompoundTag value, Function<PlayerProfile, CompoundTag> getter,
+                             BiConsumer<PlayerProfile, CompoundTag> setter) {
         if (uuid == null) return;
         PlayerProfile profile = getProfile(uuid);
-        profile.brainMemory = memory;
+        CompoundTag normalized = value == null ? new CompoundTag() : value;
+        if (normalized.equals(getter.apply(profile))) return;
+        setter.accept(profile, normalized.copy());
         profile.setDirty();
     }
 
-    public CompoundTag getHeroMemory(UUID uuid) { return getProfile(uuid).heroMemory; }
-    public void setHeroMemory(UUID uuid, CompoundTag memory) {
-        if (uuid == null) return;
-        PlayerProfile profile = getProfile(uuid);
-        profile.heroMemory = memory;
-        profile.setDirty();
+    public CompoundTag getBrainMemory(UUID uuid) { return getProfile(uuid).brainMemory.copy(); }
+    public void setBrainMemory(UUID uuid, CompoundTag memory) { setCompound(uuid, memory, p -> p.brainMemory, (p, t) -> p.brainMemory = t); }
+    public CompoundTag getHeroMemory(UUID uuid) { return getProfile(uuid).heroMemory.copy(); }
+    public void setHeroMemory(UUID uuid, CompoundTag memory) { setCompound(uuid, memory, p -> p.heroMemory, (p, t) -> p.heroMemory = t); }
+    public ListTag getArmorItems(UUID uuid) { return getProfile(uuid).armorItems.copy(); }
+    public ListTag getHandItems(UUID uuid) { return getProfile(uuid).handItems.copy(); }
+
+    private static boolean updateEquipment(PlayerProfile profile, ListTag armor, ListTag hands) {
+        ListTag normalizedArmor = armor == null ? new ListTag() : armor;
+        ListTag normalizedHands = hands == null ? new ListTag() : hands;
+        boolean changed = false;
+        if (!profile.armorItems.equals(normalizedArmor)) {
+            profile.armorItems = normalizedArmor.copy();
+            changed = true;
+        }
+        if (!profile.handItems.equals(normalizedHands)) {
+            profile.handItems = normalizedHands.copy();
+            changed = true;
+        }
+        return changed;
     }
 
-    public ListTag getArmorItems(UUID uuid) { return getProfile(uuid).armorItems; }
-    public ListTag getHandItems(UUID uuid) { return getProfile(uuid).handItems; }
     public void setEquipment(UUID uuid, ListTag armor, ListTag hands) {
         if (uuid == null) return;
         PlayerProfile profile = getProfile(uuid);
-        profile.armorItems = armor;
-        profile.handItems = hands;
-        profile.setDirty();
+        if (updateEquipment(profile, armor, hands)) profile.setDirty();
     }
 
-    public CompoundTag getCuriosBackItem(UUID uuid) { return getProfile(uuid).curiosBackItem; }
-    public void setCuriosBackItem(UUID uuid, CompoundTag tag) {
+    public void setEquipmentSnapshot(UUID uuid, ListTag armor, ListTag hands, CompoundTag curios, CompoundTag accessories) {
         if (uuid == null) return;
         PlayerProfile profile = getProfile(uuid);
-        profile.curiosBackItem = tag;
-        profile.setDirty();
+        boolean changed = updateEquipment(profile, armor, hands);
+        CompoundTag normalizedCurios = curios == null ? new CompoundTag() : curios;
+        CompoundTag normalizedAccessories = accessories == null ? new CompoundTag() : accessories;
+        if (!profile.curiosBackItem.equals(normalizedCurios)) {
+            profile.curiosBackItem = normalizedCurios.copy();
+            changed = true;
+        }
+        if (!profile.accessoriesData.equals(normalizedAccessories)) {
+            profile.accessoriesData = normalizedAccessories.copy();
+            changed = true;
+        }
+        if (changed) profile.setDirty();
     }
-    public CompoundTag getAccessoriesData(UUID uuid) { return getProfile(uuid).accessoriesData; }
-    public void setAccessoriesData(UUID uuid, CompoundTag tag) {
-        if (uuid == null) return;
-        PlayerProfile profile = getProfile(uuid);
-        profile.accessoriesData = tag;
-        profile.setDirty();
-    }
-    // 赠礼档案(玩家维度)
-    public CompoundTag getGiftProfile(UUID uuid) { return getProfile(uuid).giftProfile; }
 
-    /** 无名之蛋糕的再吃发奖冷却(到期 tick,持久化)。 */
+    public CompoundTag getCuriosBackItem(UUID uuid) { return getProfile(uuid).curiosBackItem.copy(); }
+    public void setCuriosBackItem(UUID uuid, CompoundTag tag) { setCompound(uuid, tag, p -> p.curiosBackItem, (p, t) -> p.curiosBackItem = t); }
+    public CompoundTag getAccessoriesData(UUID uuid) { return getProfile(uuid).accessoriesData.copy(); }
+    public void setAccessoriesData(UUID uuid, CompoundTag tag) { setCompound(uuid, tag, p -> p.accessoriesData, (p, t) -> p.accessoriesData = t); }
+    public CompoundTag getPoseData(UUID uuid) { return getProfile(uuid).poseData.copy(); }
+    public void setPoseData(UUID uuid, CompoundTag tag) { setCompound(uuid, tag, p -> p.poseData, (p, t) -> p.poseData = t); }
+    public CompoundTag getGiftProfile(UUID uuid) { return getProfile(uuid).giftProfile.copy(); }
+    public void setGiftProfile(UUID uuid, CompoundTag tag) { setCompound(uuid, tag, p -> p.giftProfile, (p, t) -> p.giftProfile = t); }
+
     public long getBirthdayCakeRewardTick(UUID uuid) { return getProfile(uuid).birthdayCakeRewardTick; }
     public void setBirthdayCakeRewardTick(UUID uuid, long tick) {
         if (uuid == null) return;
         PlayerProfile profile = getProfile(uuid);
-        profile.birthdayCakeRewardTick = Math.max(0L, tick);
-        profile.setDirty();
-    }
-    public void setGiftProfile(UUID uuid, CompoundTag tag) {
-        if (uuid == null) return;
-        PlayerProfile profile = getProfile(uuid);
-        profile.giftProfile = tag;
-        profile.setDirty();
-    }
-
-    public CompoundTag getPoseData(UUID uuid) { return getProfile(uuid).poseData; }
-    public void setPoseData(UUID uuid, CompoundTag tag) {
-        if (uuid == null) return;
-        PlayerProfile profile = getProfile(uuid);
-        profile.poseData = tag;
+        long normalized = Math.max(0L, tick);
+        if (profile.birthdayCakeRewardTick == normalized) return;
+        profile.birthdayCakeRewardTick = normalized;
         profile.setDirty();
     }
 
     public void setRespawnCooldown(UUID uuid, ServerLevel level, int minutes) {
         if (uuid == null) return;
         PlayerProfile profile = getProfile(uuid);
-        profile.respawnReadyTime = level.getGameTime() + (long) minutes * 60 * 20;
+        long readyTime = level.getGameTime() + (long) minutes * 60 * 20;
+        if (profile.respawnReadyTime == readyTime) return;
+        profile.respawnReadyTime = readyTime;
         profile.setDirty();
     }
 
@@ -393,6 +348,7 @@ public class HeroWorldData {
     public void setSkinVariant(UUID uuid, int variant) {
         if (uuid == null) return;
         PlayerProfile profile = getProfile(uuid);
+        if (profile.skinVariant == variant) return;
         profile.skinVariant = variant;
         profile.setDirty();
     }
@@ -401,21 +357,31 @@ public class HeroWorldData {
     public void setCustomSkinName(UUID uuid, String name) {
         if (uuid == null) return;
         PlayerProfile profile = getProfile(uuid);
-        profile.customSkinName = name;
+        String normalized = name == null ? "" : name;
+        if (profile.customSkinName.equals(normalized)) return;
+        profile.customSkinName = normalized;
         profile.setDirty();
     }
-    public byte[] getCustomSkinData(UUID uuid) { return getProfile(uuid).customSkinData; }
+
+    public byte[] getCustomSkinData(UUID uuid) { return getProfile(uuid).customSkinData.clone(); }
     public void setCustomSkinData(UUID uuid, byte[] data) {
         if (uuid == null) return;
         PlayerProfile profile = getProfile(uuid);
-        profile.customSkinData = data != null ? data : new byte[0];
+        byte[] normalized = data == null ? new byte[0] : data;
+        if (Arrays.equals(profile.customSkinData, normalized)) return;
+        profile.customSkinData = normalized.clone();
         profile.setDirty();
     }
-    public CompoundTag getTempBrainData(UUID uuid) { return getProfile(uuid).tempBrainData; }
+
+    public CompoundTag getTempBrainData(UUID uuid) {
+        CompoundTag data = getProfile(uuid).tempBrainData;
+        return data == null ? null : data.copy();
+    }
     public void setTempBrainData(UUID uuid, CompoundTag data) {
         if (uuid == null) return;
         PlayerProfile profile = getProfile(uuid);
-        profile.tempBrainData = data;
+        if (Objects.equals(profile.tempBrainData, data)) return;
+        profile.tempBrainData = data == null ? null : data.copy();
         profile.setDirty();
     }
 
@@ -423,6 +389,7 @@ public class HeroWorldData {
     public void setActiveHeroUUID(UUID uuid, UUID heroId) {
         if (uuid == null) return;
         PlayerProfile profile = getProfile(uuid);
+        if (Objects.equals(profile.activeHeroUUID, heroId)) return;
         profile.activeHeroUUID = heroId;
         profile.setDirty();
     }
@@ -431,7 +398,9 @@ public class HeroWorldData {
     public void setLastKnownHeroPos(UUID uuid, GlobalPos pos) {
         if (uuid == null) return;
         PlayerProfile profile = getProfile(uuid);
-        profile.lastKnownHeroPos = pos;
+        GlobalPos snapshot = pos == null ? null : GlobalPos.of(pos.dimension(), pos.pos().immutable());
+        if (Objects.equals(profile.lastKnownHeroPos, snapshot)) return;
+        profile.lastKnownHeroPos = snapshot;
         profile.setDirty();
     }
 
@@ -439,47 +408,36 @@ public class HeroWorldData {
     public void setSpawnedFromChat(UUID uuid, boolean spawned) {
         if (uuid == null) return;
         PlayerProfile profile = getProfile(uuid);
+        if (profile.hasSpawnedFromChat == spawned) return;
         profile.hasSpawnedFromChat = spawned;
         profile.setDirty();
     }
 
-    public boolean isAllowIncomingCrossChat(UUID uuid) {
-        return getProfile(uuid).allowIncomingCrossChat;
-    }
-
-    public void setAllowIncomingCrossChat(UUID uuid, boolean allowIncomingCrossChat) {
+    public boolean isAllowIncomingCrossChat(UUID uuid) { return getProfile(uuid).allowIncomingCrossChat; }
+    public void setAllowIncomingCrossChat(UUID uuid, boolean allowed) {
         if (uuid == null) return;
         PlayerProfile profile = getProfile(uuid);
-        profile.allowIncomingCrossChat = allowIncomingCrossChat;
+        if (profile.allowIncomingCrossChat == allowed) return;
+        profile.allowIncomingCrossChat = allowed;
         profile.setDirty();
     }
 
-    public String getClientLanguageCode(UUID uuid) {
-        return PlayerProfile.normalizeLanguageCode(getProfile(uuid).clientLanguageCode);
-    }
-
+    public String getClientLanguageCode(UUID uuid) { return getProfile(uuid).clientLanguageCode; }
     public void setClientLanguageCode(UUID uuid, String clientLanguageCode) {
         if (uuid == null) return;
         PlayerProfile profile = getProfile(uuid);
-        String normalized = PlayerProfile.normalizeLanguageCode(clientLanguageCode);
-        if (Objects.equals(profile.clientLanguageCode, normalized)) {
-            return;
-        }
+        String normalized = LanguageCodes.normalize(clientLanguageCode);
+        if (profile.clientLanguageCode.equals(normalized)) return;
         profile.clientLanguageCode = normalized;
         profile.setDirty();
     }
 
-    public int getAutoHbTurnLimit(UUID uuid) {
-        return PlayerProfile.normalizeAutoHbTurnLimit(getProfile(uuid).autoHbTurnLimit);
-    }
-
+    public int getAutoHbTurnLimit(UUID uuid) { return getProfile(uuid).autoHbTurnLimit; }
     public void setAutoHbTurnLimit(UUID uuid, int turnLimit) {
         if (uuid == null) return;
         PlayerProfile profile = getProfile(uuid);
         int normalized = PlayerProfile.normalizeAutoHbTurnLimit(turnLimit);
-        if (profile.autoHbTurnLimit == normalized) {
-            return;
-        }
+        if (profile.autoHbTurnLimit == normalized) return;
         profile.autoHbTurnLimit = normalized;
         profile.setDirty();
     }

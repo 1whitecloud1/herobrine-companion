@@ -1,17 +1,17 @@
 package com.whitecloud233.herobrine_companion.event;
 
+import com.whitecloud233.herobrine_companion.util.DebugLog;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.ai.learning.SimpleNeuralNetwork;
 import com.whitecloud233.herobrine_companion.entity.ai.learning.state.HeroMindStateRegistry;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.util.RandomSource;
-import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.LightningBolt;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import com.whitecloud233.herobrine_companion.entity.visual.HeroClip;
 import com.whitecloud233.herobrine_companion.entity.visual.HeroGestureLibrary;
 import com.whitecloud233.herobrine_companion.entity.visual.HeroIdleClips;
+import com.whitecloud233.herobrine_companion.entity.visual.HeroVisualState;
 import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;
 
@@ -19,41 +19,41 @@ public class HeroVisuals {
 
     private static final Logger LOGGER = LogUtils.getLogger();
 
-    /** 手势淡入/淡出步长(每 tick):0.25 → 4 tick ≈ 0.2 s,对齐 Bedrock hero_offer 的 blend_transition。 */
-    private static final float OFFER_BLEND_STEP = 0.25F;
-    /** 待机变体淡入/淡出步长(每 tick):0.2 → 5 tick = 0.25 s,对齐 Bedrock grounded 的 blend_transition。 */
-    private static final float VARIANT_BLEND_STEP = 0.2F;
+    public static void tickClientLocomotion(HeroEntity hero) {
+        if (!hero.level().isClientSide) return;
+        HeroVisualState state = hero.getVisualState();
+        if (!state.isSetupDone()) {
+            setupHiddenTeam(hero);
+            state.markSetupDone();
+        }
+        state.tickLocomotion(hero.isFloating(), hero.isGroundWalking(),
+                hero.getX() - hero.xOld, hero.getZ() - hero.zOld);
+    }
+
+    public static void setupHiddenTeam(HeroEntity hero) {
+        if (!hero.level().isClientSide) return;
+        net.minecraft.world.scores.Scoreboard scoreboard = hero.level().getScoreboard();
+        String teamName = "hero_hidden_hud";
+        net.minecraft.world.scores.PlayerTeam team = scoreboard.getPlayerTeam(teamName);
+        if (team == null) {
+            team = scoreboard.addPlayerTeam(teamName);
+            team.setNameTagVisibility(net.minecraft.world.scores.Team.Visibility.NEVER);
+            team.setCollisionRule(net.minecraft.world.scores.Team.CollisionRule.NEVER);
+        }
+        scoreboard.addPlayerToTeam(hero.getStringUUID(), team);
+    }
 
     public static void tickClientAnimations(HeroEntity hero) {
-        if (hero.level().isClientSide) {
-            tickOfferGesture(hero);
-            tickIdleVariants(hero);
-            // 权重步进放在最后:新起的手势/变体本 tick 就能拿到正确的目标权重
-            tickBlendWeights(hero);
-        }
-        if (hero.scytheAnimTick > 0) hero.scytheAnimTick--;
-        if (hero.debugAnimTick > 0) {
-            hero.debugAnimTick--;
-            if (hero.level().isClientSide && hero.debugAnimTick > 10 && hero.debugAnimTick < 90) {
-                spawnDebugParticles(hero);
-            }
-        }
-        if (hero.shockTicks > 0) hero.shockTicks--;
+        if (!hero.level().isClientSide) return;
+        tickOfferGesture(hero);
+        tickIdleVariants(hero);
+        tickBlendWeights(hero);
+    }
 
-        if (hero.thunderTicks > 0) {
-            hero.thunderTicks--;
-            spawnThunderParticles(hero);
-
-            if (!hero.level().isClientSide && hero.thunderTicks == 1) {
-                LightningBolt bolt = EntityType.LIGHTNING_BOLT.create(hero.level());
-                if (bolt != null) {
-                    bolt.moveTo(hero.getX(), hero.getY(), hero.getZ());
-                    bolt.setVisualOnly(true);
-                    hero.level().addFreshEntity(bolt);
-                }
-                hero.shockTicks = HeroEntity.MAX_SHOCK_TICKS;
-            }
-        }
+    public static void tickClientActionParticles(HeroEntity hero, boolean thunderWasActive) {
+        if (!hero.level().isClientSide) return;
+        if (hero.debugAnimTick > 10 && hero.debugAnimTick < 90) spawnDebugParticles(hero);
+        if (thunderWasActive) spawnThunderParticles(hero);
     }
 
     public static void tickClientAmbient(HeroEntity hero) {
@@ -62,61 +62,45 @@ public class HeroVisuals {
 
     // --- 赠礼手势:客户端播放驱动(服务端只发 cue,见 HeroEntity.playOfferGesture)---
     private static void tickOfferGesture(HeroEntity hero) {
+        HeroVisualState state = hero.getVisualState();
         int clipId = hero.getOfferGestureId();
         if (clipId == 0) {
-            // 服务端已收尾:本地裁剪保留到淡出结束(blend_out),由 tickBlendWeights 统一清理,
-            // 避免姿态在权重还没降下来时被瞬间踢回基础姿态
-            if (hero.clientOfferBlend <= 0.001F && hero.gestureLocalClipId != 0) {
-                hero.gestureEventCursor = 0;
-                hero.gestureLocalClipId = 0;
-                hero.gestureLocalFinished = false;
+            // 服务端已收尾时，仍须保留本地裁剪直到淡出结束。
+            if (state.getOfferBlend() <= 0.001F && state.getGestureClipId() != 0) {
+                state.clearGesture();
             }
             return;
         }
         int token = hero.getOfferGestureToken();
-        if (token != hero.gestureEventTokenSeen) {
-            // 新一次手势:以客户端本地 tick 为起点,不依赖服务端 tickCount(两端起点不同)
-            hero.gestureEventTokenSeen = token;
-            hero.gestureEventCursor = 0;
-            hero.gestureLocalClipId = clipId;
-            hero.gestureLocalStartTick = hero.tickCount;
-            hero.gestureLocalFinished = false;
-            LOGGER.debug("[HeroGift] offer gesture started client-side: clipId={} token={} localTick={}",
+        if (token != state.getGestureTokenSeen()) {
+            state.startGesture(clipId, token, hero.tickCount);
+            DebugLog.debug(LOGGER, "[HeroGift] offer gesture started client-side: clipId={} token={} localTick={}",
                     clipId, token, hero.tickCount);
         }
         HeroClip clip = HeroGestureLibrary.byClipId(clipId);
         if (clip == null) {
             hero.clearOfferGestureClient();
-            hero.gestureLocalClipId = 0;
-            hero.gestureLocalFinished = false;
+            state.clearGesture();
             return;
         }
-        if (hero.gestureLocalFinished) {
-            return;
-        }
-        int elapsed = hero.tickCount - hero.gestureLocalStartTick;
+        if (state.isGestureFinished()) return;
+        int elapsed = hero.tickCount - state.getGestureStartTick();
         int durationTicks = Math.max(1, Math.round(clip.duration * 20.0F));
         if (elapsed >= durationTicks) {
-            // 播完即停:姿态钉在末帧,权重由 tickBlendWeights 淡出到 0(不再硬切)
-            hero.gestureLocalFinished = true;
-            hero.gestureEventCursor = clip.events.length;
+            state.finishGesture(clip.events.length);
             return;
         }
         float t = elapsed / 20.0F;
-        while (hero.gestureEventCursor < clip.events.length) {
-            HeroClip.Event e = clip.events[hero.gestureEventCursor];
-            if (e.time() > t) {
-                break;
-            }
+        while (state.getGestureEventCursor() < clip.events.length) {
+            HeroClip.Event e = clip.events[state.getGestureEventCursor()];
+            if (e.time() > t) break;
             if (e.kind() == HeroClip.EV_SOUND) {
                 playClipSound(hero, e.arg());
             } else if (e.kind() == HeroClip.EV_END) {
-                // 收尾交给权重淡出(直接清会让末段瞬间跳回基础姿态)
-                hero.gestureLocalFinished = true;
-                hero.gestureEventCursor = clip.events.length;
+                state.finishGesture(clip.events.length);
                 break;
             }
-            hero.gestureEventCursor++;
+            state.advanceGestureEvent();
         }
     }
 
@@ -143,82 +127,47 @@ public class HeroVisuals {
 
     // --- 待机变体:纯客户端调度(Bedrock hero_locomotion 控制器 6~12 秒随机等价)---
     private static void tickIdleVariants(HeroEntity hero) {
-        if (hero.idleVariantActive && hero.idleVariantClip >= 0) {
-            HeroClip clip = HeroIdleClips.IDLE_VARIANTS[hero.idleVariantClip];
+        HeroVisualState state = hero.getVisualState();
+        if (state.isIdleVariantActive() && state.getIdleVariantClip() >= 0) {
+            HeroClip clip = HeroIdleClips.IDLE_VARIANTS[state.getIdleVariantClip()];
             int durationTicks = Math.round(clip.duration * 20.0F);
-            int elapsed = hero.tickCount - hero.idleVariantStartTick;
+            int elapsed = hero.tickCount - state.getIdleVariantStartTick();
             if (elapsed >= durationTicks) {
-                // 播放窗口结束:姿态由权重淡出(blend_out),idleVariantClip 保留到淡完再被下一轮覆盖
-                hero.idleVariantActive = false;
-                hero.idleVariantNextAt = hero.tickCount + 120 + hero.getRandom().nextInt(121);
+                state.finishIdleVariant(hero.tickCount + 120 + hero.getRandom().nextInt(121));
                 return;
             }
-            if ((hero.idleVariantClip == 4 || hero.idleVariantClip == 5) && hero.tickCount % 10 == 0) {
+            if ((state.getIdleVariantClip() == 4 || state.getIdleVariantClip() == 5) && hero.tickCount % 10 == 0) {
                 spawnLightningIdleParticles(hero);
             }
             return;
         }
-        // 上一段还在淡出时不叠新的变体,避免两段裁剪互相覆盖
-        if (hero.clientVariantBlend > 0.001F) {
-            return;
-        }
-        if (hero.tickCount < hero.idleVariantNextAt) {
-            return;
-        }
-        hero.idleVariantNextAt = hero.tickCount + 120 + hero.getRandom().nextInt(121);
-        if (hero.isBusyForIdleVisual() || hero.isFloating()) {
-            return;
-        }
-        if (hero.getDeltaMovement().horizontalDistanceSqr() > 0.02D) {
-            return;
-        }
+        // 上一段仍在淡出时不叠加新的变体。
+        if (state.getVariantBlend() > 0.001F || hero.tickCount < state.getIdleVariantNextAt()) return;
+        state.scheduleIdleVariant(hero.tickCount + 120 + hero.getRandom().nextInt(121));
+        if (hero.isBusyForIdleVisual() || hero.isFloating()) return;
+        if (hero.getDeltaMovement().horizontalDistanceSqr() > 0.02D) return;
         int pool = hero.isHandsFreeForIdleVisual() ? 6 : 2;
         int roll = hero.getRandom().nextInt(pool);
-        if (roll == hero.idleVariantLast) {
-            roll = (roll + 1) % pool;
-        }
-        hero.idleVariantClip = roll;
-        hero.idleVariantStartTick = hero.tickCount;
-        hero.idleVariantLast = roll;
-        hero.idleVariantActive = true;
+        if (roll == state.getIdleVariantLast()) roll = (roll + 1) % pool;
+        state.startIdleVariant(roll, hero.tickCount);
     }
 
-    /**
-     * 混合权重步进:手势 / 待机变体的淡入淡出(替代原来的"一帧内硬接管")。
-     *
-     * <p>步长对齐 Bedrock:{@code hero_offer} 控制器 {@code blend_transition = 0.2 s},
-     * {@code hero_locomotion} 各状态 {@code 0.25~0.3 s}。权重本体存在实体上(模型实例是渲染器共享的),
-     * 渲染时按 partial tick 插值,见 {@code HeroEntity.getOfferBlend/getVariantBlend}。
-     */
     private static void tickBlendWeights(HeroEntity hero) {
+        HeroVisualState state = hero.getVisualState();
         int clipId = hero.getOfferGestureId();
-        boolean offerOn = !hero.gestureLocalFinished && clipId != 0 && clipId == hero.gestureLocalClipId;
-        hero.clientOfferBlendO = hero.clientOfferBlend;
-        hero.clientOfferBlend = approach(hero.clientOfferBlend, offerOn ? 1.0F : 0.0F, OFFER_BLEND_STEP);
-        if (!offerOn && hero.clientOfferBlend <= 0.001F && hero.gestureLocalClipId != 0) {
-            // 淡出结束:清本地播放状态与展示手持物(与姿态归位同一帧,不会看到"手里东西先消失")
-            hero.gestureLocalClipId = 0;
-            hero.gestureEventCursor = 0;
-            hero.gestureLocalFinished = false;
+        boolean offerOn = !state.isGestureFinished() && clipId != 0 && clipId == state.getGestureClipId();
+        state.tickOfferBlend(offerOn);
+        if (!offerOn && state.getOfferBlend() <= 0.001F && state.getGestureClipId() != 0) {
+            // 本地姿态淡出后才清展示物，避免物品比手势先消失。
+            state.clearGesture();
             hero.clearOfferGestureClient();
         }
 
-        boolean variantOn = hero.idleVariantActive
+        boolean variantOn = state.isIdleVariantActive()
                 && !hero.isBusyForIdleVisual()
                 && !hero.isFloating()
                 && hero.getDeltaMovement().horizontalDistanceSqr() <= 0.02D;
-        hero.clientVariantBlendO = hero.clientVariantBlend;
-        hero.clientVariantBlend = approach(hero.clientVariantBlend, variantOn ? 1.0F : 0.0F, VARIANT_BLEND_STEP);
-    }
-
-    private static float approach(float current, float target, float step) {
-        if (current < target) {
-            return Math.min(target, current + step);
-        }
-        if (current > target) {
-            return Math.max(target, current - step);
-        }
-        return current;
+        state.tickVariantBlend(variantOn);
     }
 
     private static void spawnLightningIdleParticles(HeroEntity hero) {

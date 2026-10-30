@@ -227,7 +227,7 @@ public class GlitchEchoEntity extends Entity {
 
                         // D. 转向
                         double angle = Mth.atan2(this.getDeltaMovement().z, this.getDeltaMovement().x) * (180F / Math.PI) - 90F;
-                        this.setYRot(rotlerp(this.getYRot(), (float) angle, 20.0F));
+                        this.setYRot(Mth.approachDegrees(this.getYRot(), (float) angle, 20.0F));
                     }
                 }
                 break;
@@ -340,16 +340,7 @@ public class GlitchEchoEntity extends Entity {
     }
 
     // 角度插值辅助方法
-    protected float rotlerp(float current, float target, float maxDelta) {
-        float f = Mth.wrapDegrees(target - current);
-        if (f > maxDelta) {
-            f = maxDelta;
-        }
-        if (f < -maxDelta) {
-            f = -maxDelta;
-        }
-        return current + f;
-    }
+
 
     private BlockPos findTarget() {
         // 1. Try to find actual chest nearby

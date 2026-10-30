@@ -19,6 +19,17 @@ public class QuestProgress {
     private static final String TAG_POSITIONS = "HeroQuestPositions";
     private static final String TAG_FLAGS = "HeroQuestFlags";
 
+    /** Copy the entire active quest when Minecraft replaces the player entity. */
+    public static void copyTo(CompoundTag original, CompoundTag replacement) {
+        for (String key : new String[]{TAG_ID, TAG_PROGRESS, TAG_TARGET_UUID, TAG_HERO_UUID, TAG_POSITIONS, TAG_FLAGS}) {
+            if (original.contains(key)) {
+                replacement.put(key, original.get(key).copy());
+            } else {
+                replacement.remove(key);
+            }
+        }
+    }
+
     private final ServerPlayer player;
 
     private QuestProgress(ServerPlayer player) {

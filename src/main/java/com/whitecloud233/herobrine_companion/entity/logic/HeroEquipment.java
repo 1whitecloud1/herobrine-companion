@@ -1,6 +1,6 @@
 package com.whitecloud233.herobrine_companion.entity.logic;
 
-import com.whitecloud233.herobrine_companion.compat.accessories.HeroAccessoriesCompat;
+import com.whitecloud233.herobrine_companion.api.compat.HeroAccessoriesCompat;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -12,6 +12,7 @@ import net.neoforged.fml.ModList;
 import java.util.Optional;
 
 public class HeroEquipment {
+    private static final String ACCESSORIES_BACKUP = "HerobrineCompanionAccessoriesBackup";
     private static final EquipmentSlot[] ARMOR_SLOTS = {
             EquipmentSlot.FEET, EquipmentSlot.LEGS, EquipmentSlot.CHEST, EquipmentSlot.HEAD
     };
@@ -113,12 +114,17 @@ public class HeroEquipment {
     // 【核心防御机制】安全隔离内部类！
     public static CompoundTag getAccessoriesDataTag(HeroEntity hero) {
         if (!HeroAccessoriesCompat.isLoaded()) {
-            return new CompoundTag();
+            return hero.getPersistentData().getCompound(ACCESSORIES_BACKUP).copy();
         }
-        return HeroAccessoriesCompat.getAccessoriesDataTag(hero);
+        CompoundTag tag = HeroAccessoriesCompat.getAccessoriesDataTag(hero);
+        // A temporarily unavailable capability must not erase saved equipment.
+        if (tag.isEmpty()) return hero.getPersistentData().getCompound(ACCESSORIES_BACKUP).copy();
+        hero.getPersistentData().put(ACCESSORIES_BACKUP, tag.copy());
+        return tag;
     }
 
     public static void setAccessoriesDataFromTag(HeroEntity hero, CompoundTag tag) {
+        hero.getPersistentData().put(ACCESSORIES_BACKUP, tag == null ? new CompoundTag() : tag.copy());
         if (!HeroAccessoriesCompat.isLoaded()) {
             return;
         }

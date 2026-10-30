@@ -1,8 +1,8 @@
 package com.whitecloud233.herobrine_companion;
 
 import com.mojang.logging.LogUtils;
+import com.whitecloud233.herobrine_companion.util.DebugLog;
 import com.whitecloud233.herobrine_companion.client.event.ClientModSetup;
-import com.whitecloud233.herobrine_companion.compat.epicfight.HeroEpicFightCompat;
 import com.whitecloud233.herobrine_companion.compat.kaleidoscope.KaleidoscopeCompatBuiltinPackFallback;
 import com.whitecloud233.herobrine_companion.config.Config;
 import com.whitecloud233.herobrine_companion.datagen.DataGenerators;
@@ -32,11 +32,9 @@ public class HerobrineCompanion {
     private static final Logger LOGGER = LogUtils.getLogger();
 
     public HerobrineCompanion(IEventBus modEventBus, ModContainer modContainer) {
-
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::registerPayloads);
         modEventBus.addListener(Config::onLoad);
-        HeroEpicFightCompat.bootstrap(modEventBus);
         modEventBus.addListener(KaleidoscopeCompatBuiltinPackFallback::onAddPackFinders);
 
         modEventBus.addListener(ModEvents::entityAttributeEvent);
@@ -64,35 +62,22 @@ public class HerobrineCompanion {
         NeoForge.EVENT_BUS.register(WorldAnomalyEventHandler.class);
 
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
+        com.whitecloud233.herobrine_companion.compat.safety.CompatBootstrap.register(modEventBus);
         
-        // Register KubeJS plugin if present
-        try {
-            Class.forName("dev.latvian.mods.kubejs.plugin.KubeJSPlugin");
-            NeoForge.EVENT_BUS.register(com.whitecloud233.herobrine_companion.compat.kubejs.HerobrineCompanionKubeJSPlugin.class);
-        } catch (ClassNotFoundException e) {
-            // KubeJS not present
-        }
+
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {
-
-        event.enqueueWork(() -> {
-            HeroEpicFightCompat.tryRegisterRuntimeBridge();
-        });
-        if (com.whitecloud233.herobrine_companion.compat.ArmourerWorkshop.HeroAWCompat.isLoaded()) {
-            LOGGER.info(">>> [DEBUG] 检测到 Armourer's Workshop 已加载，准备对接渲染系统 <<<");
-        } else {
-            LOGGER.warn(">>> [DEBUG] 未检测到 Armourer's Workshop，时装功能将不可用 <<<");
-        }
+        event.enqueueWork(com.whitecloud233.herobrine_companion.compat.cooking.CookingCompatBootstrap::registerBackends);
     }
     
     private void registerPayloads(final RegisterPayloadHandlersEvent event) {
-        final var registrar = event.registrar("3");
+        final var registrar = event.registrar("4");
         PacketHandler.register(registrar);
     }
 
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event) {
-        LOGGER.info("HELLO from server starting");
+        DebugLog.info(LOGGER, "HELLO from server starting");
     }
 }

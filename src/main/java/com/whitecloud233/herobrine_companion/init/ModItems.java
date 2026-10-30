@@ -7,6 +7,7 @@ import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Rarity;
 import net.minecraft.world.item.Tiers;
+import com.whitecloud233.herobrine_companion.item.DestructionGodSpawnEggItem;
 import net.neoforged.neoforge.common.DeferredSpawnEggItem;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -23,7 +24,7 @@ public class ModItems {
     public static final DeferredItem<Item> VOID_MARROW = ITEMS.register("void_marrow", () -> new Item(new Item.Properties()));
     public static final DeferredItem<Item> GLITCH_FRAGMENT = ITEMS.register("glitch_fragment", () -> new Item(new Item.Properties().rarity(Rarity.RARE)));
     public static final DeferredItem<Item> SOURCE_CODE_FRAGMENT = ITEMS.register("source_code_fragment", () -> new Item(new Item.Properties().rarity(Rarity.EPIC)));
-    public static final DeferredItem<Item> DESTRUCTION_GOD_HEROBRINE_SPAWN_EGG = ITEMS.register("destruction_god_herobrine_spawn_egg", () -> new DeferredSpawnEggItem(ModEntities.DESTRUCTION_GOD_HEROBRINE, 0x5E4A43, 0xF4F4F4, new Item.Properties().rarity(Rarity.EPIC)));
+    public static final DeferredItem<Item> DESTRUCTION_GOD_HEROBRINE_SPAWN_EGG = ITEMS.register("destruction_god_herobrine_spawn_egg", () -> new DestructionGodSpawnEggItem(ModEntities.DESTRUCTION_GOD_HEROBRINE, 0x5E4A43, 0xF4F4F4, new Item.Properties().rarity(Rarity.EPIC)));
 
     // New Items
     public static final DeferredItem<MemoryShardItem> MEMORY_SHARD = ITEMS.register("memory_shard", () -> new MemoryShardItem(new Item.Properties().rarity(Rarity.RARE)));

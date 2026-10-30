@@ -1,5 +1,7 @@
 package com.whitecloud233.herobrine_companion.event;
 
+import com.whitecloud233.herobrine_companion.fight.ChallengeSession;
+
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.item.HeroSummonItem;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
@@ -29,7 +31,7 @@ public class HeroEndringInteraction {
 
             // 如果正在打架，什么剧情都不准触发，直接放行给战斗管理器！
             if (hero.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE) ||
-                    hero.getPersistentData().getBoolean("IsChallengeActive")) {
+                    ChallengeSession.isHeroInChallenge(hero)) {
                 return;
             }
 

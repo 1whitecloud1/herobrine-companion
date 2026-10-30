@@ -1,5 +1,7 @@
 package com.whitecloud233.herobrine_companion.entity.family;
 
+import com.whitecloud233.herobrine_companion.util.NbtKeys;
+
 import com.whitecloud233.herobrine_companion.entity.awakened.containment.JeanSubmissionAnchor;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
@@ -350,7 +352,7 @@ public final class JeanCombatResponseService {
 
     private static boolean isJean(EnderDragon dragon) {
         return HerobrineFamilyMembers.isFamilyMember(dragon, HerobrineFamilyMemberType.JEAN)
-                || dragon.getTags().contains("herobrine_companion_jean")
+                || dragon.getTags().contains(NbtKeys.JEAN_ENTITY_TAG)
                 || dragon.hasCustomName() && "jean".equalsIgnoreCase(dragon.getCustomName().getString());
     }
 

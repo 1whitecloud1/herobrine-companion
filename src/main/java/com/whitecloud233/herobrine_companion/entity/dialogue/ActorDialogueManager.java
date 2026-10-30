@@ -25,8 +25,6 @@ public final class ActorDialogueManager {
     private static final Logger LOGGER = LogUtils.getLogger();
 
     private static final double GENERATOR_RANGE = 32.0D;
-    private static final int MIN_SPEECH_TICKS = 60;
-    private static final int MAX_SPEECH_TICKS = 120;
     private static final int MAX_TEXT_LENGTH = 160;
     private static final long JOB_TIMEOUT_MS = 60_000L;
 
@@ -151,8 +149,7 @@ public final class ActorDialogueManager {
     }
 
     private int computeSpeechDuration(String text) {
-        int duration = MIN_SPEECH_TICKS + (text == null ? 0 : text.length() * 2);
-        return Math.max(MIN_SPEECH_TICKS, Math.min(MAX_SPEECH_TICKS, duration));
+        return SpeechBubbleTiming.durationTicks(text);
     }
 
     private String buildFallbackText(ActorDialogueSpec spec) {
@@ -161,7 +158,7 @@ public final class ActorDialogueManager {
         }
         if (!spec.fallbackKey().isBlank()) {
             Object[] args = spec.fallbackArgs().toArray(new Object[0]);
-            String resolved = Component.translatable(spec.fallbackKey(), args).getString();
+            String resolved = Component.translatableEscape(spec.fallbackKey(), args).getString();
             if (!resolved.isBlank()) {
                 return sanitizeReply(resolved, "...");
             }

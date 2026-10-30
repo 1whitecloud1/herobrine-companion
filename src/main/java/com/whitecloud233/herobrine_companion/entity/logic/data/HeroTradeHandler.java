@@ -10,10 +10,12 @@ import javax.annotation.Nullable;
 public class HeroTradeHandler {
 
     private MerchantOffers offers;
+    private long revision = -1;
 
     public MerchantOffers getOffers(HeroEntity hero) {
-        if (this.offers == null) {
+        if (this.offers == null || !hero.level().isClientSide && revision != HeroTrades.revision()) {
             this.offers = HeroTrades.getOffers(hero);
+            revision = HeroTrades.revision();
         }
         return this.offers;
     }
@@ -28,7 +30,24 @@ public class HeroTradeHandler {
     }
 
     public void resetOffers(HeroEntity hero) {
+        MerchantOffers previous = this.offers;
+        boolean preserveUses = revision == HeroTrades.revision();
         this.offers = null;
+        MerchantOffers refreshed = getOffers(hero);
+        if (preserveUses && previous != null) {
+            for (int i = 0; i < Math.min(previous.size(), refreshed.size()); i++) {
+                MerchantOffer old = previous.get(i);
+                MerchantOffer next = refreshed.get(i);
+                if (old.getItemCostA().item().equals(next.getItemCostA().item())
+                        && old.getItemCostA().count() == next.getItemCostA().count()
+                        && old.getItemCostA().components().equals(next.getItemCostA().components())
+                        && net.minecraft.world.item.ItemStack.matches(old.getCostB(), next.getCostB())
+                        && net.minecraft.world.item.ItemStack.matches(old.getResult(), next.getResult())) {
+                    refreshed.set(i, new MerchantOffer(next.getItemCostA(), next.getItemCostB(), next.getResult(),
+                            old.getUses(), next.getMaxUses(), next.getXp(), next.getPriceMultiplier(), old.getDemand()));
+                }
+            }
+        }
         if (hero.getTradingPlayer() != null) {
             hero.getTradingPlayer().sendMerchantOffers(
                     getContainerId(hero),

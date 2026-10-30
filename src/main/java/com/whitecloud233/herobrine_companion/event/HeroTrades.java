@@ -18,8 +18,12 @@ public class HeroTrades {
 
     private static final Logger LOGGER = LogUtils.getLogger();
 
+    private static volatile long revision;
+    public static long revision() { return revision; }
+    public static void invalidate() { revision++; }
+
     public static MerchantOffers getOffers(HeroEntity hero) {
-        LOGGER.info("Generating offers for Hero. Trust level: {}", hero.getTrustLevel());
+        LOGGER.info("Generating offers for Herobrine. Trust level: {}", hero.getTrustLevel());
         MerchantOffers offers = new MerchantOffers();
         int trust = hero.getTrustLevel();
 
@@ -108,16 +112,9 @@ public class HeroTrades {
             ));
         }
 
-        // --- 核心修改：在此处调用 KubeJS 事件 ---
-        // 这行代码会把当前的 offers 列表和 hero 实体传给 KubeJS 脚本进行“后处理”
-        // ... 在 HeroTrades.java 的对应位置 ...
-        if (ModList.get().isLoaded("kubejs")) {
-            // 将实际的调用封装在另一个类（如 SafeKubeJSCaller）中
+        if (!hero.level().isClientSide && ModList.get().isLoaded("kubejs")) {
             SafeKubeJSCaller.fireEvent(offers, hero);
         }
-        // -------------------------------------
-
-        LOGGER.info("Generated {} offers (after KubeJS modification).", offers.size());
         return offers;
     }
 
@@ -128,7 +125,7 @@ public class HeroTrades {
             int xp = offer.getXp();
             hero.increaseTrust(xp);
             // 强制刷新交易列表以解锁新等级
-            hero.resetOffers(); 
+            hero.resetOffers();
         }
     }
 }

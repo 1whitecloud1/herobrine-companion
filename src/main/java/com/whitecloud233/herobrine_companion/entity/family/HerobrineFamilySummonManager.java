@@ -1,5 +1,7 @@
 package com.whitecloud233.herobrine_companion.entity.family;
 
+import com.whitecloud233.herobrine_companion.util.NbtKeys;
+
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.NbtUtils;
@@ -160,7 +162,7 @@ public final class HerobrineFamilySummonManager {
         consumeStructure(level, structure);
         HerobrineFamilyMembers.assignSummonedIdentity(summoned, structure.memberType());
         if (summoned instanceof EnderDragon dragon && structure.memberType() == HerobrineFamilyMemberType.JEAN) {
-            dragon.addTag("herobrine_companion_jean");
+            dragon.addTag(NbtKeys.JEAN_ENTITY_TAG);
             dragon.setDragonFight(null);
             dragon.setFightOrigin(structure.center());
             dragon.getPhaseManager().setPhase(EnderDragonPhase.HOVERING);

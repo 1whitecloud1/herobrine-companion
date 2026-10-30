@@ -1,12 +1,16 @@
 package com.whitecloud233.herobrine_companion.entity.awakened;
 
 import com.mojang.logging.LogUtils;
+
+import com.whitecloud233.herobrine_companion.config.ServerConfigAccess;
+import com.whitecloud233.herobrine_companion.config.ServerRule;
 import com.whitecloud233.herobrine_companion.config.Config;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.dialogue.ActorDialogueManager;
 import com.whitecloud233.herobrine_companion.entity.dialogue.ActorDialoguePrompts;
 import com.whitecloud233.herobrine_companion.entity.dialogue.ActorDialogueSpec;
 import com.whitecloud233.herobrine_companion.entity.dialogue.SpeechBubbleAccessor;
+import com.whitecloud233.herobrine_companion.entity.dialogue.SpeechBubbleTiming;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -28,8 +32,6 @@ public final class AwakenedMobBrain {
     private static final double AUDIENCE_RANGE = 10.0D;
     private static final double WARNING_RANGE = 8.0D;
     private static final double PACK_CEASEFIRE_RANGE = 16.0D;
-    private static final int MIN_SPEECH_TICKS = 60;
-    private static final int MAX_SPEECH_TICKS = 120;
     private static final int FIRST_SIGHT_CEASEFIRE_TICKS = 100;
     private static final int INTERACTION_CEASEFIRE_TICKS = 180;
     private static final int GIFT_CEASEFIRE_TICKS = 2400;
@@ -485,7 +487,7 @@ public final class AwakenedMobBrain {
     private static boolean requestDialogueToPlayer(Mob mob, AwakenedMobProfile profile, AwakenedPlayerMemory memory,
                                                    Player player, String userPrompt, String fallbackKey,
                                                    List<String> fallbackArgs) {
-        if (!Config.awakenedMobAiDialogueEnabled) {
+        if (!ServerConfigAccess.snapshot().enabled(ServerRule.AWAKENED_DIALOGUE)) {
             return false;
         }
 
@@ -511,7 +513,7 @@ public final class AwakenedMobBrain {
     private static void requestHeroExchange(Mob mob, HeroEntity hero, AwakenedMobProfile profile) {
         ServerPlayer preferredAudience = findHeroOwnerAudience(mob, hero);
         String mobFallbackKey = randomEntry(profile.heroInteractionKeys(), mob.getRandom());
-        if (!Config.awakenedMobAiDialogueEnabled) {
+        if (!ServerConfigAccess.snapshot().enabled(ServerRule.AWAKENED_DIALOGUE)) {
             speak(mob, Component.translatable(mobFallbackKey));
             speakHeroFallbackReply(hero, mob);
             return;
@@ -607,7 +609,7 @@ public final class AwakenedMobBrain {
 
     private static String buildFallbackSeed(String fallbackKey, List<String> fallbackArgs) {
         Object[] args = fallbackArgs.toArray(new Object[0]);
-        return Component.translatable(fallbackKey, args).getString();
+        return Component.translatableEscape(fallbackKey, args).getString();
     }
 
     private static void speak(Mob mob, Component component) {
@@ -617,8 +619,7 @@ public final class AwakenedMobBrain {
     }
 
     private static int computeSpeechDuration(Component component) {
-        int duration = MIN_SPEECH_TICKS + component.getString().length() * 2;
-        return Math.min(MAX_SPEECH_TICKS, Math.max(MIN_SPEECH_TICKS, duration));
+        return SpeechBubbleTiming.durationTicks(component);
     }
 
     private static boolean hasNearbyPlayerAudience(Mob mob) {

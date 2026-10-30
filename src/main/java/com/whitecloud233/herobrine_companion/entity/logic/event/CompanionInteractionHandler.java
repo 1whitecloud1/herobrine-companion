@@ -3,6 +3,7 @@ package com.whitecloud233.herobrine_companion.entity.logic.event;
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.ai.learning.state.PranksterStateDefinition;
+import com.whitecloud233.herobrine_companion.entity.logic.HeroInvitationHelper;
 import com.whitecloud233.herobrine_companion.entity.logic.data.HeroLogic;
 import com.whitecloud233.herobrine_companion.item.HeroSummonItem;
 import net.minecraft.core.BlockPos;
@@ -26,11 +27,8 @@ public class CompanionInteractionHandler {
     public static void onPlayerInteractEntity(PlayerInteractEvent.EntityInteract event) {
         Player player = event.getEntity();
 
-        // 检查手持物品
-        if (!(player.getMainHandItem().getItem() instanceof HeroSummonItem)) return;
-
-        // [修改] 必须按住 Shift 才能触发 Hero 骑乘
-        if (!player.isShiftKeyDown()) return;
+        // 检查手持物品并确认按住了 Shift（手持契约 + Shift 才让 Hero 上车）
+        if (!(player.getMainHandItem().getItem() instanceof HeroSummonItem) || !player.isShiftKeyDown()) return;
 
         Entity target = event.getTarget();
         // 检查目标是否是载具 (船或矿车)
@@ -58,14 +56,8 @@ public class CompanionInteractionHandler {
                     hero.teleportTo(target.getX(), target.getY(), target.getZ());
 
                     // 让 Hero 骑乘载具
-                    boolean success = hero.startRiding(target, true); // force = true
-
-                    if (success) {
+                    if (hero.startRiding(target, true)) {
                         player.sendSystemMessage(Component.translatable("message.herobrine_companion.hero_ride_vehicle"));
-                    } else {
-                        // 如果骑乘失败 (比如距离太远或者其他原因)，尝试再次传送并骑乘
-                        // 或者给玩家一个提示
-                        // player.sendSystemMessage(Component.literal("Failed to mount."));
                     }
                 } else {
                     // [新增] 如果没找到 Hero，提示玩家
@@ -94,8 +86,9 @@ public class CompanionInteractionHandler {
         for (HeroEntity hero : com.whitecloud233.herobrine_companion.entity.ai.learning.HeroBrain.ACTIVE_HEROES) {
             if (hero.level() == level && hero.isAlive() && hero.isCompanionMode()) {
                 BlockPos invitedPos = hero.getInvitedPos();
-                // 如果 Hero 被邀请到这个位置，且正在执行“休息”动作 (Action=2)
-                if (invitedPos != null && invitedPos.equals(pos) && hero.getInvitedAction() == 2) {
+                // 如果 Hero 被邀请到这个位置，且正在执行“休息”动作
+                if (invitedPos != null && invitedPos.equals(pos)
+                        && hero.getInvitedAction() == HeroInvitationHelper.ACTION_REST) {
                     // 并且 Hero 确实在骑乘状态 (说明已经坐下了)
                     if (hero.isPassenger()) {
                         // [修改] 如果玩家手持 HeroSummonItem 且按住 Shift，则让 Hero 起来
@@ -103,7 +96,7 @@ public class CompanionInteractionHandler {
                             // 只有主人可以让他起来 (或者没有主人的时候)
                             if (hero.getOwnerUUID() == null || hero.getOwnerUUID().equals(player.getUUID())) {
                                 // 复用 HeroLogic 的逻辑来取消邀请
-                                HeroLogic.handlePlayerInvitation(hero, player, pos, 0);
+                                HeroLogic.handlePlayerInvitation(hero, player, pos, HeroInvitationHelper.ACTION_NONE);
 
                                 // 阻止方块的默认交互（比如坐下）
                                 event.setCanceled(true);

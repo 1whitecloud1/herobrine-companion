@@ -1,6 +1,7 @@
 package com.whitecloud233.herobrine_companion.entity.logic.data;
 
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.herobrine_companion.entity.ai.combat.HeroHostileTargetPolicy;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
@@ -39,6 +40,17 @@ public class HeroCombatProtection {
 
     public static boolean hasCompanionFriendlyFireProtection(HeroEntity hero) {
         return hero.getOwnerUUID() != null && !hero.isChallengeActiveState();
+    }
+
+    /**
+     * 战斗模式下的目标边界兜底：原版生物与觉醒怪物不吃 Herobrine 的任何战斗伤害。
+     *
+     * <p>放在事件层而不是只靠 {@code HeroEntity#canAttack}，是因为技能特效大多直接
+     * {@code target.hurt(...)}，绕过了 {@code doHurtTarget} 那层 {@code canAttack} 校验。
+     * 事件冒泡统一拦一次，保证「新加一个特效」不会悄悄破例。</p>
+     */
+    public static boolean shouldPreventProtectedBattleHit(HeroEntity hero, @Nullable Entity target) {
+        return HeroHostileTargetPolicy.isProtectedFromBattle(hero, target);
     }
 
     public static void handleNonChallengeRetaliation(HeroEntity hero, DamageSource source) {
