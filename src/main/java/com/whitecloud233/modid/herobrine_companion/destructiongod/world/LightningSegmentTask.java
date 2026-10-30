@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.destructiongod.world;
 
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.modid.herobrine_companion.util.SegmentProjection;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
@@ -10,21 +11,29 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
-
 import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 
-final class DestructionLightningBeamTask extends TerrainTask {
+/** Shared scanning/lifecycle only: ARC and BEAM keep distinct hit geometry and damage. */
+final class LightningSegmentTask extends TerrainTask {
+    enum Kind {
+        ARC(1.5D), BEAM(2.5D);
+        final double minimumRadius;
+        Kind(double minimumRadius) { this.minimumRadius = minimumRadius; }
+    }
     private final Vec3 end;
     private final double radius;
-    private final List<BlockPos> pendingBlocks = new ArrayList<>();
+    private final Kind kind;
     private boolean prepared;
+    private final List<BlockPos> pendingBlocks = new ArrayList<>();
 
-    DestructionLightningBeamTask(ServerLevel level, @Nullable LivingEntity caster, Vec3 start, Vec3 end, double radius, int delayTicks) {
+    LightningSegmentTask(ServerLevel level, @Nullable LivingEntity caster, Vec3 start, Vec3 end,
+                         double radius, int delayTicks, Kind kind) {
         super(level, caster, start, end.subtract(start), start.distanceTo(end), delayTicks);
         this.end = end;
-        this.radius = Math.max(2.5D, radius);
+        this.kind = kind;
+        this.radius = Math.max(kind.minimumRadius, radius);
     }
 
     @Override
@@ -34,27 +43,32 @@ final class DestructionLightningBeamTask extends TerrainTask {
             this.prepareBlocks();
             this.prepared = true;
             Vec3 midpoint = this.origin.lerp(this.end, 0.5D);
-            this.level.playSound(null, midpoint.x, midpoint.y, midpoint.z, SoundEvents.TRIDENT_THUNDER, SoundSource.WEATHER, 6.0F, 0.52F);
-            this.level.playSound(null, midpoint.x, midpoint.y, midpoint.z, SoundEvents.LIGHTNING_BOLT_THUNDER, SoundSource.WEATHER, 7.5F, 0.66F);
-            this.level.playSound(null, midpoint.x, midpoint.y, midpoint.z, SoundEvents.WARDEN_SONIC_BOOM, SoundSource.HOSTILE, 3.8F, 0.58F);
-            this.level.playSound(null, midpoint.x, midpoint.y, midpoint.z, SoundEvents.GENERIC_EXPLODE, SoundSource.HOSTILE, 4.8F, 0.40F);
-            this.level.sendParticles(ParticleTypes.FLASH, this.origin.x, this.origin.y, this.origin.z, 3, 0.5D, 0.5D, 0.5D, 0.0D);
-            this.level.sendParticles(ParticleTypes.ELECTRIC_SPARK, midpoint.x, midpoint.y, midpoint.z, 90, this.radius, this.radius, this.radius, 0.20D);
-            this.damageCylinder(caster, midpoint);
+            if (this.kind == Kind.ARC) {
+                this.level.playSound(null, midpoint.x, midpoint.y, midpoint.z, SoundEvents.WARDEN_SONIC_BOOM, SoundSource.HOSTILE, 2.6F, 1.45F);
+                this.level.sendParticles(ParticleTypes.ELECTRIC_SPARK, midpoint.x, midpoint.y, midpoint.z, 50, 1.2D, 1.2D, 1.2D, 0.18D);
+                AABB damageBox = new AABB(
+                        Math.min(this.origin.x, this.end.x) - this.radius - 2.0D, Math.min(this.origin.y, this.end.y) - this.radius - 2.0D, Math.min(this.origin.z, this.end.z) - this.radius - 2.0D,
+                        Math.max(this.origin.x, this.end.x) + this.radius + 2.0D, Math.max(this.origin.y, this.end.y) + this.radius + 2.0D, Math.max(this.origin.z, this.end.z) + this.radius + 2.0D);
+                DestructionTerrainManager.damageAndPush(this.level, caster, damageBox, midpoint, 14.0F, 0.9D, 0.55D);
+                DestructionTerrainManager.clearLooseEntities(this.level, caster, damageBox);
+            } else {
+                this.level.playSound(null, midpoint.x, midpoint.y, midpoint.z, SoundEvents.TRIDENT_THUNDER, SoundSource.WEATHER, 6.0F, 0.52F);
+                this.level.playSound(null, midpoint.x, midpoint.y, midpoint.z, SoundEvents.LIGHTNING_BOLT_THUNDER, SoundSource.WEATHER, 7.5F, 0.66F);
+                this.level.playSound(null, midpoint.x, midpoint.y, midpoint.z, SoundEvents.WARDEN_SONIC_BOOM, SoundSource.HOSTILE, 3.8F, 0.58F);
+                this.level.playSound(null, midpoint.x, midpoint.y, midpoint.z, SoundEvents.GENERIC_EXPLODE, SoundSource.HOSTILE, 4.8F, 0.40F);
+                this.level.sendParticles(ParticleTypes.FLASH, this.origin.x, this.origin.y, this.origin.z, 3, 0.5D, 0.5D, 0.5D, 0.0D);
+                this.level.sendParticles(ParticleTypes.ELECTRIC_SPARK, midpoint.x, midpoint.y, midpoint.z, 90, this.radius, this.radius, this.radius, 0.20D);
+                this.damageCylinder(caster, midpoint);
+            }
         }
-
-        DestructionMode mode = DestructionMode.current();
-        if (!this.pendingBlocks.isEmpty()) {
-            DestructionTerrainManager.clearBlocksInstant(this.level, this.pendingBlocks, mode, true);
-            this.pendingBlocks.clear();
-        }
+        this.queueClearBlocks(this.pendingBlocks, DestructionMode.current(), true);
+        this.pendingBlocks.clear();
         return true;
     }
 
     private void prepareBlocks() {
-        Vec3 segment = this.end.subtract(this.origin);
-        double lengthSq = segment.lengthSqr();
-        if (lengthSq < 1.0E-4D) {
+        SegmentProjection projection = new SegmentProjection(this.origin, this.end);
+        if (projection.isDegenerate()) {
             return;
         }
 
@@ -70,8 +84,7 @@ final class DestructionLightningBeamTask extends TerrainTask {
             for (int y = minY; y <= maxY; y++) {
                 for (int z = minZ; z <= maxZ; z++) {
                     Vec3 blockCenter = new Vec3(x + 0.5D, y + 0.5D, z + 0.5D);
-                    double t = Mth.clamp(blockCenter.subtract(this.origin).dot(segment) / lengthSq, 0.0D, 1.0D);
-                    Vec3 closest = this.origin.add(segment.scale(t));
+                    Vec3 closest = projection.closestPoint(blockCenter);
                     if (blockCenter.distanceToSqr(closest) <= radiusSq) {
                         this.pendingBlocks.add(new BlockPos(x, y, z));
                     }
@@ -81,9 +94,8 @@ final class DestructionLightningBeamTask extends TerrainTask {
     }
 
     private void damageCylinder(@Nullable LivingEntity caster, Vec3 midpoint) {
-        Vec3 segment = this.end.subtract(this.origin);
-        double lengthSq = segment.lengthSqr();
-        if (lengthSq < 1.0E-4D) {
+        SegmentProjection projection = new SegmentProjection(this.origin, this.end);
+        if (projection.isDegenerate()) {
             return;
         }
         double searchRadius = this.origin.distanceTo(this.end) * 0.5D + this.radius + 4.0D;
@@ -93,8 +105,7 @@ final class DestructionLightningBeamTask extends TerrainTask {
         double damageRadiusSq = (this.radius + 1.5D) * (this.radius + 1.5D);
         for (LivingEntity target : targets) {
             Vec3 targetCenter = target.position().add(0.0D, target.getBbHeight() * 0.5D, 0.0D);
-            double t = Mth.clamp(targetCenter.subtract(this.origin).dot(segment) / lengthSq, 0.0D, 1.0D);
-            Vec3 closest = this.origin.add(segment.scale(t));
+            Vec3 closest = projection.closestPoint(targetCenter);
             double distSq = targetCenter.distanceToSqr(closest);
             if (distSq > damageRadiusSq) {
                 continue;
@@ -103,7 +114,7 @@ final class DestructionLightningBeamTask extends TerrainTask {
             target.hurt(this.level.damageSources().magic(), (float) (26.0D * scale));
             Vec3 push = targetCenter.subtract(closest);
             if (push.lengthSqr() < 1.0E-4D) {
-                push = segment.normalize();
+                push = projection.delta().normalize();
             } else {
                 push = push.normalize();
             }
@@ -111,4 +122,3 @@ final class DestructionLightningBeamTask extends TerrainTask {
         }
     }
 }
-

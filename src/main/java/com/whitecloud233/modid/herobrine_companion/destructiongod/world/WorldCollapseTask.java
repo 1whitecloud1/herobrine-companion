@@ -1,6 +1,5 @@
 package com.whitecloud233.modid.herobrine_companion.destructiongod.world;
 
-import com.whitecloud233.modid.herobrine_companion.config.Config;
 import com.whitecloud233.modid.herobrine_companion.destructiongod.entity.DestructionGodHerobrineEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import net.minecraft.core.BlockPos;
@@ -34,7 +33,7 @@ final class WorldCollapseTask extends TerrainTask {
     protected boolean doTick(TickBudget budget) {
         LivingEntity caster = this.getCaster();
         DestructionMode mode = DestructionMode.current();
-        if (!Config.destructionGodFinalPhaseWorldCollapse && !(caster instanceof DestructionGodHerobrineEntity)) {
+        if (!DestructionTuning.FINAL_PHASE_WORLD_COLLAPSE && !(caster instanceof DestructionGodHerobrineEntity)) {
             return true;
         }
         if (this.currentRadius <= this.endRadius) {
@@ -66,7 +65,7 @@ final class WorldCollapseTask extends TerrainTask {
                 }
             }
         }
-        DestructionTerrainManager.clearBlocksInstant(this.level, toClear, mode, false);
+        this.queueClearBlocks(toClear, mode, false);
 
         AABB collapseBand = new AABB(this.origin.x - this.currentRadius - this.bandWidth, this.origin.y - 8.0D, this.origin.z - this.currentRadius - this.bandWidth,
                 this.origin.x + this.currentRadius + this.bandWidth, this.origin.y + 16.0D, this.origin.z + this.currentRadius + this.bandWidth);

@@ -1,5 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.destructiongod.network;
 
+import com.whitecloud233.modid.herobrine_companion.network.NetworkCodec;
+
 import com.whitecloud233.modid.herobrine_companion.network.NetworkClientBridge;
 import com.whitecloud233.modid.herobrine_companion.network.PacketDispatch;
 import net.minecraft.network.FriendlyByteBuf;
@@ -28,8 +30,8 @@ public class DestructionGodFaultSplitPacket {
     }
 
     public DestructionGodFaultSplitPacket(FriendlyByteBuf buf) {
-        this.origin = new Vec3(buf.readDouble(), buf.readDouble(), buf.readDouble());
-        this.direction = new Vec3(buf.readDouble(), buf.readDouble(), buf.readDouble());
+        this.origin = NetworkCodec.readVec3(buf);
+        this.direction = NetworkCodec.readVec3(buf);
         this.length = buf.readFloat();
         this.terrainHalfWidth = buf.readVarInt();
         this.splitDistance = buf.readVarInt();
@@ -38,12 +40,8 @@ public class DestructionGodFaultSplitPacket {
     }
 
     public void encode(FriendlyByteBuf buf) {
-        buf.writeDouble(this.origin.x);
-        buf.writeDouble(this.origin.y);
-        buf.writeDouble(this.origin.z);
-        buf.writeDouble(this.direction.x);
-        buf.writeDouble(this.direction.y);
-        buf.writeDouble(this.direction.z);
+        NetworkCodec.writeVec3(buf, this.origin);
+        NetworkCodec.writeVec3(buf, this.direction);
         buf.writeFloat(this.length);
         buf.writeVarInt(this.terrainHalfWidth);
         buf.writeVarInt(this.splitDistance);
@@ -53,8 +51,6 @@ public class DestructionGodFaultSplitPacket {
 
     public void handle(Supplier<NetworkEvent.Context> supplier) {
         NetworkEvent.Context context = supplier.get();
-        PacketDispatch.assertClient(context);
-        context.enqueueWork(() -> NetworkClientBridge.handleDestructionGodFaultSplit(this));
-        context.setPacketHandled(true);
+        PacketDispatch.enqueueClient(context, () -> NetworkClientBridge.handleDestructionGodFaultSplit(this));
     }
 }

@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.destructiongod.world;
 
 import com.mojang.math.Transformation;
+import com.whitecloud233.modid.herobrine_companion.util.BlockDisplayEffect;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.particles.ParticleTypes;
@@ -36,25 +37,6 @@ import java.util.Set;
 
 final class ScytheFaultSplitTask extends TerrainTask {
     private static final String FAULT_DISPLAY_TAG = "herobrine_fault_display";
-    @Nullable
-    private static final Method DISPLAY_SET_TRANSFORMATION = findDeclaredMethod(Display.class, "setTransformation", Transformation.class);
-    @Nullable
-    private static final Method DISPLAY_SET_INTERPOLATION_DURATION = findDeclaredMethod(Display.class, "setInterpolationDuration", int.class);
-    @Nullable
-    private static final Method DISPLAY_SET_INTERPOLATION_DELAY = findDeclaredMethod(Display.class, "setInterpolationDelay", int.class);
-    @Nullable
-    private static final Method DISPLAY_SET_VIEW_RANGE = findDeclaredMethod(Display.class, "setViewRange", float.class);
-    @Nullable
-    private static final Method DISPLAY_SET_WIDTH = findDeclaredMethod(Display.class, "setWidth", float.class);
-    @Nullable
-    private static final Method DISPLAY_SET_HEIGHT = findDeclaredMethod(Display.class, "setHeight", float.class);
-    @Nullable
-    private static final Method DISPLAY_SET_SHADOW_RADIUS = findDeclaredMethod(Display.class, "setShadowRadius", float.class);
-    @Nullable
-    private static final Method DISPLAY_SET_SHADOW_STRENGTH = findDeclaredMethod(Display.class, "setShadowStrength", float.class);
-    @Nullable
-    private static final Method BLOCK_DISPLAY_SET_BLOCK_STATE = findDeclaredMethod(Display.BlockDisplay.class, "setBlockState", BlockState.class);
-
     private static final int DISPLAY_MOVE_TICKS = 132;
     private static final int DISPLAY_HOLD_TICKS = 36;
     private static final int MAX_DISPLAY_BLOCKS = 8192;
@@ -258,7 +240,7 @@ final class ScytheFaultSplitTask extends TerrainTask {
             List<FaultDisplayBlock> groupBlocks = new ArrayList<>();
             for (FaultPaletteEntry entry : visualSnapshot.entries()) {
                 BlockState state = visualSnapshot.palette().get(entry.paletteIndex());
-                Display.BlockDisplay display = createFaultBlockDisplay(this.level, entry.pos(), state, snapshot.translation(), new Vec3(1.0D, 1.0D, 1.0D));
+                Display.BlockDisplay display = BlockDisplayEffect.create(this.level, entry.pos(), state, FAULT_DISPLAY_TAG, snapshot.translation(), new Vec3(1.0D, 1.0D, 1.0D));
                 if (display != null) {
                     groupBlocks.add(new FaultDisplayBlock(display, state));
                 }
@@ -284,7 +266,7 @@ final class ScytheFaultSplitTask extends TerrainTask {
                 if (block.display().isRemoved()) {
                     continue;
                 }
-                applyFaultDisplayState(block.display(), block.state(), group.translation(), new Vec3(1.0D, 1.0D, 1.0D), 0);
+                BlockDisplayEffect.apply(block.display(), block.state(), group.translation(), 0);
             }
         }
     }
@@ -296,7 +278,7 @@ final class ScytheFaultSplitTask extends TerrainTask {
         List<BlockPos> clears = new ArrayList<>(this.pendingCorridorClears.size() + this.pendingPlateSourceClears.size());
         clears.addAll(this.pendingCorridorClears);
         clears.addAll(this.pendingPlateSourceClears);
-        DestructionTerrainManager.applyFaultSplitChangesInstant(this.level, clears, List.of(), Map.of(), DestructionMode.DIVINE);
+        this.queueFaultChanges(clears, List.of(), Map.of(), DestructionMode.DIVINE);
         this.pendingCorridorClears.clear();
         this.pendingPlateSourceClears.clear();
     }
@@ -702,7 +684,7 @@ final class ScytheFaultSplitTask extends TerrainTask {
                 if (block.display().isRemoved()) {
                     continue;
                 }
-                applyFaultDisplayState(block.display(), block.state(), Vec3.ZERO, new Vec3(1.0D, 1.0D, 1.0D), DISPLAY_MOVE_TICKS);
+                BlockDisplayEffect.apply(block.display(), block.state(), Vec3.ZERO, DISPLAY_MOVE_TICKS);
             }
         }
     }
@@ -727,15 +709,14 @@ final class ScytheFaultSplitTask extends TerrainTask {
         while (this.pendingPlacementIndex < this.pendingPlacements.size() && budget.hasBudget() && processedThisTick < PLACEMENT_BLOCKS_PER_TICK) {
             FaultPlacement placement = this.pendingPlacements.get(this.pendingPlacementIndex++);
             batch.put(placement.pos(), placement.state());
-            budget.consume();
             processedThisTick++;
             if (batch.size() >= BLOCK_MUTATION_BATCH_SIZE) {
-                DestructionTerrainManager.applyFaultSplitChangesInstant(this.level, List.of(), List.of(), batch, DestructionMode.DIVINE);
+                this.queueFaultChanges(List.of(), List.of(), batch, DestructionMode.DIVINE);
                 batch.clear();
             }
         }
         if (!batch.isEmpty()) {
-            DestructionTerrainManager.applyFaultSplitChangesInstant(this.level, List.of(), List.of(), batch, DestructionMode.DIVINE);
+            this.queueFaultChanges(List.of(), List.of(), batch, DestructionMode.DIVINE);
         }
         if (this.pendingPlacementIndex >= this.pendingPlacements.size()) {
             this.pendingPlacements.clear();
@@ -762,93 +743,6 @@ final class ScytheFaultSplitTask extends TerrainTask {
         level.sendParticles(ParticleTypes.END_ROD, center.x, center.y + 0.08D, center.z, 2, 0.02D, 0.04D, 0.02D, 0.0D);
         level.sendParticles(ParticleTypes.ELECTRIC_SPARK, center.x, center.y + 0.10D, center.z, 2, 0.03D, 0.05D, 0.03D, 0.0D);
         level.sendParticles(ParticleTypes.FLASH, center.x, center.y + 0.12D, center.z, 1, 0.0D, 0.0D, 0.0D, 0.0D);
-    }
-
-    @Nullable
-    private static Method findDeclaredMethod(Class<?> owner, String name, Class<?>... parameterTypes) {
-        try {
-            Method method = owner.getDeclaredMethod(name, parameterTypes);
-            method.setAccessible(true);
-            return method;
-        } catch (ReflectiveOperationException exception) {
-            return null;
-        }
-    }
-
-    private static boolean invokePrivateMethod(@Nullable Method method, Object target, Object... args) {
-        if (method == null) {
-            return false;
-        }
-        try {
-            method.invoke(target, args);
-            return true;
-        } catch (ReflectiveOperationException exception) {
-            return false;
-        }
-    }
-
-    private static Display.BlockDisplay createFaultBlockDisplay(ServerLevel level, BlockPos pos, BlockState state, Vec3 translation, Vec3 scale) {
-        Display.BlockDisplay display = EntityType.BLOCK_DISPLAY.create(level);
-        if (display == null) {
-            return null;
-        }
-        display.setPos(pos.getX(), pos.getY(), pos.getZ());
-        display.setNoGravity(true);
-        display.setInvulnerable(true);
-        display.addTag(FAULT_DISPLAY_TAG);
-        applyFaultDisplayState(display, state, translation, scale, 0);
-        level.addFreshEntity(display);
-        return display;
-    }
-
-    private static void applyFaultDisplayState(Display.BlockDisplay display, BlockState state, Vec3 translation, Vec3 scale, int interpolationDuration) {
-        boolean synced = invokePrivateMethod(BLOCK_DISPLAY_SET_BLOCK_STATE, display, state);
-
-        Transformation transformation = new Transformation(
-                new Vector3f((float) translation.x, (float) translation.y, (float) translation.z),
-                new Quaternionf(),
-                new Vector3f((float) scale.x, (float) scale.y, (float) scale.z),
-                new Quaternionf()
-        );
-        synced |= invokePrivateMethod(DISPLAY_SET_TRANSFORMATION, display, transformation);
-        synced |= invokePrivateMethod(DISPLAY_SET_INTERPOLATION_DURATION, display, Math.max(0, interpolationDuration));
-        synced |= invokePrivateMethod(DISPLAY_SET_INTERPOLATION_DELAY, display, 0);
-        synced |= invokePrivateMethod(DISPLAY_SET_VIEW_RANGE, display, 256.0F);
-        synced |= invokePrivateMethod(DISPLAY_SET_WIDTH, display, 1.15F);
-        synced |= invokePrivateMethod(DISPLAY_SET_HEIGHT, display, 1.15F);
-        synced |= invokePrivateMethod(DISPLAY_SET_SHADOW_RADIUS, display, 0.0F);
-        synced |= invokePrivateMethod(DISPLAY_SET_SHADOW_STRENGTH, display, 0.0F);
-
-        if (!synced) {
-            CompoundTag tag = new CompoundTag();
-            tag.put(Display.BlockDisplay.TAG_BLOCK_STATE, NbtUtils.writeBlockState(state));
-            tag.put(Display.TAG_TRANSFORMATION, createDisplayTransformationTag(translation, scale));
-            tag.putInt(Display.TAG_INTERPOLATION_DURATION, Math.max(0, interpolationDuration));
-            tag.putInt(Display.TAG_START_INTERPOLATION, 0);
-            tag.putFloat(Display.TAG_VIEW_RANGE, 256.0F);
-            tag.putFloat(Display.TAG_WIDTH, 1.15F);
-            tag.putFloat(Display.TAG_HEIGHT, 1.15F);
-            tag.putFloat(Display.TAG_SHADOW_RADIUS, 0.0F);
-            tag.putFloat(Display.TAG_SHADOW_STRENGTH, 0.0F);
-            display.load(tag);
-        }
-    }
-
-    private static CompoundTag createDisplayTransformationTag(Vec3 translation, Vec3 scale) {
-        CompoundTag transformation = new CompoundTag();
-        transformation.put("translation", floatList((float) translation.x, (float) translation.y, (float) translation.z));
-        transformation.put("scale", floatList((float) scale.x, (float) scale.y, (float) scale.z));
-        transformation.put("left_rotation", floatList(0.0F, 0.0F, 0.0F, 1.0F));
-        transformation.put("right_rotation", floatList(0.0F, 0.0F, 0.0F, 1.0F));
-        return transformation;
-    }
-
-    private static ListTag floatList(float... values) {
-        ListTag listTag = new ListTag();
-        for (float value : values) {
-            listTag.add(FloatTag.valueOf(value));
-        }
-        return listTag;
     }
 
     private record FaultPaletteEntry(BlockPos pos, int paletteIndex) {}

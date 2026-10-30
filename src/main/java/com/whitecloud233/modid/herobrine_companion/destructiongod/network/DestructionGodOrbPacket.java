@@ -1,5 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.destructiongod.network;
 
+import com.whitecloud233.modid.herobrine_companion.network.NetworkCodec;
+
 import com.whitecloud233.modid.herobrine_companion.network.NetworkClientBridge;
 import com.whitecloud233.modid.herobrine_companion.network.PacketDispatch;
 import net.minecraft.network.FriendlyByteBuf;
@@ -26,8 +28,8 @@ public class DestructionGodOrbPacket {
     }
 
     public DestructionGodOrbPacket(FriendlyByteBuf buf) {
-        this.startPos = new Vec3(buf.readDouble(), buf.readDouble(), buf.readDouble());
-        this.impactPos = new Vec3(buf.readDouble(), buf.readDouble(), buf.readDouble());
+        this.startPos = NetworkCodec.readVec3(buf);
+        this.impactPos = NetworkCodec.readVec3(buf);
         this.fallTicks = buf.readInt();
         this.startRadius = buf.readFloat();
         this.maxRadius = buf.readFloat();
@@ -35,12 +37,8 @@ public class DestructionGodOrbPacket {
     }
 
     public void encode(FriendlyByteBuf buf) {
-        buf.writeDouble(this.startPos.x);
-        buf.writeDouble(this.startPos.y);
-        buf.writeDouble(this.startPos.z);
-        buf.writeDouble(this.impactPos.x);
-        buf.writeDouble(this.impactPos.y);
-        buf.writeDouble(this.impactPos.z);
+        NetworkCodec.writeVec3(buf, this.startPos);
+        NetworkCodec.writeVec3(buf, this.impactPos);
         buf.writeInt(this.fallTicks);
         buf.writeFloat(this.startRadius);
         buf.writeFloat(this.maxRadius);
@@ -49,8 +47,6 @@ public class DestructionGodOrbPacket {
 
     public void handle(Supplier<NetworkEvent.Context> supplier) {
         NetworkEvent.Context context = supplier.get();
-        PacketDispatch.assertClient(context);
-        context.enqueueWork(() -> NetworkClientBridge.handleDestructionGodOrb(this));
-        context.setPacketHandled(true);
+        PacketDispatch.enqueueClient(context, () -> NetworkClientBridge.handleDestructionGodOrb(this));
     }
 }

@@ -32,8 +32,6 @@ public class SPacketWorldRendCinematic {
 
     public void handle(Supplier<NetworkEvent.Context> supplier) {
         NetworkEvent.Context context = supplier.get();
-        PacketDispatch.assertClient(context);
-        context.enqueueWork(() -> NetworkClientBridge.handleWorldRendCinematic(this.x, this.y, this.z));
-        context.setPacketHandled(true);
+        PacketDispatch.enqueueClient(context, () -> NetworkClientBridge.handleWorldRendCinematic(this.x, this.y, this.z));
     }
 }

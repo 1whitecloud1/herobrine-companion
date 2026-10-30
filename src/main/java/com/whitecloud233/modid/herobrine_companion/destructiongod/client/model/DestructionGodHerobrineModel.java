@@ -1,5 +1,9 @@
 package com.whitecloud233.modid.herobrine_companion.destructiongod.client.model;
 
+import com.whitecloud233.modid.herobrine_companion.client.model.PlayerModelParts;
+
+import com.whitecloud233.modid.herobrine_companion.util.Ease;
+
 import com.whitecloud233.modid.herobrine_companion.destructiongod.entity.DestructionGodHerobrineEntity;
 import net.minecraft.client.model.PlayerModel;
 import net.minecraft.client.model.geom.ModelPart;
@@ -15,18 +19,7 @@ public class DestructionGodHerobrineModel extends PlayerModel<DestructionGodHero
         super.setupAnim(entity, limbSwing, limbSwingAmount, ageInTicks, netHeadYaw, headPitch);
 
         float idlePulse = Mth.sin(ageInTicks * 0.08F) * 0.04F;
-        this.body.y = -0.5F + idlePulse * 0.5F;
-        this.head.y = this.body.y;
-        this.hat.y = this.head.y;
-        this.jacket.y = this.body.y;
-        this.rightArm.y = 2.0F + this.body.y;
-        this.leftArm.y = 2.0F + this.body.y;
-        this.rightSleeve.y = this.rightArm.y;
-        this.leftSleeve.y = this.leftArm.y;
-        this.rightLeg.y = 12.0F + this.body.y;
-        this.leftLeg.y = 12.0F + this.body.y;
-        this.rightPants.y = this.rightLeg.y;
-        this.leftPants.y = this.leftLeg.y;
+        PlayerModelParts.anchorY(this, -0.5F + idlePulse * 0.5F);
 
         if (!entity.isCastingSkill()) {
             float phaseBreath = entity.getBossPhase() >= DestructionGodHerobrineEntity.PHASE_3 ? 0.08F : 0.04F;
@@ -41,8 +34,8 @@ public class DestructionGodHerobrineModel extends PlayerModel<DestructionGodHero
         float duration = Math.max(1.0F, entity.getSkillDuration());
         float progress = Mth.clamp(entity.getSkillTicks() / duration, 0.0F, 1.0F);
         float trigger = entity.getSkillTriggerTick() / duration;
-        float windup = smoothWindow(progress, 0.0F, Math.max(0.2F, trigger));
-        float release = smoothWindow(progress, Math.max(0.12F, trigger - 0.08F), 1.0F);
+        float windup = Ease.window(progress, 0.0F, Math.max(0.2F, trigger));
+        float release = Ease.window(progress, Math.max(0.12F, trigger - 0.08F), 1.0F);
 
         switch (entity.getSkillState()) {
             case DestructionGodHerobrineEntity.SKILL_WORLD_REND -> applyWorldRendPose(windup, release);
@@ -59,7 +52,7 @@ public class DestructionGodHerobrineModel extends PlayerModel<DestructionGodHero
             }
         }
 
-        copyHumanoidProperties();
+        PlayerModelParts.syncOverlays(this);
     }
 
     private void applyWorldRendPose(float windup, float release) {
@@ -259,24 +252,5 @@ public class DestructionGodHerobrineModel extends PlayerModel<DestructionGodHero
         this.leftLeg.xRot = 0.16F * release;
     }
 
-    private float smoothWindow(float value, float start, float end) {
-        if (end <= start) {
-            return value >= end ? 1.0F : 0.0F;
-        }
-        return smoothStep(Mth.clamp((value - start) / (end - start), 0.0F, 1.0F));
-    }
-
-    private float smoothStep(float value) {
-        return value * value * (3.0F - 2.0F * value);
-    }
-
-    private void copyHumanoidProperties() {
-        this.hat.copyFrom(this.head);
-        this.jacket.copyFrom(this.body);
-        this.leftSleeve.copyFrom(this.leftArm);
-        this.rightSleeve.copyFrom(this.rightArm);
-        this.leftPants.copyFrom(this.leftLeg);
-        this.rightPants.copyFrom(this.rightLeg);
-    }
 }
 

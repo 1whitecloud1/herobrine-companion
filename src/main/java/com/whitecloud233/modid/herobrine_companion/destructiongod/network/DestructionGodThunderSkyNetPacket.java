@@ -1,5 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.destructiongod.network;
 
+import com.whitecloud233.modid.herobrine_companion.network.NetworkCodec;
+
 import com.whitecloud233.modid.herobrine_companion.network.NetworkClientBridge;
 import com.whitecloud233.modid.herobrine_companion.network.PacketDispatch;
 import net.minecraft.network.FriendlyByteBuf;
@@ -24,7 +26,7 @@ public class DestructionGodThunderSkyNetPacket {
     }
 
     public DestructionGodThunderSkyNetPacket(FriendlyByteBuf buf) {
-        this.center = new Vec3(buf.readDouble(), buf.readDouble(), buf.readDouble());
+        this.center = NetworkCodec.readVec3(buf);
         this.cloudY = buf.readDouble();
         this.radius = buf.readFloat();
         this.lifetime = buf.readVarInt();
@@ -32,9 +34,7 @@ public class DestructionGodThunderSkyNetPacket {
     }
 
     public void encode(FriendlyByteBuf buf) {
-        buf.writeDouble(this.center.x);
-        buf.writeDouble(this.center.y);
-        buf.writeDouble(this.center.z);
+        NetworkCodec.writeVec3(buf, this.center);
         buf.writeDouble(this.cloudY);
         buf.writeFloat(this.radius);
         buf.writeVarInt(this.lifetime);
@@ -43,8 +43,6 @@ public class DestructionGodThunderSkyNetPacket {
 
     public void handle(Supplier<NetworkEvent.Context> supplier) {
         NetworkEvent.Context context = supplier.get();
-        PacketDispatch.assertClient(context);
-        context.enqueueWork(() -> NetworkClientBridge.handleDestructionGodThunderSkyNet(this));
-        context.setPacketHandled(true);
+        PacketDispatch.enqueueClient(context, () -> NetworkClientBridge.handleDestructionGodThunderSkyNet(this));
     }
 }

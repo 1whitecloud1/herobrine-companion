@@ -1,25 +1,20 @@
 package com.whitecloud233.modid.herobrine_companion.destructiongod.client.particle;
 
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.BufferBuilder;
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.Tesselator;
+import com.whitecloud233.modid.herobrine_companion.client.particle.ParticleGeometry;
+
+import com.whitecloud233.modid.herobrine_companion.client.particle.ParticleColor;
+
+import com.whitecloud233.modid.herobrine_companion.client.render.GlowTrailRenderTypes;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.client.Camera;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.Particle;
 import net.minecraft.client.particle.ParticleRenderType;
-import net.minecraft.client.renderer.GameRenderer;
-import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
-import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
-import org.joml.Vector3f;
-import org.lwjgl.opengl.GL11;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,20 +27,6 @@ public class DestructionGodLightningBeamParticle extends Particle {
     private final Vec3 absoluteEndPos;
     private final float diameter;
     private final List<Vec3> path;
-
-    private static class ParticleColor {
-        private final float r;
-        private final float g;
-        private final float b;
-        private final float a;
-
-        private ParticleColor(float r, float g, float b, float a) {
-            this.r = r;
-            this.g = g;
-            this.b = b;
-            this.a = a;
-        }
-    }
 
     public DestructionGodLightningBeamParticle(ClientLevel level, Vec3 startPos, Vec3 endPos, float diameter) {
         super(level, startPos.x, startPos.y, startPos.z);
@@ -64,7 +45,7 @@ public class DestructionGodLightningBeamParticle extends Particle {
             return;
         }
 
-        Vec3 center = new Vec3(this.x, this.y, this.z);
+        Vec3 center = this.getPos();
         Vec3 axis = this.absoluteEndPos.subtract(center);
         if (axis.lengthSqr() < 1.0E-4D) {
             axis = new Vec3(0.0D, 1.0D, 0.0D);
@@ -165,13 +146,13 @@ public class DestructionGodLightningBeamParticle extends Particle {
         ParticleColor outerGlow = new ParticleColor(0.78F, 0.90F, 1.0F, (0.28F + radiusScale * 0.12F) * beamProgress);
         ParticleColor innerGlow = new ParticleColor(0.92F, 0.97F, 1.0F, (0.50F + radiusScale * 0.14F) * beamProgress);
         ParticleColor core = new ParticleColor(1.0F, 1.0F, 1.0F, Math.min(1.0F, (0.72F + radiusScale * 0.16F) * beamProgress));
-        drawCylinder(matrix, vertex, cameraPos, this.path, 12, this.diameter * 0.58F * radiusScale, outerGlow);
-        drawCylinder(matrix, vertex, cameraPos, this.path, 10, this.diameter * 0.31F * radiusScale, innerGlow);
-        drawCylinder(matrix, vertex, cameraPos, this.path, 8, this.diameter * 0.11F * radiusScale, core);
+        ParticleGeometry.cylinder(matrix, vertex, cameraPos, this.path, 12, this.diameter * 0.58F * radiusScale, outerGlow);
+        ParticleGeometry.cylinder(matrix, vertex, cameraPos, this.path, 10, this.diameter * 0.31F * radiusScale, innerGlow);
+        ParticleGeometry.cylinder(matrix, vertex, cameraPos, this.path, 8, this.diameter * 0.11F * radiusScale, core);
     }
 
     private void renderWhiteHoleInflow(Matrix4f transform, VertexConsumer vertex, Vec3 cameraPos, float age, float chargeProgress, ParticleColor color) {
-        Vec3 center = new Vec3(this.x, this.y, this.z);
+        Vec3 center = this.getPos();
         Vec3 axis = this.absoluteEndPos.subtract(center);
         if (axis.lengthSqr() < 1.0E-4D) {
             axis = new Vec3(0.0D, 1.0D, 0.0D);
@@ -186,60 +167,15 @@ public class DestructionGodLightningBeamParticle extends Particle {
         float coreRadius = this.diameter * (0.30F + (1.0F - chargeProgress) * 0.08F);
         Vec3 portalCenter = center.add(axis.scale(this.diameter * 0.045D));
         drawRingPlane(transform, vertex, cameraPos, portalCenter.subtract(axis.scale(this.diameter * 0.05D)), lateral, vertical, collapseRadius * 0.76F, collapseRadius, 24,
-                new ParticleColor(0.54F, 0.72F, 1.0F, color.a * (0.55F + (1.0F - chargeProgress) * 0.35F)));
+                new ParticleColor(0.54F, 0.72F, 1.0F, color.a() * (0.55F + (1.0F - chargeProgress) * 0.35F)));
         drawRingPlane(transform, vertex, cameraPos, portalCenter.subtract(axis.scale(this.diameter * 0.02D)), lateral, vertical, portalRadius * 0.40F, portalRadius * 1.06F, 22,
-                new ParticleColor(0.40F, 0.58F, 0.96F, color.a * 0.48F));
+                new ParticleColor(0.40F, 0.58F, 0.96F, color.a() * 0.48F));
         drawRingPlane(transform, vertex, cameraPos, portalCenter, axis, lateral, vertical, portalRadius * 0.62F, rimOuterRadius, 20,
-                new ParticleColor(0.72F, 0.88F, 1.0F, color.a * 1.15F));
+                new ParticleColor(0.72F, 0.88F, 1.0F, color.a() * 1.15F));
         drawRingPlane(transform, vertex, cameraPos, portalCenter.add(axis.scale(this.diameter * 0.03D)), axis, lateral, vertical, coreRadius, portalRadius * 0.82F, 18,
-                new ParticleColor(0.94F, 0.98F, 1.0F, Math.min(1.0F, color.a * 1.45F)));
+                new ParticleColor(0.94F, 0.98F, 1.0F, Math.min(1.0F, color.a() * 1.45F)));
         drawDiscPlane(transform, vertex, cameraPos, portalCenter.add(axis.scale(this.diameter * 0.01D)), axis, lateral, vertical, coreRadius * 0.92F,
-                new ParticleColor(1.0F, 1.0F, 1.0F, Math.min(1.0F, color.a * 1.7F)));
-    }
-
-    private void drawCylinder(Matrix4f transform, VertexConsumer vertex, Vec3 cameraPos, List<Vec3> points, int cylinderSegments, float radius, ParticleColor color) {
-        for (int i = 0; i < points.size() - 1; i++) {
-            Vec3 p1 = points.get(i).subtract(cameraPos);
-            Vec3 p2 = points.get(i + 1).subtract(cameraPos);
-            Vec3 axis = p2.subtract(p1);
-            if (axis.lengthSqr() < 0.001D) {
-                continue;
-            }
-            List<Vec3> ringA = generateRing(p1, axis, cylinderSegments, radius);
-            List<Vec3> ringB = generateRing(p2, axis, cylinderSegments, radius);
-            for (int j = 0; j < cylinderSegments; j++) {
-                Vec3 a1 = ringA.get(j);
-                Vec3 a2 = ringA.get((j + 1) % cylinderSegments);
-                Vec3 b2 = ringB.get((j + 1) % cylinderSegments);
-                Vec3 b1 = ringB.get(j);
-                addVertex(vertex, transform, a1, color);
-                addVertex(vertex, transform, a2, color);
-                addVertex(vertex, transform, b2, color);
-                addVertex(vertex, transform, b1, color);
-            }
-        }
-    }
-
-
-    private List<Vec3> generateRing(Vec3 center, Vec3 axis, int segments, float radius) {
-        List<Vec3> ring = new ArrayList<>();
-        Vector3f axis3f = toVector3f(axis).normalize();
-        Vector3f u = Math.abs(axis3f.y) < 0.999F
-                ? axis3f.cross(new Vector3f(0.0F, 1.0F, 0.0F), new Vector3f()).normalize()
-                : axis3f.cross(new Vector3f(1.0F, 0.0F, 0.0F), new Vector3f()).normalize();
-        Vector3f v = axis3f.cross(u, new Vector3f()).normalize();
-        for (int i = 0; i < segments; i++) {
-            float angle = (float) i / segments * (float) Math.PI * 2.0F;
-            Vector3f pos = toVector3f(center);
-            pos.add(u.mul((float) Math.cos(angle) * radius, new Vector3f()));
-            pos.add(v.mul((float) Math.sin(angle) * radius, new Vector3f()));
-            ring.add(toVec3(pos));
-        }
-        return ring;
-    }
-
-    private void addVertex(VertexConsumer vertex, Matrix4f matrix, Vec3 pos, ParticleColor color) {
-        vertex.vertex(matrix, (float) pos.x, (float) pos.y, (float) pos.z).color(color.r, color.g, color.b, color.a).endVertex();
+                new ParticleColor(1.0F, 1.0F, 1.0F, Math.min(1.0F, color.a() * 1.7F)));
     }
 
     private void drawRingPlane(Matrix4f matrix, VertexConsumer vertex, Vec3 cameraPos, Vec3 center, Vec3 axis, Vec3 lateral, Vec3 vertical, float innerRadius, float outerRadius, int segments, ParticleColor color) {
@@ -258,10 +194,10 @@ public class DestructionGodLightningBeamParticle extends Particle {
             Vec3 outerB = planePoint(renderCenter, lateral, vertical, outerRadius, angleB);
             Vec3 innerB = planePoint(renderCenter, lateral, vertical, innerRadius, angleB);
             Vec3 innerA = planePoint(renderCenter, lateral, vertical, innerRadius, angleA);
-            addVertex(vertex, matrix, outerA, color);
-            addVertex(vertex, matrix, outerB, color);
-            addVertex(vertex, matrix, innerB, color);
-            addVertex(vertex, matrix, innerA, color);
+            ParticleGeometry.vertex(vertex, matrix, outerA, color);
+            ParticleGeometry.vertex(vertex, matrix, outerB, color);
+            ParticleGeometry.vertex(vertex, matrix, innerB, color);
+            ParticleGeometry.vertex(vertex, matrix, innerA, color);
         }
     }
 
@@ -273,36 +209,7 @@ public class DestructionGodLightningBeamParticle extends Particle {
         return center.add(lateral.scale(Math.cos(angle) * radius)).add(vertical.scale(Math.sin(angle) * radius));
     }
 
-    private static Vector3f toVector3f(Vec3 vec) {
-        return new Vector3f((float) vec.x, (float) vec.y, (float) vec.z);
-    }
-
-    private static Vec3 toVec3(Vector3f vec) {
-        return new Vec3(vec.x, vec.y, vec.z);
-    }
-
-    public static final ParticleRenderType RENDER_TYPE = new ParticleRenderType() {
-        @Nullable
-        @Override
-        public void begin(BufferBuilder tesselator, TextureManager manager) {
-            RenderSystem.depthMask(false);
-            RenderSystem.enableBlend();
-            RenderSystem.disableCull();
-            RenderSystem.setShader(GameRenderer::getRendertypeLightningShader);
-            RenderSystem.blendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE);
-            tesselator.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
-        }
-
-        @Override
-        public void end(Tesselator tesselator) {
-            tesselator.end();
-        }
-
-        @Override
-        public String toString() {
-            return "DESTRUCTION_GOD_LIGHTNING_BEAM";
-        }
-    };
+    public static final ParticleRenderType RENDER_TYPE = GlowTrailRenderTypes.GLOW_LIGHTNING;
 
     @Override
     public ParticleRenderType getRenderType() {

@@ -1,21 +1,13 @@
 package com.whitecloud233.modid.herobrine_companion.destructiongod.world;
 
-import com.whitecloud233.modid.herobrine_companion.config.Config;
-
-import java.util.Locale;
-
+/** 地形破坏模式。现在由 {@link DestructionTuning#MODE} 固定，不再从配置读取。 */
 enum DestructionMode {
     VISUAL,
     SAFE,
     DIVINE;
 
+    /** 当前生效模式：固定为 {@link DestructionTuning#MODE}。 */
     static DestructionMode current() {
-        String raw = Config.destructionGodTerrainDamageMode == null ? "safe" : Config.destructionGodTerrainDamageMode.trim().toLowerCase(Locale.ROOT);
-        return switch (raw) {
-            case "visual" -> VISUAL;
-            case "divine" -> DIVINE;
-            default -> SAFE;
-        };
+        return DestructionTuning.MODE;
     }
 }
-

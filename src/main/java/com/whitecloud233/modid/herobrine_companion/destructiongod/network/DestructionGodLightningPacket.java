@@ -1,5 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.destructiongod.network;
 
+import com.whitecloud233.modid.herobrine_companion.network.NetworkCodec;
+
 import com.whitecloud233.modid.herobrine_companion.network.NetworkClientBridge;
 import com.whitecloud233.modid.herobrine_companion.network.PacketDispatch;
 import net.minecraft.network.FriendlyByteBuf;
@@ -20,25 +22,19 @@ public class DestructionGodLightningPacket {
     }
 
     public DestructionGodLightningPacket(FriendlyByteBuf buf) {
-        this.startPos = new Vec3(buf.readDouble(), buf.readDouble(), buf.readDouble());
-        this.endPos = new Vec3(buf.readDouble(), buf.readDouble(), buf.readDouble());
+        this.startPos = NetworkCodec.readVec3(buf);
+        this.endPos = NetworkCodec.readVec3(buf);
         this.width = buf.readFloat();
     }
 
     public void encode(FriendlyByteBuf buf) {
-        buf.writeDouble(this.startPos.x);
-        buf.writeDouble(this.startPos.y);
-        buf.writeDouble(this.startPos.z);
-        buf.writeDouble(this.endPos.x);
-        buf.writeDouble(this.endPos.y);
-        buf.writeDouble(this.endPos.z);
+        NetworkCodec.writeVec3(buf, this.startPos);
+        NetworkCodec.writeVec3(buf, this.endPos);
         buf.writeFloat(this.width);
     }
 
     public void handle(Supplier<NetworkEvent.Context> supplier) {
         NetworkEvent.Context context = supplier.get();
-        PacketDispatch.assertClient(context);
-        context.enqueueWork(() -> NetworkClientBridge.handleDestructionGodLightning(this));
-        context.setPacketHandled(true);
+        PacketDispatch.enqueueClient(context, () -> NetworkClientBridge.handleDestructionGodLightning(this));
     }
 }

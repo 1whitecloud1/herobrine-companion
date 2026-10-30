@@ -1,12 +1,10 @@
 package com.whitecloud233.modid.herobrine_companion.destructiongod.world;
 
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
-import com.whitecloud233.modid.herobrine_companion.config.Config;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.modid.herobrine_companion.world.terrain.TerrainEditTask;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.core.SectionPos;
-import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.protocol.game.ClientboundForgetLevelChunkPacket;
 import net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket;
@@ -24,8 +22,6 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.LightLayer;
-import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.levelgen.Heightmap;
@@ -37,7 +33,6 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
 import javax.annotation.Nullable;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -94,11 +89,11 @@ public class DestructionTerrainManager {
     }
 
     public static void startDestructionLightningArc(ServerLevel level, @Nullable LivingEntity caster, Vec3 start, Vec3 end, double radius, int delayTicks) {
-        scheduleTask(new DestructionLightningArcTask(level, caster, start, end, radius, delayTicks));
+        scheduleTask(new LightningSegmentTask(level, caster, start, end, radius, delayTicks, LightningSegmentTask.Kind.ARC));
     }
 
     public static void startDestructionLightningBeam(ServerLevel level, @Nullable LivingEntity caster, Vec3 start, Vec3 end, double radius, int delayTicks) {
-        scheduleTask(new DestructionLightningBeamTask(level, caster, start, end, radius, delayTicks));
+        scheduleTask(new LightningSegmentTask(level, caster, start, end, radius, delayTicks, LightningSegmentTask.Kind.BEAM));
     }
 
     public static void startDestructionGodOrb(ServerLevel level, @Nullable LivingEntity caster, Vec3 start, Vec3 impact, int fallTicks, double startRadius, double maxOrbRadius, double craterRadius, int craterDepth, int delayTicks) {
@@ -131,12 +126,8 @@ public class DestructionTerrainManager {
         return flat.normalize();
     }
 
-    static void destroyBlock(ServerLevel level, BlockPos pos, TickBudget budget, DestructionMode mode) {
-        destroyBlock(level, pos, budget, mode, true, false);
-    }
-
-    static void destroyBlock(ServerLevel level, BlockPos pos, TickBudget budget, DestructionMode mode, boolean allowRestore, boolean absolute) {
-        if (!Config.destructionGodTerrainDamageEnabled || mode == DestructionMode.VISUAL || !budget.hasBudget()) {
+    static void destroyBlock(ServerLevel level, BlockPos pos, TickBudget budget, DestructionMode mode, boolean absolute) {
+        if (!DestructionTuning.TERRAIN_DAMAGE_ENABLED || mode == DestructionMode.VISUAL || !budget.tryVisit()) {
             return;
         }
         if (!level.isLoaded(pos)) {
@@ -151,137 +142,91 @@ public class DestructionTerrainManager {
             return;
         }
 
-        if (allowRestore) {
-            rememberForRestore(level, pos, state);
-        }
-        level.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS | Block.UPDATE_INVISIBLE);
+        if (!level.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS | Block.UPDATE_INVISIBLE)) return;
         level.sendParticles(ParticleTypes.POOF, pos.getX() + 0.5D, pos.getY() + 0.5D, pos.getZ() + 0.5D, 2, 0.15D, 0.15D, 0.15D, 0.02D);
         budget.consume();
     }
 
-    static void clearBlocksInstant(ServerLevel level, List<BlockPos> positions, DestructionMode mode, boolean absolute) {
-        if (!Config.destructionGodTerrainDamageEnabled || mode == DestructionMode.VISUAL || positions.isEmpty()) {
-            return;
-        }
 
-        Set<ChunkPos> touchedChunks = new HashSet<>();
-        LevelLightEngine lightEngine = level.getLightEngine();
-        for (BlockPos pos : positions) {
-            if (!level.isLoaded(pos)) {
-                continue;
-            }
-            BlockState state = level.getBlockState(pos);
-            if (state.isAir() || !canBreak(level, pos, state, mode, absolute)) {
-                continue;
-            }
 
-            LevelChunk chunk = level.getChunkAt(pos);
-            int sectionIndex = chunk.getSectionIndex(pos.getY());
-            if (sectionIndex < 0 || sectionIndex >= chunk.getSections().length) {
-                continue;
-            }
 
-            if (state.hasBlockEntity() || level.getBlockEntity(pos) != null) {
-                chunk.removeBlockEntity(pos);
-            }
 
-            LevelChunkSection section = chunk.getSections()[sectionIndex];
-            section.setBlockState(pos.getX() & 15, pos.getY() & 15, pos.getZ() & 15, Blocks.AIR.defaultBlockState());
-            touchedChunks.add(chunk.getPos());
-            lightEngine.checkBlock(pos);
-        }
-
-        updateTouchedChunks(level, touchedChunks, lightEngine);
-    }
-
-    static void applyFaultSplitChangesInstant(ServerLevel level, List<BlockPos> clearPositions, List<BlockPos> annihilatePositions, Map<BlockPos, BlockState> placements, DestructionMode mode) {
-        if (!Config.destructionGodTerrainDamageEnabled || mode == DestructionMode.VISUAL) {
-            return;
-        }
-
-        Set<ChunkPos> touchedChunks = new HashSet<>();
-        LevelLightEngine lightEngine = level.getLightEngine();
-        Set<Long> processed = new HashSet<>();
-
-        for (BlockPos pos : clearPositions) {
-            long key = pos.asLong();
-            if (!processed.add(key) || !level.isLoaded(pos)) {
-                continue;
-            }
-            BlockState state = level.getBlockState(pos);
-            if (!canFaultClear(level, pos, state)) {
-                continue;
-            }
-            setBlockStateFast(level, pos, Blocks.AIR.defaultBlockState(), touchedChunks, lightEngine);
-        }
-
-        for (BlockPos pos : annihilatePositions) {
-            long key = pos.asLong();
-            if (!processed.add(key) || !level.isLoaded(pos)) {
-                continue;
-            }
-            BlockState state = level.getBlockState(pos);
-            if (!canAnnihilate(level, pos, state)) {
-                continue;
-            }
-            setBlockStateFast(level, pos, Blocks.AIR.defaultBlockState(), touchedChunks, lightEngine);
-        }
-
-        for (Map.Entry<BlockPos, BlockState> entry : placements.entrySet()) {
-            BlockPos pos = entry.getKey();
-            if (!level.isLoaded(pos)) {
-                continue;
-            }
-            BlockState existing = level.getBlockState(pos);
-            if (!existing.isAir() && !canFaultClear(level, pos, existing)) {
-                continue;
-            }
-            setBlockStateFast(level, pos, entry.getValue(), touchedChunks, lightEngine);
-        }
-
-        updateTouchedChunks(level, touchedChunks, lightEngine);
-    }
-
-    private static void setBlockStateFast(ServerLevel level, BlockPos pos, BlockState newState, Set<ChunkPos> touchedChunks, LevelLightEngine lightEngine) {
+    private static boolean setBlockStateFast(ServerLevel level, BlockPos pos, BlockState newState, Set<ChunkPos> touchedChunks, LevelLightEngine lightEngine) {
         LevelChunk chunk = level.getChunkAt(pos);
         int sectionIndex = chunk.getSectionIndex(pos.getY());
-        if (sectionIndex < 0 || sectionIndex >= chunk.getSections().length) {
-            return;
-        }
+        if (sectionIndex < 0 || sectionIndex >= chunk.getSections().length) return false;
         BlockState currentState = level.getBlockState(pos);
-        if (currentState.hasBlockEntity() || level.getBlockEntity(pos) != null) {
-            chunk.removeBlockEntity(pos);
-        }
+        if (currentState == newState) return false;
+        if (currentState.hasBlockEntity() || level.getBlockEntity(pos) != null) chunk.removeBlockEntity(pos);
         LevelChunkSection section = chunk.getSections()[sectionIndex];
         section.setBlockState(pos.getX() & 15, pos.getY() & 15, pos.getZ() & 15, newState);
         touchedChunks.add(chunk.getPos());
         lightEngine.checkBlock(pos);
+        return true;
     }
+    static TerrainMutationBatch clearBlocksBatch(ServerLevel level, List<BlockPos> positions, DestructionMode mode, boolean absolute) {
+        List<BlockPos> snapshot = positions.stream().map(BlockPos::immutable).toList();
+        Set<ChunkPos> touched = new HashSet<>();
+        LevelLightEngine light = level.getLightEngine();
+        return new TerrainMutationBatch(snapshot.size(), index -> {
+            if (!DestructionTuning.TERRAIN_DAMAGE_ENABLED || mode == DestructionMode.VISUAL) return false;
+            BlockPos pos = snapshot.get(index);
+            if (!level.isLoaded(pos)) return false;
+            BlockState state = level.getBlockState(pos);
+            return !state.isAir() && canBreak(level, pos, state, mode, absolute)
+                    && setBlockStateFast(level, pos, Blocks.AIR.defaultBlockState(), touched, light);
+        }, () -> {
+            updateTouchedChunks(level, touched, light);
+            touched.clear();
+        });
+    }
+
+    static TerrainMutationBatch faultChangesBatch(ServerLevel level, List<BlockPos> clearPositions,
+                                                   List<BlockPos> annihilatePositions, Map<BlockPos, BlockState> placements,
+                                                   DestructionMode mode) {
+        List<BlockPos> clear = clearPositions.stream().map(BlockPos::immutable).toList();
+        List<BlockPos> annihilate = annihilatePositions.stream().map(BlockPos::immutable).toList();
+        List<Map.Entry<BlockPos, BlockState>> place = placements.entrySet().stream()
+                .map(entry -> Map.entry(entry.getKey().immutable(), entry.getValue())).toList();
+        Set<Long> processed = new HashSet<>();
+        Set<ChunkPos> touched = new HashSet<>();
+        LevelLightEngine light = level.getLightEngine();
+        return new TerrainMutationBatch(clear.size() + annihilate.size() + place.size(), index -> {
+            if (!DestructionTuning.TERRAIN_DAMAGE_ENABLED || mode == DestructionMode.VISUAL) return false;
+            BlockPos pos;
+            BlockState target;
+            if (index < clear.size() + annihilate.size()) {
+                boolean clearing = index < clear.size();
+                pos = clearing ? clear.get(index) : annihilate.get(index - clear.size());
+                // Match the original priority: clear positions take precedence over annihilation.
+                if (!processed.add(pos.asLong()) || !level.isLoaded(pos)) return false;
+                BlockState state = level.getBlockState(pos);
+                if (!(clearing ? canFaultClear(level, pos, state) : canAnnihilate(level, pos, state))) return false;
+                target = Blocks.AIR.defaultBlockState();
+            } else {
+                var entry = place.get(index - clear.size() - annihilate.size());
+                pos = entry.getKey();
+                target = entry.getValue();
+                if (!level.isLoaded(pos)) return false;
+                BlockState existing = level.getBlockState(pos);
+                if (!existing.isAir() && !canFaultClear(level, pos, existing)) return false;
+            }
+            return setBlockStateFast(level, pos, target, touched, light);
+        }, () -> {
+            updateTouchedChunks(level, touched, light);
+            touched.clear();
+        });
+    }
+
 
     private static void updateTouchedChunks(ServerLevel level, Set<ChunkPos> touchedChunks, LevelLightEngine lightEngine) {
         for (ChunkPos chunkPos : touchedChunks) {
             LevelChunk chunk = level.getChunk(chunkPos.x, chunkPos.z);
-            for (LevelChunkSection section : chunk.getSections()) {
-                section.recalcBlockCounts();
-            }
-            Heightmap.primeHeightmaps(chunk, Set.of(Heightmap.Types.MOTION_BLOCKING, Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, Heightmap.Types.OCEAN_FLOOR, Heightmap.Types.WORLD_SURFACE));
-            chunk.setUnsaved(true);
 
-            for (int i = 0; i < chunk.getSections().length; i++) {
-                int sectionY = chunk.getSectionYFromSectionIndex(i);
-                SectionPos sectionPos = SectionPos.of(chunkPos, sectionY);
-                var skyListener = lightEngine.getLayerListener(LightLayer.SKY);
-                if (skyListener != null) {
-                    DataLayer dataLayer = skyListener.getDataLayerData(sectionPos);
-                    if (dataLayer == null) {
-                        lightEngine.checkBlock(sectionPos.origin().offset(8, 8, 8));
-                        dataLayer = skyListener.getDataLayerData(sectionPos);
-                    }
-                    if (dataLayer != null) {
-                        java.util.Arrays.fill(dataLayer.getData(), (byte) 0xFF);
-                    }
-                }
-            }
+            // 收尾（重算 section 计数 + 高度图 + 标脏）与整块补光统一走 TerrainEditTask，
+            // 和虚空/荒芜/整平三个地形任务保持同一份实现。
+            TerrainEditTask.finishChunk(chunk);
+            TerrainEditTask.lightWholeChunk(level, chunk);
 
             level.getChunkSource().chunkMap.getPlayers(chunkPos, false).forEach(player -> {
                 player.connection.send(new ClientboundForgetLevelChunkPacket(chunkPos.x, chunkPos.z));
@@ -289,11 +234,6 @@ public class DestructionTerrainManager {
             });
         }
     }
-
-    private static void rememberForRestore(ServerLevel level, BlockPos pos, BlockState state) {
-        return;
-    }
-
 
     static boolean canBreak(ServerLevel level, BlockPos pos, BlockState state, DestructionMode mode, boolean absolute) {
         if (state.getDestroySpeed(level, pos) < 0.0F) {
@@ -311,7 +251,7 @@ public class DestructionTerrainManager {
         }
 
         boolean hasBlockEntity = state.hasBlockEntity() || level.getBlockEntity(pos) != null;
-        if (hasBlockEntity && !Config.destructionGodBreakContainers) {
+        if (hasBlockEntity && !DestructionTuning.BREAK_CONTAINERS) {
             return false;
         }
 
@@ -341,7 +281,7 @@ public class DestructionTerrainManager {
             return true;
         }
 
-        return !Config.destructionGodBreakContainers && level.getBlockEntity(pos) != null;
+        return !DestructionTuning.BREAK_CONTAINERS && level.getBlockEntity(pos) != null;
     }
 
     private static boolean isFaultProtectedBlock(ServerLevel level, BlockPos pos, BlockState state) {
@@ -362,7 +302,7 @@ public class DestructionTerrainManager {
             return true;
         }
 
-        return !Config.destructionGodBreakContainers && level.getBlockEntity(pos) != null;
+        return !DestructionTuning.BREAK_CONTAINERS && level.getBlockEntity(pos) != null;
     }
 
     private static boolean canAnnihilate(ServerLevel level, BlockPos pos, BlockState state) {
@@ -511,255 +451,5 @@ public class DestructionTerrainManager {
         level.sendParticles(ParticleTypes.CLOUD, center.x, center.y + 0.9D, center.z, 10, halfWidth * 0.22D, 0.3D, halfWidth * 0.22D, 0.01D);
     }
 
-    private static class MountainSplitRendTask extends TerrainTask {
-        private final int halfWidth;
-        private final int trenchDepth;
-        private final int faultDepth;
-
-        private MountainSplitRendTask(ServerLevel level, @Nullable LivingEntity caster, Vec3 origin, Vec3 direction, double maxLength, int halfWidth, int trenchDepth, int faultDepth, int delayTicks) {
-            super(level, caster, origin, direction, maxLength, delayTicks);
-            this.halfWidth = Math.max(3, halfWidth);
-            this.trenchDepth = Math.max(8, trenchDepth);
-            this.faultDepth = Math.max(4, faultDepth);
-        }
-
-        @Override
-        protected boolean doTick(TickBudget budget) {
-            int stepsPerTick = 5;
-            double stepSize = 1.75D;
-            DestructionMode mode = DestructionMode.current();
-            LivingEntity caster = this.getCaster();
-
-            for (int step = 0; step < stepsPerTick; step++) {
-                if (this.currentLength >= this.maxLength) {
-                    Vec3 end = this.centerPoint();
-                    int impactRadius = Math.max(5, this.halfWidth / 2 + 2);
-                    List<BlockPos> impactBlocks = new ArrayList<>();
-                    carveImpactBasin(end, impactRadius, impactBlocks);
-                    clearBlocksInstant(this.level, impactBlocks, mode, false);
-                    this.level.playSound(null, end.x, end.y, end.z, SoundEvents.WARDEN_SONIC_BOOM, SoundSource.AMBIENT, 6.0F, 0.45F);
-                    this.level.playSound(null, end.x, end.y, end.z, SoundEvents.GENERIC_EXPLODE, SoundSource.AMBIENT, 9.0F, 0.55F);
-                    damageAndPush(this.level, caster, new AABB(end.x - 16.0D, end.y - 8.0D, end.z - 16.0D, end.x + 16.0D, end.y + 12.0D, end.z + 16.0D), end, 34.0F, 2.2D, 1.25D);
-                    this.level.sendParticles(ParticleTypes.EXPLOSION_EMITTER, end.x, end.y + 0.5D, end.z, 4, 1.0D, 0.5D, 1.0D, 0.0D);
-                    return true;
-                }
-
-                Vec3 center = this.centerPoint();
-                BlockPos centerPos = new BlockPos(Mth.floor(center.x), Mth.floor(center.y), Mth.floor(center.z));
-                if (!this.level.isLoaded(centerPos)) {
-                    return true;
-                }
-
-                List<BlockPos> toClear = new ArrayList<>();
-                for (int lateral = -this.halfWidth; lateral <= this.halfWidth; lateral++) {
-                    Vec3 lateralOffset = this.perpendicular.scale(lateral);
-                    int blockX = Mth.floor(center.x + lateralOffset.x);
-                    int blockZ = Mth.floor(center.z + lateralOffset.z);
-                    int surfaceY = this.level.getHeight(Heightmap.Types.MOTION_BLOCKING, blockX, blockZ);
-                    double normalized = 1.0D - (Math.abs(lateral) / (double) this.halfWidth);
-                    double trenchFactor = Mth.clamp(normalized, 0.0D, 1.0D);
-                    int localDepth = this.trenchDepth + Mth.floor(trenchFactor * this.faultDepth);
-                    int edgeCut = Mth.floor((1.0D - trenchFactor) * 4.0D);
-                    int topY = Math.min(this.level.getMaxBuildHeight() - 1, surfaceY + 1);
-                    int bottomY = Math.max(this.level.getMinBuildHeight() + 1, surfaceY - localDepth - edgeCut);
-
-                    for (int y = topY; y >= bottomY; y--) {
-                        toClear.add(new BlockPos(blockX, y, blockZ));
-                    }
-
-                    if (trenchFactor > 0.68D) {
-                        int extraBottom = Math.max(this.level.getMinBuildHeight() + 1, bottomY - 2 - Mth.floor(trenchFactor * 3.0D));
-                        for (int y = bottomY - 1; y >= extraBottom; y--) {
-                            toClear.add(new BlockPos(blockX, y, blockZ));
-                        }
-                    }
-                }
-                clearBlocksInstant(this.level, toClear, mode, false);
-
-                AABB slice = new AABB(center.x - this.halfWidth - 1.5D, center.y - 8.0D, center.z - this.halfWidth - 1.5D,
-                        center.x + this.halfWidth + 1.5D, center.y + 18.0D, center.z + this.halfWidth + 1.5D);
-                damageAndPush(this.level, caster, slice, center, 22.0F, 1.6D, 0.85D);
-                clearLooseEntities(this.level, caster, slice);
-
-                this.level.sendParticles(ParticleTypes.EXPLOSION, center.x, center.y + 0.8D, center.z, 5, 0.7D, 0.4D, 0.7D, 0.01D);
-                this.level.sendParticles(ParticleTypes.CAMPFIRE_COSY_SMOKE, center.x, center.y + 1.2D, center.z, 8, 0.8D, 0.4D, 0.8D, 0.01D);
-                if (step == 0) {
-                    this.level.playSound(null, center.x, center.y, center.z, SoundEvents.WITHER_SHOOT, SoundSource.AMBIENT, 2.8F, 0.35F);
-                    this.level.playSound(null, center.x, center.y, center.z, SoundEvents.TRIDENT_THUNDER, SoundSource.WEATHER, 4.0F, 0.7F);
-                }
-
-                this.currentLength += stepSize;
-            }
-
-            return false;
-        }
-
-        private void carveImpactBasin(Vec3 center, int radius, List<BlockPos> toClear) {
-            int blockCenterX = Mth.floor(center.x);
-            int blockCenterZ = Mth.floor(center.z);
-            for (int dx = -radius; dx <= radius; dx++) {
-                for (int dz = -radius; dz <= radius; dz++) {
-                    double distSq = dx * dx + dz * dz;
-                    if (distSq > radius * radius) {
-                        continue;
-                    }
-                    int blockX = blockCenterX + dx;
-                    int blockZ = blockCenterZ + dz;
-                    int surfaceY = this.level.getHeight(Heightmap.Types.MOTION_BLOCKING, blockX, blockZ);
-                    int basinDepth = this.trenchDepth / 2 + Math.max(1, radius - Mth.floor(Math.sqrt(distSq)));
-                    int topY = Math.min(this.level.getMaxBuildHeight() - 1, surfaceY + 1);
-                    int bottomY = Math.max(this.level.getMinBuildHeight() + 1, surfaceY - basinDepth);
-                    for (int y = topY; y >= bottomY; y--) {
-                        toClear.add(new BlockPos(blockX, y, blockZ));
-                    }
-                }
-            }
-        }
-    }
-
-    private static class DestructionGodOrbTask extends TerrainTask {
-        private final Vec3 impact;
-        private final int fallTicks;
-        private final double startRadius;
-        private final double maxOrbRadius;
-        private final double craterRadius;
-        private final int craterDepth;
-        private final List<BlockPos> pendingCraterBlocks = new ArrayList<>();
-        private int age;
-        private int craterIndex;
-        private boolean impactPrepared;
-
-        private DestructionGodOrbTask(ServerLevel level, @Nullable LivingEntity caster, Vec3 start, Vec3 impact, int fallTicks, double startRadius, double maxOrbRadius, double craterRadius, int craterDepth, int delayTicks) {
-            super(level, caster, start, impact.subtract(start), start.distanceTo(impact), delayTicks);
-            this.impact = impact;
-            this.fallTicks = Math.max(40, fallTicks);
-            this.startRadius = Math.max(1.5D, startRadius);
-            this.maxOrbRadius = Math.max(this.startRadius + 4.0D, maxOrbRadius);
-            this.craterRadius = Math.max(this.maxOrbRadius * 2.0D, craterRadius);
-            this.craterDepth = Math.max(24, craterDepth);
-        }
-
-        @Override
-        protected boolean doTick(TickBudget budget) {
-            LivingEntity caster = this.getCaster();
-            if (this.age < this.fallTicks) {
-                Vec3 orbCenter = this.orbCenter();
-                double radius = this.currentRadius();
-                this.renderFallingOrb(orbCenter, radius);
-                this.suckTerrain(orbCenter, radius, budget);
-                this.pullEntities(caster, orbCenter, radius);
-                this.age++;
-                return false;
-            }
-
-            if (!this.impactPrepared) {
-                this.prepareImpactCrater();
-                this.impactPrepared = true;
-                this.level.playSound(null, this.impact.x, this.impact.y, this.impact.z, SoundEvents.GENERIC_EXPLODE, SoundSource.HOSTILE, 10.0F, 0.35F);
-                this.level.playSound(null, this.impact.x, this.impact.y, this.impact.z, SoundEvents.TRIDENT_THUNDER, SoundSource.WEATHER, 8.0F, 0.45F);
-                this.level.playSound(null, this.impact.x, this.impact.y, this.impact.z, SoundEvents.WITHER_DEATH, SoundSource.HOSTILE, 6.0F, 0.65F);
-                this.level.sendParticles(ParticleTypes.EXPLOSION_EMITTER, this.impact.x, this.impact.y + 1.0D, this.impact.z, 12, 2.0D, 1.0D, 2.0D, 0.0D);
-                this.level.sendParticles(ParticleTypes.FLASH, this.impact.x, this.impact.y + 1.0D, this.impact.z, 10, 2.0D, 1.0D, 2.0D, 0.0D);
-                AABB blast = new AABB(this.impact.x - this.craterRadius, this.impact.y - this.craterDepth, this.impact.z - this.craterRadius,
-                        this.impact.x + this.craterRadius, this.impact.y + this.craterRadius * 0.45D, this.impact.z + this.craterRadius);
-                damageAndPush(this.level, caster, blast, this.impact, 46.0F, 3.2D, 1.4D);
-                clearLooseEntities(this.level, caster, blast);
-            }
-
-            clearBlocksInstant(this.level, this.pendingCraterBlocks, DestructionMode.current(), true);
-            this.pendingCraterBlocks.clear();
-            this.craterIndex = 0;
-            return true;
-        }
-
-        private Vec3 orbCenter() {
-            double progress = Mth.clamp(this.age / (double) this.fallTicks, 0.0D, 1.0D);
-            Vec3 apex = this.origin.lerp(this.impact, 0.5D).add(0.0D, 18.0D, 0.0D);
-            double inv = 1.0D - progress;
-            return this.origin.scale(inv * inv).add(apex.scale(2.0D * inv * progress)).add(this.impact.scale(progress * progress));
-        }
-
-        private double currentRadius() {
-            double progress = Mth.clamp(this.age / (double) this.fallTicks, 0.0D, 1.0D);
-            return Mth.lerp(progress * progress, this.startRadius, this.maxOrbRadius);
-        }
-
-        private void renderFallingOrb(Vec3 center, double radius) {
-            this.level.sendParticles(ParticleTypes.ELECTRIC_SPARK, center.x, center.y, center.z, 12, radius * 0.18D, radius * 0.18D, radius * 0.18D, 0.05D);
-            this.level.sendParticles(ParticleTypes.REVERSE_PORTAL, center.x, center.y, center.z, 8, radius * 0.22D, radius * 0.22D, radius * 0.22D, 0.02D);
-            if (this.age % 10 == 0) {
-                this.level.playSound(null, center.x, center.y, center.z, SoundEvents.RESPAWN_ANCHOR_CHARGE, SoundSource.HOSTILE, 2.2F, 0.55F + this.level.random.nextFloat() * 0.15F);
-            }
-        }
-
-        private void suckTerrain(Vec3 center, double radius, TickBudget budget) {
-            int pulls = 32;
-            double scanRadius = radius + 8.0D;
-            DestructionMode mode = DestructionMode.current();
-            for (int i = 0; i < pulls && budget.hasBudget(); i++) {
-                double angle = this.level.random.nextDouble() * Math.PI * 2.0D;
-                double distance = Math.sqrt(this.level.random.nextDouble()) * scanRadius;
-                int x = Mth.floor(center.x + Math.cos(angle) * distance);
-                int z = Mth.floor(center.z + Math.sin(angle) * distance);
-                int surfaceY = this.level.getHeight(Heightmap.Types.MOTION_BLOCKING, x, z) - 1;
-                int y = Mth.clamp(surfaceY - this.level.random.nextInt(4), this.level.getMinBuildHeight() + 1, this.level.getMaxBuildHeight() - 1);
-                BlockPos pos = new BlockPos(x, y, z);
-                BlockState state = this.level.getBlockState(pos);
-                if (state.isAir() || !canBreak(this.level, pos, state, mode, true)) {
-                    continue;
-                }
-                destroyBlock(this.level, pos, budget, mode, false, true);
-                Vec3 p = Vec3.atCenterOf(pos);
-                this.level.sendParticles(ParticleTypes.POOF, p.x, p.y, p.z, 2, 0.08D, 0.08D, 0.08D, 0.02D);
-                this.level.sendParticles(ParticleTypes.PORTAL, p.x, p.y, p.z, 6, (center.x - p.x) * 0.07D, (center.y - p.y) * 0.07D, (center.z - p.z) * 0.07D, 0.16D);
-                this.level.sendParticles(ParticleTypes.END_ROD, p.x, p.y, p.z, 1, (center.x - p.x) * 0.03D, (center.y - p.y) * 0.03D, (center.z - p.z) * 0.03D, 0.0D);
-                this.level.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, state), p.x, p.y, p.z, 8, (center.x - p.x) * 0.06D, (center.y - p.y) * 0.06D, (center.z - p.z) * 0.06D, 0.08D);
-            }
-        }
-
-        private void pullEntities(@Nullable LivingEntity caster, Vec3 center, double radius) {
-            AABB area = new AABB(center.x - radius, center.y - radius, center.z - radius, center.x + radius, center.y + radius, center.z + radius);
-            List<LivingEntity> targets = this.level.getEntitiesOfClass(LivingEntity.class, area, entity -> entity.isAlive() && entity != caster && !(entity instanceof HeroEntity));
-            for (LivingEntity target : targets) {
-                Vec3 pull = center.subtract(target.position());
-                if (pull.lengthSqr() > 1.0E-4D) {
-                    pull = pull.normalize();
-                    target.push(pull.x * 0.18D, pull.y * 0.12D + 0.05D, pull.z * 0.18D);
-                }
-                if (this.age % 15 == 0) {
-                    target.hurt(this.level.damageSources().magic(), 4.0F);
-                }
-            }
-        }
-
-        private void prepareImpactCrater() {
-            int radius = Mth.ceil(this.craterRadius);
-            int centerX = Mth.floor(this.impact.x);
-            int centerY = Mth.floor(this.impact.y);
-            int centerZ = Mth.floor(this.impact.z);
-            double radiusSq = this.craterRadius * this.craterRadius;
-            double depth = this.craterDepth;
-            for (int dx = -radius; dx <= radius; dx++) {
-                for (int dz = -radius; dz <= radius; dz++) {
-                    double horizontalSq = dx * dx + dz * dz;
-                    if (horizontalSq > radiusSq) {
-                        continue;
-                    }
-                    double horizontalFactor = Math.sqrt(horizontalSq) / this.craterRadius;
-                    double localDepth = depth * Math.sqrt(Math.max(0.0D, 1.0D - horizontalFactor * horizontalFactor));
-                    int topY = Math.min(this.level.getMaxBuildHeight() - 1, centerY + 4 - Mth.floor(horizontalFactor * 4.0D));
-                    int bottomY = Math.max(this.level.getMinBuildHeight() + 1, centerY - Mth.ceil(localDepth));
-                    for (int y = topY; y >= bottomY; y--) {
-                        double vertical = (centerY - y) / Math.max(1.0D, depth);
-                        if (horizontalFactor * horizontalFactor + vertical * vertical <= 1.08D) {
-                            this.pendingCraterBlocks.add(new BlockPos(centerX + dx, y, centerZ + dz));
-                        }
-                    }
-                }
-            }
-        }
-    }
 }
-
-
 
