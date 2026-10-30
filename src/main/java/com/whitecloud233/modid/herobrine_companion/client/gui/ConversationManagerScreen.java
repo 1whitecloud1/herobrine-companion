@@ -9,7 +9,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 
@@ -17,20 +16,19 @@ import java.io.File;
 import java.util.List;
 import java.util.UUID;
 
-public class ConversationManagerScreen extends Screen {
+public class ConversationManagerScreen extends HeroPanelScreen {
     private static final int MAX_PANEL_WIDTH = 340;
     private static final int MAX_PANEL_HEIGHT = 245;
     private static final int MIN_PANEL_WIDTH = 260;
     private static final int MIN_PANEL_HEIGHT = 220;
-    private static final int SCREEN_MARGIN = 8;
     private static final int CONTENT_MARGIN = 10;
     private static final int CONTROL_GAP = 6;
     private static final int BUTTON_HEIGHT = 20;
-    private static final int COL_BG = 0xFF2B2B2B;
-    private static final int COL_BORDER = 0xFF555555;
-    private static final int COL_TEXT = 0xFFA9B7C6;
-    private static final int COL_TITLE = 0xFFCC7832;
-    private static final int COL_INFO = 0xFF6A8759;
+    private static final int COL_BG = HeroTheme.BG_MAIN;
+    private static final int COL_BORDER = HeroTheme.BORDER;
+    private static final int COL_TEXT = HeroTheme.TEXT;
+    private static final int COL_TITLE = HeroTheme.LABEL;
+    private static final int COL_INFO = HeroTheme.INFO;
 
     private final ConversationStore conversationStore = ConversationStore.getInstance();
     private final int entityId;
@@ -136,7 +134,17 @@ public class ConversationManagerScreen extends Screen {
         this.setInitialFocus(this.searchBox);
 
         this.addRenderableWidget(new HeroScreen.ThemedButton(
-                layout.left + (layout.panelWidth - 100) / 2, layout.backY, 100, BUTTON_HEIGHT,
+                layout.contentLeft, layout.backY, (layout.contentWidth - CONTROL_GAP) / 2, BUTTON_HEIGHT,
+                Component.translatable("gui.herobrine_companion.memory_import.open"),
+                button -> {
+                    UUID uuid = this.getPlayerUUID();
+                    if (uuid != null) Minecraft.getInstance().setScreen(new MemoryImportScreen(this, conversationStore,
+                            conversationStore.captureImportTarget(uuid)));
+                }, null
+        )).active = playerUUID != null;
+        this.addRenderableWidget(new HeroScreen.ThemedButton(
+                layout.contentLeft + (layout.contentWidth + CONTROL_GAP) / 2, layout.backY,
+                (layout.contentWidth - CONTROL_GAP) / 2, BUTTON_HEIGHT,
                 Component.translatable("gui.herobrine_companion.back"),
                 button -> Minecraft.getInstance().setScreen(new HeroScreen(this.entityId)),
                 null
@@ -146,12 +154,12 @@ public class ConversationManagerScreen extends Screen {
     }
 
     private Layout createLayout() {
-        int availableWidth = Math.max(1, this.width - SCREEN_MARGIN * 2);
-        int availableHeight = Math.max(1, this.height - SCREEN_MARGIN * 2);
-        int panelWidth = clampToAvailable(MIN_PANEL_WIDTH, MAX_PANEL_WIDTH, availableWidth);
-        int panelHeight = clampToAvailable(MIN_PANEL_HEIGHT, MAX_PANEL_HEIGHT, availableHeight);
-        int left = (this.width - panelWidth) / 2;
-        int top = (this.height - panelHeight) / 2;
+        HeroTheme.Frame frame = panelFrame(MAX_PANEL_WIDTH, MAX_PANEL_HEIGHT,
+                MIN_PANEL_WIDTH, MIN_PANEL_HEIGHT);
+        int panelWidth = frame.width();
+        int panelHeight = frame.height();
+        int left = frame.left();
+        int top = frame.top();
         int contentLeft = left + CONTENT_MARGIN;
         int contentWidth = Math.max(1, panelWidth - CONTENT_MARGIN * 2);
         int controlsY = top + 38;
@@ -170,11 +178,6 @@ public class ConversationManagerScreen extends Screen {
         return new Layout(panelWidth, panelHeight, left, top, contentLeft, contentWidth, controlsY,
                 contentLeft, searchX, searchWidth, settingsButtonX, topButtonWidth,
                 listTop, listHeight, hintTop, actionY, backY);
-    }
-
-    private static int clampToAvailable(int min, int max, int available) {
-        int clamped = Math.min(max, available);
-        return Math.max(Math.min(min, available), clamped);
     }
 
     private UUID getPlayerUUID() {
@@ -268,16 +271,10 @@ public class ConversationManagerScreen extends Screen {
     }
 
     @Override
-    public void renderBackground(GuiGraphics guiGraphics) {
-        // No default background overlay.
-    }
-
-    @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         Layout layout = this.createLayout();
 
-        guiGraphics.fill(layout.left, layout.top, layout.left + layout.panelWidth, layout.top + layout.panelHeight, COL_BG);
-        guiGraphics.renderOutline(layout.left, layout.top, layout.panelWidth, layout.panelHeight, COL_BORDER);
+        HeroTheme.plainPanel(guiGraphics, layout.left, layout.top, layout.panelWidth, layout.panelHeight);
         guiGraphics.drawCenteredString(this.font, this.title, layout.left + layout.panelWidth / 2, layout.top + 10, COL_TITLE);
 
         UUID playerUUID = this.getPlayerUUID();
@@ -296,11 +293,6 @@ public class ConversationManagerScreen extends Screen {
         guiGraphics.disableScissor();
 
         super.render(guiGraphics, mouseX, mouseY, partialTick);
-    }
-
-    @Override
-    public boolean isPauseScreen() {
-        return false;
     }
 
     private static class Layout {
@@ -345,5 +337,3 @@ public class ConversationManagerScreen extends Screen {
         }
     }
 }
-
-

@@ -24,12 +24,12 @@ public class AIDebugScreen extends Screen {
 
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm:ss").withZone(ZoneId.systemDefault());
 
-    private static final int COL_BG = 0xFF2B2B2B;
-    private static final int COL_BORDER = 0xFF555555;
-    private static final int COL_TITLE = 0xFFCC7832;
-    private static final int COL_TEXT = 0xFFA9B7C6;
-    private static final int COL_INFO = 0xFF6A8759;
-    private static final int COL_WARN = 0xFFFF8080;
+    private static final int COL_BG = HeroTheme.BG_MAIN;
+    private static final int COL_BORDER = HeroTheme.BORDER;
+    private static final int COL_TITLE = HeroTheme.LABEL;
+    private static final int COL_TEXT = HeroTheme.TEXT;
+    private static final int COL_INFO = HeroTheme.INFO;
+    private static final int COL_WARN = HeroTheme.WARN;
     private static final int COL_SELECT = 0xFF40485C;
 
     private static final int LIST_WIDTH = 230;
@@ -102,8 +102,7 @@ public class AIDebugScreen extends Screen {
 
         // ---- 左栏：条目列表 ----
         guiGraphics.enableScissor(8, TOP, listRight, bottom);
-        guiGraphics.fill(8, TOP, listRight, bottom, COL_BG);
-        guiGraphics.renderOutline(8, TOP, LIST_WIDTH, bottom - TOP, COL_BORDER);
+        HeroTheme.plainPanel(guiGraphics, 8, TOP, LIST_WIDTH, bottom - TOP);
         int visibleRows = (bottom - TOP) / ROW_HEIGHT;
         for (int i = 0; i < visibleRows; i++) {
             int entryIndex = this.listScroll + i;
@@ -126,8 +125,7 @@ public class AIDebugScreen extends Screen {
         int detailX = listRight + 10;
         int detailW = this.width - detailX - 8;
         guiGraphics.enableScissor(detailX, TOP, detailX + detailW, bottom);
-        guiGraphics.fill(detailX, TOP, detailX + detailW, bottom, COL_BG);
-        guiGraphics.renderOutline(detailX, TOP, detailW, bottom - TOP, COL_BORDER);
+        HeroTheme.plainPanel(guiGraphics, detailX, TOP, detailW, bottom - TOP);
 
         AIDebugLog.Entry e = currentEntry();
         int cursorY = TOP - this.detailScroll;

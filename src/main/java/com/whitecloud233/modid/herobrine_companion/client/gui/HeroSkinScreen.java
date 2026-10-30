@@ -50,15 +50,17 @@ public class HeroSkinScreen extends Screen {
 
     /** 面板几何：宽高钳制到窗口内，居中。返回 {startX, startY}，并更新 panelW/panelH。 */
     private int[] panelDims() {
-        this.panelW = Math.min(PANEL_WIDTH, Math.max(240, this.width - 16));
-        this.panelH = Math.min(PANEL_HEIGHT, Math.max(180, this.height - 16));
-        return new int[]{(this.width - panelW) / 2, Math.max(4, (this.height - panelH) / 2)};
+        HeroTheme.Frame frame = HeroTheme.frame(this.width, this.height,
+                PANEL_WIDTH, PANEL_HEIGHT, 240, 180, 8);
+        this.panelW = frame.width();
+        this.panelH = frame.height();
+        return new int[]{frame.left(), frame.top()};
     }
     
     // 配色
-    private static final int COL_BG_MAIN    = 0xFF2B2B2B;
-    private static final int COL_BORDER     = 0xFF555555;
-    private static final int COL_TITLE      = 0xFFCC7832;
+    private static final int COL_BG_MAIN    = HeroTheme.BG_MAIN;
+    private static final int COL_BORDER     = HeroTheme.BORDER;
+    private static final int COL_TITLE      = HeroTheme.LABEL;
 
     // 当前选中的皮肤ID
     private int selectedSkinId = 0;
@@ -79,6 +81,7 @@ public class HeroSkinScreen extends Screen {
         // 初始化皮肤列表
         skinOptions.add(new SkinOption(HeroEntity.SKIN_HEROBRINE, "gui.herobrine_companion.skin.herobrine_name"));
         skinOptions.add(new SkinOption(HeroEntity.SKIN_HERO, "gui.herobrine_companion.skin.hero_name"));
+        skinOptions.add(new SkinOption(HeroEntity.SKIN_HEROBRINE2, "gui.herobrine_companion.skin.herobrine2_name"));
         // 添加自定义皮肤选项
         skinOptions.add(new SkinOption(HeroEntity.SKIN_CUSTOM, "gui.herobrine_companion.skin.custom_name"));
     }
@@ -289,7 +292,8 @@ public class HeroSkinScreen extends Screen {
             return Files.readAllBytes(Path.of(this.customSkinName));
         } catch (Exception e) {
             if (this.minecraft != null && this.minecraft.player != null) {
-                this.minecraft.player.displayClientMessage(Component.translatable("message.herobrine_companion.skin.read_failed", e.getMessage()), false);
+                this.minecraft.player.displayClientMessage(Component.translatable("message.herobrine_companion.skin.read_failed",
+                        java.util.Objects.toString(e.getMessage(), e.getClass().getSimpleName())), false);
             }
             return new byte[0];
         }
@@ -306,8 +310,7 @@ public class HeroSkinScreen extends Screen {
         int startY = dims[1];
 
         // 背景
-        guiGraphics.fill(startX, startY, startX + panelW, startY + panelH, COL_BG_MAIN);
-        guiGraphics.renderOutline(startX, startY, panelW, panelH, COL_BORDER);
+        HeroTheme.plainPanel(guiGraphics, startX, startY, panelW, panelH);
 
         // 标题
         guiGraphics.drawCenteredString(this.font, this.title, centerX, startY + 10, COL_TITLE);
@@ -325,9 +328,9 @@ public class HeroSkinScreen extends Screen {
             // 皮肤名称
             guiGraphics.drawCenteredString(this.font, Component.translatable(option.nameKey), itemCenterX, startY + 30, 0xFFFFFF);
             
-            // 实体预览
+            // 实体预览（脚底下移并缩小缩放，避免模型头顶压住 startY+30 的名字）
             if (option.dummyEntity != null) {
-                renderEntity(guiGraphics, itemCenterX, startY + 140, 55, mouseX, mouseY, option.dummyEntity);
+                renderEntity(guiGraphics, itemCenterX, startY + 150, 50, mouseX, mouseY, option.dummyEntity);
             }
         }
 

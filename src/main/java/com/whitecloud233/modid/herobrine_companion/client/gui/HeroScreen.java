@@ -1,11 +1,15 @@
 package com.whitecloud233.modid.herobrine_companion.client.gui;
 
+import com.whitecloud233.modid.herobrine_companion.entity.logic.data.PeacefulProtection;
+
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.whitecloud233.modid.herobrine_companion.compat.epicfight.HeroEpicFightCompat;
+import com.whitecloud233.modid.herobrine_companion.client.animation.HeroPoemPreview;
 import com.whitecloud233.modid.herobrine_companion.client.gui.ConversationManagerScreen;
 import com.whitecloud233.modid.herobrine_companion.client.gui.crosschat.CrossSessionHubScreen;
 import com.whitecloud233.modid.herobrine_companion.client.event.ClientHooks;
 import com.whitecloud233.modid.herobrine_companion.client.service.ConversationStore;
+import com.whitecloud233.modid.herobrine_companion.client.network.ClientServerConfig;
+import com.whitecloud233.modid.herobrine_companion.config.ServerRule;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.SimpleNeuralNetwork;
 import com.whitecloud233.modid.herobrine_companion.init.ModEntities;
@@ -54,13 +58,13 @@ public class HeroScreen extends Screen {
     private int challengeMode = 0;
 
     // 配色方案
-    private static final int COL_BG_MAIN    = 0xFF2B2B2B;
-    private static final int COL_BG_SIDE    = 0xFF3C3F41;
-    private static final int COL_BORDER     = 0xFF555555;
-    private static final int COL_TEXT_MAIN  = 0xFFA9B7C6;
-    private static final int COL_LABEL      = 0xFFCC7832;
-    private static final int COL_VALUE      = 0xFF9876AA;
-    private static final int COL_INFO       = 0xFF6A8759;
+    private static final int COL_BG_MAIN    = HeroTheme.BG_MAIN;
+    private static final int COL_BG_SIDE    = HeroTheme.BG_SIDE;
+    private static final int COL_BORDER     = HeroTheme.BORDER;
+    private static final int COL_TEXT_MAIN  = HeroTheme.TEXT;
+    private static final int COL_LABEL      = HeroTheme.LABEL;
+    private static final int COL_VALUE      = HeroTheme.VALUE;
+    private static final int COL_INFO       = HeroTheme.INFO;
 
     /** 设计尺寸（未钳制）。运行期按窗口钳制后写入 panelW/panelH。 */
     private static final int PANEL_BASE_WIDTH = 340;
@@ -72,9 +76,11 @@ public class HeroScreen extends Screen {
 
     /** 面板几何：宽高钳制到窗口内，居中。返回 {startX, startY}，并更新 panelW/panelH。 */
     private int[] panelDims() {
-        this.panelW = Math.min(PANEL_BASE_WIDTH, Math.max(260, this.width - 16));
-        this.panelH = Math.min(PANEL_BASE_HEIGHT, Math.max(170, this.height - 16));
-        return new int[]{(this.width - panelW) / 2, Math.max(4, (this.height - panelH) / 2)};
+        HeroTheme.Frame frame = HeroTheme.frame(this.width, this.height,
+                PANEL_BASE_WIDTH, PANEL_BASE_HEIGHT, 260, 170, 8);
+        this.panelW = frame.width();
+        this.panelH = frame.height();
+        return new int[]{frame.left(), frame.top()};
     }
 
     public HeroScreen(int entityId) {
@@ -192,6 +198,10 @@ public class HeroScreen extends Screen {
             Minecraft.getInstance().setScreen(new ConversationManagerScreen(this.entityId));
         }, Tooltip.create(Component.translatable("gui.herobrine_companion.chat_conversations_tooltip")));
 
+        this.actionList.addAction(Component.translatable("gui.herobrine_companion.templates.title"), button -> {
+            Minecraft.getInstance().setScreen(new TemplateLibraryScreen(this));
+        }, Tooltip.create(Component.translatable("gui.herobrine_companion.templates.tooltip")));
+
         this.actionList.addAction(Component.translatable("gui.herobrine_companion.cross_chat.manage"), button -> {
             Minecraft.getInstance().setScreen(new CrossSessionHubScreen(this.entityId));
         }, Tooltip.create(Component.translatable("gui.herobrine_companion.cross_chat.manage_tooltip")));
@@ -200,21 +210,13 @@ public class HeroScreen extends Screen {
 
         // Protection Toggle
         this.actionList.addDynamicAction(() -> {
-            boolean isProtected = this.minecraft != null && this.minecraft.player != null && this.minecraft.player.getTags().contains("herobrine_companion_peaceful");
+            boolean isProtected = PeacefulProtection.isEnabled(this.minecraft == null ? null : this.minecraft.player);
             if (!protectionUnlocked) {
                 return Component.translatable(isProtected ? "gui.herobrine_companion.disable_protection_locked" : "gui.herobrine_companion.enable_protection_locked").withStyle(style -> style.withColor(0xFF808080));
             }
             return Component.translatable(isProtected ? "gui.herobrine_companion.disable_protection" : "gui.herobrine_companion.enable_protection");
         }, button -> {
-            boolean isProtected = this.minecraft != null && this.minecraft.player != null && this.minecraft.player.getTags().contains("herobrine_companion_peaceful");
-
-            if (this.minecraft != null && this.minecraft.player != null) {
-                if (isProtected) {
-                    this.minecraft.player.removeTag("herobrine_companion_peaceful");
-                } else {
-                    this.minecraft.player.addTag("herobrine_companion_peaceful");
-                }
-            }
+            boolean isProtected = PeacefulProtection.isEnabled(this.minecraft == null ? null : this.minecraft.player);
 
             PacketHandler.sendToServer(new PeacefulPacket(!isProtected));
             this.onClose();
@@ -244,16 +246,20 @@ public class HeroScreen extends Screen {
 
 
         int currentTrust = 0;
+        boolean currentlyFollowing = false;
+        boolean currentlyBattle = false;
         if (this.minecraft.level != null) {
             Entity entity = this.minecraft.level.getEntity(this.entityId);
             if (entity instanceof HeroEntity hero) {
                 currentTrust = hero.getTrustLevel();
-                hero.isCompanionMode();
+                currentlyFollowing = hero.isCompanionMode();
+                currentlyBattle = hero.isBattleModeActive();
             }
         }
 
         // Companion Mode
-        boolean companionUnlocked = currentTrust >= 50;
+        int followTrustThreshold = com.whitecloud233.modid.herobrine_companion.entity.companion.CompanionModePolicy.FOLLOW_TRUST_THRESHOLD;
+        boolean companionUnlocked = currentlyFollowing || currentTrust >= followTrustThreshold;
         int finalCurrentTrust = currentTrust;
         this.actionList.addDynamicAction(() -> {
             boolean currentState = false;
@@ -265,7 +271,7 @@ public class HeroScreen extends Screen {
             }
 
             if (!companionUnlocked) {
-                return Component.translatable("gui.herobrine_companion.companion_locked", 50, finalCurrentTrust).withStyle(style -> style.withColor(0xFF808080));
+                return Component.translatable("gui.herobrine_companion.companion_locked", followTrustThreshold, finalCurrentTrust).withStyle(style -> style.withColor(0xFF808080));
             }
 
             String key = currentState ? "gui.herobrine_companion.companion_disable" : "gui.herobrine_companion.companion_enable";
@@ -273,44 +279,48 @@ public class HeroScreen extends Screen {
         }, button -> {
             PacketHandler.sendToServer(new ToggleCompanionPacket(this.entityId));
             this.onClose();
-        }, Tooltip.create(Component.translatable(companionUnlocked ? "gui.herobrine_companion.companion_tooltip_unlocked" : "gui.herobrine_companion.companion_tooltip_locked", 50, currentTrust))).active = companionUnlocked;
+        }, Tooltip.create(Component.translatable(companionUnlocked ? "gui.herobrine_companion.companion_tooltip_unlocked" : "gui.herobrine_companion.companion_tooltip_locked", followTrustThreshold, currentTrust))).active = companionUnlocked;
 
-        // 战斗模式按钮：仅在检测到 Epic Fight 安装时显示（未安装时隐藏，避免无意义入口）。
-        if (HeroEpicFightCompat.isLoaded()) {
-            this.actionList.addDynamicAction(() -> {
-                boolean currentState = false;
-                boolean challengeActive = false;
-                if (this.minecraft.level != null) {
-                    Entity e = this.minecraft.level.getEntity(this.entityId);
-                    if (e instanceof HeroEntity h) {
-                        currentState = h.isBattleModeActive();
-                        challengeActive = h.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE);
-                    }
+        // 战斗模式按钮：无 Epic Fight 时走内置战斗 AI（终末之诗镰刀普攻），始终显示。
+        // 开启要过服务器规则的信任门槛（0 = 关闭）；收刀（关闭）永远可用，已开启时按钮保持可点。
+        int battleTrustThreshold = ClientServerConfig.snapshot().value(ServerRule.BATTLE_MODE_TRUST_THRESHOLD);
+        boolean battleUnlocked = currentlyBattle || battleTrustThreshold <= 0 || currentTrust >= battleTrustThreshold;
+        this.actionList.addDynamicAction(() -> {
+            boolean currentState = false;
+            boolean challengeActive = false;
+            if (this.minecraft.level != null) {
+                Entity e = this.minecraft.level.getEntity(this.entityId);
+                if (e instanceof HeroEntity h) {
+                    currentState = h.isBattleModeActive();
+                    challengeActive = h.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE);
                 }
+            }
 
-                String key;
-                if (challengeActive) {
-                    key = "gui.herobrine_companion.battle_mode_blocked";
-                } else {
-                    key = currentState
-                            ? "gui.herobrine_companion.battle_mode_disable"
-                            : "gui.herobrine_companion.battle_mode_enable";
-                }
+            String key;
+            if (challengeActive) {
+                key = "gui.herobrine_companion.battle_mode_blocked";
+            } else if (!currentState && !battleUnlocked) {
+                return Component.translatable("gui.herobrine_companion.battle_mode_locked").withStyle(style -> style.withColor(0xFF808080));
+            } else {
+                key = currentState
+                        ? "gui.herobrine_companion.battle_mode_disable"
+                        : "gui.herobrine_companion.battle_mode_enable";
+            }
 
-                return Component.translatable(key).withStyle(style -> style.withColor(0xFF4FC3F7));
-            }, button -> {
+            return Component.translatable(key).withStyle(style -> style.withColor(0xFF4FC3F7));
+        }, button -> {
+            Entity entity = this.minecraft != null && this.minecraft.level != null ? this.minecraft.level.getEntity(this.entityId) : null;
+            boolean challengeActive = entity instanceof HeroEntity hero && hero.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE);
+            boolean canToggle = battleUnlocked && !challengeActive;
+            if (canToggle) {
                 PacketHandler.sendToServer(new ToggleBattleModePacket(this.entityId));
-                Entity entity = this.minecraft != null && this.minecraft.level != null ? this.minecraft.level.getEntity(this.entityId) : null;
-                boolean challengeActive = entity instanceof HeroEntity hero && hero.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE);
-                if (this.dummyHero != null && !challengeActive) {
-                    this.dummyHero.setBattleModeActiveFrom(DUMMY_BATTLE_SYNC_BUTTON, !this.dummyHero.isBattleModeActive());
-                }
-            }, Tooltip.create(Component.translatable(
-                    HeroEpicFightCompat.isLoaded()
-                            ? "gui.herobrine_companion.battle_mode_tooltip"
-                            : HeroEpicFightCompat.getInstallHintKey()
-            )));
-        }
+            }
+            if (this.dummyHero != null && canToggle) {
+                this.dummyHero.setBattleModeActiveFrom(DUMMY_BATTLE_SYNC_BUTTON, !this.dummyHero.isBattleModeActive());
+            }
+        }, Tooltip.create(battleUnlocked
+                ? Component.translatable("gui.herobrine_companion.battle_mode_tooltip")
+                : Component.translatable("gui.herobrine_companion.battle_mode_tooltip_locked", battleTrustThreshold, finalCurrentTrust))).active = battleUnlocked;
 
         boolean finalVisited = visited;
         this.actionList.addDynamicAction(() -> {
@@ -445,7 +455,6 @@ public class HeroScreen extends Screen {
         UUID uuid = null;
         boolean battleMode = false;
         SimpleNeuralNetwork.MindState mindState = SimpleNeuralNetwork.MindState.OBSERVER;
-        String epicFightDisplay = HeroEpicFightCompat.getBridgeStatus().name();
         if (this.minecraft.level != null) {
             Entity realEntity = this.minecraft.level.getEntity(this.entityId);
             if (realEntity instanceof HeroEntity hero) {
@@ -453,9 +462,6 @@ public class HeroScreen extends Screen {
                 uuid = hero.getUUID();
                 battleMode = hero.isBattleModeActive();
                 mindState = hero.getMindState();
-                if (battleMode) {
-                    epicFightDisplay = HeroEpicFightCompat.getBridgeStatus().name() + " " + HeroEpicFightCompat.describeCurrentSnapshot(hero);
-                }
 
                 // 【核心修复】：持续刷新渲染时的皮肤与姿势状态（dummyHero 仅在 level 非空时创建，这里兜底判空）
                 if (this.dummyHero != null) {
@@ -479,10 +485,9 @@ public class HeroScreen extends Screen {
         drawInfoField(guiGraphics, indent + 5, varY + lineHeight, Component.translatable("gui.herobrine_companion.trust_level"), Component.literal(String.valueOf(trust)));
         drawInfoField(guiGraphics, indent + 5, varY + lineHeight * 2, Component.translatable("gui.herobrine_companion.battle_mode_status"), Component.translatable(battleMode ? "gui.herobrine_companion.battle_mode_status_on" : "gui.herobrine_companion.battle_mode_status_off"));
         drawInfoField(guiGraphics, indent + 5, varY + lineHeight * 3, Component.translatable("gui.herobrine_companion.mind_state"), getMindStateComponent(mindState));
-        drawInfoField(guiGraphics, indent + 5, varY + lineHeight * 4, Component.translatable("gui.herobrine_companion.epicfight_bridge"), Component.literal(epicFightDisplay));
-        drawInfoField(guiGraphics, indent + 5, varY + lineHeight * 5, Component.translatable("gui.herobrine_companion.entity_id"), Component.literal(uuid == null ? "N/A" : "..." + uuid.toString().substring(0, 4)));
+        drawInfoField(guiGraphics, indent + 5, varY + lineHeight * 4, Component.translatable("gui.herobrine_companion.entity_id"), Component.literal(uuid == null ? "N/A" : "..." + uuid.toString().substring(0, 4)));
 
-        int barY = varY + lineHeight * 6 + 5;
+        int barY = varY + lineHeight * 5 + 5;
         guiGraphics.drawString(this.font, Component.translatable("gui.herobrine_companion.sync_status"), indent, barY, COL_INFO, false);
         int maxTrust = 100;
 
@@ -520,14 +525,18 @@ public class HeroScreen extends Screen {
     }
 
     private void drawInfoLabel(GuiGraphics g, int x, int y, Component label, Component value) {
+        int labelWidth = this.font.width(label);
         g.drawString(this.font, label, x, y, COL_LABEL, false);
-        g.drawString(this.font, Component.literal(" ").append(value), x + this.font.width(label), y, COL_TEXT_MAIN, false);
+        g.drawString(this.font, Component.literal(" ").append(value), x + labelWidth, y, COL_TEXT_MAIN, false);
     }
 
     private void drawInfoField(GuiGraphics g, int x, int y, Component name, Component value) {
+        // [性能] 字体度量只算一次：原实现每个字段调用两次 font.width(name)，
+        // 而 width() 需要完整遍历字形序列（StringDecomposer），5 个字段每帧就是 10 次重复测量。
+        int nameWidth = this.font.width(name);
         g.drawString(this.font, name, x, y, COL_VALUE, false);
-        g.drawString(this.font, ": ", x + this.font.width(name), y, COL_TEXT_MAIN, false);
-        g.drawString(this.font, value, x + this.font.width(name) + 10, y, COL_INFO, false);
+        g.drawString(this.font, ": ", x + nameWidth, y, COL_TEXT_MAIN, false);
+        g.drawString(this.font, value, x + nameWidth + 10, y, COL_INFO, false);
     }
 
     private Component getMindStateComponent(SimpleNeuralNetwork.MindState state) {
@@ -553,6 +562,10 @@ public class HeroScreen extends Screen {
         entity.xRotO = -f1 * 20.0F;
         entity.yHeadRotO = entity.yRotO;
 
+        // 纸娃娃不会 tick（tickCount 恒为 0），登记成预览实体后由真实时间驱动
+        // 终末之诗的骨架动作，界面里看到的才是会动的动作而不是冻结的首帧。
+        HeroPoemPreview.drive(entity);
+
         InventoryScreen.renderEntityInInventoryFollowsMouse(
                 guiGraphics,
                 x,
@@ -562,6 +575,14 @@ public class HeroScreen extends Screen {
                 mouseY,
                 entity
         );
+    }
+
+    @Override
+    public void removed() {
+        if (this.dummyHero != null) {
+            HeroPoemPreview.release(this.dummyHero);
+        }
+        super.removed();
     }
 
     @Override public boolean isPauseScreen() { return false; }

@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.client.gui;
 
 import com.google.gson.Gson;
+import com.whitecloud233.modid.herobrine_companion.util.AtomicFiles;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
@@ -12,7 +13,6 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.Entity;
@@ -28,7 +28,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 
-public class HeroPoseScreen extends Screen {
+public class HeroPoseScreen extends HeroPanelScreen {
 
     private final int entityId;
     private HeroEntity dummyHero;
@@ -288,8 +288,8 @@ public class HeroPoseScreen extends Screen {
     }
 
     private void savePresetsToFile() {
-        try (var writer = Files.newBufferedWriter(getPresetFile().toPath(), StandardCharsets.UTF_8)) {
-            GSON.toJson(savedPresets, writer);
+        try {
+            AtomicFiles.writeJson(getPresetFile().toPath(), GSON, savedPresets);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -351,11 +351,6 @@ public class HeroPoseScreen extends Screen {
     }
 
     // 【修复 1】1.20.1 中的 renderBackground 只有 1 个参数
-    @Override
-    public void renderBackground(GuiGraphics guiGraphics) {
-        // 留空：禁用原版自带的世界模糊和黑色背景遮罩
-    }
-
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         // 【修复 2】配合 renderBackground 参数修改
@@ -607,11 +602,6 @@ public class HeroPoseScreen extends Screen {
         }
 
         return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
-    }
-
-    @Override
-    public boolean isPauseScreen() {
-        return false;
     }
 
     private class PoseSlider extends AbstractSliderButton {

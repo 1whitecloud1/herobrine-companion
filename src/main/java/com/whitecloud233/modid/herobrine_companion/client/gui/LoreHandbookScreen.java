@@ -5,7 +5,6 @@ import net.minecraft.client.GameNarrator;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.network.chat.Component;
@@ -17,7 +16,7 @@ import net.minecraft.world.item.ItemStack;
 import java.util.ArrayList;
 import java.util.List;
 
-public class LoreHandbookScreen extends Screen {
+public class LoreHandbookScreen extends HeroPanelScreen {
     // 使用原版书本材质
     private static final ResourceLocation BOOK_LOCATION = new ResourceLocation("textures/gui/book.png");
     private final ItemStack handbook;
@@ -178,11 +177,6 @@ public class LoreHandbookScreen extends Screen {
     }
 
     @Override
-    public void renderBackground(GuiGraphics guiGraphics) {
-        // 留空，不绘制默认背景
-    }
-
-    @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
         RenderSystem.disableDepthTest();
@@ -225,11 +219,6 @@ public class LoreHandbookScreen extends Screen {
             guiGraphics.drawString(this.font, cachedPageLines.get(i), leftPos + 36, yOffset, TEXT_COLOR, false);
             yOffset += 9; // 行高
         }
-    }
-
-    @Override
-    public boolean isPauseScreen() {
-        return false;
     }
 
     // --- 自定义组件 ---

@@ -7,7 +7,6 @@ import com.whitecloud233.modid.herobrine_companion.network.RequestActionPacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
 import java.util.List;
@@ -16,7 +15,7 @@ import java.util.List;
  * 委托浏览界面。单一职责：展示 {@link HeroQuestRegistry} 里的委托目录并受理“接受 / 放弃”。
  * 不感知任何委托的行为与奖励细节——名称、描述、奖励文本全部来自注册表翻译键。
  */
-public class HeroRequestScreen extends Screen {
+public class HeroRequestScreen extends HeroPanelScreen {
 
     private final int entityId;
     private final List<HeroQuestRegistry.Definition> quests = HeroQuestRegistry.definitions();
@@ -27,10 +26,10 @@ public class HeroRequestScreen extends Screen {
     private static final int ARROW_MARGIN = 50;
 
     // Colors
-    private static final int COL_BG = 0xFF2B2B2B;
-    private static final int COL_BORDER = 0xFF555555;
-    private static final int COL_TEXT = 0xFFA9B7C6;
-    private static final int COL_TITLE = 0xFFCC7832;
+    private static final int COL_BG = HeroTheme.BG_MAIN;
+    private static final int COL_BORDER = HeroTheme.BORDER;
+    private static final int COL_TEXT = HeroTheme.TEXT;
+    private static final int COL_TITLE = HeroTheme.LABEL;
 
     private int currentQuestIndex = 0;
     private HeroScreen.ThemedButton acceptButton;
@@ -114,7 +113,7 @@ public class HeroRequestScreen extends Screen {
     /** 冷却中的委托禁止接取：接受键置灰（服务端仍会权威校验）。 */
     private void refreshAcceptState() {
         if (this.acceptButton != null) {
-            this.acceptButton.active = cooldownRemaining(currentQuest().id()) <= 0;
+            this.acceptButton.active = ClientQuestState.activeQuestId() == 0 && cooldownRemaining(currentQuest().id()) <= 0;
         }
     }
 
@@ -136,6 +135,7 @@ public class HeroRequestScreen extends Screen {
 
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        refreshAcceptState();
         this.renderBackground(guiGraphics);
 
         Panel p = panel();
@@ -144,8 +144,7 @@ public class HeroRequestScreen extends Screen {
         int startY = p.top();
 
         // Background
-        guiGraphics.fill(startX, startY, startX + p.width(), startY + p.height(), COL_BG);
-        guiGraphics.renderOutline(startX, startY, p.width(), p.height(), COL_BORDER);
+        HeroTheme.plainPanel(guiGraphics, startX, startY, p.width(), p.height());
 
         // Title
         guiGraphics.drawCenteredString(this.font, this.title, centerX, startY + 10, COL_TITLE);
@@ -188,13 +187,4 @@ public class HeroRequestScreen extends Screen {
         super.render(guiGraphics, mouseX, mouseY, partialTick);
     }
 
-    @Override
-    public void renderBackground(GuiGraphics guiGraphics) {
-        // No default background
-    }
-
-    @Override
-    public boolean isPauseScreen() {
-        return false;
-    }
 }
