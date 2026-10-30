@@ -1,5 +1,8 @@
 package com.whitecloud233.herobrine_companion.entity.ai.learning.state;
 
+import com.whitecloud233.herobrine_companion.config.ServerConfigAccess;
+import com.whitecloud233.herobrine_companion.config.ServerRule;
+
 import com.whitecloud233.herobrine_companion.config.Config;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.ai.learning.HeroBrain;
@@ -33,8 +36,10 @@ public final class PranksterStateDefinition implements HeroMindStateDefinition {
     private static final String COOLDOWN_LEAF_VANISH = "PranksterCooldownLeafVanish";
     private static final String COOLDOWN_EDGE_FLASH = "PranksterCooldownEdgeFlash";
 
-    private static final int FAKE_TREASURE_COOLDOWN = 1200;
-    private static final float FAKE_TREASURE_CHANCE = 0.18F;
+    // 假箱子降频：冷却 1200→7200（1 分钟→6 分钟），单次概率 0.18→0.03，
+    // 玩家附近平均每 6 分钟左右才会出现一个假箱子（夜间加成只影响冷却结束后的触发延迟）。
+    private static final int FAKE_TREASURE_COOLDOWN = 7200;
+    private static final float FAKE_TREASURE_CHANCE = 0.03F;
     private static final double FAKE_TREASURE_MIN_DIST = 4.0D;
     private static final double FAKE_TREASURE_MAX_DIST = 8.0D;
     private static final int FAKE_TREASURE_LIFETIME = 1800;
@@ -112,7 +117,8 @@ public final class PranksterStateDefinition implements HeroMindStateDefinition {
 
         float boost = HeroStateBehaviorSupport.isNight(hero) ? 1.5F : 1.0F;
 
-        if (!hasFakeTreasure(hero)
+        if (ServerConfigAccess.snapshot().enabled(ServerRule.PRANKSTER_FAKE_CHEST)
+                && !hasFakeTreasure(hero)
                 && isCooldownReady(hero, COOLDOWN_FAKE_TREASURE)
                 && hero.getRandom().nextFloat() < FAKE_TREASURE_CHANCE * boost
                 && spawnFakeTreasure(hero, level, focus)) {
@@ -120,7 +126,7 @@ public final class PranksterStateDefinition implements HeroMindStateDefinition {
             return;
         }
 
-        if (Config.heroLeafVanishEnabled
+        if (ServerConfigAccess.snapshot().enabled(ServerRule.LEAF_VANISH)
                 && isCooldownReady(hero, COOLDOWN_LEAF_VANISH)
                 && hero.getRandom().nextFloat() < LEAF_VANISH_CHANCE * boost
                 && tryVanishNearbyLeaves(hero, level, focus)) {

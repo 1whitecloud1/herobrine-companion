@@ -1,6 +1,6 @@
 package com.whitecloud233.herobrine_companion.entity.ai.agent.tool;
 
-import com.whitecloud233.herobrine_companion.compat.epicfight.HeroEpicFightCompat;
+import com.whitecloud233.herobrine_companion.api.compat.HeroEpicFightCompat;
 import net.minecraft.network.chat.Component;
 
 import java.util.List;

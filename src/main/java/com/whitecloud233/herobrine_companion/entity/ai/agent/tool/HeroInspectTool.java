@@ -1,6 +1,6 @@
 package com.whitecloud233.herobrine_companion.entity.ai.agent.tool;
 
-import com.whitecloud233.herobrine_companion.compat.accessories.HeroAccessoriesCompat;
+import com.whitecloud233.herobrine_companion.api.compat.HeroAccessoriesCompat;
 import com.whitecloud233.herobrine_companion.compat.curios.HeroCuriosCompat;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.util.AiItemNaming;
@@ -62,7 +62,7 @@ public final class HeroInspectTool implements AgentTool {
         String field = args.getString("field").trim().toLowerCase(java.util.Locale.ROOT);
         if (!field.isEmpty() && !ALLOWED_FIELDS.contains(field)) {
             return AgentToolResult.fail("field 只允许: " + ALLOWED_FIELDS,
-                    Component.translatable("message.herobrine_companion.tool.inspect.invalid_field", ALLOWED_FIELDS));
+                    Component.translatable("message.herobrine_companion.tool.inspect.invalid_field", ALLOWED_FIELDS.toString()));
         }
         return AgentToolResult.ok("valid");
     }

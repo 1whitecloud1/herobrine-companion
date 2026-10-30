@@ -1,5 +1,8 @@
 package com.whitecloud233.herobrine_companion.entity.ai.learning;
 
+import com.whitecloud233.herobrine_companion.config.ServerConfigAccess;
+import com.whitecloud233.herobrine_companion.config.ServerRule;
+
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.logic.data.HeroWorldData;
 import com.whitecloud233.herobrine_companion.world.structure.ModStructures;
@@ -37,7 +40,7 @@ public class HeroBrain {
     }
 
     public void rememberBrokenBlock(BlockPos pos, BlockState state) {
-        if (!com.whitecloud233.herobrine_companion.config.Config.heroBlockRestoration) return;
+        if (!ServerConfigAccess.snapshot().enabled(ServerRule.BLOCK_RESTORATION)) return;
 
         long now = hero.level().getGameTime();
         Long lastBreak = recentBreaks.get(pos);
@@ -171,6 +174,16 @@ public class HeroBrain {
     public SimpleNeuralNetwork.MindState getCurrentState() { return getState(); }
     public String getDebugInfo() { return getCurrentNetwork().getDebugInfo(); }
     public void forceState(SimpleNeuralNetwork.MindState state) { getCurrentNetwork().forceState(state, hero.level().getGameTime()); }
+
+    public void forceCommandState(SimpleNeuralNetwork.MindState state) {
+        com.whitecloud233.herobrine_companion.entity.ai.learning.state.HeroMindStatePresets
+                .apply(getCurrentNetwork(), state, hero.level().getGameTime());
+        hero.getPersistentData().remove("MindMaintainerNoTaskTicks");
+        hero.getPersistentData().remove("MindGlitchNoContactTicks");
+        hero.getPersistentData().remove("MindGlitchBounceLock");
+        hero.setMindState(state);
+        saveMemories();
+    }
 
     public void save(CompoundTag tag) {
         ListTag networksTag = new ListTag();

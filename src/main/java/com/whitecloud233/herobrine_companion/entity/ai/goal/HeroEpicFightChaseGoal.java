@@ -1,8 +1,9 @@
 package com.whitecloud233.herobrine_companion.entity.ai.goal;
 
-import com.whitecloud233.herobrine_companion.compat.epicfight.HeroEpicFightCompat;
-import com.whitecloud233.herobrine_companion.compat.epicfight.HeroEpicFightDebugLog;
+import com.whitecloud233.herobrine_companion.api.compat.HeroEpicFightCompat;
+import com.whitecloud233.herobrine_companion.combat.HeroCombatDebugLog;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.herobrine_companion.entity.ai.HeroMoveControl;
 import com.whitecloud233.herobrine_companion.entity.ai.combat.HeroCombatPursuit;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.Goal;
@@ -34,8 +35,7 @@ public class HeroEpicFightChaseGoal extends Goal {
     private static final int PATH_RECALC_INTERVAL = 10;
     private static final int STUCK_TICKS_LIMIT = 10;
     private static final int LAND_COOLDOWN_TICKS = 60;
-    /** 悬停贴近后等待空中攻击的窗口；超时仍无招式则落回地面进入近战。 */
-    private static final int HOVER_GRACE_TICKS = 15;
+    private static final int GROUND_STALL_TICKS = 30;
 
     private final HeroEntity hero;
     private final double attackRadiusSqr;
@@ -43,8 +43,9 @@ public class HeroEpicFightChaseGoal extends Goal {
     private int groundPathFailures;
     private int stuckTicks;
     private boolean flyingPursuit;
-    private int landCooldown;
-    private int hoverGraceTicks;
+    private int flightCooldownUntilTick;
+    private int lastGroundProgressTick;
+    private Vec3 lastGroundProgressPosition;
 
     public HeroEpicFightChaseGoal(HeroEntity hero, double speedModifier, double attackRadius) {
         this.hero = hero;
@@ -55,7 +56,12 @@ public class HeroEpicFightChaseGoal extends Goal {
 
     @Override
     public boolean canUse() {
-        return this.canChaseTarget() && this.isOutOfAttackRange();
+        return this.canChaseTarget() && !HeroEpicFightCompat.isHeroMidAttack(this.hero) && this.isOutOfAttackRange();
+    }
+
+    @Override
+    public boolean requiresUpdateEveryTick() {
+        return true;
     }
 
     @Override
@@ -64,15 +70,15 @@ public class HeroEpicFightChaseGoal extends Goal {
         if (!this.canChaseTarget() || target == null) {
             return false;
         }
-        // 飞行追击中：悬停贴身时继续占用 Goal，由 tickFlyingPursuit/tickHoveringNearTarget
-        // 管理悬停/落地，直到浮空被外部重置（入水/传送/已落回地面）才结束。
-        // 否则 AnimatedAttackGoal 一进射程就把本 Goal 抢占并落地，飞上去立刻掉下来。
+        // Keep controlling the approach until a safe melee landing is available.
+        // Attack root motion is left to AnimatedAttackGoal in tick().
         if (this.flyingPursuit) {
             return this.hero.isFloating();
         }
         // 留一点滞后量，避免在攻击范围边缘来回抖动
         double attackRadius = Math.sqrt(this.attackRadiusSqr);
-        return !HeroCombatPursuit.isWithinAttackReach(this.hero, target, attackRadius * 0.75D);
+        return !HeroCombatPursuit.isWithinAttackReach(this.hero, target, attackRadius * 0.75D)
+                || !this.hero.hasLineOfSight(target);
     }
 
     @Override
@@ -80,17 +86,23 @@ public class HeroEpicFightChaseGoal extends Goal {
         this.pathRecalcCooldown = 0;
         this.groundPathFailures = 0;
         this.stuckTicks = 0;
-        this.flyingPursuit = false;
-        this.landCooldown = 0;
-        this.hoverGraceTicks = 0;
+        this.flyingPursuit = this.hero.isFloating();
+        this.lastGroundProgressTick = this.hero.tickCount;
+        this.lastGroundProgressPosition = this.hero.position();
         this.hero.setSprinting(false);
     }
 
     @Override
     public void stop() {
         this.hero.getNavigation().stop();
+        if (this.hero.getMoveControl() instanceof HeroMoveControl moveControl) {
+            moveControl.stopMoving();
+        }
         this.hero.setSprinting(false);
-        if (this.flyingPursuit || this.hero.isFloating()) {
+        if (this.flyingPursuit && !this.hero.isFloating()) {
+            this.flightCooldownUntilTick = this.hero.tickCount + LAND_COOLDOWN_TICKS;
+        }
+        if ((this.flyingPursuit || this.hero.isFloating()) && !HeroEpicFightCompat.isHeroMidAttack(this.hero)) {
             // 目标仍高位且落地够不着 → 保持浮空，把攻击交给 AnimatedAttackGoal 的空中连段；
             // 否则落回地面。这是"飞上去立刻掉下来"的关键修复。
             if (!this.shouldKeepHovering()) {
@@ -98,7 +110,6 @@ public class HeroEpicFightChaseGoal extends Goal {
             }
         }
         this.flyingPursuit = false;
-        this.hoverGraceTicks = 0;
     }
 
     @Override
@@ -110,22 +121,30 @@ public class HeroEpicFightChaseGoal extends Goal {
 
         this.hero.getLookControl().setLookAt(target, 30.0F, 30.0F);
 
+        // AnimatedAttackGoal also runs while chasing. Never overwrite its root
+        // motion or turn an authored jump into persistent pursuit flight.
+        if (HeroEpicFightCompat.isHeroMidAttack(this.hero)) {
+            this.hero.getNavigation().stop();
+            if (this.hero.getMoveControl() instanceof HeroMoveControl moveControl) {
+                moveControl.stopMoving();
+            }
+            this.lastGroundProgressTick = this.hero.tickCount;
+            this.lastGroundProgressPosition = this.hero.position();
+            return;
+        }
+
         double attackRadius = Math.sqrt(this.attackRadiusSqr);
         if (this.flyingPursuit) {
             this.tickFlyingPursuit(target, attackRadius);
             return;
         }
 
-        if (HeroCombatPursuit.isWithinAttackReach(this.hero, target, attackRadius)) {
+        if (HeroCombatPursuit.isWithinAttackReach(this.hero, target, attackRadius) && this.hero.hasLineOfSight(target)) {
             // 已进入贴脸近战范围：停手交给 epicfight 的 AnimatedAttackGoal 结算。
             // 高处目标不满足 isWithinAttackReach（垂直差大），不会在这里提前停手，
             // 而是继续走飞行追击逼近到悬停点。
             this.hero.getNavigation().stop();
             return;
-        }
-
-        if (this.landCooldown > 0) {
-            this.landCooldown--;
         }
 
         this.tickGroundPursuit(target, attackRadius);
@@ -134,7 +153,14 @@ public class HeroEpicFightChaseGoal extends Goal {
     // ==================== 地面追击 ====================
 
     private void tickGroundPursuit(LivingEntity target, double attackRadius) {
-        if (this.shouldEnterFlight(target)) {
+        Vec3 movement = this.hero.position().subtract(this.lastGroundProgressPosition);
+        if (movement.horizontalDistanceSqr() > 0.25D) {
+            this.lastGroundProgressPosition = this.hero.position();
+            this.lastGroundProgressTick = this.hero.tickCount;
+            this.groundPathFailures = 0;
+            this.stuckTicks = 0;
+        }
+        if (this.shouldEnterFlight(target, attackRadius)) {
             this.enterFlight(target);
             return;
         }
@@ -146,7 +172,6 @@ public class HeroEpicFightChaseGoal extends Goal {
             this.pathRecalcCooldown = PATH_RECALC_INTERVAL + this.hero.getRandom().nextInt(6);
             if (this.hero.getNavigation().moveTo(target, speed)) {
                 this.groundPathFailures = 0;
-                this.stuckTicks = 0;
             } else {
                 this.groundPathFailures++;
             }
@@ -166,12 +191,16 @@ public class HeroEpicFightChaseGoal extends Goal {
         }
     }
 
-    private boolean shouldEnterFlight(LivingEntity target) {
+    private boolean shouldEnterFlight(LivingEntity target, double attackRadius) {
         boolean targetHigh = HeroCombatPursuit.isTargetHighAbove(this.hero, target);
         boolean inFluid = HeroCombatPursuit.isHeroInFluid(this.hero);
-        // 目标高位或身处流体立即起飞；地面寻路失败 / 卡墙则尊重落地冷却，避免反复横跳
+        // A failed path is not a stalled chase: direct movement may still be
+        // closing the gap. Give grounded combos priority near the target.
         return HeroCombatPursuit.shouldTakeFlight(this.hero, target, this.groundPathFailures)
-                && (targetHigh || inFluid || this.landCooldown <= 0);
+                && (targetHigh || inFluid || (this.hero.tickCount >= this.flightCooldownUntilTick
+                && this.hero.tickCount - this.lastGroundProgressTick >= GROUND_STALL_TICKS
+                && !(this.hero.hasLineOfSight(target)
+                && HeroCombatPursuit.isWithinAttackReach(this.hero, target, attackRadius + 1.5D))));
     }
 
     private void enterFlight(LivingEntity target) {
@@ -179,8 +208,8 @@ public class HeroEpicFightChaseGoal extends Goal {
         this.groundPathFailures = 0;
         this.stuckTicks = 0;
         HeroCombatPursuit.startFlight(this.hero);
-        HeroEpicFightDebugLog.transition(this.hero, "HeroEpicFightChaseGoal.enterFlight",
-                "flying=true|" + HeroEpicFightDebugLog.heroCoreState(this.hero),
+        HeroCombatDebugLog.transition(this.hero, "HeroEpicFightChaseGoal.enterFlight",
+                "flying=true|" + HeroCombatDebugLog.heroCoreState(this.hero),
                 "target=" + target.getDisplayName().getString() + ",dist=" + String.format("%.1f", this.hero.distanceTo(target)));
     }
 
@@ -188,11 +217,10 @@ public class HeroEpicFightChaseGoal extends Goal {
 
     private void tickFlyingPursuit(LivingEntity target, double attackRadius) {
         if (HeroCombatPursuit.shouldLand(this.hero, target, attackRadius)) {
-            this.tickHoveringNearTarget();
+            this.landNearTarget();
             return;
         }
 
-        this.hoverGraceTicks = 0;
         if (!this.hero.isFloating()) {
             // 浮空被外部重置（如入水、传送），回落到地面追击状态
             this.flyingPursuit = false;
@@ -203,41 +231,14 @@ public class HeroEpicFightChaseGoal extends Goal {
         HeroCombatPursuit.flyTo(this.hero, flyTarget, HeroCombatPursuit.FLY_SPEED);
     }
 
-    /**
-     * 悬停贴近目标：正播放空中攻击则让出时间给连段（衔接空中攻击），
-     * 招式收尾后开始悬停计时，超时仍无招式且下方可落地则落回地面进入近战。
-     * 不可落地（如悬停于深渊/水面）则保持悬停，交给 AnimatedAttackGoal 空中攻击。
-     */
-    private void tickHoveringNearTarget() {
-        LivingEntity target = this.hero.getTarget();
-        double attackRadius = Math.sqrt(this.attackRadiusSqr);
-        if (target == null || !HeroCombatPursuit.shouldLand(this.hero, target, attackRadius)) {
-            this.hoverGraceTicks = 0;
-            return;
-        }
-
-        if (HeroEpicFightCompat.isHeroMidAttack(this.hero)) {
-            this.hoverGraceTicks = 0;
-            this.hero.getNavigation().stop();
-            return;
-        }
-        this.hoverGraceTicks++;
-        if (this.hoverGraceTicks >= HOVER_GRACE_TICKS) {
-            this.landNearTarget();
-        } else {
-            this.hero.getNavigation().stop();
-        }
-    }
-
     private void landNearTarget() {
         HeroCombatPursuit.land(this.hero);
         this.flyingPursuit = false;
-        this.landCooldown = LAND_COOLDOWN_TICKS;
+        this.flightCooldownUntilTick = this.hero.tickCount + LAND_COOLDOWN_TICKS;
         this.groundPathFailures = 0;
         this.stuckTicks = 0;
-        this.hoverGraceTicks = 0;
-        HeroEpicFightDebugLog.transition(this.hero, "HeroEpicFightChaseGoal.landNearTarget",
-                "flying=false|" + HeroEpicFightDebugLog.heroCoreState(this.hero),
+        HeroCombatDebugLog.transition(this.hero, "HeroEpicFightChaseGoal.landNearTarget",
+                "flying=false|" + HeroCombatDebugLog.heroCoreState(this.hero),
                 "cooldown=" + LAND_COOLDOWN_TICKS);
     }
 
@@ -273,6 +274,6 @@ public class HeroEpicFightChaseGoal extends Goal {
         // 交给飞行追击，避免 Hero 站在树下对着够不着的怪发呆 / 空挥
         double attackRadius = Math.sqrt(this.attackRadiusSqr);
         return HeroCombatPursuit.horizontalDistanceSqr(this.hero, target) <= MAX_CHASE_RANGE * MAX_CHASE_RANGE
-                && !HeroCombatPursuit.isWithinAttackReach(this.hero, target, attackRadius);
+                && (!HeroCombatPursuit.isWithinAttackReach(this.hero, target, attackRadius) || !this.hero.hasLineOfSight(target));
     }
 }

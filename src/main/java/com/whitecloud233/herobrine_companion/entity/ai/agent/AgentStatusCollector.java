@@ -59,7 +59,7 @@ public final class AgentStatusCollector {
                 // getMindState 有兜底（越界回 OBSERVER），不会为 null。
                 hero.getMindState().name(),
                 queue.size(),
-                queue.currentProgress(),
+                describeQueue(queue, hero),
                 memory.episodeCount(),
                 memory.facts().size(),
                 agent.decisionLog().recent(lines),
@@ -67,6 +67,39 @@ public final class AgentStatusCollector {
                 newestFirst(queue.recentLog(), lines),
                 describeCatalog(registry),
                 describeMemory(memory));
+    }
+
+    /**
+     * 队列进度单行：状态 + 当前步骤 + 目标 + 最近终态。
+     *
+     * <p>暂停时说明原因（战斗 / 挑战 / 恢复后待确认），否则状态页只显示"已暂停"，
+     * 玩家没法判断是卡住还是等自己确认（交接阶段 B 要求"在任务状态页呈现"）。</p>
+     */
+    private static String describeQueue(HeroTaskQueue queue, HeroEntity hero) {
+        if (queue.isIdle()) {
+            return "";
+        }
+        StringBuilder text = new StringBuilder();
+        var state = queue.currentState();
+        text.append(state == null ? "执行中" : state.displayName());
+        if (queue.isPaused()) {
+            if (hero.isBattleModeActive()) {
+                text.append("（战斗中，结束后继续）");
+            } else if (hero.isChallengeActiveState()) {
+                text.append("（试炼中，结束后继续）");
+            } else {
+                text.append("（等待恢复：重进世界后需确认目标未变）");
+            }
+        }
+        text.append(" | ").append(queue.currentProgress());
+        if (!queue.activeGoalId().isBlank()) {
+            text.append(" | 目标 ").append(queue.activeGoalId());
+        }
+        var terminals = queue.recentTerminals(1);
+        if (!terminals.isEmpty()) {
+            text.append(" | 最近 ").append(terminals.get(0).line());
+        }
+        return text.toString();
     }
 
     /** 工具目录：id + 是否需确认 + 参数摘要，供安全审计视图对照"允许做什么"。 */

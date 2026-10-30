@@ -1,6 +1,6 @@
 package com.whitecloud233.herobrine_companion.entity.ai.learning;
 
-import com.whitecloud233.herobrine_companion.compat.cooking.HeroCookingCompat;
+import com.whitecloud233.herobrine_companion.entity.cooking.CookingService;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.logic.HeroInvitationHelper;
 import net.minecraft.core.BlockPos;
@@ -88,7 +88,7 @@ public class HeroDomesticActivityGoal extends Goal {
         }
 
         if (this.activeAction == HeroInvitationHelper.ACTION_COOK) {
-            return HeroCookingCompat.isAutonomousCookingActive(this.hero, this.targetPos);
+            return CookingService.isAutonomousCookingActive(this.hero, this.targetPos);
         }
         return true;
     }
@@ -105,7 +105,7 @@ public class HeroDomesticActivityGoal extends Goal {
             }
             this.hero.setNoGravity(false);
         } else if (this.activeAction == HeroInvitationHelper.ACTION_COOK
-                && !HeroCookingCompat.beginAutonomousCooking(this.hero, this.targetPos)) {
+                && !CookingService.beginAutonomousCooking(this.hero, this.targetPos)) {
             clearPlannedActivity();
             this.cooldownTicks = 80;
             return;
@@ -144,10 +144,13 @@ public class HeroDomesticActivityGoal extends Goal {
 
     @Override
     public void stop() {
-        if (this.activeAction == HeroInvitationHelper.ACTION_COOK) {
-            HeroCookingCompat.clearAutonomousCooking(this.hero);
+        boolean ownsInvitation = this.activeAction != HeroInvitationHelper.ACTION_COOK
+                || CookingService.isAutonomousCookingActive(this.hero, this.targetPos);
+        if (this.activeAction == HeroInvitationHelper.ACTION_COOK && ownsInvitation) {
+            CookingService.clearAutonomousCooking(this.hero);
         }
-        clearInvitation();
+        // 手动选菜可能已经接管同一厨具，旧自主 Goal 退出时不能取消新邀请。
+        if (ownsInvitation) clearInvitation();
         clearPlannedActivity();
         this.cooldownTicks = MIN_COOLDOWN + this.hero.getRandom().nextInt(Math.max(1, MAX_COOLDOWN - MIN_COOLDOWN + 1));
     }
@@ -206,6 +209,10 @@ public class HeroDomesticActivityGoal extends Goal {
             if (!HeroInvitationHelper.isRestTarget(this.hero.level(), immutablePos)) {
                 continue;
             }
+            // 屋檐/楼梯下沿等座位上方有方块的位置，坐姿模型会卡进方块，直接跳过
+            if (!HeroInvitationHelper.hasRestHeadroom(this.hero.level(), immutablePos)) {
+                continue;
+            }
             double distance = this.hero.distanceToSqr(immutablePos.getX() + 0.5D, immutablePos.getY() + 0.5D, immutablePos.getZ() + 0.5D);
             if (distance < 2.0D || distance >= bestDistance) {
                 continue;
@@ -228,7 +235,7 @@ public class HeroDomesticActivityGoal extends Goal {
             if (!HeroInvitationHelper.isCookTarget(this.hero.level(), immutablePos)) {
                 continue;
             }
-            if (!HeroCookingCompat.hasAutonomousCookOptions(this.hero, immutablePos)) {
+            if (!CookingService.hasAutonomousCookOptions(this.hero, immutablePos)) {
                 continue;
             }
             double distance = this.hero.distanceToSqr(immutablePos.getX() + 0.5D, immutablePos.getY() + 0.5D, immutablePos.getZ() + 0.5D);

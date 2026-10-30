@@ -1,7 +1,9 @@
 package com.whitecloud233.herobrine_companion.entity.ai.combat;
 
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.herobrine_companion.entity.ai.HeroMoveControl;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.Level;
@@ -104,6 +106,7 @@ public final class HeroCombatPursuit {
         if (!hero.isFloating()) {
             hero.setFloating(true);
         }
+        hero.setNoGravity(true);
         hero.getNavigation().stop();
         hero.setDeltaMovement(0.0D, hero.getDeltaMovement().y, 0.0D);
         hero.setSprinting(false);
@@ -150,31 +153,28 @@ public final class HeroCombatPursuit {
     }
 
     /**
-     * 是否可在当前位置降落：水平已贴近目标、与目标高度差不大、下方若干格内有可站立地面，
+     * 是否可在当前位置降落：水平已贴近目标、下方若干格内有可站立地面，
      * 且落地后的高度差仍在攻击半径内（避免落到崖底却够不着目标）。
      */
     public static boolean shouldLand(HeroEntity hero, LivingEntity target, double attackRadius) {
         // 遇流体（水/岩浆）保持飞行越障，不在流体里落地
-        if (isHeroInFluid(hero)) {
+        if (isHeroInFluid(hero) || !hero.hasLineOfSight(target)) {
             return false;
         }
         if (horizontalDistanceSqr(hero, target) > square(attackRadius + LAND_HORIZONTAL_LEEWAY)) {
             return false;
         }
-        if (Math.abs(target.getY() - hero.getY()) > LAND_VERTICAL_BAND) {
-            return false;
-        }
         double groundY = solidGroundY(hero, LAND_DESCENT_DISTANCE);
-        if (groundY < 0.0D) {
+        if (!Double.isFinite(groundY)) {
             return false;
         }
         // 落点若是流体（浅水/岩浆）也拒绝落地，保持悬停
         Level level = hero.level();
-        BlockPos standPos = BlockPos.containing(hero.getX(), groundY + 1.0D, hero.getZ());
+        BlockPos standPos = BlockPos.containing(hero.getX(), groundY + 0.01D, hero.getZ());
         if (!level.getBlockState(standPos).getFluidState().isEmpty()) {
             return false;
         }
-        double verticalDiffAfterLand = Math.abs(target.getY() - (groundY + 1.0D));
+        double verticalDiffAfterLand = Math.abs(target.getY() - groundY);
         // 收紧高度带：只允许落到"站定后仍够得着目标"的地面。树顶/崖顶这类落地就够不着的
         // 场景拒绝落地，避免飞上去又掉下来反复弹跳（空中连段交给悬停态）
         return verticalDiffAfterLand <= LAND_REACHABLE_HEIGHT;
@@ -201,6 +201,9 @@ public final class HeroCombatPursuit {
             hero.setNoGravity(false);
         }
         hero.getNavigation().stop();
+        if (hero.getMoveControl() instanceof HeroMoveControl moveControl) {
+            moveControl.stopMoving();
+        }
         hero.setDeltaMovement(hero.getDeltaMovement().x * 0.2D, -0.12D, hero.getDeltaMovement().z * 0.2D);
         hero.setSprinting(false);
     }
@@ -213,7 +216,7 @@ public final class HeroCombatPursuit {
      * @param midAttack 是否正在播放攻击动作（悬空连段中不强行落地打断）
      */
     public static void landHeroIfCombatIdle(HeroEntity hero, LivingEntity target, double attackRadius, boolean midAttack) {
-        if (hero == null || !hero.isFloating() || !hero.isBattleModeActive() || midAttack) {
+        if (hero == null || !hero.isFloating() || !hero.isBattleModeActive() || midAttack || isHeroInFluid(hero)) {
             return;
         }
         boolean targetGone = target == null || !target.isAlive() || target.isRemoved();
@@ -234,7 +237,9 @@ public final class HeroCombatPursuit {
     /** 采样 Hero 到目标这条水平线段上最高阻挡物高度，用于巡航高度越障。 */
     private static double maxGroundObstacleY(HeroEntity hero, LivingEntity target) {
         Level level = hero.level();
-        double maxY = Math.max(hero.getY(), target.getY());
+        // Only obstacles contribute clearance. Including Hero's current height here
+        // makes flightTarget request another two blocks of ascent on every tick.
+        double maxY = target.getY();
         double dx = target.getX() - hero.getX();
         double dz = target.getZ() - hero.getZ();
         double dist = Math.sqrt(dx * dx + dz * dz);
@@ -250,22 +255,26 @@ public final class HeroCombatPursuit {
         return maxY;
     }
 
-    /** 向下扫描最近的站立地面（地面实心 + 头顶留空），返回地面方块 Y，找不到返回 -1。 */
+    /** 返回可站立碰撞面的脚部高度，找不到返回 NaN；负 Y 是合法地面。 */
     private static double solidGroundY(HeroEntity hero, double maxDescent) {
         Level level = hero.level();
         BlockPos feet = BlockPos.containing(hero.getX(), hero.getY() - 0.1D, hero.getZ());
         int maxSteps = Mth.floor(maxDescent);
-        for (int i = 1; i <= maxSteps; i++) {
+        for (int i = 0; i <= maxSteps; i++) {
             BlockPos pos = feet.below(i);
             BlockState state = level.getBlockState(pos);
-            if (!state.getCollisionShape(level, pos).isEmpty()) {
-                BlockState standSpace = level.getBlockState(pos.above());
-                if (standSpace.getCollisionShape(level, pos.above()).isEmpty()) {
-                    return pos.getY();
+            var shape = state.getCollisionShape(level, pos);
+            if (!shape.isEmpty()) {
+                double standY = pos.getY() + shape.max(Direction.Axis.Y);
+                if (hero.getY() - standY <= maxDescent
+                        && level.noCollision(hero, hero.getBoundingBox().move(0.0D, standY - hero.getY() + 0.01D, 0.0D))) {
+                    return standY;
                 }
+                // A blocked landing cannot be reached by falling through this surface.
+                return Double.NaN;
             }
         }
-        return -1.0D;
+        return Double.NaN;
     }
 
     private static double square(double value) {

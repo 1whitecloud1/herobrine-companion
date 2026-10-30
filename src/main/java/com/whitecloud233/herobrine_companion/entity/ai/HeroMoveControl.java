@@ -15,7 +15,6 @@ public class HeroMoveControl extends MoveControl {
         this.hero = hero;
     }
 
-
     @Override
     public void tick() {
         // 赠礼手势:送东西时站定不动(服务端每 tick 也会 hold,这里从移动控制源头让位,
@@ -26,10 +25,10 @@ public class HeroMoveControl extends MoveControl {
             this.hero.setDeltaMovement(0.0D, this.hero.getDeltaMovement().y, 0.0D);
             return;
         }
-
         // 战斗模式必须覆盖陪伴"贴近主人就原地不动"的行为：否则战斗+陪伴同时开启、
-        // 玩家站在 Hero 2 格内时整段移动被冻结，飞行追击也飞不起来
-        if (!this.hero.isBattleModeActive() && HeroGodlyCompanionGoal.isOwnerWithinStayStillRadius(this.hero)) {
+        // 玩家站在 Hero 2 格内时整段移动被冻结，飞行追击也飞不起来。
+        // 但战斗模式开着、却没有敌人时（陪伴 + 战斗并存）依旧按陪伴处理。
+        if (!this.hero.isChasingBattleEnemy() && HeroGodlyCompanionGoal.isOwnerWithinStayStillRadius(this.hero)) {
             this.operation = Operation.WAIT;
             this.hero.getNavigation().stop();
             this.hero.setDeltaMovement(0.0D, this.hero.getDeltaMovement().y, 0.0D);
@@ -42,8 +41,10 @@ public class HeroMoveControl extends MoveControl {
         }
 
         if (this.operation == Operation.MOVE_TO) {
-            Vec3 targetVec = new Vec3(this.wantedX - this.hero.getX(), this.wantedY - this.hero.getY(), this.wantedZ - this.hero.getZ());
-            double distSq = targetVec.lengthSqr();
+            double dx = this.wantedX - this.hero.getX();
+            double dy = this.wantedY - this.hero.getY();
+            double dz = this.wantedZ - this.hero.getZ();
+            double distSq = dx * dx + dy * dy + dz * dz;
 
             // 1. 极近点平滑刹车，消除抖动
             if (distSq < 0.5D) {
@@ -68,9 +69,6 @@ public class HeroMoveControl extends MoveControl {
             // 崖底悬停横移；到达目标高度后进入垂直收尾带线性刹车，悬停等待空中连段。
             Vec3 desiredVelocity;
             if (this.hero.isBattleModeActive()) {
-                double dx = targetVec.x;
-                double dy = targetVec.y;
-                double dz = targetVec.z;
                 double horizDistSq = dx * dx + dz * dz;
                 double horizDist = Math.sqrt(horizDistSq);
                 double hSpeed = this.speedModifier * 0.9D;
@@ -82,7 +80,7 @@ public class HeroMoveControl extends MoveControl {
                         ? new Vec3(dx / horizDist * hSpeed, vSpeed, dz / horizDist * hSpeed)
                         : new Vec3(0.0D, vSpeed, 0.0D);
             } else {
-                desiredVelocity = targetVec.normalize().scale(actualSpeed);
+                desiredVelocity = new Vec3(dx, dy, dz).normalize().scale(actualSpeed);
             }
 
             // 4. 【核心动力注入】

@@ -8,44 +8,38 @@ import com.whitecloud233.herobrine_companion.entity.ai.agent.task.AgentTaskConte
 import com.whitecloud233.herobrine_companion.entity.ai.agent.task.AgentTaskRegistry;
 import com.whitecloud233.herobrine_companion.entity.ai.agent.task.HeroTaskQueue;
 import com.whitecloud233.herobrine_companion.entity.ai.agent.task.PlannedTask;
+import com.whitecloud233.herobrine_companion.entity.ai.agent.tool.AgentToolArgs;
+import com.whitecloud233.herobrine_companion.entity.ai.agent.tool.AgentToolAudit;
+import com.whitecloud233.herobrine_companion.entity.ai.agent.tool.AgentToolFactory;
+import com.whitecloud233.herobrine_companion.entity.ai.agent.tool.AgentToolRequestService;
 import com.whitecloud233.herobrine_companion.entity.ai.agent.tool.AgentToolRegistry;
-import com.whitecloud233.herobrine_companion.entity.ai.agent.tool.HeroAcceptChallengeTool;
-import com.whitecloud233.herobrine_companion.entity.ai.agent.tool.HeroAscendTool;
-import com.whitecloud233.herobrine_companion.entity.ai.agent.tool.HeroDescendTool;
-import com.whitecloud233.herobrine_companion.entity.ai.agent.tool.HeroInspectTool;
-import com.whitecloud233.herobrine_companion.entity.ai.agent.tool.HeroLocateOwnerTool;
-import com.whitecloud233.herobrine_companion.entity.ai.agent.tool.HeroLocateCompanionTool;
-import com.whitecloud233.herobrine_companion.entity.ai.agent.tool.HeroSetModeTool;
-import com.whitecloud233.herobrine_companion.entity.ai.agent.tool.HeroSummonTool;
-import com.whitecloud233.herobrine_companion.entity.ai.agent.tool.HeroUseSkillTool;
 import com.whitecloud233.herobrine_companion.entity.logic.data.HeroWorldData;
 import com.whitecloud233.herobrine_companion.network.AgentChatOutcomePacket;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 /**
- * Agent 主控（M4）：在 M1 循环、M2 工具路由、M3 任务队列之上接通<b>记忆 + 反思学习</b>。
+ * Agent 主控：编排（时序 + 数据流）。感知 / 分类 / 规划 / 执行 / 工具 / 任务 / 记忆 / 反思各自独立。
  *
- * <p><b>设计原则</b></p>
- * <ul>
- *   <li><b>单一职责</b>：本类只做编排（时序 + 数据流），感知 / 分类 / 规划 / 执行 / 工具 / 任务 / 记忆 / 反思各自独立。</li>
- *   <li><b>依赖倒置</b>：只依赖 {@link AgentSensor} / {@link AgentIntentionClassifier} /
- *       {@link AgentPlanner} / {@link AgentExecutor} / {@link AgentTaskPlanner} / {@link AgentReflector} 等抽象。</li>
- *   <li><b>低耦合</b>：经不可变 {@link AgentFrame} 快照读取实体状态；执行阶段唯一触碰实体。</li>
- *   <li><b>无回归（M1–M4 承诺）</b>：记忆 / 反思由 {@link Config#heroMemoryEnabled} 门控（默认 true，可关即无回归）。</li>
- * </ul>
+ * <p><b>显式工具请求不走自主分类</b>（交接 A1）：客户端或玩家发来的工具 ID 已经明确，
+ * 直接交给 {@link AgentToolRequestService}——有界 FIFO、去重、立刻执行短动作、每条都有终态回执。
+ * 自主循环（{@link #CYCLE_TICKS}）只负责低频的自我驱动与决策记录，不决定显式请求是否被消费。</p>
  *
- * <p>任务队列由 {@link HeroEntity} <b>每 tick</b> 经 {@link #tickTasks(HeroEntity)} 驱动；
- * 完整感知循环仍是每 {@link #CYCLE_TICKS} tick 一次。</p>
+ * <p><b>记忆归属</b>（交接 A5）：缓存记录实际 owner UUID，不再只靠一个布尔值；
+ * 所有落盘都走 {@link #persistMemory} 这一个入口，变更置 dirty。</p>
  */
 public final class HeroAgent {
 
     /** 完整循环周期：每 20 tick（1 秒）运行一次感知→决策。 */
     public static final int CYCLE_TICKS = 20;
+
+    /** 显式请求每 tick 最多执行条数：够快又不至于一次抽干主线程。 */
+    private static final int REQUESTS_PER_TICK = 2;
 
     /** 自主任务重排冷却（tick）：避免同一意图在队列刚空闲时立刻重排，导致"检查完成"等播报刷屏。 */
     private static final long AUTONOMY_REPLAN_COOLDOWN_TICKS = 10L * 20L;
@@ -65,29 +59,33 @@ public final class HeroAgent {
     /** 统一工具注册表：Agent 调用外部能力的唯一出口（白名单/校验/确认/审计收敛其中）。 */
     private final AgentToolRegistry toolRegistry;
 
+    /** 显式工具请求的有界执行入口（直接服务，不经分类器）。 */
+    private final AgentToolRequestService toolRequests;
+
     /** 任务规划器：意图 → 任务序列。 */
     private final AgentTaskPlanner taskPlanner;
 
     /** 任务队列：多步目标的顺序执行器（tick 预算 / 失败 / 存档）。 */
     private final HeroTaskQueue taskQueue;
 
-    /** 三层记忆（per-owner 懒加载，长期存 PlayerProfile）。 */
+    /** 三层记忆（per-owner，长期存 PlayerProfile）。 */
     private final HeroMemory memory;
 
     /** 反思 / 学习：把决策结果回填记忆与心智。 */
     private final AgentReflector reflector;
 
-    private boolean memoryLoaded;
+    /** 当前缓存记忆的实际归属 owner（null = 尚未加载）。 */
+    private UUID memoryOwner;
 
-    /** 下一个周期待处理的工具请求（跨线程由外部注入，volatile 保证可见性）。 */
-    private volatile AgentToolRequest pendingRequest;
+    /** 记忆是否有未落盘变更。 */
+    private boolean memoryDirty;
 
     private AgentIntention lastIntention = AgentIntention.IDLE;
 
     /** 上一次自主入队任务序列的 game tick（配合冷却防刷屏）。 */
     private long lastAutonomousPlanTick = -AUTONOMY_REPLAN_COOLDOWN_TICKS;
 
-    /** 使用默认装配构造（M2 默认实现：规则分类器 + 注册表默认工具 + P5 感知/记忆传感器）。 */
+    /** 使用默认装配构造（规则分类器 + 默认工具清单 + P5 感知/记忆传感器）。 */
     public HeroAgent() {
         this(List.of(new AgentMindSensor(), new AgentWorldSensor(),
                         new AgentTargetSensor(), new AgentInventorySensor(), new AgentEnvironmentSensor()),
@@ -96,38 +94,40 @@ public final class HeroAgent {
                 null);
     }
 
-    /** 面向测试 / M2+ 替换的注入构造（依赖倒置）。 */
+    /** 面向测试 / 替换的注入构造（依赖倒置）。 */
     public HeroAgent(List<AgentSensor> sensors,
                      AgentIntentionClassifier classifier,
                      AgentPlanner planner,
                      AgentExecutor executor) {
         // 先建记忆，记忆传感器才可注入（P5 记忆→感知闭环）。
         this.memory = new HeroMemory();
-        // 始终附加指令传感器 + 记忆传感器：指令把挂起工具请求接入循环，记忆把长期记忆读进感知。
-        List<AgentSensor> base = new java.util.ArrayList<>(sensors);
-        base.add(new AgentDirectiveSensor(() -> this.pendingRequest));
+        List<AgentSensor> base = new ArrayList<>(sensors);
         base.add(new AgentMemorySensor(this.memory));
         this.sensors = List.copyOf(base);
         this.classifier = classifier;
         this.planner = planner;
         this.toolRegistry = createDefaultRegistry();
+        this.toolRequests = new AgentToolRequestService(new AgentToolInbox(), this.toolRegistry);
         this.executor = executor == null
-                ? new DefaultAgentExecutor(this.toolRegistry)
+                ? new DefaultAgentExecutor()
                 : executor;
         this.taskPlanner = new DefaultAgentTaskPlanner();
         this.taskQueue = createDefaultTaskQueue();
-        this.reflector = new DefaultAgentReflector(this.memory);
+        this.reflector = new DefaultAgentReflector(this.memory, this::persistMemory);
         this.decisionLog = new AgentDecisionLog();
     }
 
-    /** 每 tick 由实体调用；内部自行降频、门控与校验。 */
+    /**
+     * 每 tick 由实体调用。
+     *
+     * <p>显式工具请求<b>每 tick</b>推进（不等感知周期），自主感知循环仍按 {@link #CYCLE_TICKS} 降频。</p>
+     */
     public void tick(HeroEntity hero) {
-        if (hero == null || hero.level() == null || hero.level().isClientSide) {
+        if (!isServiceable(hero)) {
             return;
         }
-        if (hero.isRemoved() || !hero.isAlive()) {
-            return;
-        }
+        // A1：显式请求的有界执行入口与服务端线程同步执行，短动作当 tick 出结果。
+        toolRequests.drain(hero, REQUESTS_PER_TICK);
         if (hero.tickCount % CYCLE_TICKS != 0) {
             return;
         }
@@ -139,39 +139,35 @@ public final class HeroAgent {
      * 内部不做扫描，开销可忽略；战斗态由队列自行暂停。
      */
     public void tickTasks(HeroEntity hero) {
-        if (hero == null || hero.level() == null || hero.level().isClientSide) {
-            return;
-        }
-        if (hero.isRemoved() || !hero.isAlive()) {
+        if (!isServiceable(hero)) {
             return;
         }
         taskQueue.tick(new AgentTaskContext(hero));
     }
 
-    /** 单次完整循环：感知 → 思考 → 规划 → 执行 → 记录 → 反思。 */
+    private static boolean isServiceable(HeroEntity hero) {
+        return hero != null && hero.level() != null && !hero.level().isClientSide
+                && !hero.isRemoved() && hero.isAlive();
+    }
+
+    /** 单次完整循环：感知 → 思考 → 规划 → 记录 → 反思（显式请求已在 tick 内处理）。 */
     private void runCycle(HeroEntity hero) {
         ensureMemory(hero);
         AgentFrame frame = AgentFrame.capture(hero);
-        AgentToolRequest request = pendingRequest;
 
-        // 感知（含指令传感器：把挂起工具请求变成观测）
         AgentPerceptionCollector collector = new AgentPerceptionCollector();
         for (AgentSensor sensor : sensors) {
             sensor.collect(frame, collector);
         }
         List<AgentObservation> observations = collector.takeAll();
 
-        // 思考（意图 + 路由）
         AgentIntentionClassifier.Classification classification = classifier.classify(frame, observations);
-
-        // 规划
         AgentPlan plan = planner.plan(frame, classification);
 
-        // 执行（工具请求一次性消费）
-        AgentExecutor.Outcome outcome = executor.execute(hero, frame, plan, request);
-        this.pendingRequest = null;
+        // 自主通道：显式请求不再经过这里，执行器只处理"世界行为 / 空闲"说明。
+        AgentExecutor.Outcome outcome = executor.execute(hero, frame, plan, null);
 
-        // 自主长任务（P4 起配置化，默认开；队列空闲且意图适合 → 由规划器入队一段真实任务序列）。
+        // 自主长任务（配置化，默认开；队列空闲且意图适合 → 由规划器入队一段真实任务序列）。
         // 冷却：避免同一意图在队列刚空闲时立刻重排，导致"检查完成"等播报刷屏。
         if (Config.heroAutonomyEnabled && taskQueue.isIdle()) {
             long gameTime = frame.gameTime();
@@ -184,7 +180,6 @@ public final class HeroAgent {
             }
         }
 
-        // 记录（解释自己；队列非空时附带当前任务进度）
         String outcomeDescription = outcome.description();
         if (!taskQueue.isIdle()) {
             outcomeDescription = outcomeDescription + " | 队列: " + taskQueue.currentProgress();
@@ -196,7 +191,6 @@ public final class HeroAgent {
                 outcome.acted(), outcomeDescription);
         decisionLog.record(decision);
 
-        // 反思 / 学习：把本次决策结果回填记忆与心智
         AgentReflector.Reflection reflection = reflector.reflect(hero, decision);
         if (!reflection.isEmpty()) {
             decisionLog.record(new AgentDecision(
@@ -206,26 +200,133 @@ public final class HeroAgent {
         }
     }
 
-    /** 懒加载 per-owner 长期记忆（配置门控）。 */
+    // ---- 显式工具请求（A1/A2/A3） ----
+
+    /**
+     * 受理一条显式工具请求：去重 + 有界排队 + 立刻尝试执行。
+     *
+     * @return 投递结果；{@link AgentToolInbox.Offer#FULL} 时已向请求者回了 busy 回执
+     */
+    public AgentToolInbox.Offer submitToolRequest(HeroEntity hero,
+                                                  String toolId,
+                                                  AgentToolArgs args,
+                                                  UUID requesterUuid,
+                                                  boolean playerApproved,
+                                                  UUID requestId) {
+        if (hero == null) {
+            return AgentToolInbox.Offer.DUPLICATE;
+        }
+        return toolRequests.submit(hero, new AgentToolRequest(toolId, args, requesterUuid, playerApproved, requestId));
+    }
+
+    /** 请求收件箱（状态页 / 测试 / 重复确认判定）。 */
+    public AgentToolInbox inbox() {
+        return toolRequests.inbox();
+    }
+
+    /** 请求执行服务（测试注入 / 状态展示）。 */
+    public AgentToolRequestService toolRequests() {
+        return toolRequests;
+    }
+
+    /** 实体移除 / 换世界 / 归属切换时的统一收尾：释放排队请求。 */
+    public void onDetached() {
+        toolRequests.clear();
+    }
+
+    // ---- 记忆（A5） ----
+
+    /**
+     * 懒加载 per-owner 长期记忆。
+     *
+     * <p>缓存记录<b>实际 owner UUID</b>：同一实体运行期归属变化时，先把旧主人的脏数据落盘，
+     * 再切换到新主人的档案，避免"旧缓存被当作新主人的记忆使用 / 保存"。</p>
+     */
     private void ensureMemory(HeroEntity hero) {
-        if (memoryLoaded || !Config.heroMemoryEnabled || hero.getOwnerUUID() == null) {
+        if (!Config.heroMemoryEnabled || hero.getOwnerUUID() == null) {
             return;
         }
-        memoryLoaded = true;
+        UUID owner = hero.getOwnerUUID();
+        if (owner.equals(memoryOwner)) {
+            return;
+        }
+        if (memoryOwner != null) {
+            // 归属切换：旧主人的数据必须先按旧 UUID 落盘，再丢弃缓存。
+            flushMemory(hero, memoryOwner);
+        }
+        memory.clearAll();
+        memoryDirty = false;
+        memoryOwner = owner;
         if (hero.level() instanceof ServerLevel serverLevel) {
-            CompoundTag tag = HeroWorldData.get(serverLevel).getHeroMemory(hero.getOwnerUUID());
+            CompoundTag tag = HeroWorldData.get(serverLevel).getHeroMemory(owner);
             if (tag != null && !tag.isEmpty()) {
                 memory.read(tag);
             }
         }
     }
 
-    /** 三层记忆（调试 / 未来 LLM 上下文注入入口）。 */
+    /** 标记记忆有未落盘变更（写入侧统一调用）。 */
+    public void markMemoryDirty() {
+        memoryDirty = true;
+    }
+
+    /** 三层记忆（调试 / LLM 上下文注入入口）。 */
     public HeroMemory memory() {
         return memory;
     }
 
-    /** 注入一段任务序列；队列空闲时立即开始执行（M4 对话/LLM 入口，与 requestTool 平行）。 */
+    /** 当前缓存记忆的归属 owner（调试 / 归属校验）。 */
+    public UUID memoryOwner() {
+        return memoryOwner;
+    }
+
+    /** 缓存是否有未落盘变更。 */
+    public boolean memoryDirty() {
+        return memoryDirty;
+    }
+
+    /**
+     * <b>唯一落盘入口</b>：把缓存记忆写给 {@code owner} 的玩家档案并清 dirty。
+     *
+     * <p>周期刷新、实体卸载、归属切换、手动清理都走这里，避免两份各写一半的存档组装。</p>
+     */
+    public void persistMemory(HeroEntity hero) {
+        if (hero == null) {
+            return;
+        }
+        UUID owner = hero.getOwnerUUID() != null ? hero.getOwnerUUID() : memoryOwner;
+        if (owner == null) {
+            return;
+        }
+        flushMemory(hero, owner);
+        if (owner.equals(memoryOwner)) {
+            memoryDirty = false;
+        }
+    }
+
+    private void flushMemory(HeroEntity hero, UUID owner) {
+        if (owner == null || !(hero.level() instanceof ServerLevel serverLevel)) {
+            return;
+        }
+        CompoundTag tag = new CompoundTag();
+        memory.write(tag);
+        HeroWorldData.get(serverLevel).setHeroMemory(owner, tag);
+        memoryDirty = false;
+    }
+
+    /** 实体生命周期结束（移除 / 卸载）时刷写记忆，缩小"最近对话丢失窗口"。 */
+    public void flushMemoryOnDetach(HeroEntity hero) {
+        if (hero == null || !Config.heroMemoryEnabled) {
+            return;
+        }
+        if (memoryOwner != null) {
+            flushMemory(hero, memoryOwner);
+        }
+    }
+
+    // ---- 任务队列 ----
+
+    /** 注入一段任务序列；队列空闲时立即开始执行（对话/LLM 入口）。 */
     public void requestTasks(List<PlannedTask> tasks) {
         taskQueue.enqueueAll(tasks);
     }
@@ -250,21 +351,13 @@ public final class HeroAgent {
         taskQueue.read(tag);
     }
 
-    /** 注入一个待处理的工具请求；下一个循环周期被路由并执行（M4 对话/LLM 入口）。 */
-    public void requestTool(String toolId,
-                            com.whitecloud233.herobrine_companion.entity.ai.agent.tool.AgentToolArgs args,
-                            UUID requesterUuid,
-                            boolean playerApproved,
-                            UUID requestId) {
-        this.pendingRequest = new AgentToolRequest(toolId, args, requesterUuid, playerApproved, requestId);
-    }
+    // ---- 对话结果回流 ----
 
     /**
-     * 接收客户端回流的对话结果(M4 Phase 1):把一段对话的最小摘要写入情景记忆,
-     * 让 agent 真正"记得住"聊天。由 {@link AgentChatOutcomePacket} 路由调用。
+     * 接收客户端回流的对话结果：把一段对话的最小摘要写入情景记忆，让 agent 真正"记得住"聊天。
+     * 由 {@code AgentChatOutcomePacket} 路由调用。
      *
-     * <p>只写记忆、不改变世界状态;持久化交给 {@code DefaultAgentReflector} 的
-     * 周期落盘(1200 tick),此处不做写穿以免高频磁盘 I/O。</p>
+     * <p>只写记忆、不改变世界状态；持久化交给周期刷新与卸载刷写，此处不做写穿以免高频磁盘 I/O。</p>
      */
     public void acceptChatOutcome(HeroEntity hero, String message, String reply, int kind) {
         if (hero == null || !Config.heroMemoryEnabled || hero.getOwnerUUID() == null) {
@@ -281,9 +374,10 @@ public final class HeroAgent {
             default -> 1; // 玩家聊天
         };
         memory.rememberEvent(text, importance, gameTime);
+        markMemoryDirty();
     }
 
-    /** 把一段对话蒸馏成一行记忆文本(截断超长内容,避免记忆无限膨胀)。 */
+    /** 把一段对话蒸馏成一行记忆文本（截断超长内容，避免记忆无限膨胀）。 */
     private static String buildOutcomeText(String message, String reply, int kind) {
         StringBuilder sb = new StringBuilder();
         String m = message == null ? "" : message.trim();
@@ -306,11 +400,11 @@ public final class HeroAgent {
     }
 
     /**
-     * 构建长期记忆 digest(M4 Phase 1):玩家偏好(facts,始终注入) + 重要情景(episodes,分层),
-     * 带"历史不定义身份"框定语,供注入聊天 LLM 上下文。由 {@code RequestHeroMemoryDigestPacket} 调用。
+     * 构建长期记忆 digest：玩家偏好（facts，始终注入）+ 重要情景（episodes，分层），
+     * 带"历史不定义身份"框定语，供注入聊天 LLM 上下文。由 {@code RequestHeroMemoryDigestPacket} 调用。
      *
-     * <p>框定语是本方案对抗"改人设后记忆与设定冲突"的第一道防线:记忆当背景史料,
-     * 不当作身份绑定;真正定义"我现在是谁"的仍是当前人设 prompt。</p>
+     * <p>框定语是本方案对抗"改人设后记忆与设定冲突"的第一道防线：记忆当背景史料，
+     * 不当作身份绑定；真正定义"我现在是谁"的仍是当前人设 prompt。</p>
      */
     public String buildMemoryDigest(HeroEntity hero) {
         if (hero == null || !Config.heroMemoryEnabled || hero.getOwnerUUID() == null) {
@@ -344,7 +438,7 @@ public final class HeroAgent {
     }
 
     /**
-     * 清理长期记忆(记忆管理器按钮):keepFacts 为 true 只清叙事层(保留玩家偏好),
+     * 清理长期记忆（记忆管理器按钮）：keepFacts 为 true 只清叙事层（保留玩家偏好），
      * 否则清空全部。清理后立即落盘。由 {@code ClearHeroMemoryPacket} 调用。
      */
     public void clearMemory(HeroEntity hero, boolean keepFacts) {
@@ -357,17 +451,8 @@ public final class HeroAgent {
         } else {
             memory.clearAll();
         }
+        markMemoryDirty();
         persistMemory(hero);
-    }
-
-    /** 立即把内存中的记忆写穿到玩家档案(记忆管理器 / 清理后即时落盘用)。 */
-    public void persistMemory(HeroEntity hero) {
-        if (hero == null || hero.getOwnerUUID() == null || !(hero.level() instanceof ServerLevel serverLevel)) {
-            return;
-        }
-        CompoundTag tag = new CompoundTag();
-        memory.write(tag);
-        HeroWorldData.get(serverLevel).setHeroMemory(hero.getOwnerUUID(), tag);
     }
 
     /** 统一工具注册表（目录 / 审计 / 调试入口）。 */
@@ -391,16 +476,8 @@ public final class HeroAgent {
     }
 
     private static AgentToolRegistry createDefaultRegistry() {
-        AgentToolRegistry registry = new AgentToolRegistry(new com.whitecloud233.herobrine_companion.entity.ai.agent.tool.AgentToolAudit());
-        registry.register(new HeroInspectTool());
-        registry.register(new HeroLocateCompanionTool());
-        registry.register(new HeroLocateOwnerTool());
-        registry.register(new HeroAscendTool());
-        registry.register(new HeroDescendTool());
-        registry.register(new HeroAcceptChallengeTool());
-        registry.register(new HeroSetModeTool());
-        registry.register(new HeroSummonTool());
-        registry.register(new HeroUseSkillTool());
+        AgentToolRegistry registry = new AgentToolRegistry(new AgentToolAudit());
+        AgentToolFactory.createDefaults().forEach(registry::register);
         return registry;
     }
 

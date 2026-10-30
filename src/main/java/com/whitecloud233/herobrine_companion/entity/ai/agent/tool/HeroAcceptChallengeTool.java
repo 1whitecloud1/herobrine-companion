@@ -1,6 +1,6 @@
 package com.whitecloud233.herobrine_companion.entity.ai.agent.tool;
 
-import com.whitecloud233.herobrine_companion.client.fight.HeroChallengeManager;
+import com.whitecloud233.herobrine_companion.fight.HeroChallengeManager;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 

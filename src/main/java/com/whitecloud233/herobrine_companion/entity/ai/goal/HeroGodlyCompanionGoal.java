@@ -2,6 +2,7 @@ package com.whitecloud233.herobrine_companion.entity.ai.goal;
 
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.ai.HeroMoveControl;
+import com.whitecloud233.herobrine_companion.entity.ai.combat.HeroCombatTargeting;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.Goal;
@@ -9,14 +10,8 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.EnumSet;
-import java.util.UUID;
 
 public class HeroGodlyCompanionGoal extends Goal {
-    private final HeroEntity hero;
-    private final double speedModifier;
-    private Player owner;
-
-    // 参数配置
     private static final double HOVER_HEIGHT_AIR = 2.0D;
     private static final double MIN_FOLLOW_DISTANCE = 1.4D;
     private static final double MAX_FOLLOW_DISTANCE = 2.2D;
@@ -28,14 +23,15 @@ public class HeroGodlyCompanionGoal extends Goal {
     private static final double START_FLYING_DISTANCE_SQR = 144.0D;
     private static final double STOP_FLYING_DISTANCE_SQR = 64.0D;
     private static final double HARD_TELEPORT_DISTANCE_SQR = 625.0D;
-
-    // [新增] 战斗超时时间
     private static final int COMBAT_TIMEOUT = 100;
     private static final float HEAD_RETURN_SPEED = 4.0F;
     private static final float BODY_TURN_SPEED = 14.0F;
 
-    private int teleportCooldown;
+    private final HeroEntity hero;
+    private final double speedModifier;
+    private Player owner;
 
+    private int teleportCooldown;
     private float stableFollowYaw;
     private double followSideSign = 1.0D;
     private double desiredFollowDistance = MIN_FOLLOW_DISTANCE;
@@ -70,9 +66,6 @@ public class HeroGodlyCompanionGoal extends Goal {
         return dx * dx + dz * dz;
     }
 
-    /**
-     * 判断玩家是否处于战斗状态
-     */
     private boolean isInCombat(Player player) {
         int currentTick = player.tickCount;
         int lastHurtByMobTime = player.getLastHurtByMobTimestamp();
@@ -93,26 +86,19 @@ public class HeroGodlyCompanionGoal extends Goal {
 
     @Override
     public boolean canUse() {
-        if (this.hero.isBattleModeActive()) return false;
-
         if (!this.hero.isCompanionMode()) return false;
+        // 陪伴 + 战斗同时开启：附近有敌人时让战斗 AI 独占（敌人优先），没敌人才跟随
+        if (enemyTakesPriority()) return false;
+        // 拉磨时石磨接管位移，跟随会把 Hero 从磨台上拽下来
+        if (this.hero.isMillstoneHarnessed()) return false;
         // 传送后抑制跟随（庇护传送/观察者传送后 5 秒），防止 Hero 被拉回原处
         if (this.hero.isTeleportFollowHoldActive()) return false;
-        // 如果正在交易，禁止跟随移动
         if (this.hero.getTradingPlayer() != null) return false;
 
-        // 【修复点 1】：严格通过 UUID 获取自己真正的主人，禁止使用 getNearestPlayer 乱认主人
-        UUID ownerId = this.hero.getOwnerUUID();
-        if (ownerId == null) return false;
-
-        Player player = this.hero.level().getPlayerByUUID(ownerId);
-        // 如果主人离线、不在同一维度或死亡，停止跟随
+        Player player = this.hero.getOwnerUUID() != null ? this.hero.level().getPlayerByUUID(this.hero.getOwnerUUID()) : null;
         if (player == null || !player.isAlive()) return false;
 
         this.owner = player;
-
-        // 【关键修复】如果玩家进入战斗，立刻禁用贴身跟随
-        // 将身体的控制权完美移交给 HeroObserveAndRescueGoal
         if (isInCombat(this.owner)) return false;
 
         return isOwnerBeyondFollowStartRadius(this.hero, player);
@@ -120,26 +106,31 @@ public class HeroGodlyCompanionGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
-        if (this.hero.isBattleModeActive()) return false;
         if (!this.hero.isCompanionMode()) return false;
+        if (enemyTakesPriority()) return false;
+        if (this.hero.isMillstoneHarnessed()) return false;
         // 传送后抑制跟随：传送瞬间若本目标正在运行，立即让出控制权
         if (this.hero.isTeleportFollowHoldActive()) return false;
-        // 如果正在交易，立即停止跟随
         if (this.hero.getTradingPlayer() != null) return false;
         if (this.owner == null || !this.owner.isAlive()) return false;
-
-        // 【关键修复】如果在日常跟随中突然爆发战斗，立刻打断当前步伐
         if (isInCombat(this.owner)) return false;
 
         double distSqr = horizontalDistanceToOwnerSqr(this.hero, this.owner);
         return distSqr > (STAY_STILL_RADIUS * STAY_STILL_RADIUS);
     }
 
+    /**
+     * 战斗模式里一旦出现可攻击的敌人，跟随必须让位：杀敌优先。
+     *
+     * <p>没敌人的时候仍然走陪伴跟随（战斗模式开着也跟随），因此这里只拦「有敌人」
+     * 这一种情况，而不是整体拒绝战斗模式。</p>
+     */
+    private boolean enemyTakesPriority() {
+        return this.hero.isBattleModeActive() && HeroCombatTargeting.hasEngagedTarget(this.hero);
+    }
+
     @Override
     public void start() {
-        // 【修复点 2】：彻底删除 this.hero.setOwnerUUID(this.owner.getUUID());
-        // 绝对不能在行为 AI 中篡改主人的主权！
-
         initializeFollowAnchor();
         chooseFollowSide();
         pickPersonalSpace(true);
@@ -166,7 +157,6 @@ public class HeroGodlyCompanionGoal extends Goal {
             return;
         }
 
-        // 2. 兜底逻辑：距离过远传送
         double distToOwnerSqr = this.hero.distanceToSqr(this.owner);
         boolean ownerMoving = this.owner.getDeltaMovement().horizontalDistanceSqr() > 0.0025D;
         if (this.hero.tickCount >= this.nextPersonalSpaceTick && ownerMoving && distToOwnerSqr > 25.0D) {
@@ -221,34 +211,24 @@ public class HeroGodlyCompanionGoal extends Goal {
             syncHeadToBody();
         }
 
-        // === 6. [核心修复] 物理强行开门逻辑 (使用移动向量) ===
-        // 当 Hero 发生水平碰撞，或者正在显著朝某处移动时进行探测
         if (this.hero.horizontalCollision || distToTarget > 0.5D) {
-            // 重点：使用当前的移动速度向量（Velocity）来判定前方，而非 LookAngle
             Vec3 moveDir = this.hero.getDeltaMovement().normalize();
-
-            // 如果移动速度极慢（静止），则回退到视线方向作为探测兜底
-            if (this.hero.getDeltaMovement().lengthSqr() < 0.001) {
+            if (this.hero.getDeltaMovement().lengthSqr() < 0.001D) {
                 moveDir = this.hero.getLookAngle();
             }
 
-            // 探测 Hero 移动方向前方 0.8 格的位置
             net.minecraft.core.BlockPos frontPos = net.minecraft.core.BlockPos.containing(
-                    this.hero.getX() + moveDir.x * 0.8,
-                    this.hero.getY() + 0.1, // 确保探测高度在门的下半扇
-                    this.hero.getZ() + moveDir.z * 0.8
+                    this.hero.getX() + moveDir.x * 0.8D,
+                    this.hero.getY() + 0.1D,
+                    this.hero.getZ() + moveDir.z * 0.8D
             );
 
-            // 循环检查：当前高度及头顶高度（应对门的两部分）
             for (int i = 0; i < 2; i++) {
-                net.minecraft.core.BlockPos checkPos = (i == 0) ? frontPos : frontPos.above();
+                net.minecraft.core.BlockPos checkPos = i == 0 ? frontPos : frontPos.above();
                 net.minecraft.world.level.block.state.BlockState state = this.hero.level().getBlockState(checkPos);
-
-                if (state.getBlock() instanceof net.minecraft.world.level.block.DoorBlock door) {
-                    // 如果门是关着的，强行“用意念”将其推开
-                    if (!state.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.OPEN)) {
-                        door.setOpen(this.hero, this.hero.level(), state, checkPos, true);
-                    }
+                if (state.getBlock() instanceof net.minecraft.world.level.block.DoorBlock door
+                        && !state.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.OPEN)) {
+                    door.setOpen(this.hero, this.hero.level(), state, checkPos, true);
                 }
             }
         }
@@ -262,14 +242,14 @@ public class HeroGodlyCompanionGoal extends Goal {
         }
 
         float targetYRot = -((float) Mth.atan2(movement.x, movement.z)) * (180.0F / (float) Math.PI);
-        float newYRot = rotlerp(this.hero.getYRot(), targetYRot, BODY_TURN_SPEED);
+        float newYRot = Mth.approachDegrees(this.hero.getYRot(), targetYRot, BODY_TURN_SPEED);
         this.hero.setYRot(newYRot);
         this.hero.yBodyRot = newYRot;
-        this.hero.setYHeadRot(rotlerp(this.hero.yHeadRot, newYRot, HEAD_RETURN_SPEED));
+        this.hero.setYHeadRot(Mth.approachDegrees(this.hero.yHeadRot, newYRot, HEAD_RETURN_SPEED));
         this.hero.yHeadRotO = this.hero.yHeadRot;
 
         if (Math.abs(this.hero.getXRot()) > 1.0F) {
-            this.hero.setXRot(rotlerp(this.hero.getXRot(), 0.0F, 5.0F));
+            this.hero.setXRot(Mth.approachDegrees(this.hero.getXRot(), 0.0F, 5.0F));
         }
     }
 
@@ -281,14 +261,12 @@ public class HeroGodlyCompanionGoal extends Goal {
                 || (this.hero.isFloating()
                     ? horizontalDistanceSqr > STOP_FLYING_DISTANCE_SQR
                     : horizontalDistanceSqr > START_FLYING_DISTANCE_SQR);
-
         if (shouldFly) {
             if (!this.hero.isFloating()) this.hero.setFloating(true);
             if (!this.hero.isNoGravity()) this.hero.setNoGravity(true);
             this.hero.noPhysics = true;
             return true;
         }
-
         this.hero.noPhysics = false;
         if (this.hero.isFloating()) this.hero.setFloating(false);
         if (this.hero.isNoGravity()) this.hero.setNoGravity(false);
@@ -300,7 +278,6 @@ public class HeroGodlyCompanionGoal extends Goal {
             this.hero.getNavigation().stop();
             return;
         }
-
         if (this.hero.getNavigation().isDone() || this.hero.tickCount % 10 == 0) {
             this.hero.getNavigation().moveTo(this.owner, this.speedModifier);
         }
@@ -311,7 +288,7 @@ public class HeroGodlyCompanionGoal extends Goal {
         Vec3 ownerVelocity = this.owner.getDeltaMovement();
         if (ownerVelocity.horizontalDistanceSqr() > 0.0025D) {
             float moveYaw = (float) (Mth.atan2(ownerVelocity.z, ownerVelocity.x) * (180.0D / Math.PI)) - 90.0F;
-            this.stableFollowYaw = rotlerp(this.stableFollowYaw, moveYaw, 12.0F);
+            this.stableFollowYaw = Mth.approachDegrees(this.stableFollowYaw, moveYaw, 12.0F);
         }
 
         Vec3 behind = Vec3.directionFromRotation(0.0F, this.stableFollowYaw + 180.0F).scale(this.desiredFollowDistance);
@@ -366,8 +343,6 @@ public class HeroGodlyCompanionGoal extends Goal {
         pickPersonalSpace(true);
         boolean flying = updateMovementMode(horizontalDistanceToOwnerSqr(this.hero, this.owner));
         Vec3 target = calculateFollowTarget(flying);
-
-        // 【修改】废弃 teleportTo，改用 moveTo 强行降临
         this.hero.moveTo(target.x, target.y, target.z, this.hero.getYRot(), this.hero.getXRot());
         this.hero.setDeltaMovement(Vec3.ZERO);
         this.hero.noPhysics = flying;
@@ -394,7 +369,7 @@ public class HeroGodlyCompanionGoal extends Goal {
         }
 
         float bodyYaw = this.hero.getYRot();
-        this.hero.setYHeadRot(rotlerp(this.hero.yHeadRot, bodyYaw, HEAD_RETURN_SPEED));
+        this.hero.setYHeadRot(Mth.approachDegrees(this.hero.yHeadRot, bodyYaw, HEAD_RETURN_SPEED));
     }
 
     private void syncHeadToBodyInstant() {
@@ -403,10 +378,4 @@ public class HeroGodlyCompanionGoal extends Goal {
         this.hero.yHeadRotO = bodyYaw;
     }
 
-    protected float rotlerp(float pStart, float pEnd, float pMaxIncrease) {
-        float f = Mth.wrapDegrees(pEnd - pStart);
-        if (f > pMaxIncrease) f = pMaxIncrease;
-        if (f < -pMaxIncrease) f = -pMaxIncrease;
-        return pStart + f;
-    }
 }

@@ -1,7 +1,8 @@
 package com.whitecloud233.herobrine_companion.entity.ai.agent.tool;
 
+import com.whitecloud233.herobrine_companion.entity.companion.CompanionModePolicy;
+import com.whitecloud233.herobrine_companion.entity.companion.CompanionModeService;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.level.ServerPlayer;
 
 import java.util.List;
 import java.util.Set;
@@ -11,7 +12,7 @@ import java.util.UUID;
  * 动作工具：切换 Hero 的陪伴模式（原命令层 {@code toggle_companion_follow} 迁移而来）。
  *
  * <p>{@code mode=follow} 进入跟随（沿用 {@code ToggleCompanionPacket} 的信任门槛：信任≥50
- * 才愿跟随；开启且无主时绑定请求者/主人）；{@code mode=standby} 退出跟随。</p>
+ * 才愿随行；开启且未结伴时绑定请求者/同行者）；{@code mode=standby} 退出跟随。</p>
  */
 public final class HeroSetModeTool implements AgentTool {
 
@@ -28,7 +29,7 @@ public final class HeroSetModeTool implements AgentTool {
 
     @Override
     public String description() {
-        return "让 Herobrine 切换陪伴模式：follow=跟随主人，standby=原地待命（英雄自身动作）。";
+        return "让 Herobrine 切换陪伴模式：follow=随行同行者，standby=退出跟随并恢复自主活动（英雄自身动作）。";
     }
 
     @Override
@@ -52,49 +53,29 @@ public final class HeroSetModeTool implements AgentTool {
         String mode = args.getString("mode").trim().toLowerCase(java.util.Locale.ROOT);
         if (!ALLOWED_MODES.contains(mode)) {
             return AgentToolResult.fail("mode 只允许: " + ALLOWED_MODES,
-                    Component.translatable("message.herobrine_companion.tool.set_mode.invalid", ALLOWED_MODES));
+                    Component.translatable("message.herobrine_companion.tool.set_mode.invalid", ALLOWED_MODES.toString()));
         }
         return AgentToolResult.ok("valid");
     }
 
     @Override
     public AgentToolResult execute(AgentToolContext context, AgentToolArgs args) {
+        AgentToolResult validation = validate(args);
+        if (validation.failed()) return validation;
+
         var hero = context.hero();
-        String mode = args.getString("mode").trim().toLowerCase(java.util.Locale.ROOT);
-
-        if (MODE_STANDBY.equals(mode)) {
-            hero.setCompanionMode(false);
-            return AgentToolResult.ok("已切换为待命",
-                    Component.translatable("message.herobrine_companion.tool.set_mode.standby"));
+        boolean desiredMode = MODE_FOLLOW.equals(args.getString("mode").trim().toLowerCase(java.util.Locale.ROOT));
+        // 内部自主工具沿用主人身份；外部请求者存在时必须原样鉴权，不能回退成主人。
+        UUID requester = context.requesterUuid() != null ? context.requesterUuid() : hero.getOwnerUUID();
+        CompanionModePolicy.Result result = CompanionModeService.changeMode(requester, hero, desiredMode);
+        if (!result.successful()) {
+            Component display = result == CompanionModePolicy.Result.NOT_OWNER
+                    ? hero.createNotYourHeroMessage() : Component.translatable(result.messageKey());
+            return AgentToolResult.fail("陪伴模式切换失败: " + result.name(), display);
         }
-
-        // follow
-        if (hero.getTrustLevel() < 50) {
-            return AgentToolResult.fail("信任不足 50，暂时不愿跟随",
-                    Component.translatable("message.herobrine_companion.tool.set_mode.trust_low"));
-        }
-        ServerPlayer player = resolvePlayer(context);
-        if (!hero.isCompanionMode() && hero.getOwnerUUID() == null) {
-            if (player == null) {
-                return AgentToolResult.fail("无法确认主人，无法进入跟随模式",
-                        Component.translatable("message.herobrine_companion.tool.set_mode.no_owner"));
-            }
-            hero.setOwnerUUID(player.getUUID());
-        }
-        hero.setCompanionMode(true);
-        return AgentToolResult.ok("已切换为跟随",
-                Component.translatable("message.herobrine_companion.tool.set_mode.follow"));
-    }
-
-    private static ServerPlayer resolvePlayer(AgentToolContext context) {
-        var hero = context.hero();
-        UUID requesterUuid = context.requesterUuid();
-        if (requesterUuid != null && hero.level().getPlayerByUUID(requesterUuid) instanceof ServerPlayer requester) {
-            return requester;
-        }
-        if (hero.getOwnerPlayer() instanceof ServerPlayer owner) {
-            return owner;
-        }
-        return null;
+        return AgentToolResult.ok(desiredMode ? "已切换为跟随" : "已退出跟随",
+                Component.translatable(desiredMode
+                        ? "message.herobrine_companion.tool.set_mode.follow"
+                        : "message.herobrine_companion.tool.set_mode.standby"));
     }
 }

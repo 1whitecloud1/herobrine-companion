@@ -55,6 +55,8 @@ public class HeroTeleportToPlayerGoal extends Goal {
     @Override
     public boolean canUse() {
         if (this.hero.isBattleModeActive()) return false;
+        // 拉磨期间石磨每 tick 直接把 Hero 摆在磨盘上，传送会和它抢位置
+        if (this.hero.isMillstoneHarnessed()) return false;
         // 传送后抑制（庇护传送/观察者传送后 5 秒内不自动拉回）
         if (this.hero.isTeleportFollowHoldActive()) return false;
 // 如果正在骑乘 (比如在船上)，禁止传送，防止下车
@@ -200,6 +202,8 @@ public class HeroTeleportToPlayerGoal extends Goal {
     @Override
     public boolean canContinueToUse() {
         if (this.hero.isBattleModeActive()) return false;
+        // 拉磨期间石磨每 tick 直接把 Hero 摆在磨盘上，传送会和它抢位置
+        if (this.hero.isMillstoneHarnessed()) return false;
         if (this.hero.getTradingPlayer() != null) return false;
         return this.isStaring && this.stareTimer > 0 && this.targetPlayer != null && this.targetPlayer.isAlive();
     }
