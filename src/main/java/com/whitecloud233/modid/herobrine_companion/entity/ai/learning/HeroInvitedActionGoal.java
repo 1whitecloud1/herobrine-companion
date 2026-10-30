@@ -1,5 +1,6 @@
 package com.whitecloud233.modid.herobrine_companion.entity.ai.learning;
-import com.whitecloud233.modid.herobrine_companion.compat.cooking.HeroCookingCompat;
+import com.whitecloud233.modid.herobrine_companion.util.DebugLog;
+import com.whitecloud233.modid.herobrine_companion.entity.cooking.CookingService;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.logic.HeroInvitationHelper;
 import net.minecraft.core.BlockPos;
@@ -37,9 +38,27 @@ public class HeroInvitedActionGoal extends Goal {
     private static final int ACTION_REST = HeroInvitationHelper.ACTION_REST;
     private static final int ACTION_GUARD = HeroInvitationHelper.ACTION_GUARD;
     private static final int ACTION_COOK = HeroInvitationHelper.ACTION_COOK;
+    private static final int ACTION_MILLSTONE = HeroInvitationHelper.ACTION_MILLSTONE;
 
     private final HeroEntity hero;
     private BlockPos targetPos;
+
+    /**
+     * 临时排查埋点（定位「邀请做菜后 Hero 不干活」）：同一 key 的状态串变化时才输出一行 INFO。
+     * 问题定位完成后整体删除。统一前缀 [CookDiag] 便于 grep。
+     */
+    private static final org.slf4j.Logger DIAG = org.slf4j.LoggerFactory.getLogger("HeroCookDiag");
+    private static final java.util.Map<String, String> DIAG_STATE = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private static void diag(String key, String state) {
+        if (!DebugLog.enabled()) {
+            return;
+        }
+        if (state.equals(DIAG_STATE.put(key, state))) {
+            return;
+        }
+        DebugLog.info(DIAG, "[CookDiag] {} :: {}", key, state);
+    }
     private int actionType;
     private int timer;
     private boolean hasArrived;
@@ -72,19 +91,47 @@ public class HeroInvitedActionGoal extends Goal {
 
     @Override
     public boolean canUse() {
-        if (this.hero.isBattleModeActive()) return false;
+        if (this.hero.isBattleModeActive()) {
+            diag("goal.canUse", "REJECT battleMode");
+            return false;
+        }
 
         BlockPos pos = this.hero.getInvitedPos();
-        if (pos == null) return false;
+        if (pos == null) {
+            diag("goal.canUse", "noInvitation");
+            return false;
+        }
+
+        // 邀请目标已经不是厨具了（被拆掉/换成别的方块）：清掉邀请，避免 Hero 长期挂着无效目标。
+        // 只在区块确实加载时判定，避免「区块暂时卸载」被误当成「锅没了」而丢掉邀请。
+        if (this.hero.level() instanceof ServerLevel invitedLevel
+                && invitedLevel.hasChunkAt(pos)
+                && !isInvitationTargetValid(invitedLevel, pos)) {
+            diag("goal.canUse", "CLEAR stationGone pos=" + pos.toShortString());
+            if (this.hero.getInvitedAction() == ACTION_MILLSTONE) {
+                CookingService.releaseMillstone(this.hero, pos);
+            }
+            this.hero.setInvitedPos(null);
+            this.hero.setInvitedAction(HeroInvitationHelper.ACTION_NONE);
+            return false;
+        }
         
         // [新增] 如果正在交易，暂时不执行邀请动作
-        if (this.hero.getTradingPlayer() != null) return false;
+        if (this.hero.getTradingPlayer() != null) {
+            diag("goal.canUse", "REJECT trading");
+            return false;
+        }
 
         SimpleNeuralNetwork.MindState state = this.hero.getHeroBrain().getState();
         // 只有在非常不满(JUDGE)时才可能拒绝，且拒绝方式必须高冷
         if (state == SimpleNeuralNetwork.MindState.JUDGE && this.hero.getRandom().nextFloat() < 0.7f) {
+            diag("goal.canUse", "REFUSE judge");
+            // 已经绑在磨上的话必须先松绑，否则石磨会继续把这个"拒绝干活"的 Hero 按在磨台上转。
+            if (this.hero.getInvitedAction() == ACTION_MILLSTONE) {
+                CookingService.releaseMillstone(this.hero, pos);
+            }
             this.hero.setInvitedPos(null);
-            this.hero.setInvitedAction(0);
+            this.hero.setInvitedAction(HeroInvitationHelper.ACTION_NONE);
 
             // 拒绝音效：信标关闭
             this.hero.level().playSound(null, this.hero.blockPosition(), SoundEvents.BEACON_DEACTIVATE, SoundSource.NEUTRAL, 1.0f, 0.5f);
@@ -105,18 +152,26 @@ public class HeroInvitedActionGoal extends Goal {
         }
         this.targetPos = pos;
         this.actionType = this.hero.getInvitedAction();
+        diag("goal.canUse", "ACCEPT pos=" + pos.toShortString() + " action=" + this.actionType);
         return true;
     }
 
     @Override
     public boolean canContinueToUse() {
-        if (this.hero.isBattleModeActive()) return false;
+        if (this.hero.isBattleModeActive()) {
+            diag("goal.continue", "STOP battleMode");
+            return false;
+        }
 
         // [新增] 如果正在交易，立即停止
-        if (this.hero.getTradingPlayer() != null) return false;
+        if (this.hero.getTradingPlayer() != null) {
+            diag("goal.continue", "STOP trading");
+            return false;
+        }
 
         BlockPos currentInvitedPos = this.hero.getInvitedPos();
         if (currentInvitedPos == null || !currentInvitedPos.equals(this.targetPos)) {
+            diag("goal.continue", "STOP invitedPosChanged->" + currentInvitedPos);
             return false;
         }
         // 动作 2 (休息) 和 3 (守卫) 是持续性的
@@ -124,9 +179,36 @@ public class HeroInvitedActionGoal extends Goal {
             return true;
         }
         if (this.actionType == ACTION_COOK) {
-            return HeroCookingCompat.isCookwareStation(this.hero.level(), this.targetPos);
+            boolean station = CookingService.isCookwareStation(this.hero.level(), this.targetPos);
+            if (!station) {
+                diag("goal.continue", "STOP notCookwareStation pos=" + this.targetPos.toShortString());
+            }
+            return station;
+        }
+        if (this.actionType == ACTION_MILLSTONE) {
+            return CookingService.isMillstoneStation(this.hero.level(), this.targetPos);
         }
         return this.timer < 400;
+    }
+
+    /**
+     * 邀请目标是否仍然成立。
+     *
+     * <p>做菜认锅具、拉磨认石磨，这两类必须单独判定（石磨不是锅具，锅具也不该被当成磨）。
+     * 其余动作（休息 / 守卫 / 观察）不能用厨具判定去套：床、楼梯、椅子、门、箱子、刷怪笼
+     * 这些位置从来就不是厨具，套上去会恒为 false，导致邀请在下一个 tick 就被当成
+     * 「锅被拆了」清掉——表现为手持契约右键座位 Hero 完全不坐下。这里直接拿方块当前的
+     * 交互分类和已记录的动作比对。</p>
+     */
+    private boolean isInvitationTargetValid(ServerLevel level, BlockPos pos) {
+        int action = this.hero.getInvitedAction();
+        if (action == ACTION_MILLSTONE) {
+            return CookingService.isMillstoneStation(level, pos);
+        }
+        if (action == ACTION_COOK) {
+            return CookingService.isCookwareStation(level, pos);
+        }
+        return HeroInvitationHelper.getInteractionType(level, pos) == action;
     }
 
     @Override
@@ -145,7 +227,12 @@ public class HeroInvitedActionGoal extends Goal {
         this.hero.setNoGravity(true);
 
         if (this.actionType == ACTION_COOK && this.targetPos != null) {
-            HeroCookingCompat.beginCookChunkTicket(this.hero, this.targetPos);
+            CookingService.beginCookChunkTicket(this.hero, this.targetPos);
+        }
+
+        if (this.actionType == ACTION_MILLSTONE && this.targetPos != null) {
+            // 石磨区块卸载就断绑，拉磨期间必须把区块钉住。
+            CookingService.beginCookChunkTicket(this.hero, this.targetPos);
         }
 
         if (this.actionType == ACTION_GUARD) {
@@ -157,8 +244,14 @@ public class HeroInvitedActionGoal extends Goal {
 
     @Override
     public void stop() {
+        diag("goal.stop", "action=" + this.actionType + " invitedPos=" + this.hero.getInvitedPos()
+                + " targetPos=" + this.targetPos + " hasArrived=" + this.hasArrived + " timer=" + this.timer);
         if (this.actionType == ACTION_COOK) {
-            HeroCookingCompat.endCookChunkTicket(this.hero);
+            CookingService.endCookChunkTicket(this.hero);
+        }
+        if (this.actionType == ACTION_MILLSTONE) {
+            CookingService.releaseMillstone(this.hero, this.targetPos);
+            CookingService.endCookChunkTicket(this.hero);
         }
         if (this.hero.isPassenger()) {
             this.hero.stopRiding();
@@ -169,10 +262,10 @@ public class HeroInvitedActionGoal extends Goal {
         this.seatEntity = null;
         this.targetPos = null;
         this.actionType = 0;
-        if (this.hero.getInvitedPos() != null) {
-            this.hero.setInvitedPos(null);
-            this.hero.setInvitedAction(0);
-        }
+        // 这里【不能】清掉 hero.getInvitedPos()。邀请是「玩家请求 / 业务层」持有的状态，
+        // 本目标只是因为暂时不能继续（进入战斗、打开交易、区块未加载）而停止；
+        // 一旦在这里清掉，邀请就永久消失——表现为「邀请做菜后 Hero 站在锅边一动不动」。
+        // 目标下一 tick 会经 canUse() 重新接管；真正的取消由 HeroLogic / CookingService 负责。
         this.hero.setNoGravity(false);
         this.isGuardingDoor = false;
         this.isGuardingContainer = false;
@@ -196,7 +289,18 @@ public class HeroInvitedActionGoal extends Goal {
         }
 
         double arriveDistance = (this.actionType == ACTION_GUARD && this.isGuardingContainer) ? 16.0D : 4.0D;
+        if (this.actionType == ACTION_MILLSTONE) {
+            // 磨盘有碰撞体积，Hero 走不上磨台；走到磨盘 3 格内就把位置交给石磨，它会把 Hero 摆到圆周上。
+            arriveDistance = 9.0D;
+        }
         double distSqr = this.hero.distanceToSqr(destination);
+
+        // 卡死检测的生效距离必须和「到达距离」对齐。
+        // 到达判定是 distSqr < arriveDistance(普通动作 4.0)，而下面的兜底检查原本只在 distSqr > 9.0
+        // 时才生效，于是「停在 2~3 格外」就成了死区：既不算到达、也永远不触发传送。
+        // 对做菜而言这等价于永久停在“加入配菜中……”——Hero 举着锅站在原地一动不动。
+        // 容器守卫原来靠 >9.0 保护，这里保持不变。
+        double stallDistance = (this.actionType == ACTION_GUARD && this.isGuardingContainer) ? 9.0D : arriveDistance;
 
         if (!this.hasArrived) {
             this.navigationTicks++;
@@ -213,7 +317,7 @@ public class HeroInvitedActionGoal extends Goal {
                 }
 
                 // 距离目标没有缩短（贴墙滑动/绕圈/旧寻路冲突）→ 连续 3 个窗口无进展即传送
-                if (distSqr > 9.0D) {
+                if (distSqr > stallDistance) {
                     double progress = this.lastProgressDistSqr - distSqr;
                     if (progress < STALL_MIN_PROGRESS_SQ) {
                         this.noProgressWindows++;
@@ -228,16 +332,17 @@ public class HeroInvitedActionGoal extends Goal {
                 }
             }
 
-            if (this.navigationTicks > 100 && distSqr > 9.0D) {
+            if (this.navigationTicks > 100 && distSqr > stallDistance) {
                 teleportToTarget(destination);
                 return;
             }
 
             if (distSqr < arriveDistance) {
                 this.hasArrived = true;
+                diag("goal.arrive", "arrived action=" + this.actionType + " dist=" + String.format("%.2f", Math.sqrt(distSqr)));
                 this.hero.setDeltaMovement(Vec3.ZERO);
-                // 只有非容器守卫才落地，容器守卫保持飞行
-                if (!this.isGuardingContainer) {
+                // 只有非容器守卫才落地，容器守卫保持飞行；拉磨要悬在磨台上，同样不落地
+                if (!this.isGuardingContainer && this.actionType != ACTION_MILLSTONE) {
                     this.hero.setNoGravity(false);
                 }
                 performAction();
@@ -249,6 +354,8 @@ public class HeroInvitedActionGoal extends Goal {
 
             // 保持飞行状态
             if (this.actionType == ACTION_GUARD && this.isGuardingContainer) {
+                this.hero.setNoGravity(true);
+            } else if (this.actionType == ACTION_MILLSTONE) {
                 this.hero.setNoGravity(true);
             } else if (!this.hero.isNoGravity() && this.hero.isNoGravity()) {
                 this.hero.setNoGravity(false);
@@ -263,10 +370,34 @@ public class HeroInvitedActionGoal extends Goal {
                 } else {
                     performGenericGuardLogic(destination);
                 }
+            } else if (this.actionType == ACTION_MILLSTONE) {
+                // 拉磨时位置和朝向全归石磨，这里只维持绑定与转速。
+                if (!CookingService.tickMillstone(this.hero, this.targetPos)) {
+                    // 磨被拆了 / 被别的生物占了 / Hero 被挤得太远：取消邀请，别把它定在原地。
+                    diag("goal.tickMillstone", "RELEASE pos=" + this.targetPos.toShortString());
+                    CookingService.releaseMillstone(this.hero, this.targetPos);
+                    CookingService.endCookChunkTicket(this.hero);
+                    this.hero.setInvitedPos(null);
+                    this.hero.setInvitedAction(HeroInvitationHelper.ACTION_NONE);
+                    return;
+                }
+                this.hero.setMillstoneBound(true);
+
+                // 材料磨完、产物也还在磨上：活干完了，收工。
+                if (!CookingService.isMillstoneWorking(this.hero, this.targetPos)) {
+                    diag("goal.tickMillstone", "DONE pos=" + this.targetPos.toShortString());
+                    CookingService.releaseMillstone(this.hero, this.targetPos);
+                    CookingService.endCookChunkTicket(this.hero);
+                    this.hero.setInvitedPos(null);
+                    this.hero.setInvitedAction(HeroInvitationHelper.ACTION_NONE);
+                    this.hero.playSound(SoundEvents.VILLAGER_YES, 0.6F, 1.0F);
+                    return;
+                }
             } else if (this.actionType == ACTION_COOK) {
                 this.hero.setNoGravity(false);
                 performCookPresentation(destination);
-                HeroCookingCompat.tickCookware(this.hero, this.targetPos);
+                boolean cookResult = CookingService.tickCookware(this.hero, this.targetPos);
+                diag("goal.tickCook", "result=" + cookResult + " pos=" + this.targetPos.toShortString());
             } else if (this.actionType != ACTION_REST) {
                 this.hero.getLookControl().setLookAt(destination);
             }
@@ -399,7 +530,6 @@ public class HeroInvitedActionGoal extends Goal {
         }
     }
 
-
     /**
      * 容器守卫逻辑
      * 游荡 + 瞬间凝视 + 灭火 + 强制防盗
@@ -467,7 +597,6 @@ public class HeroInvitedActionGoal extends Goal {
             }
         }
     }
-
 
     /**
      * 神之领域 - 仅灭火
@@ -543,7 +672,7 @@ public class HeroInvitedActionGoal extends Goal {
         this.hero.setDeltaMovement(finalMove.x, verticalForce, finalMove.z);
 
         double angle = Mth.atan2(finalMove.z, finalMove.x) * (180F / Math.PI) - 90F;
-        this.hero.setYRot(rotlerp(this.hero.getYRot(), (float) angle, 10.0F));
+        this.hero.setYRot(Mth.approachDegrees(this.hero.getYRot(), (float) angle, 10.0F));
         this.hero.yBodyRot = this.hero.getYRot();
     }
 
@@ -575,15 +704,10 @@ public class HeroInvitedActionGoal extends Goal {
         )).getType() != HitResult.Type.MISS;
     }
 
-    private float rotlerp(float current, float target, float maxDelta) {
-        float f = Mth.wrapDegrees(target - current);
-        if (f > maxDelta) f = maxDelta;
-        if (f < -maxDelta) f = -maxDelta;
-        return current + f;
-    }
-
     private void teleportToTarget(Vec3 destination) {
         Vec3 landing = findSafeLanding(destination);
+        diag("goal.teleport", "action=" + this.actionType + " ticks=" + this.navigationTicks
+                + " dist=" + String.format("%.2f", Math.sqrt(this.hero.distanceToSqr(destination))));
         this.hero.teleportTo(landing.x, landing.y, landing.z);
         this.hero.level().playSound(null, this.hero.blockPosition(), SoundEvents.ENDERMAN_TELEPORT, SoundSource.HOSTILE, 1.0F, 1.0F);
         this.hasArrived = true;
@@ -649,9 +773,9 @@ public class HeroInvitedActionGoal extends Goal {
             double horizontal = Math.sqrt(toTarget.x * toTarget.x + toTarget.z * toTarget.z);
             float targetYaw = (float) (Mth.atan2(toTarget.z, toTarget.x) * (180.0F / Math.PI)) - 90.0F;
             float targetPitch = (float) (-(Mth.atan2(toTarget.y, horizontal) * (180.0F / Math.PI)));
-            this.hero.setYRot(rotlerp(this.hero.getYRot(), targetYaw, 12.0F));
+            this.hero.setYRot(Mth.approachDegrees(this.hero.getYRot(), targetYaw, 12.0F));
             this.hero.yBodyRot = this.hero.getYRot();
-            this.hero.setXRot(rotlerp(this.hero.getXRot(), Mth.clamp(targetPitch, -35.0F, 25.0F), 8.0F));
+            this.hero.setXRot(Mth.approachDegrees(this.hero.getXRot(), Mth.clamp(targetPitch, -35.0F, 25.0F), 8.0F));
         }
 
         if (this.timer % 14 == 0) {

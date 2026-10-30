@@ -1,16 +1,15 @@
 package com.whitecloud233.modid.herobrine_companion.entity.ai.goal;
 
-import com.whitecloud233.modid.herobrine_companion.compat.epicfight.HeroEpicFightCompat;
+import com.whitecloud233.modid.herobrine_companion.api.compat.HeroEpicFightCompat;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.modid.herobrine_companion.entity.ai.combat.HeroCombatTargeting;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.HeroCombatWeaponHelper;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.UseAnim;
 
-import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
 
@@ -181,50 +180,26 @@ public class HeroFallbackRangedAttackGoal extends Goal {
         return this.hero.isBattleModeActive()
                 && !this.hero.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE)
                 && !HeroEpicFightCompat.shouldUseEpicFightCombatAI(this.hero)
-                && HeroCombatWeaponHelper.isRangedLoadout(this.hero);
+                && HeroCombatWeaponHelper.isRangedLoadout(this.hero)
+                // 陪伴 + 战斗：清场后要把控制权还给跟随，别一直霸占着瞄准/移动。
+                && (!this.hero.isCompanionMode() || HeroCombatTargeting.hasEngagedTarget(this.hero));
     }
 
+    /** 目标获取已收敛到 {@link HeroCombatTargeting}（近战/远程共用同一份）。 */
     private LivingEntity pickBattleTarget() {
-        LivingEntity currentTarget = this.hero.getTarget();
-        return isValidTarget(currentTarget) ? currentTarget : this.target;
+        return HeroCombatTargeting.pickBattleTarget(this.hero, this.target);
     }
 
     private LivingEntity findNearestHostile() {
-        LivingEntity existingTarget = pickBattleTarget();
-        if (isValidTarget(existingTarget) && this.hero.distanceToSqr(existingTarget) <= SEARCH_RANGE * SEARCH_RANGE) {
-            return existingTarget;
-        }
-
-        List<LivingEntity> targets = this.hero.level().getEntitiesOfClass(
-                LivingEntity.class,
-                this.hero.getBoundingBox().inflate(getSearchRange()),
-                candidate -> {
-                    clearSubmission(candidate);
-                    return this.isValidTarget(candidate);
-                }
-        );
-
-        return targets.stream()
-                .min(Comparator.comparingDouble(this.hero::distanceToSqr))
-                .orElse(null);
+        return HeroCombatTargeting.findNearestHostile(this.hero, this.target);
     }
 
     private boolean isValidTarget(LivingEntity candidate) {
-        return HeroBattleStanceGoal.canHeroAttackTarget(this.hero, candidate);
-    }
-
-    private double getSearchRange() {
-        return Math.max(SEARCH_RANGE, this.hero.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.FOLLOW_RANGE));
+        return HeroCombatTargeting.canHeroAttackTarget(this.hero, candidate);
     }
 
     private void clearSubmission(LivingEntity candidate) {
-        if (candidate instanceof Mob mob) {
-            mob.getPersistentData().putBoolean("HeroSubmission", false);
-            mob.getPersistentData().remove("HeroSubmissionYaw");
-            if (mob.isSilent()) {
-                mob.setSilent(false);
-            }
-        }
+        HeroCombatTargeting.clearSubmission(candidate);
     }
 }
 

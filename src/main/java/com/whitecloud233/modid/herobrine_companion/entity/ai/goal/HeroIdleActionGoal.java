@@ -34,7 +34,6 @@ public class HeroIdleActionGoal extends Goal {
         MEDITATE,
         GLITCH,
         INSPECT_SCYTHE,
-        THUNDER_CAST,
         DEBUG_INTERFACE // [新增] 调试界面动作
     }
 
@@ -108,19 +107,20 @@ public class HeroIdleActionGoal extends Goal {
         this.startY = this.hero.getY();
         this.startZ = this.hero.getZ();
 
-        // [修改] 调整动作权重，大幅提高雷电召唤概率以测试
-        // 总权重 100
+        // 总权重 100：镰刀检视 38 / 冥想 12 / 故障 25 / 调试界面 25。
+        // 原雷电召唤分支（权重 60）会下沉躯干而四肢不动，表现为肢体分离，已整体移除；
+        // 腾出的权重按其余动作的原比例（30:10:20:20）回填，恢复概率为 0~99 全覆盖。
         int roll = this.hero.getRandom().nextInt(100);
 
-        if (roll < 30) {
+        if (roll < 38) {
             this.currentAction = IdleAction.INSPECT_SCYTHE;
             // [修改] 延长至 160 tick (8秒)
             this.idleTime = 160;
             this.hero.playScytheInspectAnim();
-        } else if (roll < 40) {
+        } else if (roll < 50) {
             this.currentAction = IdleAction.MEDITATE;
             this.idleTime = 120 + this.hero.getRandom().nextInt(80);
-        } else if (roll < 60) {
+        } else if (roll < 75) {
             this.currentAction = IdleAction.GLITCH;
             this.idleTime = 60 + this.hero.getRandom().nextInt(40);
             // [新增] 开启故障渲染
@@ -128,15 +128,10 @@ public class HeroIdleActionGoal extends Goal {
             // [新增] 初始化间歇性故障计时器
             this.glitchBurstTimer = 6; // 初始爆发 0.3 秒
             this.glitchCooldownTimer = 0;
-        } else if (roll < 80) {
+        } else {
             this.currentAction = IdleAction.DEBUG_INTERFACE;
             this.idleTime = 100; // 5秒
             this.hero.playDebugAnim(); // 触发实体动画和粒子
-        } else {
-            // 40-99 (60%) 概率触发雷电召唤
-            this.currentAction = IdleAction.THUNDER_CAST;
-            this.idleTime = 100; // 3秒
-            this.hero.castThunder(); // 触发雷电召唤动画
         }
 
         // 强制停止当前的移动
@@ -202,9 +197,6 @@ public class HeroIdleActionGoal extends Goal {
                 break;
             case DEBUG_INTERFACE:
                 // 动画逻辑由 Entity/Model 处理
-                break;
-            case THUNDER_CAST:
-                tickStaticCharge();
                 break;
         }
     }
@@ -350,32 +342,6 @@ public class HeroIdleActionGoal extends Goal {
             this.hero.setInvisible(!this.hero.isInvisible());
         } else if (this.glitchBurstTimer == 0) {
             this.hero.setInvisible(false);
-        }
-    }
-
-    private void tickStaticCharge() {
-        if (this.hero.level() instanceof ServerLevel serverLevel) {
-            if (this.hero.tickCount % 2 == 0) {
-                serverLevel.sendParticles(ParticleTypes.ELECTRIC_SPARK,
-                        this.hero.getX(),
-                        this.hero.getY() + 1.0,
-                        this.hero.getZ(),
-                        3, 0.5, 1.0, 0.5, 0.1
-                );
-
-                if (this.hero.getRandom().nextBoolean()) {
-                    serverLevel.sendParticles(ParticleTypes.SMOKE,
-                            this.hero.getX(),
-                            this.hero.getY() + 1.0,
-                            this.hero.getZ(),
-                            1, 0.3, 0.5, 0.3, 0.05
-                    );
-                }
-            }
-        }
-
-        if (this.hero.tickCount % 20 == 0) {
-            this.hero.playSound(SoundEvents.CREEPER_PRIMED, 0.5f, 0.5f);
         }
     }
 }

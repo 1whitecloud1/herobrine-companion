@@ -17,11 +17,19 @@ import net.minecraft.world.entity.player.Player;
 import java.util.List;
 
 public class HeroFixAnomalyGoal extends Goal {
+    /** 方块扫描最小间隔（tick）。原为 10，配合 O(274625) 全量扫描实测占服务端 3.7%；
+     *  改为集合反查后单次成本已极低，但仍保留节流避免无意义高频查询。 */
+    private static final int BLOCK_SCAN_INTERVAL_TICKS = 20;
+    /** 实体异常查询间隔（tick）。原先每个 canUse()（每 tick）都做一次 24 格 AABB 查询。 */
+    private static final int ENTITY_SCAN_INTERVAL_TICKS = 10;
+
     private final HeroEntity hero;
     private LivingEntity targetAnomaly;
     private BlockPos targetBlock;
     private int scanTimer;
     private int lastScanTick;
+    private int lastEntityScanTick;
+    private List<LivingEntity> cachedEntityHit = List.of();
 
     public HeroFixAnomalyGoal(HeroEntity hero) {
         this.hero = hero;
@@ -60,11 +68,12 @@ public class HeroFixAnomalyGoal extends Goal {
             return false;
         }
 
-        // [修改] 3. 优先检查方块 (每20tick检查一次)
+        // [修改] 3. 优先检查方块
         // 之前的问题是：如果一直有怪物，tickCount % 20 的时机可能刚好被怪物战斗占用了，
         // 导致 Hero 永远没机会进入找方块的逻辑。
-        // 现在改为：只要距离上次扫描超过 20 tick，就优先尝试扫描方块。
-        if (this.hero.tickCount - this.lastScanTick > 10) {
+        // 现在改为：只要距离上次扫描超过 BLOCK_SCAN_INTERVAL_TICKS，就优先尝试扫描方块。
+        // [P0 性能] 扫描本身已改为集合反查（O(已追踪数)），这里的间隔只是避免重复查同一批。
+        if (this.hero.tickCount - this.lastScanTick > BLOCK_SCAN_INTERVAL_TICKS) {
             this.lastScanTick = this.hero.tickCount;
             BlockPos pos = findGlitchBlock();
             if (pos != null) {
@@ -75,8 +84,22 @@ public class HeroFixAnomalyGoal extends Goal {
         }
 
         // 4. 其次检查实体
-        List<LivingEntity> list = this.hero.level().getEntitiesOfClass(LivingEntity.class, this.hero.getBoundingBox().inflate(24.0D),
-                e -> (e instanceof GhostZombieEntity || e instanceof GhostCreeperEntity || e instanceof GhostSkeletonEntity) && e.isAlive());
+        // [P0 性能] 原实现每次 canUse()（即每 tick）都做一次 24 格 AABB 查询并过滤类型，
+        // 是 HeroEntity.aiStep 下的稳定开销。实体异常不需要每 tick 感知，按间隔缓存结果。
+        List<LivingEntity> list;
+        if (this.hero.tickCount - this.lastEntityScanTick >= ENTITY_SCAN_INTERVAL_TICKS) {
+            this.lastEntityScanTick = this.hero.tickCount;
+            list = this.hero.level().getEntitiesOfClass(LivingEntity.class, this.hero.getBoundingBox().inflate(24.0D),
+                    e -> (e instanceof GhostZombieEntity || e instanceof GhostCreeperEntity || e instanceof GhostSkeletonEntity) && e.isAlive());
+            this.cachedEntityHit = list;
+        } else {
+            list = this.cachedEntityHit;
+            // 缓存过期前也要剔除已死亡的实体，避免锁定尸体。
+            if (!list.isEmpty()) {
+                list = list.stream().filter(LivingEntity::isAlive).toList();
+                this.cachedEntityHit = list;
+            }
+        }
 
         if (!list.isEmpty()) {
             this.targetAnomaly = list.get(0);

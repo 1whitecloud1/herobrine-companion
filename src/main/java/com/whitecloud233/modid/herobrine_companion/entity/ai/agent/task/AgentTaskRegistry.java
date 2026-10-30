@@ -15,7 +15,7 @@ public final class AgentTaskRegistry {
 
     private final Map<String, Function<Map<String, String>, PlannedTask>> factories = new LinkedHashMap<>();
 
-    /** 注册默认任务集（M3 内置安全任务 + P4 真实行为任务）。 */
+    /** 注册默认任务集（内置安全任务 + 真实行为任务 + 阶段 C/F 闭环步骤）。 */
     public void registerDefaults() {
         register(NavigateTask.ID, NavigateTask::new);
         register(TeleportTask.ID, TeleportTask::new);
@@ -23,6 +23,11 @@ public final class AgentTaskRegistry {
         register(ReportTask.ID, ReportTask::new);
         register(RepairAreaTask.ID, RepairAreaTask::new);
         register(InspectAreaTask.ID, InspectAreaTask::new);
+        register(VerifyAnomalyTask.ID, VerifyAnomalyTask::new);
+        // 阶段 F：材料 → 成品 → 交付
+        register(StartCookTask.ID, StartCookTask::new);
+        register(CookVerifyTask.ID, CookVerifyTask::new);
+        register(DeliverToOwnerTask.ID, DeliverToOwnerTask::new);
     }
 
     public void register(String id, Function<Map<String, String>, PlannedTask> factory) {

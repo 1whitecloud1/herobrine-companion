@@ -37,6 +37,13 @@ public final class HeroMemory {
     private final List<MemoryEpisode> episodes = new ArrayList<>();
     private final Map<String, String> facts = new LinkedHashMap<>();
     private final Map<String, String> working = new LinkedHashMap<>();
+    /** 命名地点与区域偏好（交接 E3）：结构化保存，供导航与区域保护实际消费。 */
+    private final HeroLandmarks landmarks = new HeroLandmarks();
+
+    /** 命名地点（读写入口）。 */
+    public HeroLandmarks landmarks() {
+        return landmarks;
+    }
 
     // ---- 情景层 ----
 
@@ -160,6 +167,7 @@ public final class HeroMemory {
         episodes.clear();
         facts.clear();
         working.clear();
+        landmarks.clear();
     }
 
     private static List<String> tokenize(String query) {
@@ -197,11 +205,14 @@ public final class HeroMemory {
             factsTag.putString(fact.getKey(), fact.getValue());
         }
         tag.put(KEY_FACTS, factsTag);
+        // 命名地点随语义层一起落盘（旧存档没有该键，读取时保持为空）。
+        landmarks.write(tag);
     }
 
     public void read(CompoundTag tag) {
         episodes.clear();
         facts.clear();
+        landmarks.clear();
         if (tag == null) {
             return;
         }
@@ -222,6 +233,7 @@ public final class HeroMemory {
                 facts.put(key, factsTag.getString(key));
             }
         }
+        landmarks.read(tag);
     }
 
     public int episodeCount() {

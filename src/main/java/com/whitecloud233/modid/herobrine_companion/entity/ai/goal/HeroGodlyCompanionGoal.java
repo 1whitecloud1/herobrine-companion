@@ -2,6 +2,7 @@ package com.whitecloud233.modid.herobrine_companion.entity.ai.goal;
 
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.HeroMoveControl;
+import com.whitecloud233.modid.herobrine_companion.entity.ai.combat.HeroCombatTargeting;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.Goal;
@@ -85,8 +86,11 @@ public class HeroGodlyCompanionGoal extends Goal {
 
     @Override
     public boolean canUse() {
-        if (this.hero.isBattleModeActive()) return false;
         if (!this.hero.isCompanionMode()) return false;
+        // 陪伴 + 战斗同时开启：附近有敌人时让战斗 AI 独占（敌人优先），没敌人才跟随
+        if (enemyTakesPriority()) return false;
+        // 拉磨时石磨接管位移，跟随会把 Hero 从磨台上拽下来
+        if (this.hero.isMillstoneHarnessed()) return false;
         // 传送后抑制跟随（庇护传送/观察者传送后 5 秒），防止 Hero 被拉回原处
         if (this.hero.isTeleportFollowHoldActive()) return false;
         if (this.hero.getTradingPlayer() != null) return false;
@@ -102,8 +106,9 @@ public class HeroGodlyCompanionGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
-        if (this.hero.isBattleModeActive()) return false;
         if (!this.hero.isCompanionMode()) return false;
+        if (enemyTakesPriority()) return false;
+        if (this.hero.isMillstoneHarnessed()) return false;
         // 传送后抑制跟随：传送瞬间若本目标正在运行，立即让出控制权
         if (this.hero.isTeleportFollowHoldActive()) return false;
         if (this.hero.getTradingPlayer() != null) return false;
@@ -112,6 +117,16 @@ public class HeroGodlyCompanionGoal extends Goal {
 
         double distSqr = horizontalDistanceToOwnerSqr(this.hero, this.owner);
         return distSqr > (STAY_STILL_RADIUS * STAY_STILL_RADIUS);
+    }
+
+    /**
+     * 战斗模式里一旦出现可攻击的敌人，跟随必须让位：杀敌优先。
+     *
+     * <p>没敌人的时候仍然走陪伴跟随（战斗模式开着也跟随），因此这里只拦「有敌人」
+     * 这一种情况，而不是整体拒绝战斗模式。</p>
+     */
+    private boolean enemyTakesPriority() {
+        return this.hero.isBattleModeActive() && HeroCombatTargeting.hasEngagedTarget(this.hero);
     }
 
     @Override
@@ -227,14 +242,14 @@ public class HeroGodlyCompanionGoal extends Goal {
         }
 
         float targetYRot = -((float) Mth.atan2(movement.x, movement.z)) * (180.0F / (float) Math.PI);
-        float newYRot = rotlerp(this.hero.getYRot(), targetYRot, BODY_TURN_SPEED);
+        float newYRot = Mth.approachDegrees(this.hero.getYRot(), targetYRot, BODY_TURN_SPEED);
         this.hero.setYRot(newYRot);
         this.hero.yBodyRot = newYRot;
-        this.hero.setYHeadRot(rotlerp(this.hero.yHeadRot, newYRot, HEAD_RETURN_SPEED));
+        this.hero.setYHeadRot(Mth.approachDegrees(this.hero.yHeadRot, newYRot, HEAD_RETURN_SPEED));
         this.hero.yHeadRotO = this.hero.yHeadRot;
 
         if (Math.abs(this.hero.getXRot()) > 1.0F) {
-            this.hero.setXRot(rotlerp(this.hero.getXRot(), 0.0F, 5.0F));
+            this.hero.setXRot(Mth.approachDegrees(this.hero.getXRot(), 0.0F, 5.0F));
         }
     }
 
@@ -273,7 +288,7 @@ public class HeroGodlyCompanionGoal extends Goal {
         Vec3 ownerVelocity = this.owner.getDeltaMovement();
         if (ownerVelocity.horizontalDistanceSqr() > 0.0025D) {
             float moveYaw = (float) (Mth.atan2(ownerVelocity.z, ownerVelocity.x) * (180.0D / Math.PI)) - 90.0F;
-            this.stableFollowYaw = rotlerp(this.stableFollowYaw, moveYaw, 12.0F);
+            this.stableFollowYaw = Mth.approachDegrees(this.stableFollowYaw, moveYaw, 12.0F);
         }
 
         Vec3 behind = Vec3.directionFromRotation(0.0F, this.stableFollowYaw + 180.0F).scale(this.desiredFollowDistance);
@@ -354,7 +369,7 @@ public class HeroGodlyCompanionGoal extends Goal {
         }
 
         float bodyYaw = this.hero.getYRot();
-        this.hero.setYHeadRot(rotlerp(this.hero.yHeadRot, bodyYaw, HEAD_RETURN_SPEED));
+        this.hero.setYHeadRot(Mth.approachDegrees(this.hero.yHeadRot, bodyYaw, HEAD_RETURN_SPEED));
     }
 
     private void syncHeadToBodyInstant() {
@@ -363,10 +378,4 @@ public class HeroGodlyCompanionGoal extends Goal {
         this.hero.yHeadRotO = bodyYaw;
     }
 
-    protected float rotlerp(float pStart, float pEnd, float pMaxIncrease) {
-        float f = Mth.wrapDegrees(pEnd - pStart);
-        if (f > pMaxIncrease) f = pMaxIncrease;
-        if (f < -pMaxIncrease) f = -pMaxIncrease;
-        return pStart + f;
-    }
 }

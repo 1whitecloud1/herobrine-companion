@@ -5,8 +5,12 @@ import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.SimpleNeur
 import java.util.List;
 
 /**
- * 规则驱动的意图分类器（M2）。在 M1"意图"之上新增"路由"：
- * 挑战/战斗让位 → 外部指令路由到工具 → 威胁 → 同行者陪伴 → 心智基调 → 静默。
+ * 规则驱动的<b>自主</b>意图分类器。
+ *
+ * <p>显式工具请求不再经过这里（交接 A1）：它由
+ * {@link com.whitecloud233.modid.herobrine_companion.entity.ai.agent.tool.AgentToolRequestService}
+ * 直接执行。本类只决定"没人指使的时候，Herobrine 自己想干什么"，因此规则里不再出现
+ * 工具路由分支，也不存在"战斗态把玩家指令一起吞掉"的历史坑。</p>
  *
  * <p>规则确定、可读、可单测，是未来换 LLM 分类器之前的确定性底座。</p>
  */
@@ -17,15 +21,9 @@ public final class AutonomyIntentionClassifier implements AgentIntentionClassifi
         // P5：附带最近教训规则摘要（若有），让决策原因"记得住"结构化教训。
         String lessons = findLessonRulesSummary(observations);
 
-        // 0. 挑战 / 战斗态：让位给既有状态机，不路由。
+        // 1. 挑战 / 战斗态：让位给既有状态机，不路由（仅作用于自主行为）。
         if (frame.isChallengeActive() || frame.isBattleActive()) {
             return Classification.world(AgentIntention.DEFER, "挑战/战斗进行中，交给既有层" + lessons);
-        }
-
-        // 1. 外部工具指令优先路由（M2 工具路由入口）。
-        String toolId = findDirectiveTool(observations);
-        if (toolId != null) {
-            return Classification.tool(AgentIntention.COMPUTE, toolId, "存在待处理工具请求: " + toolId);
         }
 
         // 2. 威胁优先。
@@ -57,16 +55,6 @@ public final class AutonomyIntentionClassifier implements AgentIntentionClassifi
             }
         }
         return "";
-    }
-
-    /** 从观测集中找到第一条携带工具指向的指令观测；没有则返回 null。 */
-    private static String findDirectiveTool(List<AgentObservation> observations) {
-        for (AgentObservation observation : observations) {
-            if (observation.kind() == AgentSenseKind.DIRECTIVE && observation.toolId() != null) {
-                return observation.toolId();
-            }
-        }
-        return null;
     }
 
     /** 心智状态 → 基调意图。 */

@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.entity.ai.goal;
 
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.modid.herobrine_companion.fight.ChallengeSession;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.HeroMoveControl;
 import com.whitecloud233.modid.herobrine_companion.util.PlayerHealthCompat;
@@ -174,8 +175,8 @@ public class HeroObserveAndRescueGoal extends Goal {
         }
 
         // 挑战/假死演出期间由专属逻辑接管，避免与陪伴救援互相抢事件。
-        if (player.getPersistentData().getBoolean("IsChallengeActive")
-                || player.getPersistentData().getBoolean("HeroFakeOutPhase")) {
+        if (ChallengeSession.isPlayerInChallenge(player)
+                || ChallengeSession.isPlayerFakeOutPhase(player)) {
             return;
         }
 

@@ -65,6 +65,11 @@ public class HeroAI {
         // 2. [Lore] 陪伴跟随 AI (优先级 2)
         // 使用新的 GodlyCompanionGoal，速度设为 1.2D
         hero.getGoalSelector().addGoal(2, new HeroGodlyCompanionGoal(hero, 1.2D));
+        // 1. [阶段 B] Agent 多步任务的移动控制（优先级 1，高于跟随、与玩家显式动作同级）。
+        // 必须高于跟随：同优先级下跟随先注册先评估，任务会永远抢不到 MOVE/LOOK。
+        // 任务不再各自写 navigation：由这个 Goal 取得控制权后按 TaskControl 的目标推进；
+        // 战斗 / 挑战（同优先级 1，且本 Goal 在 canUse 里主动让出）仍可优先。
+        hero.getGoalSelector().addGoal(HeroTaskControlGoal.PRIORITY, new HeroTaskControlGoal(hero));
         // [修改] 将待机动作优先级提升至 2，与跟随同级
         // 当跟随停止时（距离近），或者非跟随模式下，它将优先于乱逛(4)和巡视(3)
         hero.getGoalSelector().addGoal(2, new HeroIdleActionGoal(hero));

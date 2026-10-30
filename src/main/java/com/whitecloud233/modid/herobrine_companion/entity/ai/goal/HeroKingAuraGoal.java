@@ -1,5 +1,9 @@
 package com.whitecloud233.modid.herobrine_companion.entity.ai.goal;
 
+import com.whitecloud233.modid.herobrine_companion.config.ServerConfigAccess;
+import com.whitecloud233.modid.herobrine_companion.util.NbtKeys;
+import com.whitecloud233.modid.herobrine_companion.config.ServerRule;
+
 import com.whitecloud233.modid.herobrine_companion.config.Config;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.family.JeanCombatResponseService;
@@ -36,7 +40,7 @@ public class HeroKingAuraGoal extends Goal {
 
     @Override
     public boolean canUse() {
-        if (!Config.heroKingAuraEnabled) return false;
+        if (!ServerConfigAccess.snapshot().enabled(ServerRule.KING_AURA)) return false;
         if (this.hero.isBattleModeActive()) return false;
         // [新增] 如果正在交易，暂时关闭光环，避免干扰
         if (this.hero.getTradingPlayer() != null) return false;
@@ -57,7 +61,7 @@ public class HeroKingAuraGoal extends Goal {
 
     @Override
     public void tick() {
-        if (!Config.heroKingAuraEnabled) {
+        if (!ServerConfigAccess.snapshot().enabled(ServerRule.KING_AURA)) {
             clearAllMobs();
             return;
         }
@@ -136,8 +140,8 @@ public class HeroKingAuraGoal extends Goal {
     }
 
     private void clearSubmission(Mob mob, boolean releaseDragonPhase) {
-        mob.getPersistentData().putBoolean("HeroSubmission", false);
-        mob.getPersistentData().remove("HeroSubmissionYaw");
+        mob.getPersistentData().putBoolean(NbtKeys.MOB_SUBMISSION, false);
+        mob.getPersistentData().remove(NbtKeys.MOB_SUBMISSION_YAW);
         if (mob.isSilent()) {
             mob.setSilent(false);
         }
@@ -212,7 +216,7 @@ public class HeroKingAuraGoal extends Goal {
     }
 
     private void applySubmissionCalculations(Mob mob) {
-        mob.getPersistentData().putBoolean("HeroSubmission", true);
+        mob.getPersistentData().putBoolean(NbtKeys.MOB_SUBMISSION, true);
         if (!mob.isSilent()) mob.setSilent(true);
         mob.getLookControl().setLookAt(this.hero.getX(), this.hero.getY(), this.hero.getZ());
 
@@ -220,7 +224,7 @@ public class HeroKingAuraGoal extends Goal {
         double dz = this.hero.getZ() - mob.getZ();
         float targetYaw = (float)(Math.atan2(dz, dx) * (180D / Math.PI)) - 90.0F;
 
-        mob.getPersistentData().putFloat("HeroSubmissionYaw", targetYaw);
+        mob.getPersistentData().putFloat(NbtKeys.MOB_SUBMISSION_YAW, targetYaw);
 
         mob.setYRot(targetYaw);
         mob.setYBodyRot(targetYaw);
@@ -263,7 +267,7 @@ public class HeroKingAuraGoal extends Goal {
             if (!isSitting) {
                 dragon.getPhaseManager().setPhase(EnderDragonPhase.SITTING_SCANNING);
             }
-            dragon.getPersistentData().putBoolean("HeroSubmission", true);
+            dragon.getPersistentData().putBoolean(NbtKeys.MOB_SUBMISSION, true);
             if (!dragon.isSilent()) dragon.setSilent(true);
 
             dragon.setDeltaMovement(Vec3.ZERO);
@@ -301,7 +305,7 @@ public class HeroKingAuraGoal extends Goal {
 
             dragon.setDeltaMovement(intendedVel);
             float targetYaw = (float)(Math.atan2(dz, dx) * (180D / Math.PI)) - 180.0F;
-            float newYaw = rotlerp(dragon.getYRot(), targetYaw, 4.0F);
+            float newYaw = Mth.approachDegrees(dragon.getYRot(), targetYaw, 4.0F);
             dragon.setYRot(newYaw);
             dragon.setYBodyRot(newYaw);
             dragon.hasImpulse = true;
@@ -312,7 +316,7 @@ public class HeroKingAuraGoal extends Goal {
         double dx = target.getX() - self.getX();
         double dz = target.getZ() - self.getZ();
         float targetYaw = (float)(Math.atan2(dz, dx) * (180D / Math.PI)) - 180.0F;
-        float newYaw = rotlerp(self.getYRot(), targetYaw, speed);
+        float newYaw = Mth.approachDegrees(self.getYRot(), targetYaw, speed);
         self.setYRot(newYaw);
         self.setYBodyRot(newYaw);
     }
@@ -329,10 +333,4 @@ public class HeroKingAuraGoal extends Goal {
         return startY;
     }
 
-    private float rotlerp(float current, float target, float maxChange) {
-        float f = Mth.wrapDegrees(target - current);
-        if (f > maxChange) f = maxChange;
-        if (f < -maxChange) f = -maxChange;
-        return current + f;
-    }
 }

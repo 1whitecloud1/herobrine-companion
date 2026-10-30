@@ -54,7 +54,6 @@ public final class HeroSummonTool implements AgentTool {
 
     @Override
     public AgentToolResult execute(AgentToolContext context, AgentToolArgs args) {
-        var hero = context.hero();
         ServerPlayer requester = resolveRequester(context);
         if (requester == null) {
             return AgentToolResult.fail("找不到请求者玩家，无法传送",
@@ -69,15 +68,28 @@ public final class HeroSummonTool implements AgentTool {
                         Component.translatable("message.herobrine_companion.tool.summon.failed"));
     }
 
+    /**
+     * 解析发起请求的玩家。
+     *
+     * <p><b>必须走 server 的玩家表，不能用 {@code hero.level().getPlayerByUUID()}</b>：
+     * 玩家说「你过来」时，多半正是 hero 与他不在同一维度（或不在同一已加载区块）。
+     * {@code level().getPlayerByUUID()} 与 {@code HeroEntity#getOwnerPlayer()} 都只在
+     * <b>hero 当前所在维度</b>里找玩家，跨维度恒返回 null——两个分支一起落空，
+     * 工具就回一句"找不到请求者玩家，无法传送"，跨维度传送永远走不到。</p>
+     */
     private static ServerPlayer resolveRequester(AgentToolContext context) {
         var hero = context.hero();
+        if (hero == null || hero.getServer() == null) {
+            return null;
+        }
         UUID requesterUuid = context.requesterUuid();
-        if (requesterUuid != null && hero != null && hero.level().getPlayerByUUID(requesterUuid) instanceof ServerPlayer requester) {
-            return requester;
+        if (requesterUuid != null) {
+            ServerPlayer requester = hero.getServer().getPlayerList().getPlayer(requesterUuid);
+            if (requester != null) {
+                return requester;
+            }
         }
-        if (hero != null && hero.getOwnerPlayer() instanceof ServerPlayer owner) {
-            return owner;
-        }
-        return null;
+        UUID ownerUuid = hero.getOwnerUUID();
+        return ownerUuid == null ? null : hero.getServer().getPlayerList().getPlayer(ownerUuid);
     }
 }

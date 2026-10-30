@@ -26,8 +26,9 @@ public class HeroMoveControl extends MoveControl {
             return;
         }
         // 战斗模式必须覆盖陪伴"贴近主人就原地不动"的行为：否则战斗+陪伴同时开启、
-        // 玩家站在 Hero 2 格内时整段移动被冻结，飞行追击也飞不起来
-        if (!this.hero.isBattleModeActive() && HeroGodlyCompanionGoal.isOwnerWithinStayStillRadius(this.hero)) {
+        // 玩家站在 Hero 2 格内时整段移动被冻结，飞行追击也飞不起来。
+        // 但战斗模式开着、却没有敌人时（陪伴 + 战斗并存）依旧按陪伴处理。
+        if (!this.hero.isChasingBattleEnemy() && HeroGodlyCompanionGoal.isOwnerWithinStayStillRadius(this.hero)) {
             this.operation = Operation.WAIT;
             this.hero.getNavigation().stop();
             this.hero.setDeltaMovement(0.0D, this.hero.getDeltaMovement().y, 0.0D);

@@ -54,6 +54,8 @@ public class HeroTeleportToPlayerGoal extends Goal {
     @Override
     public boolean canUse() {
         if (this.hero.isBattleModeActive()) return false;
+        // 拉磨期间石磨每 tick 直接把 Hero 摆在磨盘上，传送会和它抢位置
+        if (this.hero.isMillstoneHarnessed()) return false;
         // 传送后抑制（庇护传送/观察者传送后 5 秒内不自动拉回）
         if (this.hero.isTeleportFollowHoldActive()) return false;
 

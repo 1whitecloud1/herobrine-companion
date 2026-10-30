@@ -1,5 +1,9 @@
 package com.whitecloud233.modid.herobrine_companion.entity.ai.learning;
 
+import com.whitecloud233.modid.herobrine_companion.config.ServerConfigAccess;
+import com.whitecloud233.modid.herobrine_companion.config.ServerRule;
+
+import com.whitecloud233.modid.herobrine_companion.config.Config;
 import com.whitecloud233.modid.herobrine_companion.entity.GhostCreeperEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.GhostSkeletonEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.GhostSteveEntity;
@@ -35,7 +39,7 @@ public class HeroDialogueHandler {
     public static boolean canSpeak(HeroEntity hero) {
         long time = hero.level().getGameTime();
         long last = hero.getPersistentData().getLong(TAG_LAST_SPEECH);
-        return (time - last) >= (com.whitecloud233.modid.herobrine_companion.config.Config.aiVisionInterval * 20L);
+        return (time - last) >= (ServerConfigAccess.snapshot().value(ServerRule.AI_VISION_INTERVAL) * 20L);
     }
 
     /**
@@ -221,7 +225,7 @@ public class HeroDialogueHandler {
         tryAIDialogueOrFallback(
                 hero,
                 owner,
-                "You are Hero. You yourself chose to rest on [" + blockName + "]. Speak to the player with one brief, natural first-person line about taking a quiet break there. Do not describe the player as the one resting.",
+                "You are Herobrine. You yourself chose to rest on [" + blockName + "]. Speak to the player with one brief, natural first-person line about taking a quiet break there. Do not describe the player as the one resting.",
                 AUTONOMOUS_REST_FALLBACK_KEY,
                 4,
                 restState.getBlock().getDescriptionId(),
@@ -243,7 +247,7 @@ public class HeroDialogueHandler {
         tryAIDialogueOrFallback(
                 hero,
                 owner,
-                "You are Hero. You yourself are about to cook [" + dishName + "] with nearby cookware, without using the player's ingredients. Speak to the player with one brief, natural first-person line that shows interest in the dish. Do not describe the player as the one cooking.",
+                "You are Herobrine. You yourself are about to cook [" + dishName + "] with nearby cookware, without using the player's ingredients. Speak to the player with one brief, natural first-person line that shows interest in the dish. Do not describe the player as the one cooking.",
                 AUTONOMOUS_COOK_FALLBACK_KEY,
                 4,
                 cookedResult.getDescriptionId(),
@@ -405,6 +409,10 @@ public class HeroDialogueHandler {
     private static void dispatchAIDialogueOrFallback(HeroEntity hero, ServerPlayer player, String aiPrompt, String fallbackKey,
                                                      int fallbackVariants, String contextTranslationKey,
                                                      String contextFallbackName, boolean ignoreCooldown) {
+        // 环境观察发话总开关：禁用后服务端不再发包，客户端的 LLM 调用与台词显示也就无从发生。
+        if (!Config.aiVisionSpeechEnabled) {
+            return;
+        }
         if (!ignoreCooldown && !canSpeak(hero)) {
             return;
         }

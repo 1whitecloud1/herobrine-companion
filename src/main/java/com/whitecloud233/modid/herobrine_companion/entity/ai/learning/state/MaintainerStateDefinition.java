@@ -1,5 +1,8 @@
 package com.whitecloud233.modid.herobrine_companion.entity.ai.learning.state;
 
+import com.whitecloud233.modid.herobrine_companion.config.ServerConfigAccess;
+import com.whitecloud233.modid.herobrine_companion.config.ServerRule;
+
 import com.whitecloud233.modid.herobrine_companion.config.Config;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.learning.SimpleNeuralNetwork;
@@ -61,7 +64,7 @@ public final class MaintainerStateDefinition implements HeroMindStateDefinition 
         if (HeroStateBehaviorSupport.clearAnomalyFire(level, hero.blockPosition(), 6)) {
             acted = true;
         }
-        if (Config.heroCleanItems && cleanupItems(hero, owner)) {
+        if (ServerConfigAccess.snapshot().enabled(ServerRule.CLEAN_ITEMS) && cleanupItems(hero, owner)) {
             acted = true;
         }
 

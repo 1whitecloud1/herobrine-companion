@@ -8,6 +8,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+
 /**
  * 统一工具注册表：Agent 调用任何工具的<b>唯一入口</b>（对应设计文档 4.4）。
  *
@@ -25,18 +26,9 @@ import java.util.Map;
  */
 public final class AgentToolRegistry {
 
-    /** 默认工具目录：客户端 LLM 与注册表共享的同一份"能做什么"清单。 */
+    /** 默认工具目录：客户端 LLM 与注册表共享的同一份"能做什么"清单（见 {@link AgentToolFactory}）。 */
     public static List<AgentToolDescriptor> defaultCatalog() {
-        List<AgentToolDescriptor> descriptors = new ArrayList<>(8);
-        descriptors.add(new HeroInspectTool().descriptor());
-        descriptors.add(new HeroLocateCompanionTool().descriptor());
-        descriptors.add(new HeroAscendTool().descriptor());
-        descriptors.add(new HeroDescendTool().descriptor());
-        descriptors.add(new HeroAcceptChallengeTool().descriptor());
-        descriptors.add(new HeroSetModeTool().descriptor());
-        descriptors.add(new HeroSummonTool().descriptor());
-        descriptors.add(new HeroUseSkillTool().descriptor());
-        return descriptors;
+        return AgentToolFactory.defaultCatalog();
     }
 
     private final Map<String, AgentTool> tools = new LinkedHashMap<>();
@@ -91,8 +83,9 @@ public final class AgentToolRegistry {
         AgentTool tool = lookup(toolId);
         if (tool == null) {
             audit.record(new AgentToolAudit.Entry(gameTime, toolId, argsSummary, "unknown_tool", "rejected"));
-            return AgentToolResult.fail("未知工具: " + toolId,
-                    Component.translatable("message.herobrine_companion.tool.error.unknown", toolId));
+            return AgentToolResult.denied("未知工具: " + toolId,
+                    Component.translatable("message.herobrine_companion.tool.error.unknown", toolId),
+                    AgentToolResult.Cause.UNKNOWN_TOOL);
         }
 
         AgentToolArgs safeArgs = args == null ? AgentToolArgs.empty() : args;
@@ -100,7 +93,12 @@ public final class AgentToolRegistry {
         AgentToolResult validation = tool.validate(safeArgs);
         if (!validation.ok()) {
             audit.record(new AgentToolAudit.Entry(gameTime, toolId, argsSummary, "validation", "rejected:" + validation.message()));
-            return validation;
+            // 参数错误是软件流程结果（交接 A3）：保留工具给出的文案与展示，但标成软件原因，
+            // 避免反思器把它当作"一次被拒绝的世界经历"。
+            return AgentToolResult.isSoftwareCause(validation.cause())
+                    ? validation
+                    : AgentToolResult.denied(validation.message(), validation.display(),
+                            AgentToolResult.Cause.INVALID_ARGS);
         }
 
         // 确认：需要确认且未获玩家确认且确认功能开启（P3）→ 返回 confirmation_required，
@@ -118,9 +116,11 @@ public final class AgentToolRegistry {
         try {
             result = tool.execute(context, safeArgs);
         } catch (RuntimeException error) {
-            result = AgentToolResult.fail("执行异常: " + error.getClass().getSimpleName(),
+            // 执行期异常属于软件侧（交接 A3），不写成 Hero 的世界经历。
+            result = AgentToolResult.denied("执行异常: " + error.getClass().getSimpleName(),
                     Component.translatable("message.herobrine_companion.tool.error.execute",
-                            error.getClass().getSimpleName()));
+                            error.getClass().getSimpleName()),
+                    AgentToolResult.Cause.INTERNAL);
         }
         audit.record(new AgentToolAudit.Entry(gameTime, toolId, argsSummary, "execute", result.ok() ? "ok" : "failed:" + result.message()));
         return result;
