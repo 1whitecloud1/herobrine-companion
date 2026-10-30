@@ -1,0 +1,9 @@
+{
+  "vertex": "herobrine_companion:poem_outline_screen",
+  "fragment": "herobrine_companion:poem_outline_blur",
+  "attributes": ["Position", "UV0"],
+  "samplers": [{"name": "Sampler0"}],
+  "uniforms": [
+    {"name": "TexelSize", "type": "float", "count": 2, "values": [1, 1]}
+  ]
+}
