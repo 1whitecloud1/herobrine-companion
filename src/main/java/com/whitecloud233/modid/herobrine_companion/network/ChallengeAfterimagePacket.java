@@ -53,8 +53,6 @@ public class ChallengeAfterimagePacket {
 
     public void handle(Supplier<NetworkEvent.Context> contextSupplier) {
         NetworkEvent.Context context = contextSupplier.get();
-        PacketDispatch.assertClient(context);
-        context.enqueueWork(() -> NetworkClientBridge.handleChallengeAfterimage(this));
-        context.setPacketHandled(true);
+        PacketDispatch.enqueueClient(context, () -> NetworkClientBridge.handleChallengeAfterimage(this));
     }
 }

@@ -70,8 +70,7 @@ public class PresentCrossChatAiLinePacket {
 
     public void handle(Supplier<NetworkEvent.Context> contextSupplier) {
         NetworkEvent.Context context = contextSupplier.get();
-        PacketDispatch.assertClient(context);
-        context.enqueueWork(() -> NetworkClientBridge.presentCrossChatAiLine(
+        PacketDispatch.enqueueClient(context, () -> NetworkClientBridge.presentCrossChatAiLine(
                 this.peerName,
                 this.hbMode,
                 this.speaker,
@@ -81,6 +80,5 @@ public class PresentCrossChatAiLinePacket {
                 this.primaryName,
                 this.secondaryName,
                 this.translateForViewer));
-        context.setPacketHandled(true);
     }
 }

@@ -30,9 +30,7 @@ public class AgentStatusPacket {
 
     public void handle(Supplier<NetworkEvent.Context> contextSupplier) {
         NetworkEvent.Context context = contextSupplier.get();
-        PacketDispatch.assertClient(context);
         // snapshot 是不可变记录（列表在构造期 List.copyOf），跨线程无需再做防御性拷贝。
-        context.enqueueWork(() -> NetworkClientBridge.acceptAgentStatus(this.snapshot));
-        context.setPacketHandled(true);
+        PacketDispatch.enqueueClient(context, () -> NetworkClientBridge.acceptAgentStatus(this.snapshot));
     }
 }

@@ -29,8 +29,6 @@ public class OpenCrossChatInvitePacket {
 
     public void handle(Supplier<NetworkEvent.Context> contextSupplier) {
         NetworkEvent.Context context = contextSupplier.get();
-        PacketDispatch.assertClient(context);
-        context.enqueueWork(() -> NetworkClientBridge.openCrossChatInvite(this.requesterId, this.requesterName));
-        context.setPacketHandled(true);
+        PacketDispatch.enqueueClient(context, () -> NetworkClientBridge.openCrossChatInvite(this.requesterId, this.requesterName));
     }
 }

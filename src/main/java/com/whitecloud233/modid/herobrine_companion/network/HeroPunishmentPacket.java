@@ -39,7 +39,8 @@ public class HeroPunishmentPacket {
                         player.kill();
                     }
                 }
-                case ACTION_KICK_PLAYER -> player.connection.disconnect(Component.literal("Herobrine has cast you out."));
+                case ACTION_KICK_PLAYER -> player.connection.disconnect(
+                        Component.translatable("message.herobrine_companion.punishment.kicked"));
                 default -> {
                 }
             }

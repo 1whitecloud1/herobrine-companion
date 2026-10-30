@@ -59,9 +59,8 @@ public class SavePosePacket {
             });
         } else {
             // 客户端:把姿势数据应用到本地实体
-            PacketDispatch.assertClient(context);
-            context.enqueueWork(() -> NetworkClientBridge.applySavePose(this.entityId, this.isPosing, copyAngles(this.angles)));
-            context.setPacketHandled(true);
+            PacketDispatch.enqueueClient(context,
+                    () -> NetworkClientBridge.applySavePose(this.entityId, this.isPosing, copyAngles(this.angles)));
         }
     }
 

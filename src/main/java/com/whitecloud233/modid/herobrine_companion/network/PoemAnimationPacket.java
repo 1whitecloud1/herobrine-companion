@@ -16,8 +16,6 @@ public record PoemAnimationPacket(int entityId, UUID playerId, int slot, int mod
     }
     public void handle(Supplier<NetworkEvent.Context> supplier) {
         var context = supplier.get();
-        PacketDispatch.assertClient(context);
-        context.enqueueWork(() -> StandalonePoemAnimation.receive(this));
-        context.setPacketHandled(true);
+        PacketDispatch.enqueueClient(context, () -> StandalonePoemAnimation.receive(this));
     }
 }

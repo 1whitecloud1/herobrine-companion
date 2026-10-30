@@ -3,13 +3,15 @@ package com.whitecloud233.modid.herobrine_companion.network;
 import com.whitecloud233.modid.herobrine_companion.client.network.ClientAgentStatus;
 import com.whitecloud233.modid.herobrine_companion.client.network.ClientAgentToolConfirmation;
 import com.whitecloud233.modid.herobrine_companion.client.network.ClientAgentToolResult;
+import com.whitecloud233.modid.herobrine_companion.client.network.ClientAgentFeatureHandler;
 import com.whitecloud233.modid.herobrine_companion.client.network.ClientAiPrompts;
 import com.whitecloud233.modid.herobrine_companion.client.network.ClientFxHandler;
 import com.whitecloud233.modid.herobrine_companion.client.network.ClientMemoryDigest;
 import com.whitecloud233.modid.herobrine_companion.client.network.ClientStateSync;
 import com.whitecloud233.modid.herobrine_companion.client.network.ClientUiDispatch;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.agent.AgentStatusSnapshot;
-import com.whitecloud233.modid.herobrine_companion.compat.cooking.HeroCookingCompat;
+import com.whitecloud233.modid.herobrine_companion.entity.cooking.CookOption;
+import com.whitecloud233.modid.herobrine_companion.entity.cooking.MillstoneOption;
 import com.whitecloud233.modid.herobrine_companion.destructiongod.client.cinematic.ClientSpatialRendHandler;
 import com.whitecloud233.modid.herobrine_companion.destructiongod.client.network.DestructionGodClientPacketHandler;
 import com.whitecloud233.modid.herobrine_companion.destructiongod.network.DestructionGodFaultSplitPacket;
@@ -40,15 +42,57 @@ import java.util.UUID;
  * 防止网络线程与渲染线程共享可变状态。
  */
 public final class NetworkClientBridge {
+    public static void setPeacefulProtection(boolean enabled) {
+        DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> ClientStateSync.applyPeacefulProtection(enabled));
+    }
+
+    public static void acceptTemplates(net.minecraft.network.Connection source, TemplateLibraryReply reply) {
+        DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> ClientStateSync.acceptTemplates(source, reply));
+    }
+
+    public static void acceptTemplatePlacement(net.minecraft.network.Connection source, UUID requestId, boolean ok, boolean complete) {
+        DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> ClientStateSync.acceptTemplatePlacement(source, requestId, ok, complete));
+    }
+
+    /**
+     * 建筑预览线框（S→C）：把包围盒转交客户端渲染层。
+     *
+     * <p>网络包不直接引用 {@code client.structure} 下的类——那会破坏"网络层不依赖客户端实现"
+     * 的架构边界（{@code verifyArchitecture} 会拦）。这里经唯一 DistExecutor 边界转发。</p>
+     */
+    public static void acceptTemplatePreview(int minX, int minY, int minZ, int maxX, int maxY, int maxZ, String label) {
+        DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () ->
+                com.whitecloud233.modid.herobrine_companion.client.structure.TemplatePreviewBox.show(
+                        new net.minecraft.core.BlockPos(minX, minY, minZ),
+                        new net.minecraft.core.BlockPos(maxX, maxY, maxZ), label));
+    }
+
+    /** 清空建筑预览（S→C）。 */
+    public static void clearTemplatePreview() {
+        DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () ->
+                com.whitecloud233.modid.herobrine_companion.client.structure.TemplatePreviewBox.clear());
+    }
+
+    public static void acceptHeroContent(byte[] data) {
+        byte[] copy = data.clone();
+        DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> com.whitecloud233.modid.herobrine_companion.client.network.ClientHeroContent.accept(copy));
+    }
+
     private NetworkClientBridge() {
     }
 
     // ---------- UI ----------
 
-    public static void openCookSelection(int heroId, BlockPos cookwarePos, List<HeroCookingCompat.CookOptionView> options) {
-        List<HeroCookingCompat.CookOptionView> safeOptions = List.copyOf(options);
+    public static void openCookSelection(int heroId, BlockPos cookwarePos, List<CookOption> options) {
+        List<CookOption> safeOptions = List.copyOf(options);
         DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () ->
                 ClientUiDispatch.openCookSelection(heroId, cookwarePos, safeOptions));
+    }
+
+    public static void openMillstoneSelection(int heroId, BlockPos millstonePos, List<MillstoneOption> options) {
+        List<MillstoneOption> safeOptions = List.copyOf(options);
+        DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () ->
+                ClientUiDispatch.openMillstoneSelection(heroId, millstonePos, safeOptions));
     }
 
     public static void openHeroChat(boolean hbInputMode) {
@@ -94,6 +138,12 @@ public final class NetworkClientBridge {
                 ClientAgentToolResult.accept(requestId, toolId, ok, message));
     }
 
+    /** Agent 扩展能力握手回执(T22)：只记录服务端声明的能力位；旧服务端不会走到这里。 */
+    public static void acceptAgentFeatures(UUID requestId, int features) {
+        DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () ->
+                ClientAgentFeatureHandler.accept(features));
+    }
+
     /** Agent 工具审批提示(P3)：map 做了防御性拷贝,避免网络线程与渲染线程共享可变状态。 */
     public static void acceptToolApprovalPrompt(UUID requestId, String toolId, Map<String, String> args, Component description) {
         Map<String, String> safeArgs = Map.copyOf(args);
@@ -102,6 +152,10 @@ public final class NetworkClientBridge {
     }
 
     // ---------- 实体状态同步 ----------
+
+    public static void applyServerConfig(net.minecraft.network.Connection source, ServerConfigReply reply) {
+        DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> ClientStateSync.applyServerConfig(source, reply));
+    }
 
     public static void applySavePose(int entityId, boolean isPosing, float[][] angles) {
         DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () ->

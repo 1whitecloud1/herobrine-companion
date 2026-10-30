@@ -42,8 +42,6 @@ public class PaleLightningPacket {
 
     public void handle(Supplier<NetworkEvent.Context> supplier) {
         NetworkEvent.Context context = supplier.get();
-        PacketDispatch.assertClient(context);
-        context.enqueueWork(() -> NetworkClientBridge.handlePaleLightning(this));
-        context.setPacketHandled(true);
+        PacketDispatch.enqueueClient(context, () -> NetworkClientBridge.handlePaleLightning(this));
     }
 }

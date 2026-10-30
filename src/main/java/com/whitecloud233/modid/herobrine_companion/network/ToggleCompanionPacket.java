@@ -1,6 +1,9 @@
 package com.whitecloud233.modid.herobrine_companion.network;
 
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.modid.herobrine_companion.entity.companion.CompanionModePolicy;
+import com.whitecloud233.modid.herobrine_companion.entity.companion.CompanionModeService;
+import com.whitecloud233.modid.herobrine_companion.util.HeroMenuValidity;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -31,15 +34,19 @@ public class ToggleCompanionPacket {
             if (serverPlayer != null) {
                 Entity entity = serverPlayer.level().getEntity(this.entityId);
                 if (entity instanceof HeroEntity hero) {
-                    if (hero.getTrustLevel() >= 50) {
-                        boolean newState = !hero.isCompanionMode();
-                        if (newState && hero.getOwnerUUID() == null) {
-                            hero.setOwnerUUID(serverPlayer.getUUID());
-                        }
-                        hero.setCompanionMode(newState);
-                        
-                        String msgKey = newState ? "message.herobrine_companion.companion_on" : "message.herobrine_companion.companion_off";
-                        serverPlayer.sendSystemMessage(Component.translatable(msgKey));
+                    if (!serverPlayer.isAlive() || !HeroMenuValidity.isHeroInPlayerLoadedArea(hero, serverPlayer)) {
+                        serverPlayer.sendSystemMessage(Component.translatable("message.herobrine_companion.companion_too_far"));
+                        return;
+                    }
+                    boolean desiredMode = !hero.isCompanionMode();
+                    CompanionModePolicy.Result result = CompanionModeService.changeMode(serverPlayer.getUUID(), hero, desiredMode);
+                    if (result.successful()) {
+                        String key = desiredMode ? "message.herobrine_companion.companion_on" : "message.herobrine_companion.companion_off";
+                        serverPlayer.sendSystemMessage(Component.translatable(key));
+                    } else if (result == CompanionModePolicy.Result.NOT_OWNER) {
+                        serverPlayer.sendSystemMessage(hero.createNotYourHeroMessage());
+                    } else {
+                        serverPlayer.sendSystemMessage(Component.translatable(result.messageKey()));
                     }
                 }
             }

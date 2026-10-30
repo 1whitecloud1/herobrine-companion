@@ -16,23 +16,17 @@ public class PaleLightningArcPacket {
     }
 
     public PaleLightningArcPacket(FriendlyByteBuf buf) {
-        this.startPos = new Vec3(buf.readDouble(), buf.readDouble(), buf.readDouble());
-        this.endPos = new Vec3(buf.readDouble(), buf.readDouble(), buf.readDouble());
+        this.startPos = NetworkCodec.readVec3(buf);
+        this.endPos = NetworkCodec.readVec3(buf);
     }
 
     public void encode(FriendlyByteBuf buf) {
-        buf.writeDouble(this.startPos.x);
-        buf.writeDouble(this.startPos.y);
-        buf.writeDouble(this.startPos.z);
-        buf.writeDouble(this.endPos.x);
-        buf.writeDouble(this.endPos.y);
-        buf.writeDouble(this.endPos.z);
+        NetworkCodec.writeVec3(buf, this.startPos);
+        NetworkCodec.writeVec3(buf, this.endPos);
     }
 
     public void handle(Supplier<NetworkEvent.Context> contextSupplier) {
         NetworkEvent.Context context = contextSupplier.get();
-        PacketDispatch.assertClient(context);
-        context.enqueueWork(() -> NetworkClientBridge.handlePaleLightningArc(this));
-        context.setPacketHandled(true);
+        PacketDispatch.enqueueClient(context, () -> NetworkClientBridge.handlePaleLightningArc(this));
     }
 }

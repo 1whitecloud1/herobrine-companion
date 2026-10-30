@@ -16,37 +16,55 @@ import java.util.function.Supplier;
  */
 public class AgentToolResultPacket {
 
+    /** 协议上限：message 超过它会让 writeUtf 抛 EncoderException，必须在构造时截断。 */
+    private static final int MAX_TOOL_ID = 64;
+    private static final int MAX_MESSAGE = 512;
+
     private final UUID requestId;
     private final String toolId;
     private final boolean ok;
     private final String message;
 
     public AgentToolResultPacket(UUID requestId, String toolId, boolean ok, String message) {
-        this.requestId = requestId;
-        this.toolId = toolId == null ? "" : toolId;
+        this.requestId = requestId == null ? new UUID(0L, 0L) : requestId;
+        this.toolId = clamp(toolId, MAX_TOOL_ID);
         this.ok = ok;
-        this.message = message == null ? "" : message;
+        // 工具回执可能带容器清单 / 进度描述，超长会让 writeUtf 抛异常、整包发不出去，
+        // 客户端于是只能等超时。这里按协议上限截断，并保留"被截断"的可读提示。
+        this.message = clamp(message, MAX_MESSAGE);
     }
 
     public AgentToolResultPacket(FriendlyByteBuf buf) {
         this.requestId = buf.readUUID();
-        this.toolId = buf.readUtf(64);
+        this.toolId = buf.readUtf(MAX_TOOL_ID);
         this.ok = buf.readBoolean();
-        this.message = buf.readUtf(512);
+        this.message = buf.readUtf(MAX_MESSAGE);
     }
 
     public void encode(FriendlyByteBuf buf) {
         buf.writeUUID(this.requestId);
-        buf.writeUtf(this.toolId, 64);
+        buf.writeUtf(this.toolId, MAX_TOOL_ID);
         buf.writeBoolean(this.ok);
-        buf.writeUtf(this.message, 512);
+        buf.writeUtf(this.message, MAX_MESSAGE);
+    }
+
+    /**
+     * 截断到协议允许的字符数。
+     *
+     * <p>按 {@code writeUtf} 的判定口径（UTF-16 字符数）截断，并在末尾留一个省略号，
+     * 让读到回执的一方知道"这里被截过"而不是数据莫名变短。</p>
+     */
+    private static String clamp(String value, int max) {
+        String text = value == null ? "" : value;
+        if (text.length() <= max) {
+            return text;
+        }
+        return text.substring(0, Math.max(0, max - 1)) + "…";
     }
 
     public void handle(Supplier<NetworkEvent.Context> contextSupplier) {
         NetworkEvent.Context context = contextSupplier.get();
-        PacketDispatch.assertClient(context);
-        context.enqueueWork(() -> NetworkClientBridge.acceptAgentToolResult(
+        PacketDispatch.enqueueClient(context, () -> NetworkClientBridge.acceptAgentToolResult(
                 this.requestId, this.toolId, this.ok, this.message));
-        context.setPacketHandled(true);
     }
 }

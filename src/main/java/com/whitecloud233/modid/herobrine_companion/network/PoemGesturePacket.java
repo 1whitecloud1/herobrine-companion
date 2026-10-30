@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.network;
 
-import com.whitecloud233.modid.herobrine_companion.compat.epicfight.HeroEpicFightCompat;
+import com.whitecloud233.modid.herobrine_companion.api.compat.HeroEpicFightCompat;
+import com.whitecloud233.modid.herobrine_companion.combat.poem.StandalonePoemController;
 import java.util.function.Supplier;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraftforge.network.NetworkEvent;
@@ -17,7 +18,9 @@ public record PoemGesturePacket(int gesture, int slot, int mode) {
         var context = supplier.get();
         PacketDispatch.enqueueServer(context, () -> {
             if (context.getSender() != null) {
-                HeroEpicFightCompat.queuePoemGesture(context.getSender(), gesture, slot, mode);
+                if (StandalonePoemController.standalone()) {
+                    StandalonePoemController.requestGesture(context.getSender(), gesture, slot, mode);
+                } else HeroEpicFightCompat.queuePoemGesture(context.getSender(), gesture, slot, mode);
             }
         });
     }

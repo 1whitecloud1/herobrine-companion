@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.network;
 
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.modid.herobrine_companion.util.HeroMenuValidity;
 import com.whitecloud233.modid.herobrine_companion.world.inventory.HeroMerchantMenu;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
@@ -34,7 +35,8 @@ public class OpenTradePacket {
                 Entity entity = player.level().getEntity(this.entityId);
 
                 if (entity instanceof HeroEntity hero) {
-                    if (player.distanceToSqr(hero) < 64.0D) {
+                    // 与菜单保持打开的条件一致，避免仍在已加载区块内却因超过 8 格无法打开。
+                    if (HeroMenuValidity.isHeroInPlayerLoadedArea(hero, player)) {
 
                         // 获取交易列表（此时已修复了 KubeJS 导致的崩溃）
                         net.minecraft.world.item.trading.MerchantOffers offers = hero.getOffers();

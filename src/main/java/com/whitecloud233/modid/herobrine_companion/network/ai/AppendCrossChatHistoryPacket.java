@@ -42,9 +42,7 @@ public class AppendCrossChatHistoryPacket {
 
     public void handle(Supplier<NetworkEvent.Context> contextSupplier) {
         NetworkEvent.Context context = contextSupplier.get();
-        PacketDispatch.assertClient(context);
-        context.enqueueWork(() -> NetworkClientBridge.appendCrossChatHistory(
+        PacketDispatch.enqueueClient(context, () -> NetworkClientBridge.appendCrossChatHistory(
                 this.peerName, this.hbMode, this.speaker, this.content, this.kind));
-        context.setPacketHandled(true);
     }
 }

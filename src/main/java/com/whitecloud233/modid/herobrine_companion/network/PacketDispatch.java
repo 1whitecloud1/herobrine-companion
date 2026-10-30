@@ -48,4 +48,17 @@ public final class PacketDispatch {
         context.enqueueWork(task);
         context.setPacketHandled(true);
     }
+
+    /**
+     * S→C 包的 handle 标准入口:断言客户端 + 排队到主线程 + 标记已处理。
+     *
+     * <p>与 {@link #enqueueServer} 完全对称。此前只有 C→S 方向有这个封装,
+     * S→C 的 38 个包只能各自手抄
+     * {@code assertClient + enqueueWork + setPacketHandled} 三行。</p>
+     */
+    public static void enqueueClient(NetworkEvent.Context context, Runnable task) {
+        assertClient(context);
+        context.enqueueWork(task);
+        context.setPacketHandled(true);
+    }
 }

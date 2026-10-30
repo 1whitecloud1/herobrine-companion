@@ -59,15 +59,13 @@ public class SyncHeroCosmeticsPacket {
 
     public void handle(Supplier<NetworkEvent.Context> supplier) {
         NetworkEvent.Context context = supplier.get();
-        PacketDispatch.assertClient(context);
-        context.enqueueWork(() -> NetworkClientBridge.applySyncHeroCosmetics(
+        PacketDispatch.enqueueClient(context, () -> NetworkClientBridge.applySyncHeroCosmetics(
                 this.entityId,
                 this.skinVariant,
                 this.customSkinName,
                 this.customSkinData,
                 this.curiosBackItem,
                 this.accessoriesData));
-        context.setPacketHandled(true);
     }
 
     private static byte[] getCustomSkinData(HeroEntity hero) {

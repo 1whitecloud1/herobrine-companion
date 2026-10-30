@@ -1,13 +1,13 @@
 package com.whitecloud233.modid.herobrine_companion.network.ai;
 
 import com.whitecloud233.modid.herobrine_companion.network.NetworkClientBridge;
+import com.whitecloud233.modid.herobrine_companion.util.LanguageCodes;
 import com.whitecloud233.modid.herobrine_companion.network.PacketDispatch;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraftforge.network.NetworkEvent;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.UUID;
 import java.util.function.Supplier;
 
@@ -31,7 +31,7 @@ public class ActorDialoguePromptPacket {
         this.seedText = seedText == null ? "" : seedText;
         this.fallbackKey = fallbackKey == null ? "" : fallbackKey;
         this.fallbackArgs = fallbackArgs == null ? List.of() : List.copyOf(fallbackArgs);
-        this.outputLanguageCode = normalizeLanguageCode(outputLanguageCode);
+        this.outputLanguageCode = LanguageCodes.normalize(outputLanguageCode);
     }
 
     public ActorDialoguePromptPacket(FriendlyByteBuf buf) {
@@ -47,7 +47,7 @@ public class ActorDialoguePromptPacket {
             args.add(buf.readUtf(512));
         }
         this.fallbackArgs = List.copyOf(args);
-        this.outputLanguageCode = normalizeLanguageCode(buf.readUtf(32));
+        this.outputLanguageCode = LanguageCodes.normalize(buf.readUtf(32));
     }
 
     public void encode(FriendlyByteBuf buf) {
@@ -66,8 +66,7 @@ public class ActorDialoguePromptPacket {
 
     public void handle(Supplier<NetworkEvent.Context> contextSupplier) {
         NetworkEvent.Context context = contextSupplier.get();
-        PacketDispatch.assertClient(context);
-        context.enqueueWork(() -> NetworkClientBridge.handleActorDialoguePrompt(
+        PacketDispatch.enqueueClient(context, () -> NetworkClientBridge.handleActorDialoguePrompt(
                 this.jobId,
                 this.conversationScopeId,
                 this.systemPrompt,
@@ -77,14 +76,6 @@ public class ActorDialoguePromptPacket {
                 this.fallbackArgs,
                 this.outputLanguageCode
         ));
-        context.setPacketHandled(true);
     }
 
-    private static String normalizeLanguageCode(String rawLanguageCode) {
-        if (rawLanguageCode == null) {
-            return "en_us";
-        }
-        String normalized = rawLanguageCode.trim().toLowerCase(Locale.ROOT).replace('-', '_');
-        return normalized.isEmpty() ? "en_us" : normalized;
-    }
 }

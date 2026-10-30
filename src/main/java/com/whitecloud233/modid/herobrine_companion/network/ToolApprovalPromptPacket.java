@@ -58,10 +58,8 @@ public class ToolApprovalPromptPacket {
 
     public void handle(Supplier<NetworkEvent.Context> contextSupplier) {
         NetworkEvent.Context context = contextSupplier.get();
-        PacketDispatch.assertClient(context);
-        context.enqueueWork(() -> NetworkClientBridge.acceptToolApprovalPrompt(
+        PacketDispatch.enqueueClient(context, () -> NetworkClientBridge.acceptToolApprovalPrompt(
                 this.requestId, this.toolId, this.args, this.description));
-        context.setPacketHandled(true);
     }
 
     /** 反序列化本地化组件；空串 / 解析失败回退为空白组件，保证网络线程不抛异常。 */

@@ -1,11 +1,11 @@
 package com.whitecloud233.modid.herobrine_companion.network.ai;
 
 import com.whitecloud233.modid.herobrine_companion.network.NetworkClientBridge;
+import com.whitecloud233.modid.herobrine_companion.util.LanguageCodes;
 import com.whitecloud233.modid.herobrine_companion.network.PacketDispatch;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraftforge.network.NetworkEvent;
 
-import java.util.Locale;
 import java.util.UUID;
 import java.util.function.Supplier;
 
@@ -27,7 +27,7 @@ public class HeroCrossChatPromptPacket {
         this.kind = kind;
         this.prompt = prompt == null ? "" : prompt;
         this.seedText = seedText == null ? "" : seedText;
-        this.outputLanguageCode = normalizeLanguageCode(outputLanguageCode);
+        this.outputLanguageCode = LanguageCodes.normalize(outputLanguageCode);
     }
 
     public HeroCrossChatPromptPacket(FriendlyByteBuf buf) {
@@ -36,7 +36,7 @@ public class HeroCrossChatPromptPacket {
         this.kind = buf.readByte();
         this.prompt = buf.readUtf(16384);
         this.seedText = buf.readUtf(2048);
-        this.outputLanguageCode = normalizeLanguageCode(buf.readUtf(32));
+        this.outputLanguageCode = LanguageCodes.normalize(buf.readUtf(32));
     }
 
     public void encode(FriendlyByteBuf buf) {
@@ -50,17 +50,8 @@ public class HeroCrossChatPromptPacket {
 
     public void handle(Supplier<NetworkEvent.Context> contextSupplier) {
         NetworkEvent.Context context = contextSupplier.get();
-        PacketDispatch.assertClient(context);
-        context.enqueueWork(() -> NetworkClientBridge.handleHeroCrossChatPrompt(
+        PacketDispatch.enqueueClient(context, () -> NetworkClientBridge.handleHeroCrossChatPrompt(
                 this.jobId, this.sessionId, this.kind, this.prompt, this.seedText, this.outputLanguageCode));
-        context.setPacketHandled(true);
     }
 
-    private static String normalizeLanguageCode(String rawLanguageCode) {
-        if (rawLanguageCode == null) {
-            return "en_us";
-        }
-        String normalized = rawLanguageCode.trim().toLowerCase(Locale.ROOT).replace('-', '_');
-        return normalized.isEmpty() ? "en_us" : normalized;
-    }
 }

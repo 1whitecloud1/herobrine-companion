@@ -13,7 +13,7 @@ public class SyncRewardsPacket {
 
     public SyncRewardsPacket(int entityId, Set<Integer> claimedRewards) {
         this.entityId = entityId;
-        this.claimedRewards = claimedRewards;
+        this.claimedRewards = Set.copyOf(claimedRewards);
     }
 
     public SyncRewardsPacket(FriendlyByteBuf buf) {
@@ -35,8 +35,6 @@ public class SyncRewardsPacket {
 
     public void handle(Supplier<NetworkEvent.Context> contextSupplier) {
         NetworkEvent.Context context = contextSupplier.get();
-        PacketDispatch.assertClient(context);
-        context.enqueueWork(() -> NetworkClientBridge.applySyncRewards(this.entityId, this.claimedRewards));
-        context.setPacketHandled(true);
+        PacketDispatch.enqueueClient(context, () -> NetworkClientBridge.applySyncRewards(this.entityId, this.claimedRewards));
     }
 }

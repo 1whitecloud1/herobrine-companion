@@ -33,8 +33,6 @@ public class HeroMemoryDigestPacket {
 
     public void handle(Supplier<NetworkEvent.Context> contextSupplier) {
         NetworkEvent.Context context = contextSupplier.get();
-        PacketDispatch.assertClient(context);
-        context.enqueueWork(() -> NetworkClientBridge.acceptMemoryDigest(this.digest));
-        context.setPacketHandled(true);
+        PacketDispatch.enqueueClient(context, () -> NetworkClientBridge.acceptMemoryDigest(this.digest));
     }
 }

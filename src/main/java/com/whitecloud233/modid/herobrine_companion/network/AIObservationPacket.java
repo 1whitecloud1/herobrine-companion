@@ -47,10 +47,8 @@ public class AIObservationPacket {
 
     public void handle(Supplier<NetworkEvent.Context> contextSupplier) {
         NetworkEvent.Context context = contextSupplier.get();
-        PacketDispatch.assertClient(context);
-        context.enqueueWork(() -> NetworkClientBridge.handleAIObservation(
+        PacketDispatch.enqueueClient(context, () -> NetworkClientBridge.handleAIObservation(
                 this.heroId, this.observationDesc, this.fallbackKey, this.fallbackVariants,
                 this.contextTranslationKey, this.contextFallbackName));
-        context.setPacketHandled(true);
     }
 }

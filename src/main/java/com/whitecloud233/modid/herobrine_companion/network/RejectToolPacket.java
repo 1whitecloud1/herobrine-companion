@@ -9,10 +9,13 @@ import java.util.UUID;
 import java.util.function.Supplier;
 
 /**
- * C→S 审批拒绝（P3）：玩家在确认屏点"拒绝"后，丢弃待确认调用并补发失败结果，
+ * C→S 审批拒绝：玩家在确认屏点"拒绝"后，丢弃待确认调用并补发确定终态，
  * 让客户端等待的合成调用及时结束（不会谎称已执行）。
  *
  * <p><b>单一职责</b>：只做"丢弃 + 回执"。</p>
+ *
+ * <p>拒绝是<b>玩家意志</b>，不是世界失败，也不是 Hero 的负面经历（交接 A3）：
+ * 回执如实说明"已取消该操作"，反思侧不会为它写失败教训。</p>
  */
 public class RejectToolPacket {
 
@@ -44,8 +47,9 @@ public class RejectToolPacket {
         long gameTime = player.getServer() == null ? 0L : player.getServer().overworld().getGameTime();
         AgentToolConfirmationStore.ConfirmationEntry entry = AgentToolConfirmationStore.take(requestId, gameTime);
         if (requestId != null) {
+            String message = entry == null ? "该请求已失效（过期或已处理），未执行" : "已取消该操作";
             PacketHandler.sendToPlayer(new AgentToolResultPacket(
-                    requestId, entry == null ? "" : entry.toolId(), false, "已取消该操作"), player);
+                    requestId, entry == null ? "" : entry.toolId(), false, message), player);
         }
     }
 }

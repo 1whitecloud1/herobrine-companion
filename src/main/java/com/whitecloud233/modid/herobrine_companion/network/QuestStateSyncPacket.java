@@ -46,8 +46,6 @@ public class QuestStateSyncPacket {
 
     public static void handle(QuestStateSyncPacket packet, Supplier<NetworkEvent.Context> supplier) {
         NetworkEvent.Context context = supplier.get();
-        PacketDispatch.assertClient(context);
-        context.enqueueWork(() -> ClientQuestState.setQuestState(packet.activeQuestId, packet.cooldownEnds));
-        context.setPacketHandled(true);
+        PacketDispatch.enqueueClient(context, () -> ClientQuestState.setQuestState(packet.activeQuestId, packet.cooldownEnds));
     }
 }
