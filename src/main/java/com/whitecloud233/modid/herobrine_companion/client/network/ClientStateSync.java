@@ -14,7 +14,38 @@ import java.util.Set;
  * 收包后把服务端实体状态同步到客户端实体的处理入口。由 {@code NetworkClientBridge} 经 DistExecutor 转发。
  */
 public final class ClientStateSync {
+    /** Connection-scoped state must never leak into the next world/server. */
+    public static void clearSessionState() {
+        com.whitecloud233.modid.herobrine_companion.client.ClientQuestState.setQuestState(0, java.util.Map.of());
+        ClientMemoryDigest.reset();
+        com.whitecloud233.modid.herobrine_companion.client.agent.ClientAgentStatusStore.clear();
+        com.whitecloud233.modid.herobrine_companion.client.agent.ClientAgentToolRequestStore.clear();
+    }
+
+    public static void applyPeacefulProtection(boolean enabled) {
+        var player = Minecraft.getInstance().player;
+        if (player == null) return;
+        if (enabled) {
+            player.addTag(com.whitecloud233.modid.herobrine_companion.entity.logic.data.PeacefulProtection.TAG);
+        } else {
+            player.removeTag(com.whitecloud233.modid.herobrine_companion.entity.logic.data.PeacefulProtection.TAG);
+        }
+    }
+
+    public static void acceptTemplates(net.minecraft.network.Connection source,
+                                       com.whitecloud233.modid.herobrine_companion.network.TemplateLibraryReply reply) {
+        ClientTemplateLibrary.accept(source, reply);
+    }
+
+    public static void acceptTemplatePlacement(net.minecraft.network.Connection source, java.util.UUID requestId, boolean ok, boolean complete) {
+        ClientTemplatePlacement.accept(source, requestId, ok, complete);
+    }
     private ClientStateSync() {
+    }
+
+    public static void applyServerConfig(net.minecraft.network.Connection source,
+                                         com.whitecloud233.modid.herobrine_companion.network.ServerConfigReply reply) {
+        ClientServerConfig.accept(source, reply);
     }
 
     public static void applySavePose(int entityId, boolean isPosing, float[][] angles) {
@@ -38,9 +69,7 @@ public final class ClientStateSync {
 
         Entity entity = minecraft.level.getEntity(entityId);
         if (entity instanceof HeroEntity hero) {
-            for (int rewardId : claimedRewards) {
-                hero.claimReward(rewardId);
-            }
+            hero.applyClaimedRewardsSnapshot(claimedRewards);
         }
     }
 

@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.client.network;
 
 import com.whitecloud233.modid.herobrine_companion.client.service.ActorDialogueRequest;
+import com.whitecloud233.modid.herobrine_companion.util.LanguageCodes;
 import com.whitecloud233.modid.herobrine_companion.client.service.ActorDialogueService;
 import com.whitecloud233.modid.herobrine_companion.client.service.AIService;
 import com.whitecloud233.modid.herobrine_companion.client.service.CrossChatHistoryStore;
@@ -8,6 +9,7 @@ import com.whitecloud233.modid.herobrine_companion.client.service.LLMConfig;
 import com.whitecloud233.modid.herobrine_companion.client.service.LocalChatService;
 import com.whitecloud233.modid.herobrine_companion.config.Config;
 import com.whitecloud233.modid.herobrine_companion.entity.dialogue.SpeechBubbleAccessor;
+import com.whitecloud233.modid.herobrine_companion.entity.dialogue.SpeechBubbleTiming;
 import com.whitecloud233.modid.herobrine_companion.network.AgentChatOutcomePacket;
 import com.whitecloud233.modid.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.modid.herobrine_companion.network.ai.ActorDialogueResultPacket;
@@ -38,8 +40,6 @@ public final class ClientAiPrompts {
     private static final long DUPLICATE_SUPPRESS_WINDOW_MS = 5_000L;
     private static final String AUTONOMOUS_REST_FALLBACK_KEY = "message.herobrine_companion.autonomous_rest";
     private static final String AUTONOMOUS_COOK_FALLBACK_KEY = "message.herobrine_companion.autonomous_cook";
-    private static final int MIN_BUBBLE_TICKS = 45;
-    private static final int MAX_BUBBLE_TICKS = 180;
 
     private ClientAiPrompts() {
     }
@@ -68,8 +68,14 @@ public final class ClientAiPrompts {
         if (shouldSuppressDuplicate(mc.player.getUUID(), heroId, observationDesc)) {
             return;
         }
+        // 环境观察发话总开关：禁用后连大模型都不再请求，聊天框与头顶气泡都不会出现台词。
+        if (!Config.aiVisionSpeechEnabled) {
+            return;
+        }
 
         boolean domesticLine = isDomesticFallbackKey(fallbackKey);
+        // 模组设置「观察台词仅显示气泡」开启后，环境观察台词只进头顶气泡，不再打印到聊天框。
+        boolean bubbleOnly = Config.aiVisionBubbleOnly;
         String resolvedContextName = resolveContextName(contextTranslationKey, contextFallbackName);
         String effectiveObservation = buildObservationDescription(fallbackKey, observationDesc, resolvedContextName);
         boolean isAiReady = !LLMConfig.isKeyMissingOrInvalid() && Config.aiVisionEnabled;
@@ -79,18 +85,20 @@ public final class ClientAiPrompts {
                         if (isUsableAiReply(reply)) {
                             Component line = Component.literal(sanitize(reply));
                             if (domesticLine) {
-                                showHeroDialogue(mc, heroId, line, true);
+                                showHeroDialogue(mc, heroId, line, true, bubbleOnly);
+                            } else if (bubbleOnly) {
+                                showHeroBubble(mc, heroId, line);
                             } else {
                                 mc.player.sendSystemMessage(Component.literal(LegacyFormattingText.normalize("§e<Herobrine> §f" + reply)));
                             }
                         } else {
-                            showFallbackDialogue(mc, heroId, fallbackKey, fallbackVariants, resolvedContextName);
+                            showFallbackDialogue(mc, heroId, fallbackKey, fallbackVariants, resolvedContextName, bubbleOnly);
                         }
                     }));
             return;
         }
 
-        showFallbackDialogue(mc, heroId, fallbackKey, fallbackVariants, resolvedContextName);
+        showFallbackDialogue(mc, heroId, fallbackKey, fallbackVariants, resolvedContextName, bubbleOnly);
     }
 
     public static void presentCrossChatAiLine(String peerName, boolean hbMode, String speaker, String content,
@@ -188,14 +196,19 @@ public final class ClientAiPrompts {
     }
 
     private static void showFallbackDialogue(Minecraft mc, int heroId, String fallbackKey, int fallbackVariants,
-                                             String resolvedContextName) {
+                                             String resolvedContextName, boolean bubbleOnly) {
         Component line = buildFallbackDialogue(mc, fallbackKey, fallbackVariants, resolvedContextName);
         if (line == null) {
             return;
         }
 
         if (isDomesticFallbackKey(fallbackKey)) {
-            showHeroDialogue(mc, heroId, line, true);
+            showHeroDialogue(mc, heroId, line, true, bubbleOnly);
+            return;
+        }
+
+        if (bubbleOnly) {
+            showHeroBubble(mc, heroId, line);
             return;
         }
 
@@ -274,11 +287,11 @@ public final class ClientAiPrompts {
     private static String buildObservationDescription(String fallbackKey, String observationDesc, String resolvedContextName) {
         if (AUTONOMOUS_REST_FALLBACK_KEY.equals(fallbackKey)) {
             String subject = resolvedContextName.isBlank() ? "the spot you chose" : resolvedContextName;
-            return "You are Hero. You yourself chose to rest on [" + subject + "]. Reply to the player with one short, natural first-person line about taking a quiet break there. Do not say the player is the one resting.";
+            return "You are Herobrine. You yourself chose to rest on [" + subject + "]. Reply to the player with one short, natural first-person line about taking a quiet break there. Do not say the player is the one resting.";
         }
         if (AUTONOMOUS_COOK_FALLBACK_KEY.equals(fallbackKey)) {
             String subject = resolvedContextName.isBlank() ? "the dish you chose" : resolvedContextName;
-            return "You are Hero. You yourself decided to cook [" + subject + "] with nearby cookware, without using the player's ingredients. Reply to the player with one short, natural first-person line that shows interest in the food. Do not say the player is the one cooking.";
+            return "You are Herobrine. You yourself decided to cook [" + subject + "] with nearby cookware, without using the player's ingredients. Reply to the player with one short, natural first-person line that shows interest in the food. Do not say the player is the one cooking.";
         }
         return observationDesc == null ? "" : observationDesc;
     }
@@ -299,8 +312,8 @@ public final class ClientAiPrompts {
                 || AUTONOMOUS_COOK_FALLBACK_KEY.equals(fallbackKey);
     }
 
-    private static void showHeroDialogue(Minecraft mc, int heroId, Component line, boolean withPrefix) {
-        if (mc.player != null) {
+    private static void showHeroDialogue(Minecraft mc, int heroId, Component line, boolean withPrefix, boolean bubbleOnly) {
+        if (!bubbleOnly && mc.player != null) {
             Component chatLine = withPrefix
                     ? Component.literal("<Herobrine> ").withStyle(ChatFormatting.YELLOW)
                     .append(line.copy().withStyle(ChatFormatting.WHITE))
@@ -308,6 +321,15 @@ public final class ClientAiPrompts {
             mc.player.sendSystemMessage(chatLine);
         }
 
+        showHeroBubble(mc, heroId, line);
+    }
+
+    /**
+     * 只把台词挂在 Herobrine 头顶的气泡上，不写入聊天框。
+     *
+     * <p>由模组设置「观察台词仅显示气泡」({@code aiVisionBubbleOnly}) 开启时使用。</p>
+     */
+    private static void showHeroBubble(Minecraft mc, int heroId, Component line) {
         if (mc.level == null) {
             return;
         }
@@ -319,8 +341,7 @@ public final class ClientAiPrompts {
     }
 
     private static int computeBubbleDuration(Component line) {
-        int duration = MIN_BUBBLE_TICKS + line.getString().length() * 2;
-        return Math.max(MIN_BUBBLE_TICKS, Math.min(MAX_BUBBLE_TICKS, duration));
+        return SpeechBubbleTiming.durationTicks(line);
     }
 
     private static void applyPresentedLine(Minecraft mc, String peerName, boolean hbMode, String speaker,
@@ -407,16 +428,9 @@ public final class ClientAiPrompts {
     }
 
     private static boolean isChineseLocale(String languageCode) {
-        return normalizeLanguageCode(languageCode).startsWith("zh");
+        return LanguageCodes.normalize(languageCode).startsWith("zh");
     }
 
-    private static String normalizeLanguageCode(String rawLanguageCode) {
-        if (rawLanguageCode == null) {
-            return "en_us";
-        }
-        String normalized = rawLanguageCode.trim().toLowerCase(Locale.ROOT).replace('-', '_');
-        return normalized.isEmpty() ? "en_us" : normalized;
-    }
 
     private static String sanitize(String content) {
         return content == null ? "" : content.replace('\r', ' ').replace('\n', ' ').trim();
