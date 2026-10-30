@@ -1,10 +1,16 @@
 package com.whitecloud233.herobrine_companion.item;
 
+import com.google.common.collect.ImmutableMultimap;
+import com.google.common.collect.Multimap;
+
 import com.whitecloud233.herobrine_companion.init.*;
+import com.whitecloud233.herobrine_companion.config.ServerConfigAccess;
+import com.whitecloud233.herobrine_companion.config.ServerRule;
+import com.whitecloud233.herobrine_companion.client.render.PoemOfTheEndGeoCompat;
 import com.whitecloud233.herobrine_companion.combat.poem.PoemMeleeHit;
 
-import com.whitecloud233.herobrine_companion.compat.epicfight.HeroEpicFightStateMapper;
-import com.whitecloud233.herobrine_companion.compat.epicfight.HeroEpicFightCompat;
+import com.whitecloud233.herobrine_companion.combat.HeroCombatStateMapper;
+import com.whitecloud233.herobrine_companion.api.compat.HeroEpicFightCompat;
 import com.whitecloud233.herobrine_companion.entity.projectile.CleaveBladeEntity;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.projectile.RealmBreakerLightningEntity;
@@ -88,10 +94,10 @@ public class PoemOfTheEndItem extends DiggerItem {
     }
     public String getEpicFightWeaponStyleKey(ItemStack stack) {
         return switch (getMode(stack)) {
-            case MODE_REALM_BREAKER -> HeroEpicFightStateMapper.HERO_WEAPON_STYLE_REALM_BREAKER;
-            case MODE_THUNDER_CALL -> HeroEpicFightStateMapper.HERO_WEAPON_STYLE_THUNDER;
-            case MODE_VOID_SHATTER -> HeroEpicFightStateMapper.HERO_WEAPON_STYLE_VOID_SHATTER;
-            default -> HeroEpicFightStateMapper.HERO_WEAPON_STYLE_BASIC;
+            case MODE_REALM_BREAKER -> HeroCombatStateMapper.HERO_WEAPON_STYLE_REALM_BREAKER;
+            case MODE_THUNDER_CALL -> HeroCombatStateMapper.HERO_WEAPON_STYLE_THUNDER;
+            case MODE_VOID_SHATTER -> HeroCombatStateMapper.HERO_WEAPON_STYLE_VOID_SHATTER;
+            default -> HeroCombatStateMapper.HERO_WEAPON_STYLE_BASIC;
         };
     }
     // 设置模式
@@ -220,6 +226,11 @@ public class PoemOfTheEndItem extends DiggerItem {
             if (count >= maxTargets) break;
             
             PacketHandler.sendToTracking(new PaleLightningPacket(target.getX(), target.getY(), target.getZ(), 6.0F, true), target);
+            // 原版落雷的雷声与撞击声，由服务端广播给落点附近的玩家。
+            level.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.LIGHTNING_BOLT_THUNDER,
+                    SoundSource.WEATHER, 4.0F, 0.8F + level.random.nextFloat() * 0.2F);
+            level.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.LIGHTNING_BOLT_IMPACT,
+                    SoundSource.WEATHER, 2.0F, 0.5F + level.random.nextFloat() * 0.2F);
             
             // 计算针对该目标的附魔加成 (支持锋利、亡灵杀手、节肢杀手)
             // 使用魔法伤害以绕过护甲，并防止被免疫雷电的生物（如女巫）免疫
@@ -406,14 +417,13 @@ public class PoemOfTheEndItem extends DiggerItem {
         // ==========================================
         // 【新增】：检查配置，如果关闭则直接取消技能
         // ==========================================
-        if (!com.whitecloud233.herobrine_companion.config.Config.cleaveSkillEnabled) {
-            player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§c[系统] 服务器已禁用此终极技能！"));
+        if (!ServerConfigAccess.snapshot().enabled(ServerRule.CLEAVE_SKILL)) {
+            player.sendSystemMessage(net.minecraft.network.chat.Component.translatable("message.herobrine_companion.poem.disabled_by_server"));
             return;
         }
 
         if (player.getCooldowns().isOnCooldown(this)) {
-            // 【提示：如果按了没反应，可能是这里被拦截了】
-            player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§c[提示] 技能正在冷却中！"));
+            player.sendSystemMessage(net.minecraft.network.chat.Component.translatable("message.herobrine_companion.poem.cooldown"));
             return;
         }
 
@@ -449,14 +459,7 @@ public class PoemOfTheEndItem extends DiggerItem {
                         level, spawnX, startSurfaceY, spawnZ, dirX, dirZ, lifeTicks);
 
         // 【探头3】实体生成检测
-        player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§b[Debug] 服务端：实体创建完毕，准备加入世界..."));
-
-        boolean success = level.addFreshEntity(visualBlade);
-        if (success) {
-            player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§b[Debug] 服务端：实体加入成功！坐标: " + visualBlade.position()));
-        } else {
-            player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§c[Debug] 服务端严重错误：实体加入失败！"));
-        }
+        level.addFreshEntity(visualBlade);
 
         level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.WARDEN_SONIC_BOOM, SoundSource.PLAYERS, 5.0F, 0.5F);
 

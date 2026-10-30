@@ -40,9 +40,6 @@ public class AddItemModifier extends LootModifier {
 
     @Override
     protected ObjectArrayList<ItemStack> doApply(ObjectArrayList<ItemStack> generatedLoot, LootContext context) {
-        // 启用调试日志
-        System.out.println(">>> Loot Modifier Triggered! Table: " + context.getQueriedLootTableId());
-        
         ItemStack stack = new ItemStack(item);
         
         if (nbtString.isPresent()) {
@@ -51,9 +48,7 @@ public class AddItemModifier extends LootModifier {
                 CompoundTag tag = TagParser.parseTag(nbtString.get());
                 // 适配 1.20.5+ DataComponents
                 stack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
-                System.out.println(">>> Applied NBT: " + tag);
             } catch (Exception e) {
-                System.err.println(">>> Failed to parse NBT for item " + item + ": " + nbtString.get());
                 e.printStackTrace();
             }
         }

@@ -1,6 +1,10 @@
 package com.whitecloud233.herobrine_companion.item;
 
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.nbt.CompoundTag;
+
+import com.whitecloud233.herobrine_companion.config.ServerConfigAccess;
+import com.whitecloud233.herobrine_companion.config.ServerRule;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResultHolder;
@@ -29,8 +33,8 @@ public class AbyssalGazeItem extends Item {
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
 
-        // 配置检查
-        if (!com.whitecloud233.herobrine_companion.config.Config.abyssalGazeEnabled) {
+        // 【新增】配置检查
+        if (!ServerConfigAccess.snapshot().enabled(ServerRule.ABYSSAL_GAZE)) {
             if (!level.isClientSide) {
                 player.sendSystemMessage(Component.translatable("message.herobrine_companion.item_disabled_in_config").withStyle(net.minecraft.ChatFormatting.RED));
             }
