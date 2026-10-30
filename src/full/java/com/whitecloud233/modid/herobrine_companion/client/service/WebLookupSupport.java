@@ -1,5 +1,6 @@
 package com.whitecloud233.modid.herobrine_companion.client.service;
 
+import com.whitecloud233.modid.herobrine_companion.util.JsonInputs;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.whitecloud233.modid.herobrine_companion.client.llm.LlmToolSpec;
@@ -54,18 +55,18 @@ public final class WebLookupSupport {
 
     /** 解析并校验模型给的参数；不合法返回带原因的 error。 */
     static ParseResult parseAction(JsonObject args) {
-        String actionId = getString(args, "action").trim().toLowerCase(Locale.ROOT);
+        String actionId = JsonInputs.string(args, "action", "").trim().toLowerCase(Locale.ROOT);
         Action action = Action.fromId(actionId);
         if (action == null) {
             return ParseResult.error("action 只能是 " + Action.ids());
         }
         switch (action) {
             case SEARCH -> {
-                String site = getString(args, "site").trim().toLowerCase(Locale.ROOT);
+                String site = JsonInputs.string(args, "site", "").trim().toLowerCase(Locale.ROOT);
                 if (!WebLookupDomainRegistry.isSearchableHost(site)) {
                     return ParseResult.error("site 只能是 " + WebLookupDomainRegistry.searchableHostsDescription());
                 }
-                String query = getString(args, "query").trim();
+                String query = JsonInputs.string(args, "query", "").trim();
                 if (query.isBlank()) {
                     return ParseResult.error("query 不能为空");
                 }
@@ -75,7 +76,7 @@ public final class WebLookupSupport {
                 return ParseResult.success(new WebLookupAction(action, site, query, ""));
             }
             case FETCH -> {
-                String url = getString(args, "url").trim();
+                String url = JsonInputs.string(args, "url", "").trim();
                 if (url.isBlank()) {
                     return ParseResult.error("url 不能为空");
                 }
@@ -206,17 +207,6 @@ public final class WebLookupSupport {
             while (AUDIT.size() > MAX_AUDIT) {
                 AUDIT.removeFirst();
             }
-        }
-    }
-
-    private static String getString(JsonObject args, String name) {
-        if (args == null || !args.has(name) || args.get(name).isJsonNull() || !args.get(name).isJsonPrimitive()) {
-            return "";
-        }
-        try {
-            return args.get(name).getAsString();
-        } catch (RuntimeException ignored) {
-            return "";
         }
     }
 

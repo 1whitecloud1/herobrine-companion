@@ -31,10 +31,7 @@ public final class WebLookupService {
     private static final int MAX_PER_LINE_CHARS = 240;         // 单行（标题/摘要）截断
     private static final Duration TIMEOUT = Duration.ofSeconds(12);
 
-    private static final HttpClient CLIENT = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(8))
-            .followRedirects(HttpClient.Redirect.NORMAL)
-            .build();
+    private static final HttpClient CLIENT = HttpClients.shared(8);
 
     private WebLookupService() {
     }

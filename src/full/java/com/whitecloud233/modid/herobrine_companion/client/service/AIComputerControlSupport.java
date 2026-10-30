@@ -1,5 +1,6 @@
 package com.whitecloud233.modid.herobrine_companion.client.service;
 
+import com.whitecloud233.modid.herobrine_companion.util.JsonInputs;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.whitecloud233.modid.herobrine_companion.client.llm.LlmToolSpec;
@@ -29,14 +30,14 @@ final class AIComputerControlSupport {
     }
 
     static ParseResult parseAction(JsonObject args) {
-        String actionId = getString(args, "action").trim().toLowerCase(Locale.ROOT);
+        String actionId = JsonInputs.string(args, "action", "").trim().toLowerCase(Locale.ROOT);
         Action action = Action.fromId(actionId);
         if (action == null) {
             return ParseResult.error("Unknown or missing allowlisted action");
         }
 
-        String name = getString(args, "name").trim();
-        String content = getString(args, "content");
+        String name = JsonInputs.string(args, "name", "").trim();
+        String content = JsonInputs.string(args, "content", "");
         if (action.requiresName()) {
             String nameError = validateEntryName(name);
             if (nameError != null) {
@@ -152,17 +153,6 @@ final class AIComputerControlSupport {
             return "The text content contains a prohibited null character";
         }
         return null;
-    }
-
-    private static String getString(JsonObject args, String name) {
-        if (args == null || !args.has(name) || args.get(name).isJsonNull() || !args.get(name).isJsonPrimitive()) {
-            return "";
-        }
-        try {
-            return args.get(name).getAsString();
-        } catch (RuntimeException ignored) {
-            return "";
-        }
     }
 
     private static boolean containsAny(String text, String... needles) {
