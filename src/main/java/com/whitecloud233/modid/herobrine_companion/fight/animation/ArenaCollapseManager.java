@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.fight.animation;
 
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.modid.herobrine_companion.fight.ChallengeSession;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
@@ -22,7 +23,7 @@ public class ArenaCollapseManager {
         // 【核心】：寻找玩家的实时坐标，让世界向着玩家脚底收敛坍塌！
         ServerPlayer targetPlayer = null;
         for (ServerPlayer p : level.players()) {
-            if (p.getPersistentData().getBoolean("IsChallengeActive")) {
+            if (ChallengeSession.isPlayerInChallenge(p)) {
                 targetPlayer = p;
                 break;
             }

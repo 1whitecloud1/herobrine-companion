@@ -20,8 +20,6 @@ public class SPacketStartCollapse {
 
     public void handle(Supplier<NetworkEvent.Context> supplier) {
         NetworkEvent.Context context = supplier.get();
-        PacketDispatch.assertClient(context);
-        context.enqueueWork(NetworkClientBridge::startCollapse);
-        context.setPacketHandled(true);
+        PacketDispatch.enqueueClient(context, NetworkClientBridge::startCollapse);
     }
 }

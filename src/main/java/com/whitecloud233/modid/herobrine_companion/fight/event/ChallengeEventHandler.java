@@ -1,6 +1,8 @@
 package com.whitecloud233.modid.herobrine_companion.fight.event;
 
 import com.whitecloud233.modid.herobrine_companion.fight.HeroChallengeManager;
+import com.whitecloud233.modid.herobrine_companion.util.NbtKeys;
+import com.whitecloud233.modid.herobrine_companion.fight.ChallengeSession;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.util.EndRingContext;
 import com.whitecloud233.modid.herobrine_companion.world.structure.ModStructures;
@@ -18,7 +20,7 @@ public class ChallengeEventHandler {
     @SubscribeEvent
     public static void onPlayerLoggedOut(net.minecraftforge.event.entity.player.PlayerEvent.PlayerLoggedOutEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
-            if (player.getPersistentData().getBoolean("IsChallengeActive")) {
+            if (ChallengeSession.isPlayerInChallenge(player)) {
                 // 如果玩家在挑战期间强行退出（拔网线），立刻触发失败逻辑！
                 // 这会自动清理 Boss 实体、恢复 End Ring 场地，并释放全局锁
                 HeroChallengeManager.failChallenge(player);
@@ -29,8 +31,8 @@ public class ChallengeEventHandler {
     @SubscribeEvent
     public static void onLivingDeath(LivingDeathEvent event) {
         if (event.getEntity() instanceof HeroEntity hero) {
-            if (hero.getPersistentData().getBoolean("IsChallengeActive")
-                    && !hero.getPersistentData().getBoolean("IsFakeOutPhase")) {
+            if (ChallengeSession.isHeroInChallenge(hero)
+                    && !ChallengeSession.isHeroFakeOutPhase(hero)) {
 
                 event.setCanceled(true); // 取消死亡
                 hero.setHealth(1.0f);    // 锁在1滴血
@@ -49,7 +51,7 @@ public class ChallengeEventHandler {
     public static void onLivingDamage(LivingDamageEvent event) {
         // 1. 【核心救命补丁】：防止玩家在假死演出期间“鞭尸”把 Herobrine 打死！
         if (event.getEntity() instanceof HeroEntity hero) {
-            if (hero.getPersistentData().getBoolean("IsFakeOutPhase")) {
+            if (ChallengeSession.isHeroFakeOutPhase(hero)) {
                 event.setCanceled(true); // 绝对无敌
                 return;
             }
@@ -57,12 +59,12 @@ public class ChallengeEventHandler {
 
         // 2. 玩家在“虚晃一枪”期间受到的伤害锁血与无敌
         if (event.getEntity() instanceof ServerPlayer player) {
-            boolean isFakeOutPhase = player.getPersistentData().getBoolean("HeroFakeOutPhase");
-            boolean isChallengeActive = player.getPersistentData().getBoolean("IsChallengeActive");
+            boolean isFakeOutPhase = ChallengeSession.isPlayerFakeOutPhase(player);
+            boolean isChallengeActive = ChallengeSession.isPlayerInChallenge(player);
 
             // 如果假死标记残留到了日常/陪伴模式，立刻清掉，避免后续每次受伤都被锁成半颗心。
             if (isFakeOutPhase && !isChallengeActive) {
-                player.getPersistentData().remove("HeroFakeOutPhase");
+                player.getPersistentData().remove(NbtKeys.PLAYER_FAKE_OUT_PHASE);
                 return;
             }
 
@@ -85,7 +87,7 @@ public class ChallengeEventHandler {
         }
 
         if (player.level().dimension() != ModStructures.END_RING_DIMENSION_KEY
-                || !player.getPersistentData().getBoolean("HeroFakeOutPhase")) {
+                || !ChallengeSession.isPlayerFakeOutPhase(player)) {
             return;
         }
 

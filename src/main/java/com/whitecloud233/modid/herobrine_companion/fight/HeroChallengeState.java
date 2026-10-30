@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.fight;
 
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.modid.herobrine_companion.util.NbtKeys;
 import com.whitecloud233.modid.herobrine_companion.fight.animation.ArenaCollapseManager;
 import com.whitecloud233.modid.herobrine_companion.fight.goal.HeroPhase1Goal;
 import com.whitecloud233.modid.herobrine_companion.fight.network.SPacketFakeCrash;
@@ -19,7 +20,7 @@ public class HeroChallengeState {
     @SubscribeEvent
     public static void onBlockPlace(BlockEvent.EntityPlaceEvent event) {
         if (event.getEntity() instanceof Player player) {
-            if (player.getPersistentData().getBoolean("IsChallengeActive")) {
+            if (ChallengeSession.isPlayerInChallenge(player)) {
                 if (!player.isCreative() && !player.isSpectator()) {
                     event.setCanceled(true);
                     if (!player.level().isClientSide) {
@@ -34,7 +35,7 @@ public class HeroChallengeState {
     @SubscribeEvent
     public static void onBlockBreak(BlockEvent.BreakEvent event) {
         Player player = event.getPlayer();
-        if (player != null && player.getPersistentData().getBoolean("IsChallengeActive")) {
+        if (player != null && ChallengeSession.isPlayerInChallenge(player)) {
             if (!player.isCreative() && !player.isSpectator()) {
                 event.setCanceled(true);
                 if (!player.level().isClientSide) {
@@ -48,7 +49,7 @@ public class HeroChallengeState {
         // ==========================================
         // 【新增】：世界剥落与虚空坠落服务端演出
         // ==========================================
-        if (hero.getPersistentData().getBoolean("IsFakeOutPhase")) {
+        if (ChallengeSession.isHeroFakeOutPhase(hero)) {
             int timer = hero.getPersistentData().getInt("FakeOutTimer");
             timer++;
             hero.getPersistentData().putInt("FakeOutTimer", timer);
@@ -67,7 +68,7 @@ public class HeroChallengeState {
             // 不能依赖 TRACKING_ENTITY，否则玩家掉入虚空后可能因为脱离 Boss 跟踪范围而收不到假崩溃包。
             if (timer == 200) {
                 for (ServerPlayer player : level.players()) {
-                    if (player.getPersistentData().getBoolean("HeroFakeOutPhase")) {
+                    if (ChallengeSession.isPlayerFakeOutPhase(player)) {
                         com.whitecloud233.modid.herobrine_companion.network.PacketHandler.sendToPlayer(
                                 new SPacketFakeCrash(),
                                 player
@@ -91,10 +92,10 @@ public class HeroChallengeState {
 
 
         // ... 下方是你原本的 IS_CHALLENGE_ACTIVE 等逻辑保持不变
-        if (hero.getPersistentData().getBoolean("IsChallengeActive")) {
+        if (ChallengeSession.isHeroInChallenge(hero)) {
             if (!hero.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE)) {
                 hero.getEntityData().set(HeroEntity.IS_CHALLENGE_ACTIVE, true);
-                int savedTicks = hero.getPersistentData().getInt("ChallengePhaseTicks");
+                int savedTicks = hero.getPersistentData().getInt(NbtKeys.HERO_CHALLENGE_PHASE_TICKS);
                 hero.getEntityData().set(HeroEntity.CHALLENGE_TICKS, savedTicks);
             }
         }
@@ -110,7 +111,7 @@ public class HeroChallengeState {
 
         if (hero.level() instanceof ServerLevel serverLevel) {
             for (ServerPlayer player : serverLevel.players()) {
-                if (player.getPersistentData().getBoolean("IsChallengeActive")) {
+                if (ChallengeSession.isPlayerInChallenge(player)) {
                     if (!player.isCreative() && !player.isSpectator()) {
                         boolean updateNeeded = false;
 
@@ -136,9 +137,9 @@ public class HeroChallengeState {
     }
 
     public static void onRestoreFromDisk(HeroEntity hero) {
-        if (hero.getPersistentData().getBoolean("IsChallengeActive")) {
+        if (ChallengeSession.isHeroInChallenge(hero)) {
             hero.getEntityData().set(HeroEntity.IS_CHALLENGE_ACTIVE, true);
-            int savedTicks = hero.getPersistentData().getInt("ChallengePhaseTicks");
+            int savedTicks = hero.getPersistentData().getInt(NbtKeys.HERO_CHALLENGE_PHASE_TICKS);
             hero.getEntityData().set(HeroEntity.CHALLENGE_TICKS, savedTicks);
             hero.setNoGravity(true);
             hero.goalSelector.removeAllGoals(goal -> true);

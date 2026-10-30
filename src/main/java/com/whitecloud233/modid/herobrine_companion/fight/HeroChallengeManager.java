@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.fight;
 
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.modid.herobrine_companion.util.NbtKeys;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.HeroAI;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.HeroMoveControl;
 import com.whitecloud233.modid.herobrine_companion.fight.goal.HeroPhase1Goal;
@@ -57,7 +58,7 @@ public class HeroChallengeManager {
         if (currentChallenger != null) {
             ServerPlayer challenger = server.getPlayerList().getPlayer(currentChallenger);
             // 如果锁定的玩家在线，且真的在挑战中，则拦截当前玩家
-            if (challenger != null && challenger.getPersistentData().getBoolean("IsChallengeActive")) {
+            if (challenger != null && ChallengeSession.isPlayerInChallenge(challenger)) {
                 player.sendSystemMessage(Component.translatable("message.herobrine_companion.challenge.occupied", challenger.getName()));
                 return;
             } else {
@@ -78,8 +79,8 @@ public class HeroChallengeManager {
         }
 
         // 2. 提前给玩家和 Hero 打上挑战标记，屏蔽所有的剧情和维度截杀
-        player.getPersistentData().putBoolean("IsChallengeActive", true);
-        oldHero.getPersistentData().putBoolean("IsChallengeActive", true);
+        player.getPersistentData().putBoolean(NbtKeys.PLAYER_IN_CHALLENGE, true);
+        oldHero.getPersistentData().putBoolean(NbtKeys.HERO_IN_CHALLENGE, true);
 
         // 3. 无论是否已经在试炼维度，都强制将玩家拉入 102.0 决战平台！
         player.teleportTo(endRingLevel, 0.5, 102.0, 5.5, player.getYRot(), player.getXRot());
@@ -116,9 +117,9 @@ public class HeroChallengeManager {
         hero.removeTag(EndRingContext.TAG_FIXED);
         hero.removeTag(EndRingContext.TAG_RESPAWNED_SAFE);
 // 【新增】：每次开启挑战，必须清空上一次的假死状态，防止永久无敌！
-        hero.getPersistentData().remove("IsFakeOutPhase");
+        hero.getPersistentData().remove(NbtKeys.HERO_FAKE_OUT_PHASE);
         if (target != null) {
-            target.getPersistentData().remove("HeroFakeOutPhase");
+            target.getPersistentData().remove(NbtKeys.PLAYER_FAKE_OUT_PHASE);
         }
         hero.goalSelector.removeAllGoals(goal -> true);
         hero.targetSelector.removeAllGoals(goal -> true);
@@ -133,7 +134,7 @@ public class HeroChallengeManager {
         float maxHealth = DIFFICULTY_MAX_HEALTH.getOrDefault(challengeMode, 1000.0f);
 
         hero.getPersistentData().putFloat("ChallengeDamageMultiplier", damageMultiplier);
-        hero.getPersistentData().putBoolean("IsChallengeActive", true);
+        hero.getPersistentData().putBoolean(NbtKeys.HERO_IN_CHALLENGE, true);
 
         hero.getEntityData().set(HeroEntity.IS_CHALLENGE_ACTIVE, true);
         hero.getEntityData().set(HeroEntity.CHALLENGE_TICKS, 0);
@@ -161,11 +162,11 @@ public class HeroChallengeManager {
     public static void endChallenge(HeroEntity hero, boolean playerWon) {
         hero.getEntityData().set(HeroEntity.IS_CHALLENGE_ACTIVE, false);
         hero.getEntityData().set(HeroEntity.CHALLENGE_TICKS, 0);
-        hero.getPersistentData().putBoolean("IsChallengeActive", false);
-        hero.getPersistentData().remove("ChallengePhaseTicks");
+        hero.getPersistentData().putBoolean(NbtKeys.HERO_IN_CHALLENGE, false);
+        hero.getPersistentData().remove(NbtKeys.HERO_CHALLENGE_PHASE_TICKS);
         hero.clearChallengeAfterimages();
         // 【新增】：结束时清空假死标记
-        hero.getPersistentData().remove("IsFakeOutPhase");
+        hero.getPersistentData().remove(NbtKeys.HERO_FAKE_OUT_PHASE);
         hero.goalSelector.removeAllGoals(goal -> true);
         hero.targetSelector.removeAllGoals(goal -> true);
         hero.setTarget(null);
@@ -204,7 +205,7 @@ public class HeroChallengeManager {
 
         if (hero.getOwnerUUID() != null) {
             Player owner = hero.level().getPlayerByUUID(hero.getOwnerUUID());
-            if (owner instanceof ServerPlayer serverPlayer && serverPlayer.getPersistentData().getBoolean("IsChallengeActive")) {
+            if (owner instanceof ServerPlayer serverPlayer && ChallengeSession.isPlayerInChallenge(serverPlayer)) {
                 return serverPlayer;
             }
         }
@@ -212,14 +213,14 @@ public class HeroChallengeManager {
         UUID activeChallenger = HeroWorldData.get(hero.getServer().overworld()).getActiveChallengerUUID();
         if (activeChallenger != null) {
             ServerPlayer lockedPlayer = hero.getServer().getPlayerList().getPlayer(activeChallenger);
-            if (lockedPlayer != null && lockedPlayer.getPersistentData().getBoolean("IsChallengeActive")) {
+            if (lockedPlayer != null && ChallengeSession.isPlayerInChallenge(lockedPlayer)) {
                 return lockedPlayer;
             }
         }
 
         if (hero.level() instanceof ServerLevel serverLevel) {
             for (ServerPlayer player : serverLevel.players()) {
-                if (player.getPersistentData().getBoolean("IsChallengeActive")) {
+                if (ChallengeSession.isPlayerInChallenge(player)) {
                     return player;
                 }
             }
@@ -253,7 +254,7 @@ public class HeroChallengeManager {
         player.teleportTo(returnLevel, rx, ry, rz, player.getYRot(), player.getXRot());
 
         // [核心修复 1] 在传送 Hero 之前，临时再给他发一张跨维度的“免检通行证”！
-        hero.getPersistentData().putBoolean("IsChallengeActive", true);
+        hero.getPersistentData().putBoolean(NbtKeys.HERO_IN_CHALLENGE, true);
 
         // 将 Hero 拉回去
         hero.changeDimension(returnLevel, new net.minecraftforge.common.util.ITeleporter() {
@@ -264,7 +265,7 @@ public class HeroChallengeManager {
 
                 // [核心修复 2] 落地主世界后，立刻没收他的免检通行证，并重新装载日常 AI！
                 if (e instanceof HeroEntity newHero) {
-                    newHero.getPersistentData().putBoolean("IsChallengeActive", false);
+                    newHero.getPersistentData().putBoolean(NbtKeys.HERO_IN_CHALLENGE, false);
                     newHero.getEntityData().set(HeroEntity.IS_CHALLENGE_ACTIVE, false);
 
                     newHero.goalSelector.removeAllGoals(goal -> true);
@@ -287,8 +288,8 @@ public class HeroChallengeManager {
         // ✅ 新增：胜利并传送回主世界后，恢复飞行权限
         restoreFlightAbilities(player);
 
-        playerData.remove("HeroFakeOutPhase");
-        playerData.remove("IsChallengeActive");
+        playerData.remove(NbtKeys.PLAYER_FAKE_OUT_PHASE);
+        playerData.remove(NbtKeys.PLAYER_IN_CHALLENGE);
         // ==========================================
         // 【新增】：玩家已安全回到主世界，瞬间在后台重置 End Ring 场地！
         // ==========================================
@@ -300,8 +301,8 @@ public class HeroChallengeManager {
 
     public static void failChallenge(ServerPlayer player) {
         CompoundTag playerData = player.getPersistentData();
-        playerData.putBoolean("IsChallengeActive", false);
-        playerData.remove("HeroFakeOutPhase");
+        playerData.putBoolean(NbtKeys.PLAYER_IN_CHALLENGE, false);
+        playerData.remove(NbtKeys.PLAYER_FAKE_OUT_PHASE);
 
         ServerLevel level = (ServerLevel) player.level();
         HeroEntity activeHero = null;
@@ -309,7 +310,7 @@ public class HeroChallengeManager {
 
         // 寻找正在与玩家战斗的 Hero (已优化为 O(1) 查找)
         for (HeroEntity hero : com.whitecloud233.modid.herobrine_companion.entity.ai.learning.HeroBrain.ACTIVE_HEROES) {
-            if (hero.level() == level && hero.isAlive() && hero.getPersistentData().getBoolean("IsChallengeActive")) {
+            if (hero.level() == level && hero.isAlive() && ChallengeSession.isHeroInChallenge(hero)) {
                 activeHero = hero;
                 break;
             }
@@ -319,14 +320,14 @@ public class HeroChallengeManager {
             // 清理 Hero 战斗状态
             activeHero.getEntityData().set(HeroEntity.IS_CHALLENGE_ACTIVE, false);
             activeHero.getEntityData().set(HeroEntity.CHALLENGE_TICKS, 0);
-            activeHero.getPersistentData().putBoolean("IsChallengeActive", false);
+            activeHero.getPersistentData().putBoolean(NbtKeys.HERO_IN_CHALLENGE, false);
             activeHero.clearChallengeAfterimages();
 
             // 【核心修复】：在这里使用 activeHero 清除存档的进度！
-            activeHero.getPersistentData().remove("ChallengePhaseTicks");
+            activeHero.getPersistentData().remove(NbtKeys.HERO_CHALLENGE_PHASE_TICKS);
 // 【新增】：失败时清空假死标记
-            activeHero.getPersistentData().remove("IsFakeOutPhase");
-            player.getPersistentData().remove("HeroFakeOutPhase");
+            activeHero.getPersistentData().remove(NbtKeys.HERO_FAKE_OUT_PHASE);
+            player.getPersistentData().remove(NbtKeys.PLAYER_FAKE_OUT_PHASE);
             // 恢复血量和重力
             activeHero.getAttribute(Attributes.MAX_HEALTH).setBaseValue(20.0D);
             activeHero.setHealth(activeHero.getMaxHealth());
@@ -391,8 +392,8 @@ public class HeroChallengeManager {
 
     private static void clearPlayerChallengeFlags(ServerPlayer player) {
         CompoundTag playerData = player.getPersistentData();
-        playerData.remove("HeroFakeOutPhase");
-        playerData.remove("IsChallengeActive");
+        playerData.remove(NbtKeys.PLAYER_FAKE_OUT_PHASE);
+        playerData.remove(NbtKeys.PLAYER_IN_CHALLENGE);
     }
 
     // ==========================================
@@ -400,7 +401,7 @@ public class HeroChallengeManager {
     // ==========================================
     public static void triggerFakeOutPhase(HeroEntity hero) {
         // 1. 标记 Boss 进入假死演出阶段
-        hero.getPersistentData().putBoolean("IsFakeOutPhase", true);
+        hero.getPersistentData().putBoolean(NbtKeys.HERO_FAKE_OUT_PHASE, true);
 
         // 2. 切断神明与世界的联系：清空所有行动 AI
         hero.goalSelector.removeAllGoals(goal -> true);
@@ -419,10 +420,10 @@ public class HeroChallengeManager {
             // 遍历当前维度（End Ring）的所有玩家
             for (ServerPlayer player : serverLevel.players()) {
                 // 只对正在参与试炼的玩家生效
-                if (player.getPersistentData().getBoolean("IsChallengeActive")) {
+                if (ChallengeSession.isPlayerInChallenge(player)) {
 
                     // 给玩家打上标记，用于稍后在事件中锁血（保持半颗心不死）
-                    player.getPersistentData().putBoolean("HeroFakeOutPhase", true);
+                    player.getPersistentData().putBoolean(NbtKeys.PLAYER_FAKE_OUT_PHASE, true);
 
                     // 【核心】使用你自己的 PacketHandler 发送崩坏数据包！
                     // 这会通知客户端开始黑屏和隐藏UI

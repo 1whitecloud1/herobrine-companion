@@ -1,5 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.fight.network;
 
+import com.whitecloud233.modid.herobrine_companion.network.NetworkCodec;
+
 import com.whitecloud233.modid.herobrine_companion.network.NetworkClientBridge;
 import com.whitecloud233.modid.herobrine_companion.network.PacketDispatch;
 import net.minecraft.network.FriendlyByteBuf;
@@ -30,9 +32,9 @@ public class SPacketChallengeArenaSlice {
     }
 
     public SPacketChallengeArenaSlice(FriendlyByteBuf buf) {
-        this.center = new Vec3(buf.readDouble(), buf.readDouble(), buf.readDouble());
-        this.capNormal = new Vec3(buf.readDouble(), buf.readDouble(), buf.readDouble());
-        this.cutDirection = new Vec3(buf.readDouble(), buf.readDouble(), buf.readDouble());
+        this.center = NetworkCodec.readVec3(buf);
+        this.capNormal = NetworkCodec.readVec3(buf);
+        this.cutDirection = NetworkCodec.readVec3(buf);
         this.cutOffset = buf.readFloat();
         this.arenaRadius = buf.readFloat();
         this.fallTicks = buf.readVarInt();
@@ -41,15 +43,9 @@ public class SPacketChallengeArenaSlice {
     }
 
     public void encode(FriendlyByteBuf buf) {
-        buf.writeDouble(this.center.x);
-        buf.writeDouble(this.center.y);
-        buf.writeDouble(this.center.z);
-        buf.writeDouble(this.capNormal.x);
-        buf.writeDouble(this.capNormal.y);
-        buf.writeDouble(this.capNormal.z);
-        buf.writeDouble(this.cutDirection.x);
-        buf.writeDouble(this.cutDirection.y);
-        buf.writeDouble(this.cutDirection.z);
+        NetworkCodec.writeVec3(buf, this.center);
+        NetworkCodec.writeVec3(buf, this.capNormal);
+        NetworkCodec.writeVec3(buf, this.cutDirection);
         buf.writeFloat(this.cutOffset);
         buf.writeFloat(this.arenaRadius);
         buf.writeVarInt(this.fallTicks);
@@ -59,8 +55,6 @@ public class SPacketChallengeArenaSlice {
 
     public void handle(Supplier<NetworkEvent.Context> supplier) {
         NetworkEvent.Context context = supplier.get();
-        PacketDispatch.assertClient(context);
-        context.enqueueWork(() -> NetworkClientBridge.handleChallengeArenaSlice(this));
-        context.setPacketHandled(true);
+        PacketDispatch.enqueueClient(context, () -> NetworkClientBridge.handleChallengeArenaSlice(this));
     }
 }

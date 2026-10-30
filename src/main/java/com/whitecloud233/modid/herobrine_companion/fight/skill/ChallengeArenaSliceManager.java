@@ -1,7 +1,10 @@
 package com.whitecloud233.modid.herobrine_companion.fight.skill;
 
 import com.mojang.math.Transformation;
+import com.whitecloud233.modid.herobrine_companion.util.BlockDisplayEffect;
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.modid.herobrine_companion.fight.ChallengeSession;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.FloatTag;
@@ -42,16 +45,6 @@ public final class ChallengeArenaSliceManager {
     private static final String DISPLAY_TAG = "herobrine_challenge_cake_slice";
 
     private static final List<CakeSliceTask> ACTIVE_TASKS = new ArrayList<>();
-
-    private static final Method DISPLAY_SET_TRANSFORMATION = findDeclaredMethod(Display.class, "setTransformation", Transformation.class);
-    private static final Method DISPLAY_SET_INTERPOLATION_DURATION = findDeclaredMethod(Display.class, "setInterpolationDuration", int.class);
-    private static final Method DISPLAY_SET_INTERPOLATION_DELAY = findDeclaredMethod(Display.class, "setInterpolationDelay", int.class);
-    private static final Method DISPLAY_SET_VIEW_RANGE = findDeclaredMethod(Display.class, "setViewRange", float.class);
-    private static final Method DISPLAY_SET_WIDTH = findDeclaredMethod(Display.class, "setWidth", float.class);
-    private static final Method DISPLAY_SET_HEIGHT = findDeclaredMethod(Display.class, "setHeight", float.class);
-    private static final Method DISPLAY_SET_SHADOW_RADIUS = findDeclaredMethod(Display.class, "setShadowRadius", float.class);
-    private static final Method DISPLAY_SET_SHADOW_STRENGTH = findDeclaredMethod(Display.class, "setShadowStrength", float.class);
-    private static final Method BLOCK_DISPLAY_SET_BLOCK_STATE = findDeclaredMethod(Display.BlockDisplay.class, "setBlockState", BlockState.class);
 
     private ChallengeArenaSliceManager() {
     }
@@ -193,7 +186,7 @@ public final class ChallengeArenaSliceManager {
             int spawned = 0;
             while (spawned < DISPLAYS_PER_TICK && this.displaySpawnIndex < this.displayEntries.size()) {
                 SliceDisplayEntry entry = this.displayEntries.get(this.displaySpawnIndex++);
-                Display.BlockDisplay display = createDisplay(this.level, entry.pos(), entry.state());
+                Display.BlockDisplay display = BlockDisplayEffect.create(this.level, entry.pos(), entry.state(), DISPLAY_TAG);
                 if (display != null) {
                     this.displays.add(new SliceDisplay(display, entry.state()));
                 }
@@ -214,7 +207,7 @@ public final class ChallengeArenaSliceManager {
             Vec3 fallTranslation = new Vec3(0.0D, -FALL_DISTANCE, 0.0D);
             for (SliceDisplay slice : this.displays) {
                 if (!slice.display().isRemoved()) {
-                    applyDisplayState(slice.display(), slice.state(), fallTranslation, FALL_TICKS);
+                    BlockDisplayEffect.apply(slice.display(), slice.state(), fallTranslation, FALL_TICKS);
                 }
             }
 
@@ -245,7 +238,7 @@ public final class ChallengeArenaSliceManager {
             return true;
         }
         Entity caster = task.level.getEntity(task.casterUuid);
-        return caster != null && !caster.isRemoved() && caster.getPersistentData().getBoolean("IsChallengeActive");
+        return caster instanceof HeroEntity hero && !caster.isRemoved() && ChallengeSession.isHeroInChallenge(hero);
     }
 
     private record SliceDisplayEntry(BlockPos pos, BlockState state) {
@@ -254,91 +247,4 @@ public final class ChallengeArenaSliceManager {
     private record SliceDisplay(Display.BlockDisplay display, BlockState state) {
     }
 
-    @Nullable
-    private static Display.BlockDisplay createDisplay(ServerLevel level, BlockPos pos, BlockState state) {
-        Display.BlockDisplay display = EntityType.BLOCK_DISPLAY.create(level);
-        if (display == null) {
-            return null;
-        }
-        display.setPos(pos.getX(), pos.getY(), pos.getZ());
-        display.setNoGravity(true);
-        display.setInvulnerable(true);
-        display.addTag(DISPLAY_TAG);
-        applyDisplayState(display, state, Vec3.ZERO, 0);
-        level.addFreshEntity(display);
-        return display;
-    }
-
-    private static void applyDisplayState(Display.BlockDisplay display, BlockState state, Vec3 translation, int interpolationDuration) {
-        boolean synced = invokePrivateMethod(BLOCK_DISPLAY_SET_BLOCK_STATE, display, state);
-
-        Transformation transformation = new Transformation(
-                new Vector3f((float) translation.x, (float) translation.y, (float) translation.z),
-                new Quaternionf(),
-                new Vector3f(1.0F, 1.0F, 1.0F),
-                new Quaternionf()
-        );
-        synced |= invokePrivateMethod(DISPLAY_SET_TRANSFORMATION, display, transformation);
-        synced |= invokePrivateMethod(DISPLAY_SET_INTERPOLATION_DURATION, display, Math.max(0, interpolationDuration));
-        synced |= invokePrivateMethod(DISPLAY_SET_INTERPOLATION_DELAY, display, 0);
-        synced |= invokePrivateMethod(DISPLAY_SET_VIEW_RANGE, display, 256.0F);
-        synced |= invokePrivateMethod(DISPLAY_SET_WIDTH, display, 1.15F);
-        synced |= invokePrivateMethod(DISPLAY_SET_HEIGHT, display, 1.15F);
-        synced |= invokePrivateMethod(DISPLAY_SET_SHADOW_RADIUS, display, 0.0F);
-        synced |= invokePrivateMethod(DISPLAY_SET_SHADOW_STRENGTH, display, 0.0F);
-
-        if (!synced) {
-            CompoundTag tag = new CompoundTag();
-            tag.put(Display.BlockDisplay.TAG_BLOCK_STATE, NbtUtils.writeBlockState(state));
-            tag.put(Display.TAG_TRANSFORMATION, createDisplayTransformationTag(translation));
-            tag.putInt(Display.TAG_INTERPOLATION_DURATION, Math.max(0, interpolationDuration));
-            tag.putInt(Display.TAG_START_INTERPOLATION, 0);
-            tag.putFloat(Display.TAG_VIEW_RANGE, 256.0F);
-            tag.putFloat(Display.TAG_WIDTH, 1.15F);
-            tag.putFloat(Display.TAG_HEIGHT, 1.15F);
-            tag.putFloat(Display.TAG_SHADOW_RADIUS, 0.0F);
-            tag.putFloat(Display.TAG_SHADOW_STRENGTH, 0.0F);
-            display.load(tag);
-        }
-    }
-
-    private static CompoundTag createDisplayTransformationTag(Vec3 translation) {
-        CompoundTag transformation = new CompoundTag();
-        transformation.put("translation", floatList((float) translation.x, (float) translation.y, (float) translation.z));
-        transformation.put("scale", floatList(1.0F, 1.0F, 1.0F));
-        transformation.put("left_rotation", floatList(0.0F, 0.0F, 0.0F, 1.0F));
-        transformation.put("right_rotation", floatList(0.0F, 0.0F, 0.0F, 1.0F));
-        return transformation;
-    }
-
-    private static ListTag floatList(float... values) {
-        ListTag listTag = new ListTag();
-        for (float value : values) {
-            listTag.add(FloatTag.valueOf(value));
-        }
-        return listTag;
-    }
-
-    @Nullable
-    private static Method findDeclaredMethod(Class<?> owner, String name, Class<?>... parameterTypes) {
-        try {
-            Method method = owner.getDeclaredMethod(name, parameterTypes);
-            method.setAccessible(true);
-            return method;
-        } catch (ReflectiveOperationException exception) {
-            return null;
-        }
-    }
-
-    private static boolean invokePrivateMethod(@Nullable Method method, Object target, Object... args) {
-        if (method == null) {
-            return false;
-        }
-        try {
-            method.invoke(target, args);
-            return true;
-        } catch (ReflectiveOperationException exception) {
-            return false;
-        }
-    }
 }

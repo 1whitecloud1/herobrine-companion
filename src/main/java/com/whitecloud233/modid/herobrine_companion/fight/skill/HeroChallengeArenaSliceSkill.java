@@ -1,6 +1,8 @@
 package com.whitecloud233.modid.herobrine_companion.fight.skill;
 
 import com.whitecloud233.modid.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.modid.herobrine_companion.util.NbtKeys;
+import com.whitecloud233.modid.herobrine_companion.fight.ChallengeSession;
 import com.whitecloud233.modid.herobrine_companion.destructiongod.network.DestructionGodFaultSplitPacket;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.fight.network.SPacketChallengeArenaSlice;
@@ -52,8 +54,8 @@ public final class HeroChallengeArenaSliceSkill {
         }
 
         SliceSkillState state = STATES.computeIfAbsent(hero.getUUID(), ignored -> new SliceSkillState());
-        boolean challengeActive = hero.getPersistentData().getBoolean("IsChallengeActive")
-                && !hero.getPersistentData().getBoolean("IsFakeOutPhase");
+        boolean challengeActive = ChallengeSession.isHeroInChallenge(hero)
+                && !ChallengeSession.isHeroFakeOutPhase(hero);
 
         if (!challengeActive || hero.isRemoved()) {
             STATES.remove(hero.getUUID());
@@ -73,7 +75,7 @@ public final class HeroChallengeArenaSliceSkill {
             return;
         }
 
-        int phaseTicks = hero.getPersistentData().getInt("ChallengePhaseTicks");
+        int phaseTicks = hero.getPersistentData().getInt(NbtKeys.HERO_CHALLENGE_PHASE_TICKS);
         if (phaseTicks < FIRST_CAST_PHASE || phaseTicks < state.nextCastPhase || state.cooldown > 0) {
             return;
         }
@@ -151,7 +153,7 @@ public final class HeroChallengeArenaSliceSkill {
             state.cooldown = cast.cooldown();
             state.castTicks = -1;
             state.castData = null;
-            state.nextCastPhase = hero.getPersistentData().getInt("ChallengePhaseTicks") + RETRY_INTERVAL;
+            state.nextCastPhase = hero.getPersistentData().getInt(NbtKeys.HERO_CHALLENGE_PHASE_TICKS) + RETRY_INTERVAL;
         }
     }
 
@@ -183,7 +185,7 @@ public final class HeroChallengeArenaSliceSkill {
 
     private static ServerPlayer findChallengePlayer(ServerLevel level) {
         for (ServerPlayer player : level.players()) {
-            if (player.getPersistentData().getBoolean("IsChallengeActive")) {
+            if (ChallengeSession.isPlayerInChallenge(player)) {
                 return player;
             }
         }

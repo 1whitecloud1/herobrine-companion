@@ -20,8 +20,6 @@ public class SPacketFakeCrash {
 
     public void handle(Supplier<NetworkEvent.Context> supplier) {
         NetworkEvent.Context context = supplier.get();
-        PacketDispatch.assertClient(context);
-        context.enqueueWork(NetworkClientBridge::openFakeCrash);
-        context.setPacketHandled(true);
+        PacketDispatch.enqueueClient(context, NetworkClientBridge::openFakeCrash);
     }
 }

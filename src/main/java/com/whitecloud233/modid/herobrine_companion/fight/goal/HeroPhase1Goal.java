@@ -1,6 +1,8 @@
 package com.whitecloud233.modid.herobrine_companion.fight.goal;
 
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.modid.herobrine_companion.util.NbtKeys;
+import com.whitecloud233.modid.herobrine_companion.fight.ChallengeSession;
 import com.whitecloud233.modid.herobrine_companion.fight.HeroAfterimage;
 import com.whitecloud233.modid.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.modid.herobrine_companion.network.PaleLightningArcPacket;
@@ -64,8 +66,7 @@ public class HeroPhase1Goal extends Goal {
 
     @Override
     public boolean canUse() {
-        return this.hero.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE)
-                || this.hero.getPersistentData().getBoolean("IsChallengeActive");
+        return ChallengeSession.isHeroInChallenge(this.hero);
     }
 
     @Override
@@ -75,7 +76,7 @@ public class HeroPhase1Goal extends Goal {
 
     @Override
     public void start() {
-        this.phaseTicks = this.hero.getPersistentData().getInt("ChallengePhaseTicks");
+        this.phaseTicks = this.hero.getPersistentData().getInt(NbtKeys.HERO_CHALLENGE_PHASE_TICKS);
         this.movementCooldown = 0;
         this.moveTarget = null;
         this.moveTicks = 0;
@@ -100,7 +101,7 @@ public class HeroPhase1Goal extends Goal {
 
         if (this.target == null || !this.target.isAlive() || this.target.isRemoved()) {
             Player nearestPlayer = this.hero.level().getNearestPlayer(this.hero, 100.0D);
-            if (nearestPlayer != null && nearestPlayer.getPersistentData().getBoolean("IsChallengeActive")) {
+            if (nearestPlayer != null && ChallengeSession.isPlayerInChallenge(nearestPlayer)) {
                 this.target = nearestPlayer;
             } else {
                 hoverIdle();
@@ -109,7 +110,7 @@ public class HeroPhase1Goal extends Goal {
         }
 
         this.phaseTicks++;
-        this.hero.getPersistentData().putInt("ChallengePhaseTicks", this.phaseTicks);
+        this.hero.getPersistentData().putInt(NbtKeys.HERO_CHALLENGE_PHASE_TICKS, this.phaseTicks);
         this.hero.getEntityData().set(HeroEntity.CHALLENGE_TICKS, this.phaseTicks);
         this.hero.getLookControl().setLookAt(this.target, 30.0F, 30.0F);
 
@@ -331,7 +332,7 @@ public class HeroPhase1Goal extends Goal {
 
     private int challengeMode() {
         if (this.hero.getPersistentData().contains("ChallengeMode")) {
-            return Math.max(0, Math.min(2, this.hero.getPersistentData().getInt("ChallengeMode")));
+            return Mth.clamp(this.hero.getPersistentData().getInt("ChallengeMode"), 0, 2);
         }
 
         float multiplier = this.hero.getPersistentData().contains("ChallengeDamageMultiplier")

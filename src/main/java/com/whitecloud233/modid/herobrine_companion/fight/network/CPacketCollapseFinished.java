@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.fight.network;
 
 import com.whitecloud233.modid.herobrine_companion.fight.HeroChallengeManager;
+import com.whitecloud233.modid.herobrine_companion.fight.ChallengeSession;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.network.PacketDispatch;
 import net.minecraft.network.FriendlyByteBuf;
@@ -26,7 +27,7 @@ public class CPacketCollapseFinished {
             if (player != null && player.level() instanceof ServerLevel level) {
                 // 找到正在和这个玩家对峙的处于“假死阶段”的 Herobrine
                 for (var entity : level.getAllEntities()) {
-                    if (entity instanceof HeroEntity hero && hero.getPersistentData().getBoolean("IsFakeOutPhase")) {
+                    if (entity instanceof HeroEntity hero && ChallengeSession.isHeroFakeOutPhase(hero)) {
 
                         // 清除假死计时器
                         hero.getPersistentData().remove("FakeOutTimer");
