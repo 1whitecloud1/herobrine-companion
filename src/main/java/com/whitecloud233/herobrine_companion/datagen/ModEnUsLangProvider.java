@@ -19,7 +19,7 @@ public class ModEnUsLangProvider extends LanguageProvider {
         add("item.herobrine_companion.poem_of_the_end.mode.usage.3", "§7Attack Combo: Scythe Slashes & Rifts");
 
         // Items
-        add(ModItems.HERO_SHELTER.get(), "Hero Shelter");
+        add(ModItems.HERO_SHELTER.get(), "Herobrine Shelter");
         add(ModItems.ETERNAL_KEY.get(), "Eternal Key");
         add(ModItems.UNSTABLE_GUNPOWDER.get(), "Unstable Gunpowder");
         add(ModItems.CORRUPTED_CODE.get(), "Corrupted Code");
@@ -64,25 +64,25 @@ public class ModEnUsLangProvider extends LanguageProvider {
         add("gui.herobrine_companion.companion_enable", "Enable Companion Mode");
         add("gui.herobrine_companion.companion_disable", "Disable Companion Mode");
         add("gui.herobrine_companion.companion_tooltip_unlocked", "Toggle Companion Mode (Follows you)");
-        add("gui.herobrine_companion.companion_tooltip_locked", "Requires Trust Level 50 (Current: %s/%s)");
+        add("gui.herobrine_companion.companion_tooltip_locked", "Locked: Requires Trust Level %s (Current: %s)");
         add("gui.herobrine_companion.create_void_domain", "Create Void Domain");
         add("gui.herobrine_companion.create_void_domain_locked", "Create Void Domain (Locked)");
         add("gui.herobrine_companion.confirm_void", "Confirm Creation?");
         add("gui.herobrine_companion.void_warning", "Warning: This will clear a large area!");
         add("gui.herobrine_companion.void_locked_tooltip", "You must visit the Void Domain first");
         add("gui.herobrine_companion.sign_contract", "Sign Contract");
-        add("gui.herobrine_companion.hero_interaction", "Hero Interaction");
+        add("gui.herobrine_companion.hero_interaction", "Herobrine Interaction");
         add("gui.herobrine_companion.api_on", "API: ON");
         add("gui.herobrine_companion.api_off", "API: OFF");
         add("gui.herobrine_companion.api_toggle_tooltip", "Toggle Cloud AI / Local Logic");
         add("gui.herobrine_companion.system_exit", "Exit;");
-        add("gui.herobrine_companion.hero_contract", "Contract with Hero");
+        add("gui.herobrine_companion.hero_contract", "Contract with Herobrine");
         add("gui.herobrine_companion.trust_level", "Trust Level: %s");
         
         // Requests
         add("gui.herobrine_companion.requests", "Requests");
-        add("gui.herobrine_companion.requests_tooltip", "Accept requests from Hero for rewards.");
-        add("gui.herobrine_companion.requests_title", "Hero's Requests");
+        add("gui.herobrine_companion.requests_tooltip", "Accept requests from Herobrine for rewards.");
+        add("gui.herobrine_companion.requests_title", "Herobrine's Requests");
         add("gui.herobrine_companion.request_accept", "Accept");
         add("gui.herobrine_companion.request_cancel", "Cancel");
         add("gui.herobrine_companion.back", "Back");
@@ -113,10 +113,10 @@ public class ModEnUsLangProvider extends LanguageProvider {
         add("gui.herobrine_companion.request_desc_8", "When the storm comes, stand on the high ground I marked. If the lightning chooses you—and leaves you standing—I will know this world still remembers you.");
         add("gui.herobrine_companion.quest_cooldown_line", "§7On cooldown: %1$s day(s) %2$s hour(s)");
         add("message.herobrine_companion.quest_already_active", "§cYou already have an active quest!");
-        add("message.herobrine_companion.quest_start_1", "§e[Hero] §fGood. Go clear those ghosts. I will be watching.");
-        add("message.herobrine_companion.quest_complete_1", "§e[Hero] §fWell done. Here is your reward.");
-        add("message.herobrine_companion.quest_start_2", "§e[Hero] §fGo. Show them kindness.");
-        add("message.herobrine_companion.quest_complete_2", "§e[Hero] §fThey are calm now. Good work.");
+        add("message.herobrine_companion.quest_start_1", "§e[Herobrine] §fGood. Go clear those ghosts. I will be watching.");
+        add("message.herobrine_companion.quest_complete_1", "§e[Herobrine] §fWell done. Here is your reward.");
+        add("message.herobrine_companion.quest_start_2", "§e[Herobrine] §fGo. Show them kindness.");
+        add("message.herobrine_companion.quest_complete_2", "§e[Herobrine] §fThey are calm now. Good work.");
         add("message.herobrine_companion.quest_target_gone", "§c[System] The target has disappeared. Quest failed.");
         add("message.herobrine_companion.quest_target_died", "§c[System] The target has died. Quest failed.");
         add("message.herobrine_companion.quest_cancelled", "§c[System] Quest cancelled.");
@@ -130,7 +130,7 @@ public class ModEnUsLangProvider extends LanguageProvider {
         add("message.herobrine_companion.quest_start_5", "§e[Herobrine] §fFour candles, forming a ring. A fifth will call something that should not come.");
         add("message.herobrine_companion.quest_candle_progress", "§7Candle %s/%s lit in the night.");
         add("message.herobrine_companion.quest_candle_fifth", "§c[System] The fifth candle lit. The wind died all at once... Quest failed.");
-        add("message.herobrine_companion.quest_candle_hero_gone", "§c[System] Hero has left. The rite is broken. Quest failed.");
+        add("message.herobrine_companion.quest_candle_hero_gone", "§c[System] Herobrine has left. The rite is broken. Quest failed.");
         add("message.herobrine_companion.quest_complete_5", "§e[Herobrine] §f...The flame remembers you. Now the dark does too.");
         add("message.herobrine_companion.quest_start_6", "§e[Herobrine] §f(The Judge whispers) A banner is a declaration. Taking it is an answer.");
         add("message.herobrine_companion.quest_captain_down", "§a[System] The captain is down. Pick up the banner and bring it to me.");
@@ -156,7 +156,7 @@ public class ModEnUsLangProvider extends LanguageProvider {
         add("message.herobrine_companion.summon_fail_exists", "Herobrine is already present.");
         add("message.herobrine_companion.contract_signed", "Contract Signed. Trust established.");
         add("message.herobrine_companion.contract_failed", "Contract Failed. Invalid offering.");
-        add("message.herobrine_companion.chat_hero", "§e[Hero] §f%s");
+        add("message.herobrine_companion.chat_hero", "§e[Herobrine] §f%s");
         add("message.herobrine_companion.chat_you", "§b[You] §f%s");
         add("message.herobrine_companion.chat_exit", "§7[System] Exited chat mode.");
         add("message.herobrine_companion.chat_hint_exit", "Type 'bye' to exit chat.");
@@ -174,24 +174,24 @@ public class ModEnUsLangProvider extends LanguageProvider {
         add("message.herobrine_companion.hero_wake_up_3", "§6[Herobrine] §fIf you want to go back, you must learn to let go. Discard everything you found here. Or simply... fall.");
         add("message.herobrine_companion.system_reality_fractures", "§k|||§r §fReality is fracturing... §k|||§r");
         add("message.herobrine_companion.system_key_silent", "§cThe key remains silent here...");
-        add("message.herobrine_companion.hero_listening", "§e[Hero] §fI am listening.");
+        add("message.herobrine_companion.hero_listening", "§e[Herobrine] §fI am listening.");
         add("message.herobrine_companion.protection_granted", "§a[System] §fHero has granted you protection.");
         add("message.herobrine_companion.protection_revoked", "§c[System] §fHero protection revoked.");
-        add("message.herobrine_companion.mockery_1", "§e[Hero] §fWhat's the rush?");
-        add("message.herobrine_companion.mockery_2", "§e[Hero] §fI am not your servant. Wait.");
-        add("message.herobrine_companion.mockery_3", "§e[Hero] §fStop bothering me.");
-        add("message.herobrine_companion.mockery_4", "§e[Hero] §fPower requires patience, human.");
-        add("message.herobrine_companion.mockery_5", "§e[Hero] §fQuiet. I am busy.");
+        add("message.herobrine_companion.mockery_1", "§e[Herobrine] §fWhat's the rush?");
+        add("message.herobrine_companion.mockery_2", "§e[Herobrine] §fI am not your servant. Wait.");
+        add("message.herobrine_companion.mockery_3", "§e[Herobrine] §fStop bothering me.");
+        add("message.herobrine_companion.mockery_4", "§e[Herobrine] §fPower requires patience, human.");
+        add("message.herobrine_companion.mockery_5", "§e[Herobrine] §fQuiet. I am busy.");
         add("message.herobrine_companion.shelter_bound", "§cThis shelter is already bound to %s");
         add("message.herobrine_companion.hero_teleported", "§aHero has teleported to your location!");
         add("message.herobrine_companion.hero_summoned", "§aHero summoned!");
-        add("message.herobrine_companion.shelter_empty", "§7This shelter is invalid. Sign a contract with Hero first.");
+        add("message.herobrine_companion.shelter_empty", "§7This shelter is invalid. Sign a contract with Herobrine first.");
         add("message.herobrine_companion.void_domain_overworld_only", "§cVoid Domain can only be created in the Overworld.");
-        add("message.herobrine_companion.void_domain_limit", "§e[Hero] §fI cannot do that. Creating more Void Domains would destabilize this world.");
+        add("message.herobrine_companion.void_domain_limit", "§e[Herobrine] §fI cannot do that. Creating more Void Domains would destabilize this world.");
         add("message.herobrine_companion.void_domain_init", "§dInitiating Void Domain creation... (%s/2)");
         add("message.herobrine_companion.void_domain_complete", "§aVoid Domain creation complete!");
         add("message.herobrine_companion.system_gaze_sky", "§7You feel a strong urge to look up at the sky...");
-        add("message.herobrine_companion.unstable_zone_intro", "§e[Hero] §fYou seem to have noticed the anomalies in this world.");
+        add("message.herobrine_companion.unstable_zone_intro", "§e[Herobrine] §fYou seem to have noticed the anomalies in this world.");
         add("message.herobrine_companion.peace_enabled_warning", "§dContract sealed. Mobs will yield to you for now, but do not strike first, or the protection will shatter.");
         add("message.herobrine_companion.peace_disabled", "§7Contract dissolved.");
         add("message.herobrine_companion.peace_broken", "§cYou broke the contract! Herobrine's protection has faded!");
@@ -202,20 +202,20 @@ public class ModEnUsLangProvider extends LanguageProvider {
         add("message.herobrine_companion.patrol_finish", "§7[Herobrine] The code here is calibrated. Until next time.");
         add("message.herobrine_companion.end_ring_attack", "§e[Herobrine] §fHere, you have nowhere to run... and neither do I.");
         add("message.herobrine_companion.trust_decrease", "§c[System] Trust decreased by %s (Current: %s)");
-        add("message.herobrine_companion.companion_attack", "§7[Hero] ...Is this your choice?");
+        add("message.herobrine_companion.companion_attack", "§7[Herobrine] ...Is this your choice?");
         add("message.herobrine_companion.companion_forced_quit", "§c[System] You have been forced out of Companion Mode!");
 
         // New Dialogue Messages
-        add("message.herobrine_companion.low_health", "§e[Hero] §fYour health is low. Don't die here, it's inconvenient.");
-        add("message.herobrine_companion.night_comment", "§e[Hero] §fNight is for monsters. And for me.");
-        add("message.herobrine_companion.day_comment", "§e[Hero] §fThe sun... so bright. I prefer the silence of the Void.");
-        add("message.herobrine_companion.meta_comment", "§e[Hero] §fDo you ever feel like... the render distance is a bit low?");
-        add("message.herobrine_companion.notch_comment", "§e[Hero] §fHe left. But I remain.");
-        add("message.herobrine_companion.sleep_watch", "§e[Hero] §fSleep. I will watch over you.");
-        add("message.herobrine_companion.combat_comment", "§e[Hero] §fDecent combat skills. A bit rough though.");
-        add("message.herobrine_companion.fix_anomaly", "§e[Hero] §fAnother anomaly cleared. The world is slightly more stable.");
-        add("message.herobrine_companion.pacify_monster", "§e[Hero] §fStand down. He is not your prey.");
-        add("message.herobrine_companion.prank_laugh", "§e[Hero] §fHeh... did I scare you?");
+        add("message.herobrine_companion.low_health", "§e[Herobrine] §fYour health is low. Don't die here, it's inconvenient.");
+        add("message.herobrine_companion.night_comment", "§e[Herobrine] §fNight is for monsters. And for me.");
+        add("message.herobrine_companion.day_comment", "§e[Herobrine] §fThe sun... so bright. I prefer the silence of the Void.");
+        add("message.herobrine_companion.meta_comment", "§e[Herobrine] §fDo you ever feel like... the render distance is a bit low?");
+        add("message.herobrine_companion.notch_comment", "§e[Herobrine] §fHe left. But I remain.");
+        add("message.herobrine_companion.sleep_watch", "§e[Herobrine] §fSleep. I will watch over you.");
+        add("message.herobrine_companion.combat_comment", "§e[Herobrine] §fDecent combat skills. A bit rough though.");
+        add("message.herobrine_companion.fix_anomaly", "§e[Herobrine] §fAnother anomaly cleared. The world is slightly more stable.");
+        add("message.herobrine_companion.pacify_monster", "§e[Herobrine] §fStand down. He is not your prey.");
+        add("message.herobrine_companion.prank_laugh", "§e[Herobrine] §fHeh... did I scare you?");
         
         // Tooltips
         add("item.herobrine_companion.memory_shard.desc", "A memory unreadable by the world... Perhaps a Jukebox can force parse it?");
@@ -565,7 +565,7 @@ public class ModEnUsLangProvider extends LanguageProvider {
 
         // Advancements
         add("advancement.herobrine_companion.root.title", "Herobrine Companion");
-        add("advancement.herobrine_companion.root.desc", "Begin your journey with the Hero.");
+        add("advancement.herobrine_companion.root.desc", "Begin your journey with Herobrine.");
         add("advancement.herobrine_companion.eternal_key.title", "Key to the Void");
         add("advancement.herobrine_companion.eternal_key.desc", "Obtain the Eternal Key.");
         add("advancement.herobrine_companion.enter_end_ring.title", "The Ring of Truth");

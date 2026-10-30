@@ -53,7 +53,7 @@ public class ModZhCnLangProvider extends LanguageProvider {
         add("itemGroup.herobrine_companion", "Herobrine companion");
 
         // Entities
-        add("entity.herobrine_companion.hero", "Hero");
+        add("entity.herobrine_companion.hero", "Herobrine");
         add("entity.herobrine_companion.herobrine", "Herobrine");
         add("entity.herobrine_companion.ghost_creeper", "幽灵苦力怕");
         add("entity.herobrine_companion.ghost_zombie", "幽灵僵尸");
@@ -87,18 +87,18 @@ public class ModZhCnLangProvider extends LanguageProvider {
         add("gui.herobrine_companion.void_warning", "§c警告: §7清除你周围 17x17 区块直到基岩。\n§7这会造成地形和结构的不可逆破坏。\n§e请谨慎使用！");
         add("gui.herobrine_companion.void_locked_tooltip", "§c[系统] 你需要先探索 End Ring 维度才能掌握这种力量。");
         add("gui.herobrine_companion.sign_contract", "签署契约");
-        add("gui.herobrine_companion.hero_interaction", "Hero 交互");
+        add("gui.herobrine_companion.hero_interaction", "Herobrine 交互");
         add("gui.herobrine_companion.api_on", "API: 开启");
         add("gui.herobrine_companion.api_off", "API: 关闭");
         add("gui.herobrine_companion.api_toggle_tooltip", "切换 云端 AI / 本地逻辑");
         add("gui.herobrine_companion.system_exit", "离开;");
-        add("gui.herobrine_companion.hero_contract", "与Hero的契约");
+        add("gui.herobrine_companion.hero_contract", "与Herobrine的契约");
         add("gui.herobrine_companion.trust_level", "信任度: %s");
         
         // Requests
         add("gui.herobrine_companion.requests", "委托");
-        add("gui.herobrine_companion.requests_title", "Hero 的委托");
-        add("gui.herobrine_companion.requests_tooltip", "接受 Hero 的委托以获取奖励。");
+        add("gui.herobrine_companion.requests_title", "Herobrine 的委托");
+        add("gui.herobrine_companion.requests_tooltip", "接受 Herobrine 的委托以获取奖励。");
         add("gui.herobrine_companion.request_name_1", "清理不稳定区域");
         add("gui.herobrine_companion.request_desc_1", "不稳定区域的异常正在扩散。我需要你清除 5 个幽灵实体 (Ghost Mobs) 来稳定代码。");
         add("gui.herobrine_companion.request_name_2", "安抚末影人");
@@ -127,12 +127,12 @@ public class ModZhCnLangProvider extends LanguageProvider {
         add("gui.herobrine_companion.quest_cooldown_line", "§7冷却中: %1$s 天 %2$s 小时");
         add("gui.herobrine_companion.request_accept", "接受");
         add("gui.herobrine_companion.request_cancel", "放弃");
-        add("message.herobrine_companion.quest_start_1", "§e[Hero] §f很好。去清理那些幽灵吧。我会在这里等你。");
-        add("message.herobrine_companion.quest_complete_1", "§e[Hero] §f做得好。这是你的奖励。");
+        add("message.herobrine_companion.quest_start_1", "§e[Herobrine] §f很好。去清理那些幽灵吧。我会在这里等你。");
+        add("message.herobrine_companion.quest_complete_1", "§e[Herobrine] §f做得好。这是你的奖励。");
         add("message.herobrine_companion.quest_already_active", "§c你已经有一个正在进行的委托了！");
         add("message.herobrine_companion.trust_increase", "§a[系统] 信任度增加 %s (当前: %s)");
-        add("message.herobrine_companion.quest_start_2", "§e[Hero] §f去吧。向它们展示善意。");
-        add("message.herobrine_companion.quest_complete_2", "§e[Hero] §f它们平静下来了。干得好。");
+        add("message.herobrine_companion.quest_start_2", "§e[Herobrine] §f去吧。向它们展示善意。");
+        add("message.herobrine_companion.quest_complete_2", "§e[Herobrine] §f它们平静下来了。干得好。");
         add("message.herobrine_companion.quest_target_gone", "§c[系统] 目标消失了。委托失败。");
         add("message.herobrine_companion.quest_target_died", "§c[System] 目标死亡。委托失败。");
         add("message.herobrine_companion.quest_cancelled", "§c[系统] 委托已放弃。");
@@ -146,7 +146,7 @@ public class ModZhCnLangProvider extends LanguageProvider {
         add("message.herobrine_companion.quest_start_5", "§e[Herobrine] §f四支蜡烛，围成一个圆。第五支会引来不该来的东西。");
         add("message.herobrine_companion.quest_candle_progress", "§7烛火 %s/%s 已在夜色中亮起。");
         add("message.herobrine_companion.quest_candle_fifth", "§c[系统] 第五支蜡烛亮了。风忽然停了……委托失败。");
-        add("message.herobrine_companion.quest_candle_hero_gone", "§c[系统] Hero 离开了。仪式中断。委托失败。");
+        add("message.herobrine_companion.quest_candle_hero_gone", "§c[系统] Herobrine 离开了。仪式中断。委托失败。");
         add("message.herobrine_companion.quest_complete_5", "§e[Herobrine] §f……火光记住你了。现在，黑暗也记住了。");
         add("message.herobrine_companion.quest_start_6", "§e[Herobrine] §f（审判者低语）旗帜是宣言。取下它，就是回应。");
         add("message.herobrine_companion.quest_captain_down", "§a[系统] 队长倒下了。捡起旗帜，带回我身边。");
@@ -167,12 +167,12 @@ public class ModZhCnLangProvider extends LanguageProvider {
         // Messages
         add("message.herobrine_companion.system_cloud_connected", "§b[系统] §f已连接到云端 AI。");
         add("message.herobrine_companion.system_local_mode", "§b[系统] §f本地模式已启用。");
-        add("message.herobrine_companion.summon_success", "§a已召唤Hero！");
+        add("message.herobrine_companion.summon_success", "§a已召唤Herobrine！");
         add("message.herobrine_companion.summon_fail_dimension", "Herobrine 无法在此处被召唤。");
         add("message.herobrine_companion.summon_fail_exists", "Herobrine 已经存在。");
         add("message.herobrine_companion.contract_signed", "契约已签订。信任已建立。");
         add("message.herobrine_companion.contract_failed", "契约失败。供品无效。");
-        add("message.herobrine_companion.chat_hero", "§e[Hero] §f%s");
+        add("message.herobrine_companion.chat_hero", "§e[Herobrine] §f%s");
         add("message.herobrine_companion.chat_you", "§b[你] §f%s");
         add("message.herobrine_companion.chat_exit", "§7[系统] 已退出聊天模式。");
         add("message.herobrine_companion.chat_hint_exit", "输入 '再见' 退出聊天。");
@@ -190,24 +190,24 @@ public class ModZhCnLangProvider extends LanguageProvider {
         add("message.herobrine_companion.hero_wake_up_3", "§6[Herobrine] §f如果你想回去，你必须学会如何放手。丢弃你在这里找到的一切。或者干脆...坠落。");
         add("message.herobrine_companion.system_reality_fractures", "§k|||§r §f现实正在破碎... §k|||§r");
         add("message.herobrine_companion.system_key_silent", "§c钥匙在这里保持沉默...");
-        add("message.herobrine_companion.hero_listening", "§e[Hero] §f我在听。");
+        add("message.herobrine_companion.hero_listening", "§e[Herobrine] §f我在听。");
         add("message.herobrine_companion.protection_granted", "§a[系统] §fHero 已授予你保护。");
         add("message.herobrine_companion.protection_revoked", "§c[系统] §fHero 保护已撤销。");
-        add("message.herobrine_companion.mockery_1", "§e[Hero] §f急什么？");
-        add("message.herobrine_companion.mockery_2", "§e[Hero] §f我不是你的仆人。等着。");
-        add("message.herobrine_companion.mockery_3", "§e[Hero] §f别总是打扰我。");
-        add("message.herobrine_companion.mockery_4", "§e[Hero] §f力量需要耐心，人类。");
-        add("message.herobrine_companion.mockery_5", "§e[Hero] §f安静。我很忙。");
+        add("message.herobrine_companion.mockery_1", "§e[Herobrine] §f急什么？");
+        add("message.herobrine_companion.mockery_2", "§e[Herobrine] §f我不是你的仆人。等着。");
+        add("message.herobrine_companion.mockery_3", "§e[Herobrine] §f别总是打扰我。");
+        add("message.herobrine_companion.mockery_4", "§e[Herobrine] §f力量需要耐心，人类。");
+        add("message.herobrine_companion.mockery_5", "§e[Herobrine] §f安静。我很忙。");
         add("message.herobrine_companion.shelter_bound", "§c这个庇护已经绑定到 %s");
         add("message.herobrine_companion.hero_teleported", "§aHero 已传送到你的位置！");
-        add("message.herobrine_companion.hero_summoned", "§a已召唤Hero！");
-        add("message.herobrine_companion.shelter_empty", "§7这个庇护是无效的。先与 Hero 签订契约。");
+        add("message.herobrine_companion.hero_summoned", "§a已召唤Herobrine！");
+        add("message.herobrine_companion.shelter_empty", "§7这个庇护是无效的。先与 Herobrine 签订契约。");
         add("message.herobrine_companion.void_domain_overworld_only", "§c空置域只能在主世界创建。");
-        add("message.herobrine_companion.void_domain_limit", "§e[Hero] §f我不能那样做。创建更多的空置域会破坏这个世界的平衡。");
+        add("message.herobrine_companion.void_domain_limit", "§e[Herobrine] §f我不能那样做。创建更多的空置域会破坏这个世界的平衡。");
         add("message.herobrine_companion.void_domain_init", "§d正在启动空置域创建... (%s/2)");
         add("message.herobrine_companion.void_domain_complete", "§a空置域创建完成！");
         add("message.herobrine_companion.system_gaze_sky", "§7你感到一种强烈的冲动，想要仰望天空...");
-        add("message.herobrine_companion.unstable_zone_intro", "§e[Hero] §f你似乎注意到了这个世界的异常。");
+        add("message.herobrine_companion.unstable_zone_intro", "§e[Herobrine] §f你似乎注意到了这个世界的异常。");
         add("message.herobrine_companion.peace_enabled_warning", "§d契约已立。众生暂时臣服于你，但切勿主动挥剑，否则庇护将瞬间破碎。");
         add("message.herobrine_companion.peace_disabled", "§7契约解除。");
         add("message.herobrine_companion.peace_broken", "§c你打破了契约！Herobrine 的庇护已失效！");
@@ -218,66 +218,66 @@ public class ModZhCnLangProvider extends LanguageProvider {
         add("message.herobrine_companion.patrol_finish", "§7[Herobrine] 此处的代码已校准完毕。期待下次再见。");
         add("message.herobrine_companion.end_ring_attack", "§e[Herobrine] §f在这里，你无路可逃...我也一样。");
         add("message.herobrine_companion.trust_decrease", "§c[System] 信任度减少 %s (当前: %s)");
-        add("message.herobrine_companion.companion_attack", "§7[Hero] ...这就是你的选择吗？");
+        add("message.herobrine_companion.companion_attack", "§7[Herobrine] ...这就是你的选择吗？");
         add("message.herobrine_companion.companion_forced_quit", "§c[System]你已经退出陪伴模式！");
         
         // New Dialogue Messages
-        add("message.herobrine_companion.low_health_1", "§e[Hero] §f你的生命值很低。别死在这里，那会很麻烦。");
-        add("message.herobrine_companion.low_health_2", "§e[Hero] §f你需要治疗。现在。");
-        add("message.herobrine_companion.low_health_3", "§e[Hero] §f脆弱的凡人躯体...");
+        add("message.herobrine_companion.low_health_1", "§e[Herobrine] §f你的生命值很低。别死在这里，那会很麻烦。");
+        add("message.herobrine_companion.low_health_2", "§e[Herobrine] §f你需要治疗。现在。");
+        add("message.herobrine_companion.low_health_3", "§e[Herobrine] §f脆弱的凡人躯体...");
         
 
-        add("message.herobrine_companion.night_comment_1", "§e[Hero] §f夜晚是怪物的时间。也是我的时间。");
-        add("message.herobrine_companion.night_comment_2", "§e[Hero] §f黑暗总是让人感到舒适，不是吗？");
-        add("message.herobrine_companion.night_comment_3", "§e[Hero] §f小心背后。");
+        add("message.herobrine_companion.night_comment_1", "§e[Herobrine] §f夜晚是怪物的时间。也是我的时间。");
+        add("message.herobrine_companion.night_comment_2", "§e[Herobrine] §f黑暗总是让人感到舒适，不是吗？");
+        add("message.herobrine_companion.night_comment_3", "§e[Herobrine] §f小心背后。");
         
 
-        add("message.herobrine_companion.day_comment_1", "§e[Hero] §f阳光... 如此刺眼。我更喜欢虚空的寂静。");
-        add("message.herobrine_companion.day_comment_2", "§e[Hero] §f又是一个无聊的白天。");
-        add("message.herobrine_companion.day_comment_3", "§e[Hero] §f这种亮度对我的眼睛不好。");
+        add("message.herobrine_companion.day_comment_1", "§e[Herobrine] §f阳光... 如此刺眼。我更喜欢虚空的寂静。");
+        add("message.herobrine_companion.day_comment_2", "§e[Herobrine] §f又是一个无聊的白天。");
+        add("message.herobrine_companion.day_comment_3", "§e[Herobrine] §f这种亮度对我的眼睛不好。");
         
 
-        add("message.herobrine_companion.meta_comment_1", "§e[Hero] §f你有没有觉得... 这个世界的渲染距离有点低？");
-        add("message.herobrine_companion.meta_comment_2", "§e[Hero] §f我能看到区块边界。你能吗？");
-        add("message.herobrine_companion.meta_comment_3", "§e[Hero] §f有时候我觉得这个世界的物理引擎很可笑。");
+        add("message.herobrine_companion.meta_comment_1", "§e[Herobrine] §f你有没有觉得... 这个世界的渲染距离有点低？");
+        add("message.herobrine_companion.meta_comment_2", "§e[Herobrine] §f我能看到区块边界。你能吗？");
+        add("message.herobrine_companion.meta_comment_3", "§e[Herobrine] §f有时候我觉得这个世界的物理引擎很可笑。");
         
-        add("message.herobrine_companion.notch_comment", "§e[Hero] §f他离开了。但我还在。");
-        
-
-        add("message.herobrine_companion.sleep_watch_1", "§e[Hero] §f睡吧。我会看着你的。");
-        add("message.herobrine_companion.sleep_watch_2", "§e[Hero] §f你休息吧。我不需要睡眠。");
-        add("message.herobrine_companion.sleep_watch_3", "§e[Hero] §f梦境... 有时候比现实更真实。");
+        add("message.herobrine_companion.notch_comment", "§e[Herobrine] §f他离开了。但我还在。");
         
 
-        add("message.herobrine_companion.combat_comment_1", "§e[Hero] §f不错的战斗技巧。虽然有点粗糙。");
-        add("message.herobrine_companion.combat_comment_2", "§e[Hero] §f太慢了。不过。");
-        add("message.herobrine_companion.combat_comment_3", "§e[Hero] §f勉强及格。");
-        
-        add("message.herobrine_companion.fix_anomaly_1", "§e[Hero] §f又一个异常被清除了。世界稍微稳定了一点。");
-        add("message.herobrine_companion.fix_anomaly_2", "§e[Hero] §f这些错误就像病毒一样。必须根除。");
-        add("message.herobrine_companion.fix_anomaly_3", "§e[Hero] §f清理完毕。");
+        add("message.herobrine_companion.sleep_watch_1", "§e[Herobrine] §f睡吧。我会看着你的。");
+        add("message.herobrine_companion.sleep_watch_2", "§e[Herobrine] §f你休息吧。我不需要睡眠。");
+        add("message.herobrine_companion.sleep_watch_3", "§e[Herobrine] §f梦境... 有时候比现实更真实。");
         
 
-        add("message.herobrine_companion.pacify_monster_1", "§e[Hero] §f退下。他不是你们的猎物。");
-        add("message.herobrine_companion.pacify_monster_2", "§e[Hero] §f离开这里。");
-        add("message.herobrine_companion.pacify_monster_3", "§e[Hero] §f他是我的朋友。");
+        add("message.herobrine_companion.combat_comment_1", "§e[Herobrine] §f不错的战斗技巧。虽然有点粗糙。");
+        add("message.herobrine_companion.combat_comment_2", "§e[Herobrine] §f太慢了。不过。");
+        add("message.herobrine_companion.combat_comment_3", "§e[Herobrine] §f勉强及格。");
+        
+        add("message.herobrine_companion.fix_anomaly_1", "§e[Herobrine] §f又一个异常被清除了。世界稍微稳定了一点。");
+        add("message.herobrine_companion.fix_anomaly_2", "§e[Herobrine] §f这些错误就像病毒一样。必须根除。");
+        add("message.herobrine_companion.fix_anomaly_3", "§e[Herobrine] §f清理完毕。");
         
 
-        add("message.herobrine_companion.prank_laugh_1", "§e[Hero] §f呵... 吓到你了？");
-        add("message.herobrine_companion.prank_laugh_2", "§e[Hero] §f你的反应真有趣。");
-        add("message.herobrine_companion.prank_laugh_3", "§e[Hero] §f别紧张，只是开个玩笑。");
+        add("message.herobrine_companion.pacify_monster_1", "§e[Herobrine] §f退下。他不是你们的猎物。");
+        add("message.herobrine_companion.pacify_monster_2", "§e[Herobrine] §f离开这里。");
+        add("message.herobrine_companion.pacify_monster_3", "§e[Herobrine] §f他是我的朋友。");
         
 
-        add("message.herobrine_companion.area_cleansed_1", "§e[Hero] §f这片区域的代码已经重写。应该安全了。");
-        add("message.herobrine_companion.area_cleansed_2", "§e[Hero] §f这里的混乱已经被平息。");
+        add("message.herobrine_companion.prank_laugh_1", "§e[Herobrine] §f呵... 吓到你了？");
+        add("message.herobrine_companion.prank_laugh_2", "§e[Herobrine] §f你的反应真有趣。");
+        add("message.herobrine_companion.prank_laugh_3", "§e[Herobrine] §f别紧张，只是开个玩笑。");
         
-        add("message.herobrine_companion.biome_comment_1", "§e[Hero] §f这里的地形生成算法... 很有趣。");
-        add("message.herobrine_companion.biome_comment_2", "§e[Hero] §f我不喜欢这里的气氛。");
-        add("message.herobrine_companion.biome_comment_3", "§e[Hero] §f这里很安静。太安静了。");
+
+        add("message.herobrine_companion.area_cleansed_1", "§e[Herobrine] §f这片区域的代码已经重写。应该安全了。");
+        add("message.herobrine_companion.area_cleansed_2", "§e[Herobrine] §f这里的混乱已经被平息。");
         
-        add("message.herobrine_companion.idle_comment_1", "§e[Hero] §f我们在等什么？");
-        add("message.herobrine_companion.idle_comment_2", "§e[Hero] §f又是一个无聊的日子。");
-        add("message.herobrine_companion.idle_comment_3", "§e[Hero] §f你想去看看世界的尽头吗？");
+        add("message.herobrine_companion.biome_comment_1", "§e[Herobrine] §f这里的地形生成算法... 很有趣。");
+        add("message.herobrine_companion.biome_comment_2", "§e[Herobrine] §f我不喜欢这里的气氛。");
+        add("message.herobrine_companion.biome_comment_3", "§e[Herobrine] §f这里很安静。太安静了。");
+        
+        add("message.herobrine_companion.idle_comment_1", "§e[Herobrine] §f我们在等什么？");
+        add("message.herobrine_companion.idle_comment_2", "§e[Herobrine] §f又是一个无聊的日子。");
+        add("message.herobrine_companion.idle_comment_3", "§e[Herobrine] §f你想去看看世界的尽头吗？");
         
         // Tooltips
         add("item.herobrine_companion.memory_shard.desc", "一段无法被世界读取的记忆……也许唱片机能强行解析它？");
@@ -621,7 +621,7 @@ public class ModZhCnLangProvider extends LanguageProvider {
 
         // Advancements
         add("advancement.herobrine_companion.root.title", "Herobrine Companion");
-        add("advancement.herobrine_companion.root.desc", "开始你与 Hero 的旅程。");
+        add("advancement.herobrine_companion.root.desc", "开始你与 Herobrine 的旅程。");
         add("advancement.herobrine_companion.eternal_key.title", "虚空之钥");
         add("advancement.herobrine_companion.eternal_key.desc", "获得永恒门钥。");
         add("advancement.herobrine_companion.enter_end_ring.title", "真理之环");
