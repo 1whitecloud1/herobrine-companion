@@ -1,29 +1,28 @@
 package com.whitecloud233.herobrine_companion.client.gui;
 
+import com.whitecloud233.herobrine_companion.client.gui.HeroTheme;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.whitecloud233.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.herobrine_companion.world.inventory.HeroMerchantMenu;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.MenuAccess;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.inventory.MerchantMenu;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.trading.MerchantOffer;
 import net.minecraft.world.item.trading.MerchantOffers;
 
 // 【核心修改】改为继承 Screen，彻底避开 AbstractContainerScreen 的逻辑，从而让 JEI 忽略此界面
 // 同时实现 MenuAccess 接口，以满足 RegisterMenuScreensEvent 的泛型要求
-public class HeroTradeScreen extends Screen implements MenuAccess<MerchantMenu> {
+public class HeroTradeScreen extends Screen implements MenuAccess<HeroMerchantMenu> {
     // 配色方案
-    private static final int COL_BG_MAIN    = 0xFF2B2B2B;
-    private static final int COL_BG_SIDE    = 0xFF3C3F41;
-    private static final int COL_BORDER     = 0xFF555555;
-    private static final int COL_TEXT_MAIN  = 0xFFA9B7C6;
-    private static final int COL_INFO       = 0xFF6A8759;
+    private static final int COL_BG_MAIN    = HeroTheme.BG_MAIN;
+    private static final int COL_BG_SIDE    = HeroTheme.BG_SIDE;
+    private static final int COL_BORDER     = HeroTheme.BORDER;
+    private static final int COL_TEXT_MAIN  = HeroTheme.TEXT;
+    private static final int COL_INFO       = HeroTheme.INFO;
 
     // 按钮风格
     private static final int BTN_BG_NORMAL = 0xFF3C3F41;
@@ -31,7 +30,7 @@ public class HeroTradeScreen extends Screen implements MenuAccess<MerchantMenu> 
     private static final int BTN_BORDER    = 0xFF555555;
 
     // 菜单引用，用于数据交互
-    private final MerchantMenu menu;
+    private final HeroMerchantMenu menu;
     // 布局参数
     protected int imageWidth = 276;
     protected int imageHeight = 166;
@@ -47,14 +46,14 @@ public class HeroTradeScreen extends Screen implements MenuAccess<MerchantMenu> 
     private int shopItem = -1;
     private boolean isDragging;
 
-    public HeroTradeScreen(MerchantMenu menu, Inventory playerInventory, Component title) {
+    public HeroTradeScreen(HeroMerchantMenu menu, Inventory playerInventory, Component title) {
         super(title);
         this.menu = menu;
         this.inventoryLabelY = this.imageHeight - 94;
     }
 
     @Override
-    public MerchantMenu getMenu() {
+    public HeroMerchantMenu getMenu() {
         return this.menu;
     }
 
@@ -441,37 +440,18 @@ public class HeroTradeScreen extends Screen implements MenuAccess<MerchantMenu> 
             }
         }
 
-        // 信任度条
-        HeroEntity hero = getHeroEntity();
-        if (hero != null) {
-            int trust = hero.getTrustLevel();
-            int barX = x + 136;
-            int barY = y + 65;
-            int barWidth = 102;
-            guiGraphics.drawString(this.font, "Trust: " + trust, barX, barY - 10, COL_INFO, false);
-            guiGraphics.fill(barX, barY, barX + barWidth, barY + 4, 0xFF555555);
-            float progress = Math.min(1.0f, (float)trust / 100.0f);
-            int color = trust < 30 ? 0xFFFF5555 : (trust < 70 ? 0xFFFFFF55 : 0xFF55FF55);
-            guiGraphics.fill(barX, barY, barX + (int)(barWidth * progress), barY + 4, color);
-        }
+        // 当前交易对象的信任值由菜单同步，不依赖客户端附近的实体。
+        int trust = this.menu.getTrustLevel();
+        int barX = x + 136;
+        int barY = y + 65;
+        int barWidth = 102;
+        guiGraphics.drawString(this.font, "Trust: " + trust, barX, barY - 10, COL_INFO, false);
+        guiGraphics.fill(barX, barY, barX + barWidth, barY + 4, 0xFF555555);
+        float progress = Mth.clamp((float)trust / 100.0f, 0.0f, 1.0f);
+        int color = trust < 30 ? 0xFFFF5555 : (trust < 70 ? 0xFFFFFF55 : 0xFF55FF55);
+        guiGraphics.fill(barX, barY, barX + (int)(barWidth * progress), barY + 4, color);
 
         renderCustomScroller(guiGraphics, x, y);
-    }
-
-    private HeroEntity getHeroEntity() {
-        if (this.minecraft == null || this.minecraft.level == null || this.minecraft.player == null) return null;
-        HeroEntity closest = null;
-        double minDst = Double.MAX_VALUE;
-        for (Entity e : this.minecraft.level.entitiesForRendering()) {
-            if (e instanceof HeroEntity hero) {
-                double dst = hero.distanceToSqr(this.minecraft.player);
-                if (dst < minDst) {
-                    minDst = dst;
-                    closest = hero;
-                }
-            }
-        }
-        return (minDst < 256) ? closest : null;
     }
 
     private void drawArrow(GuiGraphics guiGraphics, int x, int y) {

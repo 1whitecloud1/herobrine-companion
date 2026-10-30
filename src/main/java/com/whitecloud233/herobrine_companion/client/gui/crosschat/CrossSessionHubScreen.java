@@ -2,6 +2,8 @@ package com.whitecloud233.herobrine_companion.client.gui.crosschat;
 
 import com.whitecloud233.herobrine_companion.client.event.ClientHooks;
 import com.whitecloud233.herobrine_companion.client.gui.HeroScreen;
+import com.whitecloud233.herobrine_companion.client.gui.HeroTheme;
+import com.whitecloud233.herobrine_companion.client.gui.HeroPanelScreen;
 import com.whitecloud233.herobrine_companion.client.service.CrossChatHistoryStore;
 import com.whitecloud233.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.herobrine_companion.network.ai.CloseCrossChatSessionPacket;
@@ -13,7 +15,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.ObjectSelectionList;
-import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
@@ -21,12 +22,11 @@ import net.minecraft.util.Mth;
 import java.io.File;
 import java.util.*;
 
-public class CrossSessionHubScreen extends Screen {
+public class CrossSessionHubScreen extends HeroPanelScreen {
     private static final int MAX_PANEL_WIDTH = 352;
     private static final int MAX_PANEL_HEIGHT = 344;
     private static final int MIN_PANEL_WIDTH = 300;
     private static final int MIN_PANEL_HEIGHT = 310;
-    private static final int SCREEN_MARGIN = 8;
     private static final int CONTENT_MARGIN = 16;
     private static final int ROW_GAP = 6;
     private static final int BUTTON_GAP = 8;
@@ -170,12 +170,12 @@ public class CrossSessionHubScreen extends Screen {
     }
 
     private Layout createLayout() {
-        int availableWidth = Math.max(1, this.width - SCREEN_MARGIN * 2);
-        int availableHeight = Math.max(1, this.height - SCREEN_MARGIN * 2);
-        int panelWidth = clampToAvailable(MIN_PANEL_WIDTH, MAX_PANEL_WIDTH, availableWidth);
-        int panelHeight = clampToAvailable(MIN_PANEL_HEIGHT, MAX_PANEL_HEIGHT, availableHeight);
-        int left = (this.width - panelWidth) / 2;
-        int top = (this.height - panelHeight) / 2;
+        HeroTheme.Frame frame = panelFrame(MAX_PANEL_WIDTH, MAX_PANEL_HEIGHT,
+                MIN_PANEL_WIDTH, MIN_PANEL_HEIGHT);
+        int panelWidth = frame.width();
+        int panelHeight = frame.height();
+        int left = frame.left();
+        int top = frame.top();
         int contentLeft = left + CONTENT_MARGIN;
         int contentWidth = Math.max(1, panelWidth - CONTENT_MARGIN * 2);
         int listTop = top + 42;
@@ -189,11 +189,6 @@ public class CrossSessionHubScreen extends Screen {
 
         return new Layout(panelWidth, panelHeight, left, top, contentLeft, contentWidth,
                 listTop, listHeight, requestY, permissionY, chatY, toolsY, autoY, infoTop);
-    }
-
-    private static int clampToAvailable(int min, int max, int available) {
-        int clamped = Math.min(max, available);
-        return Math.max(Math.min(min, available), clamped);
     }
 
     private void updateButtons() {
@@ -385,22 +380,15 @@ public class CrossSessionHubScreen extends Screen {
     }
 
     @Override
-    public void renderBackground(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-    }
-
-    @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         Layout layout = this.createLayout();
-        guiGraphics.fill(layout.left, layout.top, layout.left + layout.panelWidth, layout.top + layout.panelHeight, BG);
-        guiGraphics.renderOutline(layout.left, layout.top, layout.panelWidth, layout.panelHeight, BORDER);
+        HeroTheme.plainPanel(guiGraphics, layout.left, layout.top, layout.panelWidth, layout.panelHeight);
         guiGraphics.drawCenteredString(this.font, this.title, this.width / 2, layout.top + 12, TITLE);
         guiGraphics.drawString(this.font,
                 Component.translatable("gui.herobrine_companion.cross_chat.online_players"),
                 layout.contentLeft, layout.top + 30, TEXT, false);
 
-        guiGraphics.fill(layout.contentLeft, layout.listTop,
-                layout.contentLeft + layout.contentWidth, layout.listTop + layout.listHeight, LIST_BG);
-        guiGraphics.renderOutline(layout.contentLeft, layout.listTop, layout.contentWidth, layout.listHeight, BORDER);
+        HeroTheme.plainPanel(guiGraphics, layout.contentLeft, layout.listTop, layout.contentWidth, layout.listHeight, LIST_BG);
 
         if (this.playerList != null && this.playerList.isEmpty()) {
             guiGraphics.drawCenteredString(this.font,
@@ -445,11 +433,6 @@ public class CrossSessionHubScreen extends Screen {
         guiGraphics.disableScissor();
 
         super.render(guiGraphics, mouseX, mouseY, partialTick);
-    }
-
-    @Override
-    public boolean isPauseScreen() {
-        return false;
     }
 
     private static class Layout {

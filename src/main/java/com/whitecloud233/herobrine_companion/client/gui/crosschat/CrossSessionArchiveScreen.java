@@ -1,6 +1,8 @@
 package com.whitecloud233.herobrine_companion.client.gui.crosschat;
 
 import com.whitecloud233.herobrine_companion.client.gui.HeroScreen;
+import com.whitecloud233.herobrine_companion.client.gui.HeroTheme;
+import com.whitecloud233.herobrine_companion.client.gui.HeroPanelScreen;
 import com.whitecloud233.herobrine_companion.client.service.CrossChatHistoryStore;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -20,20 +22,19 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
-public class CrossSessionArchiveScreen extends Screen {
+public class CrossSessionArchiveScreen extends HeroPanelScreen {
     private static final int MAX_PANEL_WIDTH = 420;
     private static final int MAX_PANEL_HEIGHT = 310;
     private static final int MIN_PANEL_WIDTH = 340;
     private static final int MIN_PANEL_HEIGHT = 300;
-    private static final int SCREEN_MARGIN = 8;
     private static final int CONTENT_MARGIN = 12;
     private static final int CONTROL_GAP = 8;
     private static final int BUTTON_HEIGHT = 20;
-    private static final int COL_BG = 0xFF2B2B2B;
-    private static final int COL_BORDER = 0xFF555555;
-    private static final int COL_TEXT = 0xFFA9B7C6;
+    private static final int COL_BG = HeroTheme.BG_MAIN;
+    private static final int COL_BORDER = HeroTheme.BORDER;
+    private static final int COL_TEXT = HeroTheme.TEXT;
     private static final int COL_TITLE = 0xFFD16D9E;
-    private static final int COL_INFO = 0xFF6A8759;
+    private static final int COL_INFO = HeroTheme.INFO;
     private static final int LIST_BG = 0xFF232323;
     private static final int LIST_SELECTED_BG = 0xFF4E3A4F;
     private static final int LIST_HOVER_BG = 0xFF383838;
@@ -141,12 +142,12 @@ public class CrossSessionArchiveScreen extends Screen {
     }
 
     private Layout createLayout() {
-        int availableWidth = Math.max(1, this.width - SCREEN_MARGIN * 2);
-        int availableHeight = Math.max(1, this.height - SCREEN_MARGIN * 2);
-        int panelWidth = clampToAvailable(MIN_PANEL_WIDTH, MAX_PANEL_WIDTH, availableWidth);
-        int panelHeight = clampToAvailable(MIN_PANEL_HEIGHT, MAX_PANEL_HEIGHT, availableHeight);
-        int left = (this.width - panelWidth) / 2;
-        int top = (this.height - panelHeight) / 2;
+        HeroTheme.Frame frame = panelFrame(MAX_PANEL_WIDTH, MAX_PANEL_HEIGHT,
+                MIN_PANEL_WIDTH, MIN_PANEL_HEIGHT);
+        int panelWidth = frame.width();
+        int panelHeight = frame.height();
+        int left = frame.left();
+        int top = frame.top();
         int contentLeft = left + CONTENT_MARGIN;
         int contentWidth = Math.max(1, panelWidth - CONTENT_MARGIN * 2);
         int searchY = top + 34;
@@ -159,11 +160,6 @@ public class CrossSessionArchiveScreen extends Screen {
         int detailWidth = Math.max(1, contentLeft + contentWidth - detailLeft);
         return new Layout(panelWidth, panelHeight, left, top, contentLeft, contentWidth,
                 searchY, mainTop, mainHeight, contentLeft, listWidth, detailLeft, detailWidth, rowOneY, rowTwoY);
-    }
-
-    private static int clampToAvailable(int min, int max, int available) {
-        int clamped = Math.min(max, available);
-        return Math.max(Math.min(min, available), clamped);
     }
 
     private void refreshArchiveList() {
@@ -307,27 +303,18 @@ public class CrossSessionArchiveScreen extends Screen {
     }
 
     @Override
-    public void renderBackground(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-    }
-
-    @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         Layout layout = this.createLayout();
-        guiGraphics.fill(layout.left, layout.top, layout.left + layout.panelWidth, layout.top + layout.panelHeight, COL_BG);
-        guiGraphics.renderOutline(layout.left, layout.top, layout.panelWidth, layout.panelHeight, COL_BORDER);
+        HeroTheme.plainPanel(guiGraphics, layout.left, layout.top, layout.panelWidth, layout.panelHeight);
         guiGraphics.drawCenteredString(this.font, this.title, this.width / 2, layout.top + 10, COL_TITLE);
 
         guiGraphics.drawString(this.font,
                 Component.translatable("gui.herobrine_companion.cross_chat.archive_subtitle"),
                 layout.contentLeft, layout.top + 22, COL_INFO, false);
 
-        guiGraphics.fill(layout.listLeft, layout.mainTop,
-                layout.listLeft + layout.listWidth, layout.mainTop + layout.mainHeight, LIST_BG);
-        guiGraphics.renderOutline(layout.listLeft, layout.mainTop, layout.listWidth, layout.mainHeight, COL_BORDER);
+        HeroTheme.plainPanel(guiGraphics, layout.listLeft, layout.mainTop, layout.listWidth, layout.mainHeight, LIST_BG);
 
-        guiGraphics.fill(layout.detailLeft, layout.mainTop,
-                layout.detailLeft + layout.detailWidth, layout.mainTop + layout.mainHeight, DETAIL_BG);
-        guiGraphics.renderOutline(layout.detailLeft, layout.mainTop, layout.detailWidth, layout.mainHeight, COL_BORDER);
+        HeroTheme.plainPanel(guiGraphics, layout.detailLeft, layout.mainTop, layout.detailWidth, layout.mainHeight, DETAIL_BG);
 
         if (this.archiveList != null && this.archiveList.isEmpty()) {
             guiGraphics.drawCenteredString(this.font,
@@ -404,11 +391,6 @@ public class CrossSessionArchiveScreen extends Screen {
     private static String formatTimestamp(long timestamp) {
         long safeTimestamp = timestamp > 0 ? timestamp : System.currentTimeMillis();
         return DETAIL_TIME.format(Instant.ofEpochMilli(safeTimestamp).atZone(ZoneId.systemDefault()));
-    }
-
-    @Override
-    public boolean isPauseScreen() {
-        return false;
     }
 
     private static class Layout {

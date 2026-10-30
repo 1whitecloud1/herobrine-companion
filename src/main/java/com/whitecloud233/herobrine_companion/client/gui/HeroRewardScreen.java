@@ -1,8 +1,10 @@
 package com.whitecloud233.herobrine_companion.client.gui;
 
+import com.whitecloud233.herobrine_companion.client.gui.HeroTheme;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.event.HeroRewards;
+import com.whitecloud233.herobrine_companion.client.network.ClientHeroContent;
 import com.whitecloud233.herobrine_companion.network.ClaimRewardPacket;
 import com.whitecloud233.herobrine_companion.network.PacketHandler;
 import net.minecraft.client.Minecraft;
@@ -18,9 +20,12 @@ import net.minecraft.world.item.ItemStack;
 import java.util.ArrayList;
 import java.util.List;
 
-public class HeroRewardScreen extends Screen {
+public class HeroRewardScreen extends HeroPanelScreen {
     private final int entityId;
     private HeroEntity hero;
+    private long contentRevision;
+    private long rewardsRevision;
+    private int trustLevel;
     private static final int PANEL_WIDTH = 300;
     private static final int PANEL_HEIGHT = 200;
     
@@ -39,9 +44,17 @@ public class HeroRewardScreen extends Screen {
         this.entityId = entityId;
     }
 
+    /** 面板几何：宽高钳制到窗口内，居中。返回 {startX, startY, w, h}。 */
+    private int[] panelDims() {
+        HeroTheme.Frame frame = HeroTheme.frame(this.width, this.height,
+                PANEL_WIDTH, PANEL_HEIGHT, 240, 160, 8);
+        return new int[]{frame.left(), frame.top(), frame.width(), frame.height()};
+    }
+
     @Override
     protected void init() {
         super.init();
+        this.hero = null;
         if (this.minecraft.level != null) {
             Entity entity = this.minecraft.level.getEntity(this.entityId);
             if (entity instanceof HeroEntity h) {
@@ -49,9 +62,15 @@ public class HeroRewardScreen extends Screen {
             }
         }
 
-        int startX = (this.width - PANEL_WIDTH) / 2;
-        int startY = (this.height - PANEL_HEIGHT) / 2;
+        int[] dims = panelDims();
+        int startX = dims[0];
+        int startY = dims[1];
+        int panelW = dims[2];
+        int panelH = dims[3];
 
+        contentRevision = ClientHeroContent.revision();
+        rewardsRevision = hero != null ? hero.getClaimedRewardsRevision() : -1L;
+        trustLevel = hero != null ? hero.getTrustLevel() : Integer.MIN_VALUE;
         rewardButtons.clear();
         
         // 初始化按钮，但不添加到 Screen 的 renderables 中（我们手动渲染和处理）
@@ -59,22 +78,13 @@ public class HeroRewardScreen extends Screen {
         // 这里我们选择：添加到 renderables，但在 render 中更新它们的 Y 坐标，并根据裁剪区域设置 visible
         
         int index = 0;
-        for (HeroRewards.Reward reward : HeroRewards.REWARDS) {
+        for (HeroRewards.Reward reward : ClientHeroContent.rewards()) {
             boolean unlocked = hero != null && hero.getTrustLevel() >= reward.requiredTrust;
             boolean claimed = hero != null && hero.hasClaimedReward(reward.id);
 
-            RewardButton btn = new RewardButton(startX + 200, 0, 80, 20, 
+            RewardButton btn = new RewardButton(startX + panelW - 100, 0, 80, 20,
                 Component.translatable(claimed ? "gui.herobrine_companion.claimed" : (unlocked ? "gui.herobrine_companion.claim" : "gui.herobrine_companion.locked")), 
-                button -> {
-                    if (unlocked && !claimed) {
-                        PacketHandler.sendToServer(new ClaimRewardPacket(this.entityId, reward.id));
-                        if (hero != null) {
-                            hero.claimReward(reward.id);
-                        }
-                        button.setMessage(Component.translatable("gui.herobrine_companion.claimed"));
-                        button.active = false;
-                    }
-                },
+                button -> requestReward(reward, button),
                 Tooltip.create(Component.translatable("gui.herobrine_companion.reward_tooltip", reward.requiredTrust)),
                 index
             );
@@ -89,26 +99,40 @@ public class HeroRewardScreen extends Screen {
         this.addRenderableWidget(Button.builder(Component.translatable("gui.back"), button -> {
             this.onClose();
             Minecraft.getInstance().setScreen(new HeroScreen(this.entityId));
-        }).bounds(startX + PANEL_WIDTH / 2 - 40, startY + PANEL_HEIGHT - 25, 80, 20).build());
+        }).bounds(startX + panelW / 2 - 40, startY + panelH - 25, 80, 20).build());
     }
 
-    @Override
-    public void renderBackground(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        // 留空
+    private boolean needsStateRefresh() {
+        Entity current = this.minecraft.level.getEntity(this.entityId);
+        HeroEntity currentHero = current instanceof HeroEntity value ? value : null;
+        return currentHero != hero || contentRevision != ClientHeroContent.revision()
+                || (hero != null && (rewardsRevision != hero.getClaimedRewardsRevision()
+                || trustLevel != hero.getTrustLevel()));
+    }
+
+    private void requestReward(HeroRewards.Reward reward, Button button) {
+        if (hero != null && hero.getTrustLevel() >= reward.requiredTrust && !hero.hasClaimedReward(reward.id)) {
+            PacketHandler.sendToServer(new ClaimRewardPacket(this.entityId, reward.id));
+            // Keep the current label until the server confirms the result.
+            button.active = false;
+        }
     }
 
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        if (this.minecraft == null) return;
+        if (this.minecraft == null || this.minecraft.level == null) return;
+        if (needsStateRefresh()) { clearWidgets(); init(); }
         
         RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
         
-        int startX = (this.width - PANEL_WIDTH) / 2;
-        int startY = (this.height - PANEL_HEIGHT) / 2;
+        int[] dims = panelDims();
+        int startX = dims[0];
+        int startY = dims[1];
+        int panelW = dims[2];
+        int panelH = dims[3];
 
         // 绘制背景
-        guiGraphics.fill(startX, startY, startX + PANEL_WIDTH, startY + PANEL_HEIGHT, 0xFF2B2B2B);
-        guiGraphics.renderOutline(startX, startY, PANEL_WIDTH, PANEL_HEIGHT, 0xFF555555);
+        HeroTheme.plainPanel(guiGraphics, startX, startY, panelW, panelH);
 
         // 标题
         guiGraphics.drawCenteredString(this.font, this.title, this.width / 2, startY + 10, 0xFFFFFF);
@@ -116,10 +140,10 @@ public class HeroRewardScreen extends Screen {
         // --- 滚动列表区域 ---
         int listX = startX + 10;
         int listY = startY + LIST_TOP_MARGIN;
-        int listWidth = PANEL_WIDTH - 20;
-        int listHeight = PANEL_HEIGHT - LIST_TOP_MARGIN - LIST_BOTTOM_MARGIN;
+        int listWidth = panelW - 20;
+        int listHeight = panelH - LIST_TOP_MARGIN - LIST_BOTTOM_MARGIN;
         
-        int contentHeight = HeroRewards.REWARDS.size() * ITEM_HEIGHT;
+        int contentHeight = ClientHeroContent.rewards().size() * ITEM_HEIGHT;
         int maxScroll = Math.max(0, contentHeight - listHeight);
         
         // 限制滚动范围
@@ -139,7 +163,7 @@ public class HeroRewardScreen extends Screen {
         int currentY = (int) (listY - scrollOffset);
         
         int index = 0;
-        for (HeroRewards.Reward reward : HeroRewards.REWARDS) {
+        for (HeroRewards.Reward reward : ClientHeroContent.rewards()) {
             // 优化：只渲染可见范围内的条目
             if (currentY + ITEM_HEIGHT > listY && currentY < listY + listHeight) {
                 int itemX = listX;
@@ -185,7 +209,7 @@ public class HeroRewardScreen extends Screen {
 
         // --- 绘制滚动条 ---
         if (maxScroll > 0) {
-            int scrollBarX = startX + PANEL_WIDTH - 8;
+            int scrollBarX = startX + panelW - 8;
             int scrollBarY = listY;
             int scrollBarHeight = listHeight;
             
@@ -204,7 +228,7 @@ public class HeroRewardScreen extends Screen {
         
         // --- 再次遍历绘制 Tooltip (在 Scissor 之外) ---
         currentY = (int) (listY - scrollOffset);
-        for (HeroRewards.Reward reward : HeroRewards.REWARDS) {
+        for (HeroRewards.Reward reward : ClientHeroContent.rewards()) {
             if (currentY + ITEM_HEIGHT > listY && currentY < listY + listHeight) {
                 int itemX = listX;
                 for (ItemStack item : reward.items) {
@@ -221,8 +245,9 @@ public class HeroRewardScreen extends Screen {
     
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-        int contentHeight = HeroRewards.REWARDS.size() * ITEM_HEIGHT;
-        int listHeight = PANEL_HEIGHT - LIST_TOP_MARGIN - LIST_BOTTOM_MARGIN;
+        int contentHeight = ClientHeroContent.rewards().size() * ITEM_HEIGHT;
+        // 列表高度按当前窗口钳制后的面板高度算，与 render 里的口径保持一致。
+        int listHeight = panelDims()[3] - LIST_TOP_MARGIN - LIST_BOTTOM_MARGIN;
         int maxScroll = Math.max(0, contentHeight - listHeight);
         
         if (maxScroll > 0) {
@@ -243,10 +268,6 @@ public class HeroRewardScreen extends Screen {
         return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
     }
     
-    @Override
-    public boolean isPauseScreen() {
-        return false;
-    }
     
     // 简单的按钮包装类，方便管理
     private static class RewardButton extends Button {

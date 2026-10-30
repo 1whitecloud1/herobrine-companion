@@ -1,6 +1,8 @@
 package com.whitecloud233.herobrine_companion.client.gui.crosschat;
 
 import com.whitecloud233.herobrine_companion.client.gui.HeroScreen;
+import com.whitecloud233.herobrine_companion.client.gui.HeroTheme;
+import com.whitecloud233.herobrine_companion.client.gui.HeroPanelScreen;
 import com.whitecloud233.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.herobrine_companion.network.ai.RespondCrossChatInvitePacket;
 import net.minecraft.client.Minecraft;
@@ -10,12 +12,11 @@ import net.minecraft.network.chat.Component;
 
 import java.util.UUID;
 
-public class CrossChatInviteScreen extends Screen {
+public class CrossChatInviteScreen extends HeroPanelScreen {
     private static final int MAX_PANEL_WIDTH = 260;
     private static final int MAX_PANEL_HEIGHT = 120;
     private static final int MIN_PANEL_WIDTH = 200;
     private static final int MIN_PANEL_HEIGHT = 112;
-    private static final int SCREEN_MARGIN = 8;
     private static final int CONTENT_MARGIN = 14;
     private static final int BUTTON_GAP = 10;
     private static final int BUTTON_HEIGHT = 20;
@@ -46,7 +47,7 @@ public class CrossChatInviteScreen extends Screen {
                 Component.translatable("gui.herobrine_companion.cross_chat.accept"),
                 button -> {
                     PacketHandler.sendToServer(new RespondCrossChatInvitePacket(this.requesterId, true));
-                    this.closeAndReturn();
+                    this.returnToPrevious(this.previousScreen);
                 }, null
         ));
 
@@ -55,47 +56,33 @@ public class CrossChatInviteScreen extends Screen {
                 Component.translatable("gui.herobrine_companion.cross_chat.deny"),
                 button -> {
                     PacketHandler.sendToServer(new RespondCrossChatInvitePacket(this.requesterId, false));
-                    this.closeAndReturn();
+                    this.returnToPrevious(this.previousScreen);
                 }, null
         ));
     }
 
     private Layout createLayout() {
-        int availableWidth = Math.max(1, this.width - SCREEN_MARGIN * 2);
-        int availableHeight = Math.max(1, this.height - SCREEN_MARGIN * 2);
-        int panelWidth = clampToAvailable(MIN_PANEL_WIDTH, MAX_PANEL_WIDTH, availableWidth);
-        int panelHeight = clampToAvailable(MIN_PANEL_HEIGHT, MAX_PANEL_HEIGHT, availableHeight);
-        int left = (this.width - panelWidth) / 2;
-        int top = (this.height - panelHeight) / 2;
+        HeroTheme.Frame frame = panelFrame(MAX_PANEL_WIDTH, MAX_PANEL_HEIGHT,
+                MIN_PANEL_WIDTH, MIN_PANEL_HEIGHT);
+        int panelWidth = frame.width();
+        int panelHeight = frame.height();
+        int left = frame.left();
+        int top = frame.top();
         int contentLeft = left + CONTENT_MARGIN;
         int contentWidth = Math.max(1, panelWidth - CONTENT_MARGIN * 2);
         int buttonY = top + panelHeight - 36;
         return new Layout(panelWidth, panelHeight, left, top, contentLeft, contentWidth, buttonY);
     }
 
-    private static int clampToAvailable(int min, int max, int available) {
-        int clamped = Math.min(max, available);
-        return Math.max(Math.min(min, available), clamped);
-    }
-
-    private void closeAndReturn() {
-        Minecraft.getInstance().setScreen(this.previousScreen);
-    }
-
     @Override
     public void onClose() {
-        this.closeAndReturn();
-    }
-
-    @Override
-    public void renderBackground(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        returnToPrevious(this.previousScreen);
     }
 
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         Layout layout = this.createLayout();
-        guiGraphics.fill(layout.left, layout.top, layout.left + layout.panelWidth, layout.top + layout.panelHeight, BG);
-        guiGraphics.renderOutline(layout.left, layout.top, layout.panelWidth, layout.panelHeight, BORDER);
+        HeroTheme.plainPanel(guiGraphics, layout.left, layout.top, layout.panelWidth, layout.panelHeight, HeroTheme.BG_MAIN_TRANSLUCENT);
         guiGraphics.drawCenteredString(this.font, this.title, this.width / 2, layout.top + 12, TITLE);
         guiGraphics.enableScissor(layout.contentLeft, layout.top + 34,
                 layout.contentLeft + layout.contentWidth, layout.buttonY - 4);
@@ -104,11 +91,6 @@ public class CrossChatInviteScreen extends Screen {
                 layout.contentLeft, layout.top + 34, layout.contentWidth, TEXT);
         guiGraphics.disableScissor();
         super.render(guiGraphics, mouseX, mouseY, partialTick);
-    }
-
-    @Override
-    public boolean isPauseScreen() {
-        return false;
     }
 
     private static class Layout {

@@ -1,6 +1,7 @@
 package com.whitecloud233.herobrine_companion.client.gui;
 
 import com.whitecloud233.herobrine_companion.init.*;
+import com.whitecloud233.herobrine_companion.util.AtomicFiles;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -301,8 +302,8 @@ public class HeroPoseScreen extends Screen {
     }
 
     private void savePresetsToFile() {
-        try (var writer = Files.newBufferedWriter(getPresetFile().toPath(), StandardCharsets.UTF_8)) {
-            GSON.toJson(savedPresets, writer);
+        try {
+            AtomicFiles.writeJson(getPresetFile().toPath(), GSON, savedPresets);
         } catch (Exception e) {
             LOGGER.warn("Unable to save pose presets", e);
         }

@@ -6,7 +6,7 @@ import com.mojang.blaze3d.vertex.BufferUploader; // 【新增】1.21.1 核心渲
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
-import com.whitecloud233.herobrine_companion.client.fight.event.ClientCollapseHandler;
+import com.whitecloud233.herobrine_companion.fight.event.ClientCollapseHandler;
 import com.whitecloud233.herobrine_companion.fight.network.CPacketCollapseFinished;
 import com.whitecloud233.herobrine_companion.network.PacketHandler;
 import net.minecraft.client.Minecraft;

@@ -1,5 +1,6 @@
 package com.whitecloud233.herobrine_companion.client.gui;
 
+import com.whitecloud233.herobrine_companion.client.gui.HeroTheme;
 import com.whitecloud233.herobrine_companion.init.*;
 
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -10,7 +11,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.Entity;
@@ -23,7 +23,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
-public class HeroSkinScreen extends Screen {
+public class HeroSkinScreen extends HeroPanelScreen {
 
     private final int entityId;
 
@@ -43,9 +43,22 @@ public class HeroSkinScreen extends Screen {
     private static final int PANEL_WIDTH = 340;
     private static final int PANEL_HEIGHT = 220;
 
-    private static final int COL_BG_MAIN    = 0xFF2B2B2B;
-    private static final int COL_BORDER     = 0xFF555555;
-    private static final int COL_TITLE      = 0xFFCC7832;
+    /** 面板实际尺寸：init/render 时按窗口钳制后写入，供布局使用。 */
+    private int panelW = PANEL_WIDTH;
+    private int panelH = PANEL_HEIGHT;
+
+    /** 面板几何：宽高钳制到窗口内，居中。返回 {startX, startY}，并更新 panelW/panelH。 */
+    private int[] panelDims() {
+        HeroTheme.Frame frame = HeroTheme.frame(this.width, this.height,
+                PANEL_WIDTH, PANEL_HEIGHT, 240, 180, 8);
+        this.panelW = frame.width();
+        this.panelH = frame.height();
+        return new int[]{frame.left(), frame.top()};
+    }
+
+    private static final int COL_BG_MAIN    = HeroTheme.BG_MAIN;
+    private static final int COL_BORDER     = HeroTheme.BORDER;
+    private static final int COL_TITLE      = HeroTheme.LABEL;
 
     private int selectedSkinId = 0;
     private String customSkinName = "";
@@ -62,6 +75,7 @@ public class HeroSkinScreen extends Screen {
 
         skinOptions.add(new SkinOption(HeroEntity.SKIN_HEROBRINE, "gui.herobrine_companion.skin.herobrine_name"));
         skinOptions.add(new SkinOption(HeroEntity.SKIN_HERO, "gui.herobrine_companion.skin.hero_name"));
+        skinOptions.add(new SkinOption(HeroEntity.SKIN_HEROBRINE2, "gui.herobrine_companion.skin.herobrine2_name"));
         skinOptions.add(new SkinOption(HeroEntity.SKIN_CUSTOM, "gui.herobrine_companion.skin.custom_name"));
     }
 
@@ -98,14 +112,15 @@ public class HeroSkinScreen extends Screen {
 
         int centerX = this.width / 2;
         int centerY = this.height / 2;
-        int startX = centerX - PANEL_WIDTH / 2;
-        int startY = centerY - PANEL_HEIGHT / 2;
-        int btnY = startY + PANEL_HEIGHT - 50;
+        int[] dims = panelDims();
+        int startX = dims[0];
+        int startY = dims[1];
+        int btnY = startY + panelH - 50;
 
         int startIndex = currentPage * ITEMS_PER_PAGE;
         int endIndex = Math.min(startIndex + ITEMS_PER_PAGE, skinOptions.size());
 
-        int slotWidth = PANEL_WIDTH / ITEMS_PER_PAGE;
+        int slotWidth = panelW / ITEMS_PER_PAGE;
 
         for (int i = startIndex; i < endIndex; i++) {
             SkinOption option = skinOptions.get(i);
@@ -183,7 +198,7 @@ public class HeroSkinScreen extends Screen {
 
             if (endIndex < skinOptions.size()) {
                 this.addRenderableWidget(new HeroScreen.ThemedButton(
-                        startX + PANEL_WIDTH - 30, centerY, 20, 20, Component.literal(">"),
+                        startX + panelW - 30, centerY, 20, 20, Component.literal(">"),
                         b -> { currentPage++; rebuildWidgets(); }, null
                 ));
             }
@@ -191,7 +206,7 @@ public class HeroSkinScreen extends Screen {
 
         this.addRenderableWidget(new HeroScreen.ThemedButton(
                 centerX - 40,
-                startY + PANEL_HEIGHT - 25,
+                startY + panelH - 25,
                 80, 20,
                 Component.translatable("gui.herobrine_companion.back"),
                 button -> {
@@ -256,7 +271,8 @@ public class HeroSkinScreen extends Screen {
             return Files.readAllBytes(Path.of(this.customSkinName));
         } catch (Exception e) {
             if (this.minecraft != null && this.minecraft.player != null) {
-                this.minecraft.player.displayClientMessage(Component.translatable("message.herobrine_companion.skin.read_failed", e.getMessage()), false);
+                this.minecraft.player.displayClientMessage(Component.translatable("message.herobrine_companion.skin.read_failed",
+                        java.util.Objects.toString(e.getMessage(), e.getClass().getSimpleName())), false);
             }
             return new byte[0];
         }
@@ -268,17 +284,17 @@ public class HeroSkinScreen extends Screen {
 
         int centerX = this.width / 2;
         int centerY = this.height / 2;
-        int startX = centerX - PANEL_WIDTH / 2;
-        int startY = centerY - PANEL_HEIGHT / 2;
+        int[] dims = panelDims();
+        int startX = dims[0];
+        int startY = dims[1];
 
-        guiGraphics.fill(startX, startY, startX + PANEL_WIDTH, startY + PANEL_HEIGHT, COL_BG_MAIN);
-        guiGraphics.renderOutline(startX, startY, PANEL_WIDTH, PANEL_HEIGHT, COL_BORDER);
+        HeroTheme.plainPanel(guiGraphics, startX, startY, panelW, panelH);
 
         guiGraphics.drawCenteredString(this.font, this.title, centerX, startY + 10, COL_TITLE);
 
         int startIndex = currentPage * ITEMS_PER_PAGE;
         int endIndex = Math.min(startIndex + ITEMS_PER_PAGE, skinOptions.size());
-        int slotWidth = PANEL_WIDTH / ITEMS_PER_PAGE;
+        int slotWidth = panelW / ITEMS_PER_PAGE;
 
         for (int i = startIndex; i < endIndex; i++) {
             SkinOption option = skinOptions.get(i);
@@ -287,8 +303,9 @@ public class HeroSkinScreen extends Screen {
 
             guiGraphics.drawCenteredString(this.font, Component.translatable(option.nameKey), itemCenterX, startY + 30, 0xFFFFFF);
 
+            // 名字画在 startY+30，脚底基准下移并缩小缩放，避免模型头顶压住名字
             if (option.dummyEntity != null) {
-                renderEntity(guiGraphics, itemCenterX, startY + 140, 55, mouseX, mouseY, option.dummyEntity);
+                renderEntity(guiGraphics, itemCenterX, startY + 150, 50, mouseX, mouseY, option.dummyEntity);
             }
         }
 
@@ -322,13 +339,5 @@ public class HeroSkinScreen extends Screen {
         guiGraphics.pose().popPose();
         RenderSystem.disableDepthTest();
         RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
-    }
-    @Override
-    public void renderBackground(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        // 留空：禁用原版自带的世界模糊和黑色背景遮罩，保持和 HeroScreen 视觉一致
-    }
-    @Override
-    public boolean isPauseScreen() {
-        return false;
     }
 }

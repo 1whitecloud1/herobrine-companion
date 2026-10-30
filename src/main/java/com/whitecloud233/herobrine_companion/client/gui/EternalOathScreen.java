@@ -3,13 +3,12 @@ package com.whitecloud233.herobrine_companion.client.gui;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.GameNarrator;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
 
 import java.util.List;
 
-public class EternalOathScreen extends Screen {
+public class EternalOathScreen extends HeroPanelScreen {
     private List<FormattedCharSequence> lines;
     private float scrollSpeed = 0.3f;
     private float scrollAmount = 0.0f;
@@ -26,11 +25,6 @@ public class EternalOathScreen extends Screen {
         Component text = Component.translatable("lore.herobrine_companion.fragment_9.body");
         // 分割文本，宽度稍微窄一点，更有诗意
         this.lines = this.font.split(text, this.width );
-    }
-
-    @Override
-    public void renderBackground(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        // 留空：禁用原版自带的世界模糊和黑色背景遮罩
     }
 
     @Override
@@ -85,10 +79,6 @@ public class EternalOathScreen extends Screen {
         super.render(guiGraphics, mouseX, mouseY, partialTick);
     }
 
-    @Override
-    public boolean isPauseScreen() {
-        return false; // 不暂停游戏
-    }
     
     @Override
     public void onClose() {
