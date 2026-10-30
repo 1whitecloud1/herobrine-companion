@@ -5,4 +5,12 @@ import com.google.gson.JsonObject;
 /**
  * LLM 返回的工具调用（名字 + 已解析的 JSON 参数）。
  */
-public record LlmToolInvocation(String name, JsonObject arguments) {}
+public record LlmToolInvocation(String name, JsonObject arguments) {
+    public LlmToolInvocation {
+        name = name == null ? "" : name;
+        arguments = arguments == null ? new JsonObject() : arguments.deepCopy();
+    }
+
+    @Override
+    public JsonObject arguments() { return arguments.deepCopy(); }
+}

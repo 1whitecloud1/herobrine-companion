@@ -1,13 +1,15 @@
 package com.whitecloud233.modid.herobrine_companion.client.llm.format;
 
 import com.google.gson.JsonArray;
+import com.whitecloud233.modid.herobrine_companion.client.llm.LlmHttp;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.whitecloud233.modid.herobrine_companion.client.llm.LlmChatMessage;
 import com.whitecloud233.modid.herobrine_companion.client.llm.LlmChatPayload;
 import com.whitecloud233.modid.herobrine_companion.client.llm.LlmFormatAdapter;
 import com.whitecloud233.modid.herobrine_companion.client.llm.LlmSettings;
-import com.whitecloud233.modid.herobrine_companion.client.llm.LlmStreamingResponse;
+import com.whitecloud233.modid.herobrine_companion.client.llm.LlmResponse;
+import com.whitecloud233.modid.herobrine_companion.client.llm.LlmFinishReason;
 import com.whitecloud233.modid.herobrine_companion.client.llm.LlmToolInvocation;
 import com.whitecloud233.modid.herobrine_companion.client.llm.LlmToolSpec;
 import com.whitecloud233.modid.herobrine_companion.client.service.LLMConfig;
@@ -16,7 +18,6 @@ import org.slf4j.Logger;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -94,17 +95,11 @@ public final class OpenAiChatAdapter implements LlmFormatAdapter {
     }
 
     private static HttpRequest buildRequest(LlmSettings settings, JsonObject body, boolean stream) {
-        HttpRequest.Builder builder = HttpRequest.newBuilder()
-                .uri(URI.create(settings.endpoint()))
-                .header("Content-Type", "application/json; charset=UTF-8")
-                .header("Authorization", "Bearer " + settings.apiKey());
-        if (stream) {
-            builder.header("Accept", "text/event-stream");
-        }
-        if (settings.provider() == LLMConfig.Provider.OPENROUTER) {
-            builder.header("X-Title", "Herobrine Companion");
-        }
-        return builder.POST(HttpRequest.BodyPublishers.ofString(body.toString(), StandardCharsets.UTF_8)).build();
+        return LlmHttp.post(settings.endpoint(), settings.apiKey(), body.toString(), stream,
+                LlmHttp.AuthStyle.BEARER,
+                settings.provider() == LLMConfig.Provider.OPENROUTER
+                        ? new String[]{"X-Title", "Herobrine Companion"}
+                        : null);
     }
 
     @Override
@@ -152,6 +147,27 @@ public final class OpenAiChatAdapter implements LlmFormatAdapter {
     }
 
     @Override
+    public LlmFinishReason extractFinishReason(JsonObject json) {
+        try {
+            JsonObject choice = json.getAsJsonArray("choices").get(0).getAsJsonObject();
+            return finishReason(choice.get("finish_reason").getAsString());
+        } catch (RuntimeException ignored) {
+            return LlmFinishReason.UNKNOWN;
+        }
+    }
+
+    private static LlmFinishReason finishReason(String reason) {
+        if (reason == null) return LlmFinishReason.UNKNOWN;
+        return switch (reason) {
+            case "stop" -> LlmFinishReason.COMPLETE;
+            case "length" -> LlmFinishReason.TOKEN_LIMIT;
+            case "tool_calls", "function_call" -> LlmFinishReason.TOOL_CALL;
+            case "content_filter" -> LlmFinishReason.CONTENT_FILTERED;
+            default -> LlmFinishReason.UNKNOWN;
+        };
+    }
+
+    @Override
     public JsonObject wrapTool(LlmToolSpec spec) {
         JsonObject tool = new JsonObject();
         tool.addProperty("type", "function");
@@ -164,14 +180,14 @@ public final class OpenAiChatAdapter implements LlmFormatAdapter {
     }
 
     @Override
-    public LlmStreamingResponse readStreaming(HttpClient client, HttpRequest request,
+    public LlmResponse readStreaming(HttpClient client, HttpRequest request,
                                               Consumer<String> partialConsumer, Logger logger) {
         try {
             HttpResponse<InputStream> response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
             if (response.statusCode() != 200) {
                 try (InputStream errorStream = response.body()) {
                     String errorBody = new String(errorStream.readAllBytes(), StandardCharsets.UTF_8);
-                    return LlmStreamingResponse.error(response.statusCode(), errorBody);
+                    return LlmResponse.httpFailure(response.statusCode(), errorBody);
                 }
             }
 
@@ -180,8 +196,8 @@ public final class OpenAiChatAdapter implements LlmFormatAdapter {
                 StringBuilder replyBuilder = new StringBuilder();
                 StringBuilder reasoningBuilder = new StringBuilder();
                 StreamToolAccumulator toolAccumulator = new StreamToolAccumulator();
-                StreamEmitState emitState = new StreamEmitState();
-                String[] finishReasonHolder = new String[1];
+                StreamTextEmitter emitState = new StreamTextEmitter();
+                StreamCompletion completion = new StreamCompletion();
                 String line;
                 while ((line = reader.readLine()) != null) {
                     if (line.isBlank()) {
@@ -196,13 +212,13 @@ public final class OpenAiChatAdapter implements LlmFormatAdapter {
                         if ("[DONE]".equals(data)) {
                             break;
                         }
-                        processStreamingPayload(data, replyBuilder, reasoningBuilder, toolAccumulator, partialConsumer, emitState, finishReasonHolder, logger);
+                        processStreamingPayload(data, replyBuilder, reasoningBuilder, toolAccumulator, partialConsumer, emitState, completion, logger);
                     } else if (trimmedLine.startsWith("{")) {
-                        processStreamingPayload(trimmedLine, replyBuilder, reasoningBuilder, toolAccumulator, partialConsumer, emitState, finishReasonHolder, logger);
+                        processStreamingPayload(trimmedLine, replyBuilder, reasoningBuilder, toolAccumulator, partialConsumer, emitState, completion, logger);
                     }
                 }
-                return LlmStreamingResponse.success(replyBuilder.toString(), reasoningBuilder.toString(),
-                        toolAccumulator.getToolName(), toolAccumulator.getToolArguments(), finishReasonHolder[0]);
+                return completion.response(replyBuilder.toString(), reasoningBuilder.toString(),
+                        toolAccumulator.getToolName(), toolAccumulator.getToolArguments());
             }
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -211,17 +227,18 @@ public final class OpenAiChatAdapter implements LlmFormatAdapter {
 
     private static void processStreamingPayload(String payload, StringBuilder replyBuilder, StringBuilder reasoningBuilder,
                                                 StreamToolAccumulator toolAccumulator,
-                                                Consumer<String> partialConsumer, StreamEmitState emitState,
-                                                String[] finishReasonHolder, Logger logger) {
+                                                Consumer<String> partialConsumer, StreamTextEmitter emitState,
+                                                StreamCompletion completion, Logger logger) {
         try {
             JsonObject json = JsonParser.parseString(payload).getAsJsonObject();
+            if (completion.readError(json)) return;
             JsonArray choices = json.getAsJsonArray("choices");
             if (choices == null || choices.isEmpty()) {
                 return;
             }
             JsonObject choice = choices.get(0).getAsJsonObject();
-            if (finishReasonHolder[0] == null && choice.has("finish_reason") && !choice.get("finish_reason").isJsonNull()) {
-                finishReasonHolder[0] = choice.get("finish_reason").getAsString();
+            if (choice.has("finish_reason") && !choice.get("finish_reason").isJsonNull()) {
+                completion.finish(finishReason(choice.get("finish_reason").getAsString()));
             }
             JsonObject delta = null;
             if (choice.has("delta") && choice.get("delta").isJsonObject()) {
@@ -236,7 +253,7 @@ public final class OpenAiChatAdapter implements LlmFormatAdapter {
                 String deltaText = delta.get("content").getAsString();
                 if (!deltaText.isEmpty()) {
                     replyBuilder.append(deltaText);
-                    emitStreamingText(partialConsumer, replyBuilder, emitState);
+                    emitState.emit(partialConsumer, replyBuilder);
                 }
             }
             if (delta.has("reasoning_content") && !delta.get("reasoning_content").isJsonNull()) {
@@ -251,25 +268,6 @@ public final class OpenAiChatAdapter implements LlmFormatAdapter {
         } catch (Exception e) {
             logger.debug("Ignoring malformed streaming payload: {}", payload, e);
         }
-    }
-
-    private static void emitStreamingText(Consumer<String> partialConsumer, StringBuilder replyBuilder, StreamEmitState emitState) {
-        if (partialConsumer == null || replyBuilder.isEmpty()) {
-            return;
-        }
-        long now = System.currentTimeMillis();
-        int currentLength = replyBuilder.length();
-        if ((now - emitState.lastEmitAt) < 40L && (currentLength - emitState.lastEmitLength) < 2) {
-            return;
-        }
-        emitState.lastEmitAt = now;
-        emitState.lastEmitLength = currentLength;
-        partialConsumer.accept(replyBuilder.toString());
-    }
-
-    private static class StreamEmitState {
-        private long lastEmitAt;
-        private int lastEmitLength;
     }
 
     private static class StreamToolAccumulator {

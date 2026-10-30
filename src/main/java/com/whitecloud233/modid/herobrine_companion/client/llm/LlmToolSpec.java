@@ -15,5 +15,9 @@ public record LlmToolSpec(String name, String description, JsonObject inputSchem
         if (description == null) {
             description = "";
         }
+        inputSchema = inputSchema == null ? new JsonObject() : inputSchema.deepCopy();
     }
+
+    @Override
+    public JsonObject inputSchema() { return inputSchema.deepCopy(); }
 }

@@ -32,9 +32,25 @@ public interface LlmFormatAdapter {
     /** 从非流式响应提取工具调用；无则返回 null。 */
     LlmToolInvocation extractToolInvocation(JsonObject json);
 
-    /** 读取流式响应（阻塞直到流结束，返回产出）。 */
-    LlmStreamingResponse readStreaming(HttpClient client, HttpRequest request,
-                                       Consumer<String> partialConsumer, Logger logger);
+    /** 将非流式响应解析为与供应商无关的结果。 */
+    default LlmResponse parseResponse(JsonObject json) {
+        if (json == null) {
+            return new LlmResponse("", "", null, LlmFinishReason.UNKNOWN,
+                    new LlmFailure(LlmFailure.Kind.INVALID_RESPONSE, 200, "Missing response object"));
+        }
+        if (json.has("error") && !json.get("error").isJsonNull()) {
+            return LlmResponse.providerFailure(json.get("error").toString());
+        }
+        LlmFinishReason finish = extractFinishReason(json);
+        if (finish == LlmFinishReason.ERROR) return LlmResponse.providerFailure("Provider reported a failed response");
+        return LlmResponse.success(extractText(json, ""), extractReasoning(json), extractToolInvocation(json), finish);
+    }
+
+    LlmFinishReason extractFinishReason(JsonObject json);
+
+    /** 读取流式响应（阻塞直到流结束，返回统一结果）。 */
+    LlmResponse readStreaming(HttpClient client, HttpRequest request,
+                              Consumer<String> partialConsumer, Logger logger);
 
     /** 把中性工具描述包装成该格式的工具 JSON。 */
     JsonObject wrapTool(LlmToolSpec spec);

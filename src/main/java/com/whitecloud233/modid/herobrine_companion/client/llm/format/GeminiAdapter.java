@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.client.llm.format;
 
 import com.google.gson.JsonArray;
+import com.whitecloud233.modid.herobrine_companion.client.llm.LlmHttp;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -8,7 +9,8 @@ import com.whitecloud233.modid.herobrine_companion.client.llm.LlmChatMessage;
 import com.whitecloud233.modid.herobrine_companion.client.llm.LlmChatPayload;
 import com.whitecloud233.modid.herobrine_companion.client.llm.LlmFormatAdapter;
 import com.whitecloud233.modid.herobrine_companion.client.llm.LlmSettings;
-import com.whitecloud233.modid.herobrine_companion.client.llm.LlmStreamingResponse;
+import com.whitecloud233.modid.herobrine_companion.client.llm.LlmResponse;
+import com.whitecloud233.modid.herobrine_companion.client.llm.LlmFinishReason;
 import com.whitecloud233.modid.herobrine_companion.client.llm.LlmToolInvocation;
 import com.whitecloud233.modid.herobrine_companion.client.llm.LlmToolSpec;
 import org.slf4j.Logger;
@@ -16,7 +18,6 @@ import org.slf4j.Logger;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -118,14 +119,7 @@ public final class GeminiAdapter implements LlmFormatAdapter {
     }
 
     private static HttpRequest buildRequest(String url, String apiKey, JsonObject body, boolean stream) {
-        HttpRequest.Builder builder = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .header("Content-Type", "application/json; charset=UTF-8")
-                .header("x-goog-api-key", apiKey);
-        if (stream) {
-            builder.header("Accept", "text/event-stream");
-        }
-        return builder.POST(HttpRequest.BodyPublishers.ofString(body.toString(), StandardCharsets.UTF_8)).build();
+        return LlmHttp.post(url, apiKey, body.toString(), stream, LlmHttp.AuthStyle.GEMINI);
     }
 
     @Override
@@ -149,7 +143,8 @@ public final class GeminiAdapter implements LlmFormatAdapter {
                     continue;
                 }
                 JsonObject part = element.getAsJsonObject();
-                if (part.has("text") && !part.get("text").isJsonNull()) {
+                if (part.has("text") && !part.get("text").isJsonNull()
+                        && !(part.has("thought") && part.get("thought").getAsBoolean())) {
                     text.append(part.get("text").getAsString());
                 }
             }
@@ -195,6 +190,49 @@ public final class GeminiAdapter implements LlmFormatAdapter {
     }
 
     @Override
+    public LlmFinishReason extractFinishReason(JsonObject json) {
+        return finishReason(json);
+    }
+
+    private static LlmFinishReason finishReason(JsonObject json) {
+        try {
+            if (json.has("promptFeedback") && json.getAsJsonObject("promptFeedback").has("blockReason")) {
+                String blocked = json.getAsJsonObject("promptFeedback").get("blockReason").getAsString();
+                if (!blocked.isBlank() && !"BLOCK_REASON_UNSPECIFIED".equals(blocked)) return LlmFinishReason.CONTENT_FILTERED;
+            }
+            String reason = json.getAsJsonArray("candidates").get(0).getAsJsonObject().get("finishReason").getAsString();
+            return switch (reason) {
+                case "STOP" -> LlmFinishReason.COMPLETE;
+                case "MAX_TOKENS" -> LlmFinishReason.TOKEN_LIMIT;
+                case "SAFETY", "RECITATION", "BLOCKLIST", "PROHIBITED_CONTENT", "SPII", "IMAGE_SAFETY" -> LlmFinishReason.CONTENT_FILTERED;
+                case "MALFORMED_FUNCTION_CALL", "UNEXPECTED_TOOL_CALL" -> LlmFinishReason.ERROR;
+                default -> LlmFinishReason.UNKNOWN;
+            };
+        } catch (RuntimeException ignored) {
+            return LlmFinishReason.UNKNOWN;
+        }
+    }
+
+    @Override
+    public String extractReasoning(JsonObject json) {
+        StringBuilder text = new StringBuilder();
+        try {
+            JsonArray parts = json.getAsJsonArray("candidates").get(0).getAsJsonObject()
+                    .getAsJsonObject("content").getAsJsonArray("parts");
+            for (JsonElement element : parts) {
+                if (element.isJsonObject()) {
+                    JsonObject part = element.getAsJsonObject();
+                    if (part.has("thought") && part.get("thought").getAsBoolean() && part.has("text")) {
+                        text.append(part.get("text").getAsString());
+                    }
+                }
+            }
+        } catch (RuntimeException ignored) {
+        }
+        return text.toString();
+    }
+
+    @Override
     public JsonObject wrapTool(LlmToolSpec spec) {
         JsonObject declaration = new JsonObject();
         declaration.addProperty("name", spec.name());
@@ -208,14 +246,14 @@ public final class GeminiAdapter implements LlmFormatAdapter {
     }
 
     @Override
-    public LlmStreamingResponse readStreaming(HttpClient client, HttpRequest request,
+    public LlmResponse readStreaming(HttpClient client, HttpRequest request,
                                               Consumer<String> partialConsumer, Logger logger) {
         try {
             HttpResponse<InputStream> response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
             if (response.statusCode() != 200) {
                 try (InputStream errorStream = response.body()) {
                     String errorBody = new String(errorStream.readAllBytes(), StandardCharsets.UTF_8);
-                    return LlmStreamingResponse.error(response.statusCode(), errorBody);
+                    return LlmResponse.httpFailure(response.statusCode(), errorBody);
                 }
             }
 
@@ -223,7 +261,9 @@ public final class GeminiAdapter implements LlmFormatAdapter {
                  BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
                 StringBuilder replyBuilder = new StringBuilder();
                 GeminiToolAccumulator toolAccumulator = new GeminiToolAccumulator();
-                StreamEmitState emitState = new StreamEmitState();
+                StreamTextEmitter emitState = new StreamTextEmitter();
+                StreamCompletion completion = new StreamCompletion();
+                StringBuilder reasoningBuilder = new StringBuilder();
                 String line;
                 while ((line = reader.readLine()) != null) {
                     String trimmedLine = line.trim();
@@ -234,19 +274,21 @@ public final class GeminiAdapter implements LlmFormatAdapter {
                     if (data.isEmpty() || "{}".equals(data) || "[DONE]".equals(data)) {
                         continue;
                     }
-                    processStreamingFrame(data, replyBuilder, toolAccumulator, partialConsumer, emitState, logger);
+                    processStreamingFrame(data, replyBuilder, reasoningBuilder, toolAccumulator, partialConsumer, emitState, completion, logger);
                 }
-                return LlmStreamingResponse.success(replyBuilder.toString(), toolAccumulator.getToolName(), toolAccumulator.getToolArguments());
+                return completion.response(replyBuilder.toString(), reasoningBuilder.toString(), toolAccumulator.getToolName(), toolAccumulator.getToolArguments());
             }
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
 
-    private static void processStreamingFrame(String payload, StringBuilder replyBuilder, GeminiToolAccumulator toolAccumulator,
-                                              Consumer<String> partialConsumer, StreamEmitState emitState, Logger logger) {
+    private static void processStreamingFrame(String payload, StringBuilder replyBuilder, StringBuilder reasoningBuilder, GeminiToolAccumulator toolAccumulator,
+                                              Consumer<String> partialConsumer, StreamTextEmitter emitState, StreamCompletion completion, Logger logger) {
         try {
             JsonObject json = JsonParser.parseString(payload).getAsJsonObject();
+            if (completion.readError(json)) return;
+            completion.finish(finishReason(json));
             JsonArray candidates = json.getAsJsonArray("candidates");
             if (candidates == null || candidates.isEmpty()) {
                 return;
@@ -266,9 +308,11 @@ public final class GeminiAdapter implements LlmFormatAdapter {
                 JsonObject part = element.getAsJsonObject();
                 if (part.has("text") && !part.get("text").isJsonNull()) {
                     String deltaText = part.get("text").getAsString();
-                    if (!deltaText.isEmpty()) {
+                    if (part.has("thought") && part.get("thought").getAsBoolean()) {
+                        reasoningBuilder.append(deltaText);
+                    } else if (!deltaText.isEmpty()) {
                         replyBuilder.append(deltaText);
-                        emitStreamingText(partialConsumer, replyBuilder, emitState);
+                        emitState.emit(partialConsumer, replyBuilder);
                     }
                 }
                 if (part.has("functionCall") && part.get("functionCall").isJsonObject()) {
@@ -280,30 +324,12 @@ public final class GeminiAdapter implements LlmFormatAdapter {
         }
     }
 
-    private static void emitStreamingText(Consumer<String> partialConsumer, StringBuilder replyBuilder, StreamEmitState emitState) {
-        if (partialConsumer == null || replyBuilder.isEmpty()) {
-            return;
-        }
-        long now = System.currentTimeMillis();
-        int currentLength = replyBuilder.length();
-        if ((now - emitState.lastEmitAt) < 40L && (currentLength - emitState.lastEmitLength) < 2) {
-            return;
-        }
-        emitState.lastEmitAt = now;
-        emitState.lastEmitLength = currentLength;
-        partialConsumer.accept(replyBuilder.toString());
-    }
-
-    private static class StreamEmitState {
-        private long lastEmitAt;
-        private int lastEmitLength;
-    }
-
     private static class GeminiToolAccumulator {
         private String toolName;
         private String toolArguments;
 
         private void absorbFunctionCall(JsonObject functionCall) {
+            if (toolName != null) return;
             if (functionCall.has("name") && !functionCall.get("name").isJsonNull()) {
                 this.toolName = functionCall.get("name").getAsString();
             }
