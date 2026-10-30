@@ -1,0 +1,34 @@
+# 建筑模板导入
+
+入口位于 Herobrine 主界面“会话管理”下方的“建筑模板”。选择文件，可填写便于检索的中文名称，然后点击“上传导入”。界面显示服务器确认后的模板名称、格式、尺寸，可复制完整 ID 或删除模板。导入本身不会放置建筑。
+
+导入完成后，直接说想建什么即可，不需要报模板 ID：例如“能建造史诗房子吗”“帮我建造名为海边小屋的模板”。当前世界服务器确认过的模板（名称、精确 ID、尺寸、方块数，最多 12 个）会随世界上下文一起注入系统提示，LLM 直接按名称/尺寸挑选最合适的模板并放置。需要更多候选时仍可用 `registry_lookup`，参数 `category=template, query=名称片段`；`query=*` 列出当前玩家在当前世界上传的全部模板。
+
+`template_id` 接受三种写法，且只认当前连接内真实存在的模板：完整 ID、模板名称（忽略大小写与 `.nbt`/`.schematic` 等扩展名），或唯一名称片段。片段有歧义、或 ID 不属于本世界时一律拒绝——此时工具层提示 LLM 重新查询，不会拿旧对话里的 ID 去执行。原版结构模板需显式写 `minecraft:` 命名空间，裸名字不再被补前缀。
+
+模板**按存档存储**（`<world>/herobrine_companion/templates/<uuid>.json`）：在 A 存档导入的建筑，切到 B 存档后列表为空，模型会明确告知「本存档还没有导入建筑」并引导去导入页，而不会拿随包模板或旧 ID 凑数。早期版本曾把模组自带的 `herobrine_companion:live_house` 当作后备，导致玩家明明导入了一栋大房子，模型却去盖小屋；该后备已移除，模板列表只包含玩家自己导入并由服务器确认的条目。
+
+> 早期版本把本地配置 `nbtStructures` 里的手写映射注入提示词，那份映射不会随导入更新，模型会一直使用过期 ID（如已被删除的旧模板），最终以 “command lattice rejects that malformed invocation” 失败。该字段已废弃：旧配置读取时忽略、不再写回，建筑目录一律以服务器确认的当前世界模板为准。
+
+- `.nbt`：原版结构方块格式；多个调色板时使用第一个。
+- `.litematic`：格式 v4–v7，支持多区域、负尺寸、跨 long 的紧密位编码。
+- `.schem`：Sponge v1/v2/v3，包含 WorldEdit 常见文件。
+- `.schematic`：MCEdit/WorldEdit Alpha，转换原版数字方块 ID 与 metadata；无法识别的旧模组数字 ID 会报错。
+
+无需安装 Litematica 或 WorldEdit。仅导入方块与方块实体（例如箱子、告示牌）；不导入实体、群系和计划刻。旧数据经 Minecraft DataFixer 升级；高于当前 Minecraft 数据版本的文件在处理方块体积前报错，缺失方块或无效属性也会报错。建筑整体平移到最小角为 `(0,0,0)`，不保留投影原点/WorldEdit Offset；多区域间相对距离保留。模板中的空气也参与放置，会覆盖目标位置已有方块。
+
+文件上限 8 MiB；不额外限制建筑单轴长度、包围盒体积或累计方块数，尺寸需为正且能由文件格式与 Java 数据结构表示；每位玩家每个世界最多 128 个模板。上传与删除要求单机存档所有者或服务器 OP 权限；放置沿用既有命令权限（单机需启用作弊，联机需 OP）。上传模板的放置请求会等待服务器实际执行结果，失败/超时不会向 LLM 返回成功。联机上传使用独立可选网络通道，旧服务器显示不支持，不改变现有主通道的包 ID。
+
+密集模板（Litematica、Sponge、Alpha）的方块数据以调色板和位压缩数组保存，不再为每格空气分配 CompoundTag；仅为实际方块实体保存独立 NBT。解码、压缩写盘由专用单线程后台任务完成，服务端线程只提交文件和小型目录。密集模板存储在 `<world>/herobrine_companion/blueprints/uploaded/<player_uuid>/<sha256>.nbt`，由本模组的建造工具读取，不能直接作为原版 `/place template` 文件使用。原版 NBT 模板和旧版已导入文件继续读取 `generated/herobrine_companion/structures/uploaded/...`。目录元数据仍存储在 `<world>/herobrine_companion/templates/<player_uuid>.json`。
+
+建造改为按区块分批执行，共享每 tick 约 3 ms 的工作预算，每批最多处理 4096 格；异步等待区块加载，避免一次指令生成完整建筑。服务器每秒发送过程回执，只有完成回执才表示成功。断开连接、离开所在维度或失去权限时停止建造，已放置部分保留。放置前检查建筑整体的世界高度和边界。新旧客户端/服务端需要一起更新模板通道版本。
+
+ID 由玩家 UUID 与文件 SHA-256 生成，不使用客户端文件路径。相同文件再次导入更新名称，不增加模板数量。客户端目录仅存在于当前连接，离开世界清空。
+
+职责分层：`structure/template` 中各格式解码器仅转换 NBT；`TemplateRepository` 负责持久化；`TemplateUploadBuffer` 负责分片组装；`ServerTemplateLibrary` 负责权限与导入协调；`network/Template*` 负责协议；`ClientTemplateLibrary` 管理连接内快照与分片发送；管理页只负责输入和展示；`TemplateLookupSupport` 负责 LLM 检索结果与名称/片段解析；`AICommandSkillSupport.normalizeTemplateId` 把两者收敛成一个可执行 ID；`AIGameContextSupport.appendBuildingTemplates` 负责把目录注入提示词。
+
+验证：`gradlew verifyTemplateImport verifyTemplatePlacement verifyTemplatePackets verifyTemplateLlm verifyArchitecture`，或 `gradlew check`。回归覆盖压缩/原始 NBT、多调色板、Sponge 三个版本、跨 long 编码、负区域、多区域、重叠区域、方块实体、旧 ID、损坏数据、乱序/变更分片、玩家隔离、重启读取与删除持久化、包编解码，以及“名称检索 → 精确 ID → LLM 放置指令”、按名称/片段/文件名解析、歧义与未知 ID 拒绝、命令执行前的资源闸门放行已确认模板。额外覆盖区块对齐遍历、等待区块时的断点续建、单 tick 数量与时间预算。实际世界方块更新和不同 GUI 缩放仍需游戏内验证。
+
+真实大文件回归：`gradlew verifyTemplateSample -PtemplateFixture="D:\360极速浏览器X下载\汀洲书院.litematic"`。独立 JVM 限制为 256 MiB 堆，验证原文件的版本前置拒绝、21086409 格的压缩解析与区块遍历、方块实体保留及压缩存储往返。此文件数据版本为 3700，而当前 1.20.1 服务器为 3465，包含当前版本没有的方块，必须先使用对应版本转换模板；通过格式层读取测试不表示它可以原样导入 1.20.1。
+
+格式依据：[Sponge Schematic 规范](https://github.com/SpongePowered/Schematic-Specification/tree/master/versions)、[Litematica 原作者读写实现](https://github.com/maruohon/litematica/blob/pre-rewrite/fabric/1.21.1-masa/src/main/java/fi/dy/masa/litematica/schematic/LitematicaSchematic.java)、[WorldEdit Alpha 格式读取实现](https://github.com/EngineHub/WorldEdit/blob/master/worldedit-core/src/main/java/com/sk89q/worldedit/extent/clipboard/io/MCEditSchematicReader.java)。
