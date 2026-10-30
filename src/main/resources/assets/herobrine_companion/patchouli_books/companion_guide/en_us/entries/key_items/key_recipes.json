@@ -1,0 +1,32 @@
+{
+  "name": "Core Recipes",
+  "icon": "herobrine_companion:recall_stone",
+  "category": "herobrine_companion:key_items",
+  "sortnum": 2,
+  "pages": [
+    {
+      "type": "patchouli:crafting",
+      "title": "Shelter of the Creator",
+      "recipe": "herobrine_companion:hero_shelter",
+      "text": "Obtain a Totem of Undying to unlock the recipe. Sign a contract after crafting.$(br2)See $(l:herobrine_companion:key_items/hero_shelter)Shelter of the Creator$(/l) for materials, contract steps and usage."
+    },
+    {
+      "type": "patchouli:crafting",
+      "title": "Recall Stone",
+      "recipe": "herobrine_companion:recall_stone",
+      "text": "Unlocked by obtaining a Glitch Fragment. Requires a Memory Shard, Corrupted Code and other materials. Returns you to the recorded death location."
+    },
+    {
+      "type": "patchouli:crafting",
+      "title": "Source Flow",
+      "recipe": "herobrine_companion:source_flow",
+      "text": "Unlocked by obtaining a Source Code Fragment. Uses Source Code Fragments, a Ghast Tear and Eyes of Ender."
+    },
+    {
+      "type": "patchouli:crafting",
+      "title": "Awakened Vessel",
+      "recipe": "herobrine_companion:awakened_vessel",
+      "text": "Crafted from Glitch Fragments, Memory Shards, a Source Code Fragment, an Eye of Ender and Crying Obsidian. See Awakened Mobs."
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "name": "连接你的 AI",
+  "icon": "herobrine_companion:source_code_fragment",
+  "category": "herobrine_companion:llm_connection",
+  "sortnum": 0,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "为什么要连接",
+      "text": "不连接 AI 也能正常游玩：Herobrine 会使用内置的预设台词。连接后，他的对话由大模型实时生成，更贴合当时的语境。$(br2)入口：打开对话管理器 → 「LLM设置」 → API 设置。密钥等配置只保存在你自己的电脑上，不会进存档。"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "云端接入三步",
+      "text": "$(li)选择服务商：内置 DeepSeek 官方、OpenRouter、七牛云（OpenAI 兼容与 Claude 接口）、Gemini 预设，也可选自定义。$(li)填写 API 密钥：到对应服务商官网注册并创建密钥，整串复制粘贴进来。$(li)获取模型：填好接口地址与密钥后点「获取模型列表」，从下拉框选择模型并保存。"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "自定义接口",
+      "text": "自定义模式按 OpenAI 兼容格式发送请求：需要填写完整聊天接口地址（一般以 /v1/chat/completions 结尾）、模型标识和显示名称。$(br2)选 Gemini 预设则走 Google 原生接口，地址已预填好，只需密钥和模型。"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "本地模型",
+      "text": "想让自己的电脑生成 Herobrine 的回答？先在游戏外准备模型、启动本地软件，再回游戏填写连接信息。$(br2)模组只负责连接，不会替你下载、安装或启动任何程序。$(br2)不知道从哪里开始，点这里看$(l:herobrine_companion:llm_connection/local_model_setup)本地模型：一步步连接$(/l)。从打开软件、填写地址到排查错误，都有说明。"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "关于代理",
+      "text": "如果所选服务商需要代理才能访问，打开「LLM设置」里的「跟随系统代理」，云端对话、模型列表和上下文探测会走系统代理；本地服务始终直连。$(br2)注意：代理软件没运行而这个开关还开着时，云端联网功能可能超时。这时关掉这个开关即可恢复。"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "验证连接",
+      "text": "保存配置后随便和他说一句话试试。想看调用细节：打开「LLM设置」 → 「AI 调试」，里面有每次请求的状态码和原始返回。$(br2)连不上的话，翻看$(l:herobrine_companion:llm_connection/llm_error_codes)错误速查$(/l)。"
+    }
+  ]
+}

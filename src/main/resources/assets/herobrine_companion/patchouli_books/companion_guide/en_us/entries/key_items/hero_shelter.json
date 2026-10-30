@@ -1,0 +1,49 @@
+{
+  "name": "Shelter of the Creator",
+  "icon": "herobrine_companion:hero_shelter",
+  "category": "herobrine_companion:key_items",
+  "sortnum": 4,
+  "pages": [
+    {
+      "type": "patchouli:crafting",
+      "title": "Craft the Shelter",
+      "recipe": "herobrine_companion:hero_shelter",
+      "text": "Use 4 Gold Ingots, 2 Diamonds, 1 Totem of Undying, 1 Paper and 1 experience bottle. Obtain a totem to unlock the recipe.$(br2)Sign a contract before using it."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Sign the Contract",
+      "text": "Find Herobrine outside the End Ring. Hold an unbound Shelter in your main hand and right click him to open the contract screen.$(br2)Place 1 Nether Star in the left slot and 1 bottle of dragon breath in the right slot. Click Sign Contract. Both materials are consumed.$(br2)The Shelter will show your name when bound. You can then use it to recall or invite him."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Bring Him to You",
+      "text": "Hold your bound Shelter and right click the top of ordinary ground, such as dirt or stone. He will teleport above the spot you clicked. Leave room for him to stand.$(br2)It can bring him from another dimension. If he cannot be found, it summons him again and restores his saved state.$(br2)Use $(item)Source Flow$() to teleport yourself to him."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Send an Invitation",
+      "text": "With Herobrine in the same dimension as you, hold your bound Shelter and right click a supported block.$(br2)He will go there and perform the matching activity. If a chest or another interface opens, hold the sneak key and right click again.$(br2)If he is in another dimension, the first click only brings him over. Wait for the cooldown, then click the block again to invite him."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Things He Can Do",
+      "text": "$(li)Rest: click a bed, stairs, a slab or a supported seat, such as a chair or sofa. He will sit there.$(li)Guard: click a door, trapdoor, fence gate or a supported container, such as a chest or barrel. He will guard the area.$(li)Inspect: click a spawner, enchanting table, beacon, command block, diamond ore, emerald ore, gold ore or ancient debris. He will take a look."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Cooking and Milling",
+      "text": "With a compatible cooking mod installed, you can invite him to supported cookware and millstones.$(br2)Click cookware, then choose a recipe and portions. He will go and cook. If no recipes appear, check the ingredients and cookware requirements.$(br2)Click a millstone, then choose ingredients and portions. Ingredients are taken from your inventory before he starts milling. A millstone occupied by another creature cannot be used."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Change or End an Invite",
+      "text": "For rest, guard or inspect invitations, click the same block again after the cooldown to cancel. Click another supported block to change the place or activity.$(br2)You can also click ordinary ground with the Shelter to recall him and end his current invitation. This works for cooking and milling too.$(br2)He may refuse when very upset. Battle mode or trading pauses invitation activities."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "A Few Useful Tips",
+      "text": "After a successful recall or invitation, wait 5 seconds before using the Shelter again. Its gray bar shows the remaining cooldown.$(br2)The Shelter can be reused. Recalls and invitations do not consume it.$(br2)It remembers the player who signed the contract. In multiplayer, use the Shelter you bound yourself."
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "name": "Protector",
+  "icon": "herobrine_companion:tab_icon",
+  "category": "herobrine_companion:hero_states",
+  "sortnum": 2,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "Protector",
+      "text": "He pays closer attention to your safety and moves nearer at night or when danger rises. At low health, he may provide healing or resistance and warn of nearby threats."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Practical Advice",
+      "text": "Automatic aid depends on the situation and his current behaviour. The panel's Grant Protection option is a separate feature that requires a visit to the End Ring."
+    }
+  ]
+}

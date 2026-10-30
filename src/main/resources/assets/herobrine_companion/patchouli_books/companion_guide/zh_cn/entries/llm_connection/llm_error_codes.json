@@ -1,0 +1,28 @@
+{
+  "name": "错误速查",
+  "icon": "herobrine_companion:corrupted_code",
+  "category": "herobrine_companion:llm_connection",
+  "sortnum": 2,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "错误长什么样",
+      "text": "连接出问题时，你会在这些地方看到提示：$(li)聊天回复末尾的 (API Error: 数字)$(li)回复末尾的 (Network Error: 原因)$(li)设置页的「获取模型失败：HTTP 数字」$(li)红色系统提示，例如「当前 API 密钥无效或已失效」$(br2)那个数字是服务商返回的 HTTP 状态码，含义见下一页。"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "状态码含义",
+      "text": "$(li)401 / 403 —— 密钥问题：密钥抄错、已删除或过期，账户也可能欠费。重新整串复制一次密钥最有效。$(li)404 —— 地址不对：接口地址写错了，常见是漏了聊天接口末尾的 /chat/completions。对照服务商文档修改。$(li)400 / 422 —— 请求被拒：多数是模型名写错，或该模型不支持当前用法。用「获取模型列表」重新选一个。$(li)429 —— 太频繁：请求过快或当日额度用完，等一会儿再聊。$(li)5xx（500/502/503…）—— 服务商那边故障：不是你的问题，稍后再试。"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "连不上（Network Error）",
+      "text": "云端连不上时，先看网络是否正常；如果开着「跟随系统代理」，也要确认代理软件正在运行。$(br2)$(bold)本地模型连不上$()，先检查本地软件的服务是否启动、模型是否加载完成，再核对游戏里的地址和端口。模组不会替你启动服务。$(br2)按$(l:herobrine_companion:llm_connection/local_model_setup)本地模型分步教程$(/l)逐项检查；详细错误看你使用的软件日志，或游戏里的「AI 调试」。"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "系统提示与日志",
+      "text": "$(li)「请打开 AI 设置界面」——还没配置任何 AI。$(li)「当前 API 密钥无效或已失效」——密钥曾被服务端拒绝，重新填写并保存即可。$(li)「接口已响应，但没有返回可用模型」——这个地址或账号下没有可用模型，换地址或服务商。$(br2)更多细节：打开「LLM设置」 → 「AI 调试」查看每次调用的状态码与原始返回，或在 logs/latest.log 里搜索 \"LLM chat request failed\"。"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "name": "States at a Glance",
+  "icon": "herobrine_companion:tab_icon",
+  "category": "herobrine_companion:hero_states",
+  "sortnum": 0,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "Eight States",
+      "text": "Herobrine responds to your actions, the environment and his memories. His eight states are Observer, Protector, Judge, Prankster, Maintainer, Glitch Lord, Monster King and Reminiscing.$(br2)Check the main panel for his current state. Trust and mental state are separate systems."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Living Together",
+      "text": "Watch his position, gaze, speech and the world around him. Repeated attacks build resentment; danger, anomalies and memories also affect his reactions.$(br2)States change during play. Companion mode has a separate follow toggle on the main panel. See $(l:herobrine_companion:commands/commands_overview)Companion Commands$(/l) to change states manually."
+    }
+  ]
+}

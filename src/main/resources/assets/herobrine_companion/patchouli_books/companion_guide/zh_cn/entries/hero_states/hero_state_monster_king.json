@@ -1,0 +1,18 @@
+{
+  "name": "怪物之王",
+  "icon": "herobrine_companion:tab_icon",
+  "category": "herobrine_companion:hero_states",
+  "sortnum": 7,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "怪物之王",
+      "text": "他会把注意力转向周围怪物，压制或调度它们的行为。怪物可能停止进攻、列队、围绕玩家或集体注视。"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "相处提示",
+      "text": "敌意压制与现场冲突有关。不要因为怪物暂时安静就主动攻击；它们的状态、你的行为和他的心境仍会改变局面。"
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "name": "同行指令",
+  "icon": "herobrine_companion:source_code_fragment",
+  "category": "herobrine_companion:commands",
+  "sortnum": 0,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "恢复同行者",
+      "text": "$(thing)/hc_recover_hero$()$(br)召回自己的 Herobrine，解除骑乘和邀请；丢失时从存档重建。保留信任度、已领奖励、装备和外观。$(br2)别名：$(thing)/hcr$()、$(thing)/hc_restore_hero$()、$(thing)/hero_recover$()。$(br2)也可用 $(thing)/hc_hero recover$()；recover 可换成 restore 或 fix。"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "信任度",
+      "text": "$(thing)/hc_trust$()$(br)查询存档与实体的信任度。$(br2)$(thing)/hc_add_trust 10$()$(br)增加 10 点，省略数字默认加 10。仅接受正整数，总值有上限。$(br2)也可用 $(thing)/hc_trust add 10$()。未加载同行者时也会保存。增加信任度需要作弊或管理员权限。"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "更改状态",
+      "text": "$(thing)/hc_hero_state$()$(br)查询当前状态。$(br2)$(thing)/hc_hero_state set protector$()$(br)切换为守护者。可使用英文名、中文名或数字 0–7，按 Tab 补全。$(br2)更改状态需要作弊或管理员权限，且同行者已加载。状态与情绪参数会保存，之后仍会随游戏行为变化。"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "八种状态",
+      "text": "$(thing)0 observer$()：观察者$(br)$(thing)1 protector$()：守护者$(br)$(thing)2 judge$()：审判者$(br)$(thing)3 prankster$()：恶作剧者$(br)$(thing)4 maintainer$()：维护者$(br)$(thing)5 glitch_lord$()：故障之主$(br)$(thing)6 monster_king$()：怪物之王$(br)$(thing)7 reminiscing$()：追忆者$(br2)例：$(thing)/hc_hero_state set 7$()$(br)或 $(thing)/hc_hero_state set 追忆者$()。"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "兼容写法",
+      "text": "信任度别名：$(thing)/hc_trust_add$()、$(thing)/hero_add_trust$()、$(thing)/hcat$()。查询也可用 $(thing)/hero_trust$()。$(br2)状态别名：$(thing)/hero_state$()、$(thing)/hchs$()。set 可换成 force 或 switch。$(br2)例：$(thing)/hchs switch monster_king$()。所有更改只作用于自己的同行者。"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "归属诊断",
+      "text": "$(thing)/hc_hero_owner_map$()$(br)查看在线玩家、存档与实体 UUID、归属和维度。需要作弊或管理员权限。$(br2)简写：$(thing)/hcom$()。$(br2)恢复需要安全落脚点。挑战期间无法恢复或更改状态；末地擂台中无法恢复。"
+    }
+  ]
+}

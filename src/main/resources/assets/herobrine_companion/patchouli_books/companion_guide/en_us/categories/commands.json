@@ -1,0 +1,6 @@
+{
+  "name": "Commands",
+  "description": "Chat and status commands supported by this Java edition.",
+  "icon": "herobrine_companion:source_code_fragment",
+  "sortnum": 5
+}

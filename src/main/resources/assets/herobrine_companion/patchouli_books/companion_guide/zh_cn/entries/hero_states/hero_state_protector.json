@@ -1,0 +1,18 @@
+{
+  "name": "守护者",
+  "icon": "herobrine_companion:tab_icon",
+  "category": "herobrine_companion:hero_states",
+  "sortnum": 2,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "守护者",
+      "text": "他会更留意你的安全，在夜间或危险时靠近。生命值过低时，他可能提供恢复、抗性等援助，并提醒附近的威胁。"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "相处提示",
+      "text": "主动救助取决于现场条件与当前行为。主页面的“授予保护”属于另一项功能，需要先造访终末之环；两者不能混为一谈。"
+    }
+  ]
+}

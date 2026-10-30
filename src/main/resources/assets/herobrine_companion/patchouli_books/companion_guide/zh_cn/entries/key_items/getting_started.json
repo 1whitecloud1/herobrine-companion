@@ -1,0 +1,28 @@
+{
+  "name": "初次同行",
+  "icon": "herobrine_companion:hero_shelter",
+  "category": "herobrine_companion:key_items",
+  "sortnum": 0,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "获得这本攻略",
+      "text": "安装帕秋莉手册（Patchouli）后，首次与 Herobrine 交互并成功打开主页面时，会自动获得一本同行手册。每位玩家只发放一次，背包满时会掉落在脚边。$(br2)创造模式也能在本模组物品栏中找到它。"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "查阅手册",
+      "text": "手持同行手册右键打开帕秋莉界面，使用分类目录、搜索和书签查阅。切换游戏语言可阅读对应译文。$(br2)同行手册提供玩法攻略。传说手册则保存已收集的故事，故事正文仍需逐份收集残页并写入。"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "与他建立联系",
+      "text": "与 Herobrine 交互，查看主页面中的信任度、状态、委托与奖励。信任达到 2 时，可在奖励页领取传说手册与第一份碎片。$(br2)合成创世神的庇护后，持它与 Herobrine 交互，按契约界面要求提交一颗下界之星与一瓶龙息。"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "下一步",
+      "text": "绑定后的庇护用于召回，也能邀请他使用床、座椅或支持的工作方块。源流涌现则把你传到他身边。$(br2)信任达到 50 后可开启陪伴模式。造访终末之环后，再查看主页面的保护开关。$(br2)签约、邀请和传送的具体操作见$(l:herobrine_companion:key_items/hero_shelter)创世神的庇护$(/l)。其他配方见$(l:herobrine_companion:key_items/key_recipes)核心合成配方$(/l)。"
+    }
+  ]
+}

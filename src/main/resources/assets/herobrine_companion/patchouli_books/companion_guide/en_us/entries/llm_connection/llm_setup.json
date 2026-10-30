@@ -1,0 +1,38 @@
+{
+  "name": "Connecting Your AI",
+  "icon": "herobrine_companion:source_code_fragment",
+  "category": "herobrine_companion:llm_connection",
+  "sortnum": 0,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "Why Connect",
+      "text": "The mod is fully playable without an AI: Herobrine falls back to preset lines. Once connected, his replies are generated live by a large language model and match the moment much better.$(br2)Entry point: open the Conversation Manager → \"LLM Settings\" → API setup. Keys and other settings are stored only on your own computer, never in the world save."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Cloud Setup in 3 Steps",
+      "text": "$(li)Pick a provider: presets for DeepSeek official, OpenRouter, Qiniu (OpenAI-compatible and Claude endpoints) and Gemini are built in, plus a Custom mode.$(li)Enter the API key: register on the provider's site, create a key, and paste the whole string in.$(li)Fetch models: with the endpoint and key filled in, click \"Fetch model list\", pick a model from the dropdown and save."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Custom Endpoints",
+      "text": "Custom mode sends OpenAI-compatible requests: fill in the full chat endpoint URL (usually ending in /v1/chat/completions), the model ID and a display name.$(br2)The Gemini preset uses Google's native API instead — the URL is pre-filled, you only need a key and a model."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Local Models",
+      "text": "Want your own computer to generate Herobrine's replies? Prepare a model and start a local app outside Minecraft, then enter its connection settings in the game.$(br2)The mod will not download, install or start anything.$(br2)Follow $(l:herobrine_companion:llm_connection/local_model_setup)Local Model Setup$(/l) for plain-language instructions, URL examples and troubleshooting."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "About Proxies",
+      "text": "If your provider needs a proxy, enable \"Follow system proxy\" in LLM Settings: cloud chats, model discovery and context probing use the system proxy. Local services always connect directly.$(br2)If the proxy app is not running while this switch is on, cloud requests may time out. Turn the switch off to restore direct access."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Verifying the Connection",
+      "text": "After saving, just say something to him. For call-by-call details open \"LLM Settings\" → \"AI Debug\", which shows each request's status code and raw response.$(br2)If it doesn't work, see the $(l:herobrine_companion:llm_connection/llm_error_codes)Error Quick Reference$(/l)."
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "name": "First Steps",
+  "icon": "herobrine_companion:hero_shelter",
+  "category": "herobrine_companion:key_items",
+  "sortnum": 0,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "Get This Guide",
+      "text": "With Patchouli installed, you automatically receive a Companion Guide the first time an interaction with Herobrine opens his main panel. Each player receives it once. If your inventory is full, it drops at your feet.$(br2)It also appears in this mod's creative tab."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Using This Guide",
+      "text": "Right-click while holding this guide. Browse with categories, search and bookmarks; change the game language for a translation.$(br2)The Lore Handbook stores the full story. Find fragments and record them there to unlock it."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Make a Connection",
+      "text": "Interact with Herobrine to view trust, state, requests and rewards. At trust 2, claim the Lore Handbook and first fragment from Rewards.$(br2)Craft Shelter of the Creator and use it on him. The contract screen requires one Nether Star and one Dragon's Breath."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Next Steps",
+      "text": "A bound Shelter recalls him and supports invitations to beds, seats and compatible work blocks. Source Flow takes you to him instead.$(br2)Companion mode unlocks at trust 50. After visiting the End Ring, check the protection toggle.$(br2)See $(l:herobrine_companion:key_items/hero_shelter)Shelter of the Creator$(/l) for contract, invitation and teleport steps. See $(l:herobrine_companion:key_items/key_recipes)Core Recipes$(/l) for other recipes."
+    }
+  ]
+}

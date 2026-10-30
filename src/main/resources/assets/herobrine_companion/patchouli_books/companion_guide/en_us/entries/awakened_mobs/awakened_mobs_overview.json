@@ -1,0 +1,32 @@
+{
+  "name": "Awakened Mobs",
+  "icon": "herobrine_companion:awakened_vessel",
+  "category": "herobrine_companion:awakened_mobs",
+  "sortnum": 0,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "Recognise Awakening",
+      "text": "Some ordinary monsters awaken under suitable conditions, gaining names, awareness and interactions. Herobrine's presence affects their chance, while local and family limits apply.$(br2)When you see a name, observe its speech and actions before attacking."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Families & Bonds",
+      "text": "Supported families include zombies, skeletons, creepers, spiders, ender creatures, witches, raiders, slimes, nether fire creatures, guardians, phantoms, piglins, beasts and Wardens.$(br2)They track relationships with players. Attacks worsen hostility; preferred gifts can improve relations and earn returns."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Peer Interaction",
+      "text": "Awakened mobs may greet you, chat, warn of danger and talk with Herobrine or other awakened mobs.$(br2)Peers may cooperate, argue or fight. Friendly speech does not mean every monster will obey you. Keep watching relationships and nearby threats."
+    },
+    {
+      "type": "patchouli:crafting",
+      "title": "Awakened Vessel",
+      "recipe": "herobrine_companion:awakened_vessel",
+      "text": "Use an empty vessel on an eligible awakened mob to capture it. Use the filled vessel on a block or in the air to release. The destination needs enough space."
+    }
+  ],
+  "extra_recipe_mappings": {
+    "herobrine_companion:awakened_vessel": 3
+  }
+}

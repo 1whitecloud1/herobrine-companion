@@ -1,0 +1,18 @@
+{
+  "name": "Glitch Lord",
+  "icon": "herobrine_companion:tab_icon",
+  "category": "herobrine_companion:hero_states",
+  "sortnum": 6,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "Glitch Lord",
+      "text": "Anomalous encounters may bring out glitch-like behaviour: afterimages, flickering, short teleports and unusual changes nearby."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Practical Advice",
+      "text": "This differs from ordinary following. Observe him and the surroundings before approaching. Recall and teleport items can help when exploring anomalies."
+    }
+  ]
+}

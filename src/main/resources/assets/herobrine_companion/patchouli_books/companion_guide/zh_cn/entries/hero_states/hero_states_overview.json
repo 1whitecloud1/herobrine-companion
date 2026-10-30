@@ -1,0 +1,18 @@
+{
+  "name": "状态总览",
+  "icon": "herobrine_companion:tab_icon",
+  "category": "herobrine_companion:hero_states",
+  "sortnum": 0,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "他的八种心境",
+      "text": "Herobrine 会根据你的行为、周围环境与记忆，在观察者、守护者、审判者、恶作剧者、维护者、故障之主、怪物之王和追忆者之间变化。$(br2)主页面会显示当前状态。信任度与精神状态是不同的机制；信任高也不代表他永远保持守护者状态。"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "如何相处",
+      "text": "先观察他的站位、目光、语言与周围变化。持续攻击会积累不满；危险、环境异常和旧日记忆也会改变他的反应。$(br2)这些状态会随游戏过程自行判定。陪伴模式是主页面中单独的跟随开关。需要手动切换状态时，参阅$(l:herobrine_companion:commands/commands_overview)同行指令$(/l)。"
+    }
+  ]
+}

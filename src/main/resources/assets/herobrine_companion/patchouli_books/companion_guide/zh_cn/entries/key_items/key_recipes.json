@@ -1,0 +1,32 @@
+{
+  "name": "核心合成配方",
+  "icon": "herobrine_companion:recall_stone",
+  "category": "herobrine_companion:key_items",
+  "sortnum": 2,
+  "pages": [
+    {
+      "type": "patchouli:crafting",
+      "title": "创世神的庇护",
+      "recipe": "herobrine_companion:hero_shelter",
+      "text": "取得不死图腾后解锁配方。合成后还要签约才能使用。$(br2)材料、签约步骤和用法见$(l:herobrine_companion:key_items/hero_shelter)创世神的庇护$(/l)。"
+    },
+    {
+      "type": "patchouli:crafting",
+      "title": "回溯之石",
+      "recipe": "herobrine_companion:recall_stone",
+      "text": "取得故障碎片后解锁。需要记忆碎片、损坏片段等材料；使用后返回记录的死亡地点。"
+    },
+    {
+      "type": "patchouli:crafting",
+      "title": "源流涌现",
+      "recipe": "herobrine_companion:source_flow",
+      "text": "取得源代码碎片后解锁。核心材料为源代码碎片与恶魂之泪，周围放置末影之眼。"
+    },
+    {
+      "type": "patchouli:crafting",
+      "title": "醒魂容器",
+      "recipe": "herobrine_companion:awakened_vessel",
+      "text": "使用故障碎片、记忆碎片、源代码碎片、末影之眼与哭泣的黑曜石制作。详见觉醒怪物分类。"
+    }
+  ]
+}

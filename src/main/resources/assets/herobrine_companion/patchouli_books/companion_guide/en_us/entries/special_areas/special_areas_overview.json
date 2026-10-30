@@ -1,0 +1,23 @@
+{
+  "name": "Special Areas",
+  "icon": "herobrine_companion:eternal_key",
+  "category": "herobrine_companion:special_areas",
+  "sortnum": 0,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "Unstable Zones",
+      "text": "Unstable zones in the Overworld contain random blocks and anomalous changes. They are useful places to find ghost mobs and related materials.$(br2)Watch the first-visit messages and Herobrine's reaction. He may intervene to handle anomalies; inspect threats and terrain before gathering."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Enter the End Ring",
+      "text": "Seek an Eternal Key in places such as stronghold libraries, End Cities and Ancient Cities. A Glitch Echo called with a Memory Shard and jukebox can offer clues.$(br2)Use the key on bedrock in the End. Visiting the End Ring advances the relevant records and unlocks the panel's protection feature."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Return Home",
+      "text": "The End Ring hosts story and challenges. Follow the prompts and interact with Herobrine. Once the story reaches the return stage, gaze upward for about 10 seconds to return.$(br2)Return depends on story progress in this Java edition. Challenges have their own session rules."
+    }
+  ]
+}

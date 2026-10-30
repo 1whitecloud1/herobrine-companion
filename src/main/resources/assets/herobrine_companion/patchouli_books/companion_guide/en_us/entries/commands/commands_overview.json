@@ -1,0 +1,38 @@
+{
+  "name": "Companion Commands",
+  "icon": "herobrine_companion:source_code_fragment",
+  "category": "herobrine_companion:commands",
+  "sortnum": 0,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "Recover Your Companion",
+      "text": "$(thing)/hc_recover_hero$()$(br)Recall your Herobrine, or rebuild him from saved data. Keeps trust, claimed rewards, gear and appearance.$(br2)Aliases: $(thing)/hcr$(), $(thing)/hc_restore_hero$(), $(thing)/hero_recover$().$(br2)$(thing)/hc_hero recover$() also accepts restore or fix."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Trust",
+      "text": "$(thing)/hc_trust$()$(br)Show saved and live trust.$(br2)$(thing)/hc_add_trust 10$()$(br)Add 10 trust; omit the number for 10. Positive integers only; the total is capped.$(br2)Also: $(thing)/hc_trust add 10$(). Works while unloaded. Adding trust needs cheats or operator permission."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Change State",
+      "text": "$(thing)/hc_hero_state$()$(br)Show current state.$(br2)$(thing)/hc_hero_state set protector$()$(br)Use English, Chinese or 0–7. Tab lists states.$(br2)Changes require a loaded companion and cheats or OP permission. States still evolve during play."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Eight States",
+      "text": "$(thing)0 observer$()$(br)$(thing)1 protector$()$(br)$(thing)2 judge$()$(br)$(thing)3 prankster$()$(br)$(thing)4 maintainer$()$(br)$(thing)5 glitch_lord$()$(br)$(thing)6 monster_king$()$(br)$(thing)7 reminiscing$()$(br2)Example: $(thing)/hc_hero_state set 7$() selects Reminiscing."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Compatible Aliases",
+      "text": "Trust: $(thing)/hc_trust_add$(), $(thing)/hero_add_trust$(), $(thing)/hcat$(). Query with $(thing)/hero_trust$().$(br2)State: $(thing)/hero_state$() or $(thing)/hchs$(). Use force or switch instead of set.$(br2)$(thing)/hchs switch monster_king$()$(br)Changes affect only your own companion."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Owner Diagnostics",
+      "text": "$(thing)/hc_hero_owner_map$()$(br)List online players and saved/live companion UUIDs, owners and dimensions.$(br2)Alias: $(thing)/hcom$(). Requires cheats or operator permission.$(br2)Recovery needs safe ground. Challenges block recovery and state changes; the End Ring blocks recovery."
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "name": "Error Quick Reference",
+  "icon": "herobrine_companion:corrupted_code",
+  "category": "herobrine_companion:llm_connection",
+  "sortnum": 2,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "What Errors Look Like",
+      "text": "When something goes wrong you will see:$(li)(API Error: <number>) at the end of a chat reply$(li)(Network Error: <reason>) at the end of a reply$(li)\"Fetch models failed: HTTP <number>\" in the settings screen$(li)red system messages such as \"The current API key is invalid or expired\"$(br2)That number is the HTTP status code returned by the provider — see the next page."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Status Codes, Plainly",
+      "text": "$(li)401 / 403 — key problem: the key was mistyped, deleted or expired, or the account is out of credit. Re-pasting the full key fixes most cases.$(li)404 — wrong address: the endpoint URL is incorrect, often missing the /chat/completions ending for a chat API. Check it against the provider's docs.$(li)400 / 422 — request rejected: usually a mistyped model name, or that model doesn't support this usage. Re-pick one via \"Fetch model list\".$(li)429 — too many requests: you're going too fast or hit the daily quota; wait a bit.$(li)5xx (500/502/503…) — provider-side outage: not your fault, try again later."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Can't Connect (Network Error)",
+      "text": "For cloud failures, check your internet connection and any enabled proxy.$(br2)For $(bold)local models$(), check that the app's server is running and the model has loaded, then compare the address and port with your game settings. The mod will not start the service for you.$(br2)Follow the $(l:herobrine_companion:llm_connection/local_model_setup)local model tutorial$(/l). Read your app's logs or open AI Debug in the game for details."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "System Messages & Logs",
+      "text": "$(li)\"Open the AI settings screen\" — no AI is configured yet.$(li)\"The current API key is invalid or expired\" — the key was rejected by the server once; re-enter and save it.$(li)\"The endpoint responded but returned no models\" — no usable model under this URL or account; change the URL or provider.$(br2)For more detail open \"LLM Settings\" → \"AI Debug\" to see each call's status code and raw response, or search \"LLM chat request failed\" in logs/latest.log."
+    }
+  ]
+}

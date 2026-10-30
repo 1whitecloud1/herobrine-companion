@@ -1,0 +1,6 @@
+{
+  "name": "AI Connection",
+  "description": "Connect Herobrine to an LLM (cloud or local) and troubleshoot connection errors.",
+  "icon": "herobrine_companion:memory_shard",
+  "sortnum": 7
+}

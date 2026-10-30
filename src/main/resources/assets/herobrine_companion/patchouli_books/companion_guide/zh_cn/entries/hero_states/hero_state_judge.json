@@ -1,0 +1,18 @@
+{
+  "name": "审判者",
+  "icon": "herobrine_companion:tab_icon",
+  "category": "herobrine_companion:hero_states",
+  "sortnum": 3,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "审判者",
+      "text": "持续攻击与冒犯会让他积累不满。他可能拉开距离，以雷电、压迫性的反馈或负面效果表达警告，部分互动也会受到限制。"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "相处提示",
+      "text": "停止攻击，离开冲突现场，等待他平静下来。不要把惩戒状态下的拒绝误认为聊天、交易或跟随系统失效。"
+    }
+  ]
+}

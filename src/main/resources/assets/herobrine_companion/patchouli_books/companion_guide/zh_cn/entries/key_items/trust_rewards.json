@@ -1,0 +1,18 @@
+{
+  "name": "信任与奖励",
+  "icon": "herobrine_companion:abyssal_gaze",
+  "category": "herobrine_companion:key_items",
+  "sortnum": 3,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "领取奖励",
+      "text": "主页面的“奖励”会显示所需信任、可领取和已领取状态。达到门槛后需要主动领取。$(br2)默认奖励：$(br)2：传说手册＋碎片 1$(br)10：两个不死图腾$(br)20：幽邃之视$(br)30：32 颗钻石"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "继续同行",
+      "text": "后续默认奖励：$(br)50：魂缚之契$(br)75：凌越之允$(br)100：终末之诗$(br2)收集并首次写入一种传说残页，会记录一份 20 点待结算信任奖励。重复残页可补入新手册，但不会重复获得这份奖励。$(br2)整合包可调整奖励，以游戏内列表为准。"
+    }
+  ]
+}

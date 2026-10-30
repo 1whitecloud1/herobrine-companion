@@ -1,0 +1,6 @@
+{
+  "name": "指令查询",
+  "description": "查询当前 Java 版支持的聊天与状态指令。",
+  "icon": "herobrine_companion:source_code_fragment",
+  "sortnum": 5
+}
