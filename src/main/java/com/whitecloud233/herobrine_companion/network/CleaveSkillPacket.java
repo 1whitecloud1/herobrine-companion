@@ -31,13 +31,11 @@ public record CleaveSkillPacket() implements CustomPacketPayload {
         context.enqueueWork(() -> {
             // 通过 context.player() 直接获取发送此包的玩家，并强转为 ServerPlayer
             if (context.player() instanceof ServerPlayer player) {
-                // 【加入 Debug 提示 1】
                 // 获取主手物品进行校验
                 if (player.getMainHandItem().getItem() instanceof PoemOfTheEndItem poemItem) {
-                    // 【加入 Debug 提示 2】
                     poemItem.triggerWorldCleave(player.serverLevel(), player);
                 } else {
-                    player.sendSystemMessage(Component.literal("§c[Debug] 服务端错误：你主手里拿的不是镰刀！"));
+                    player.sendSystemMessage(Component.translatable("message.herobrine_companion.cleave.not_scythe"));
                 }
             }
         });

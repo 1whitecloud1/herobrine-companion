@@ -4,9 +4,7 @@ import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.ai.agent.tool.AgentToolConfirmationStore;
 import com.whitecloud233.herobrine_companion.item.HeroSummonItem;
-import io.netty.buffer.ByteBuf;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
@@ -16,8 +14,12 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import java.util.UUID;
 
 /**
- * C→S 审批同意（P3）：玩家在确认屏点"确认"后，按 requestId 取回待确认工具调用，
- * 以 {@code playerApproved=true} 重新注入 agent 循环执行；结果经 {@link AgentToolResultPacket} 回喂。
+ * C→S 审批同意：玩家在确认屏点"确认"后，按 requestId 取回待确认工具调用，
+ * 以 {@code playerApproved=true} 重新投递给 agent 执行；结果经 {@link AgentToolResultPacket} 回喂。
+ *
+ * <p><b>有效性复核</b>（交接 A3）：确认时按<b>确认者 == 原请求者</b>、<b>维度一致</b>、
+ * <b>未过期</b>重新核对，避免玩家在别的世界点下确认后操作到早已失效的对象；
+ * 重复确认（条目已被取走）返回明确终态，不会第二次执行。</p>
  */
 public record ApproveToolPacket(UUID requestId) implements CustomPacketPayload {
 
@@ -51,10 +53,17 @@ public record ApproveToolPacket(UUID requestId) implements CustomPacketPayload {
         long gameTime = player.getServer() == null ? 0L : player.getServer().overworld().getGameTime();
         AgentToolConfirmationStore.ConfirmationEntry entry = AgentToolConfirmationStore.take(requestId, gameTime);
         if (entry == null) {
-            // 已过期 / 不存在：补发失败结果，避免客户端等待悬挂。
+            // 已过期 / 已确认过 / 不存在：补发确定终态，避免客户端等待悬挂，也不重复执行。
             if (requestId != null) {
-                PacketHandler.sendToPlayer(new AgentToolResultPacket(requestId, "", false, "确认请求已过期"), player);
+                PacketHandler.sendToPlayer(new AgentToolResultPacket(
+                        requestId, "", false, "确认请求已过期或已处理，未执行"), player);
             }
+            return;
+        }
+        if (entry.requesterUuid() != null && !entry.requesterUuid().equals(player.getUUID())) {
+            // 不是原请求者：作废该条，不执行（防止他人替你确认已过期的对象）。
+            PacketHandler.sendToPlayer(new AgentToolResultPacket(
+                    requestId, entry.toolId(), false, "该确认请求不属于你，已作废"), player);
             return;
         }
         if (player.getServer() == null) {
@@ -65,7 +74,19 @@ public record ApproveToolPacket(UUID requestId) implements CustomPacketPayload {
             PacketHandler.sendToPlayer(new AgentToolResultPacket(requestId, entry.toolId(), false, "我暂时不在，无法处理"), player);
             return;
         }
-        // 以确认者身份重新注入，confirmed=true；结果送回确认者。
-        hero.getHeroAgent().requestTool(entry.toolId(), entry.args(), player.getUUID(), true, requestId);
+        if (!sameDimension(hero, entry)) {
+            PacketHandler.sendToPlayer(new AgentToolResultPacket(
+                    requestId, entry.toolId(), false, "场景已改变（维度不同），该操作未执行"), player);
+            return;
+        }
+        // 以确认者身份重新投递，confirmed=true；结果送回确认者。
+        hero.getHeroAgent().submitToolRequest(hero, entry.toolId(), entry.args(), player.getUUID(), true, requestId);
+    }
+
+    private static boolean sameDimension(HeroEntity hero, AgentToolConfirmationStore.ConfirmationEntry entry) {
+        if (entry.dimensionId() == null || entry.dimensionId().isBlank() || hero.level() == null) {
+            return true;
+        }
+        return entry.dimensionId().equals(hero.level().dimension().location().toString());
     }
 }

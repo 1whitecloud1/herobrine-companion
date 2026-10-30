@@ -2,14 +2,12 @@ package com.whitecloud233.herobrine_companion.network;
 
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
-import com.whitecloud233.herobrine_companion.entity.ai.agent.AgentFrame;
-import com.whitecloud233.herobrine_companion.entity.ai.agent.AgentIntention;
-import com.whitecloud233.herobrine_companion.entity.ai.agent.AgentIntentionClassifier.Classification;
+import com.whitecloud233.herobrine_companion.entity.ai.agent.AgentTaskRequestHandler;
 import com.whitecloud233.herobrine_companion.entity.ai.agent.HeroAgent;
-import com.whitecloud233.herobrine_companion.entity.ai.agent.task.PlannedTask;
 import com.whitecloud233.herobrine_companion.entity.ai.agent.tool.AgentToolArgs;
 import com.whitecloud233.herobrine_companion.entity.ai.agent.tool.HeroSummonTool;
 import com.whitecloud233.herobrine_companion.item.HeroSummonItem;
+import com.whitecloud233.herobrine_companion.world.structure.ModStructures;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
@@ -20,7 +18,6 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-import java.util.List;
 import java.util.UUID;
 
 /**
@@ -99,24 +96,42 @@ public record AgentRequestPacket(String kind, String name, String argsJson, UUID
             }
             player.sendSystemMessage(Component.translatable("message.herobrine_companion.agent.not_available"));
             // P2：带 requestId 的工具请求补发失败结果，避免客户端等待结果包而悬挂。
-            if (KIND_TOOL.equals(kind) && requestId != null) {
+            if (requestId != null) {
                 PacketHandler.sendToPlayer(new AgentToolResultPacket(requestId, name, false, "我暂时不在，无法处理"), player);
             }
             return;
         }
         HeroAgent agent = hero.getHeroAgent();
 
+        if (KIND_TOOL.equals(kind) || KIND_TASK.equals(kind)) {
+            // 试炼维度里 HeroEntity 刻意跳过 agent.tick（脑冻结，见 HeroEntity#tick 的维度判断），
+            // 请求投递后永远不会被消费，客户端只能干等 30 秒拿到"无法确认结果"。
+            // 这里直接处理或回执，不让它静默消失。
+            if (hero.level().dimension() == ModStructures.END_RING_DIMENSION_KEY) {
+                boolean handled = KIND_TOOL.equals(kind) && HeroSummonTool.ID.equals(name)
+                        && HeroSummonItem.performSummonOrTeleport(player.serverLevel(), player, player.position());
+                if (requestId != null) {
+                    PacketHandler.sendToPlayer(new AgentToolResultPacket(requestId, name, handled,
+                            handled ? "已传送到你身边" : "我正被困在试炼维度，暂时无法执行该请求"), player);
+                }
+                return;
+            }
+        }
         if (KIND_TOOL.equals(kind)) {
-            agent.requestTool(name, AgentToolArgs.fromJson(argsJson), player.getUUID(), false, requestId);
+            // 显式工具请求直接进有界执行入口（交接 A1）：短动作当 tick 执行并回执，
+            // 需要等待的按 FIFO 排队，队满回 busy——不再经过自主分类，也不会互相覆盖。
+            agent.submitToolRequest(hero, name, AgentToolArgs.fromJson(argsJson), player.getUUID(), false, requestId);
         } else if (KIND_TASK.equals(kind)) {
-            AgentIntention intention = switch (name) {
-                case "repair" -> AgentIntention.REMEDIATE;
-                case "inspect" -> AgentIntention.INVESTIGATE;
-                default -> AgentIntention.REMEDIATE;
-            };
-            AgentFrame frame = AgentFrame.capture(hero);
-            List<PlannedTask> tasks = agent.taskPlanner().plan(frame, Classification.world(intention, "LLM 对话触发"));
-            agent.requestTasks(tasks);
+            // D1：任务控制（start/status/pause/resume/cancel）由服务端解析扁平参数后操作既有队列，
+            // 不再只按 name=scene 规划，也不再默认执行修复。
+            AgentToolArgs taskArgs = AgentToolArgs.fromJson(argsJson);
+            AgentTaskRequestHandler.Outcome outcome = AgentTaskRequestHandler.handle(hero, taskArgs, name);
+            String receipt = outcome.message();
+            if ("inspect".equals(name)) {
+                receipt += "。inspect 任务只检查异常方块，不查询附近实体。"
+                        + "如果玩家只是问附近有什么，请直接使用本轮系统注入的 Current Environment 实体列表作答。";
+            }
+            PacketHandler.sendToPlayer(new AgentToolResultPacket(requestId, name, outcome.ok(), receipt), player);
         }
     }
 }

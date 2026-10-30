@@ -23,24 +23,39 @@ public record AgentToolResultPacket(UUID requestId, String toolId, boolean ok, S
     public static final Type<AgentToolResultPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(HerobrineCompanion.MODID, "agent_tool_result"));
 
+    /** 协议上限（与既有布局一致）；超过会让流编解码抛异常，必须在构造时截断。 */
+    public static final int MAX_TOOL_ID = 64;
+    public static final int MAX_MESSAGE = 512;
+
     private static final StreamCodec<FriendlyByteBuf, UUID> UUID_STREAM_CODEC =
             StreamCodec.<FriendlyByteBuf, UUID>of((buf, uuid) -> buf.writeUUID(uuid), buf -> buf.readUUID());
 
     public static final StreamCodec<FriendlyByteBuf, AgentToolResultPacket> STREAM_CODEC = StreamCodec.composite(
             UUID_STREAM_CODEC,
             AgentToolResultPacket::requestId,
-            ByteBufCodecs.stringUtf8(64),
+            ByteBufCodecs.stringUtf8(MAX_TOOL_ID),
             AgentToolResultPacket::toolId,
             ByteBufCodecs.BOOL,
             AgentToolResultPacket::ok,
-            ByteBufCodecs.stringUtf8(512),
+            ByteBufCodecs.stringUtf8(MAX_MESSAGE),
             AgentToolResultPacket::message,
             AgentToolResultPacket::new
     );
 
     public AgentToolResultPacket {
-        toolId = toolId == null ? "" : toolId;
-        message = message == null ? "" : message;
+        toolId = clamp(toolId, MAX_TOOL_ID);
+        // 工具回执可能带容器清单 / 进度描述，超长会让编解码抛异常、整包发不出去，
+        // 客户端于是只能等超时。这里按协议上限截断，并保留"被截断"的可读提示。
+        message = clamp(message, MAX_MESSAGE);
+    }
+
+    /** 截断到协议允许的字符数，末尾留省略号让读的一方知道被截过。 */
+    private static String clamp(String value, int max) {
+        String text = value == null ? "" : value;
+        if (text.length() <= max) {
+            return text;
+        }
+        return text.substring(0, Math.max(0, max - 1)) + "…";
     }
 
     @Override

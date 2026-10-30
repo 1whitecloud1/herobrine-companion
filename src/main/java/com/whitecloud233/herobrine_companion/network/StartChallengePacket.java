@@ -1,7 +1,7 @@
 package com.whitecloud233.herobrine_companion.network;
 
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
-import com.whitecloud233.herobrine_companion.client.fight.HeroChallengeManager;
+import com.whitecloud233.herobrine_companion.fight.HeroChallengeManager;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;

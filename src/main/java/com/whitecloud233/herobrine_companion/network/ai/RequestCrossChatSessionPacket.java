@@ -34,7 +34,7 @@ public class RequestCrossChatSessionPacket implements CustomPacketPayload {
             }
             String requestedName = packet.targetName == null ? "" : packet.targetName.trim();
             if (requestedName.isEmpty()) {
-                sender.sendSystemMessage(Component.literal("[Cross HB] Target player name cannot be empty."));
+                sender.sendSystemMessage(Component.translatable("message.herobrine_companion.cross_chat.target_name_empty"));
                 return;
             }
             ServerPlayer target = sender.server.getPlayerList().getPlayerByName(requestedName);
@@ -48,7 +48,7 @@ public class RequestCrossChatSessionPacket implements CustomPacketPayload {
                 }
             }
             if (target == null) {
-                sender.sendSystemMessage(Component.literal("[Cross HB] Online player not found: " + requestedName));
+                sender.sendSystemMessage(Component.translatable("message.herobrine_companion.cross_chat.target_not_found", requestedName));
                 return;
             }
             HeroCrossChatManager.INSTANCE.requestSession(sender, target);

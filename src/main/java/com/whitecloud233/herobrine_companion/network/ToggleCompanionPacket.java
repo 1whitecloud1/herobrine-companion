@@ -5,6 +5,12 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.chat.Component;
+
+import com.whitecloud233.herobrine_companion.entity.companion.CompanionModePolicy;
+import com.whitecloud233.herobrine_companion.entity.companion.CompanionModeService;
+import com.whitecloud233.herobrine_companion.util.HeroMenuValidity;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
@@ -28,17 +34,19 @@ public record ToggleCompanionPacket(int entityId) implements CustomPacketPayload
             if (context.player() instanceof ServerPlayer serverPlayer) {
                 Entity entity = serverPlayer.level().getEntity(payload.entityId);
                 if (entity instanceof HeroEntity hero) {
-                    // 再次在服务端校验信任度，防止作弊
-                    if (hero.getTrustLevel() >= 50) {
-                        boolean newState = !hero.isCompanionMode();
-                        if (newState && hero.getOwnerUUID() == null) {
-                            hero.setOwnerUUID(serverPlayer.getUUID());
-                        }
-                        hero.setCompanionMode(newState);
-                        
-                        // 发送反馈消息
-                        String msgKey = newState ? "message.herobrine_companion.companion_on" : "message.herobrine_companion.companion_off";
-                        serverPlayer.sendSystemMessage(net.minecraft.network.chat.Component.translatable(msgKey));
+                    if (!serverPlayer.isAlive() || !HeroMenuValidity.isHeroInPlayerLoadedArea(hero, serverPlayer)) {
+                        serverPlayer.sendSystemMessage(Component.translatable("message.herobrine_companion.companion_too_far"));
+                        return;
+                    }
+                    boolean desiredMode = !hero.isCompanionMode();
+                    CompanionModePolicy.Result result = CompanionModeService.changeMode(serverPlayer.getUUID(), hero, desiredMode);
+                    if (result.successful()) {
+                        String key = desiredMode ? "message.herobrine_companion.companion_on" : "message.herobrine_companion.companion_off";
+                        serverPlayer.sendSystemMessage(Component.translatable(key));
+                    } else if (result == CompanionModePolicy.Result.NOT_OWNER) {
+                        serverPlayer.sendSystemMessage(hero.createNotYourHeroMessage());
+                    } else {
+                        serverPlayer.sendSystemMessage(Component.translatable(result.messageKey()));
                     }
                 }
             }

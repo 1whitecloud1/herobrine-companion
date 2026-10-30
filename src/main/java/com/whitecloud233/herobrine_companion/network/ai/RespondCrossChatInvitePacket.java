@@ -37,7 +37,7 @@ public class RespondCrossChatInvitePacket implements CustomPacketPayload {
             }
             ServerPlayer requester = target.server.getPlayerList().getPlayer(packet.requesterId);
             if (requester == null) {
-                target.sendSystemMessage(Component.literal("[Cross HB] The requesting player is already offline."));
+                target.sendSystemMessage(Component.translatable("message.herobrine_companion.cross_chat.requester_offline"));
                 return;
             }
             HeroCrossChatManager.INSTANCE.respondToRequest(target, requester, packet.accept);

@@ -1,5 +1,7 @@
 package com.whitecloud233.herobrine_companion.network;
 
+import com.whitecloud233.herobrine_companion.entity.logic.data.PeacefulProtection;
+
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.network.chat.Component;
@@ -33,12 +35,13 @@ public record PeacefulPacket(boolean peaceful) implements CustomPacketPayload {
                 // 检查前置条件：是否去过维度
                 if (!serverPlayer.getPersistentData().getBoolean("HasVisitedHeroDimension")) {
                     serverPlayer.sendSystemMessage(Component.translatable("message.herobrine_companion.hero_not_ready"));
+                    PeacefulProtection.syncToPlayer(serverPlayer);
                     return;
                 }
 
                 if (payload.peaceful) {
                     // === 开启和平 ===
-                    serverPlayer.addTag("herobrine_companion_peaceful");
+                    PeacefulProtection.setEnabled(serverPlayer, true);
 
                     // 音效：幻术师准备法术 (神秘感)
                     serverPlayer.level().playSound(null, serverPlayer.blockPosition(), SoundEvents.ILLUSIONER_PREPARE_MIRROR, SoundSource.PLAYERS, 1.0f, 0.8f);
@@ -48,7 +51,7 @@ public record PeacefulPacket(boolean peaceful) implements CustomPacketPayload {
 
                 } else {
                     // === 关闭和平 ===
-                    serverPlayer.removeTag("herobrine_companion_peaceful");
+                    PeacefulProtection.setEnabled(serverPlayer, false);
 
                     // 音效：信标关闭 (机械感/终止感)
                     serverPlayer.level().playSound(null, serverPlayer.blockPosition(), SoundEvents.BEACON_DEACTIVATE, SoundSource.PLAYERS, 1.0f, 1.0f);

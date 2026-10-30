@@ -24,17 +24,13 @@ public class PaleLightningArcPacket implements CustomPacketPayload {
     }
 
     public PaleLightningArcPacket(FriendlyByteBuf buf) {
-        this.startPos = new Vec3(buf.readDouble(), buf.readDouble(), buf.readDouble());
-        this.endPos = new Vec3(buf.readDouble(), buf.readDouble(), buf.readDouble());
+        this.startPos = buf.readVec3();
+        this.endPos = buf.readVec3();
     }
 
     public void encode(FriendlyByteBuf buf) {
-        buf.writeDouble(this.startPos.x);
-        buf.writeDouble(this.startPos.y);
-        buf.writeDouble(this.startPos.z);
-        buf.writeDouble(this.endPos.x);
-        buf.writeDouble(this.endPos.y);
-        buf.writeDouble(this.endPos.z);
+        buf.writeVec3(this.startPos);
+        buf.writeVec3(this.endPos);
     }
 
     @Override

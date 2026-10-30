@@ -1,6 +1,7 @@
 package com.whitecloud233.herobrine_companion.network;
 
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.herobrine_companion.util.HeroMenuValidity;
 import com.whitecloud233.herobrine_companion.world.inventory.HeroMerchantMenu;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -33,7 +34,8 @@ public record OpenTradePacket(int entityId) implements CustomPacketPayload {
                 Entity entity = player.level().getEntity(payload.entityId());
 
                 if (entity instanceof HeroEntity hero) {
-                    if (player.distanceToSqr(hero) < 64.0D) {
+                    // 与菜单保持打开的条件一致，避免仍在已加载区块内却因超过 8 格无法打开。
+                    if (HeroMenuValidity.isHeroInPlayerLoadedArea(hero, player)) {
 
                         // 1. 获取并检查交易列表，防止列表为空导致异常
                         net.minecraft.world.item.trading.MerchantOffers offers = hero.getOffers();

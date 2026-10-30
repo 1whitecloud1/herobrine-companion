@@ -1,6 +1,7 @@
 package com.whitecloud233.herobrine_companion.network;
 
-import com.whitecloud233.herobrine_companion.compat.epicfight.HeroEpicFightCompat;
+import com.whitecloud233.herobrine_companion.api.compat.HeroEpicFightCompat;
+import com.whitecloud233.herobrine_companion.combat.poem.StandalonePoemController;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -26,7 +27,9 @@ public record PoemGesturePacket(int gesture, int slot, int mode) implements Cust
     public static void handle(PoemGesturePacket packet, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (context.player() instanceof ServerPlayer player) {
-                HeroEpicFightCompat.queuePoemGesture(player, packet.gesture(), packet.slot(), packet.mode());
+                if (StandalonePoemController.standalone()) {
+                    StandalonePoemController.requestGesture(player, packet.gesture(), packet.slot(), packet.mode());
+                } else HeroEpicFightCompat.queuePoemGesture(player, packet.gesture(), packet.slot(), packet.mode());
             }
         });
     }

@@ -11,10 +11,29 @@ public class Config {
 
     // ... [中间的 1~8 武器和技能的配置保持你的原样不变] ...
     public static final ModConfigSpec.BooleanValue POEM_OF_THE_END_EXPLOSION = BUILDER.comment("终末之诗在破境状态下是否启用爆炸").define("poemOfTheEndExplosion_v2", false);
-    public static final ModConfigSpec.BooleanValue HERO_KING_AURA_ENABLED = BUILDER.comment("是否启用 Herobrine 的怪物臣服AI").define("heroKingAuraEnabled_v2", true);
+
+    // 独立动作总开关：关闭后立即回到原版持械动作（不再播放独立连招/刀光/待机跑步），
+    // 同时服务端恢复原版近战判定。运行期可改，无需重启。
+    public static final ModConfigSpec.BooleanValue POEM_ACTIONS_ENABLED = BUILDER
+            .comment("Whether the standalone Poem of the End action set is enabled (combos, blade trails, idle/run poses)")
+            .comment("终末之诗独立动作总开关（连招、刀光、待机/跑步动作）。关闭后立即恢复原版持械动作与近战，无需重启")
+            .define("poemActionsEnabled", true);
+
+    public static final ModConfigSpec.BooleanValue POEM_OUTLINE_ENABLED = BUILDER
+            .comment("Render the Poem of the End silhouette outline on this client. Changes apply immediately; glow and blade trails are unaffected.")
+            .comment("本机终末之诗描边开关。关闭后跳过描边模型、遮罩与合成，立即生效；保留刀刃发光和攻击刀光，无需 OP 权限")
+            .define("poemOutlineEnabled", true);
+
+    public static final ModConfigSpec.BooleanValue HERO_KING_AURA_ENABLED = BUILDER.comment("是否启用 Herobrine 的怪物臣服AI").define("heroKingAuraEnabled_v2", false);
     public static final ModConfigSpec.BooleanValue HERO_BLOCK_RESTORATION = BUILDER.comment("Herobrine是否自动修复被破坏的方块").define("heroBlockRestoration_v2", false);
     public static final ModConfigSpec.BooleanValue HERO_CLEAN_ITEMS = BUILDER.comment("Herobrine是否自动清理地上的掉落物").define("heroCleanItems_v2", false);
     public static final ModConfigSpec.BooleanValue HERO_LEAF_VANISH_ENABLED = BUILDER.comment("Herobrine是否允许在恶作剧状态下拔掉附近树叶").define("heroLeafVanishEnabled", true);
+
+    public static final ModConfigSpec.BooleanValue PRANKSTER_FAKE_CHEST_ENABLED = BUILDER
+            .comment("Whether Herobrine may place fake treasure chests (chest + torches) near the focus player in Prankster state")
+            .comment("Herobrine是否允许在恶作剧状态下在玩家附近放置假宝箱（箱子+火把）")
+            .define("pranksterFakeChestEnabled", true);
+
     public static final ModConfigSpec.BooleanValue CLEAVE_SKILL_ENABLED = BUILDER.comment("是否启用镰刀的 5 键存档毁灭术").define("cleaveSkillEnabled", false);
     public static final ModConfigSpec.BooleanValue SOUL_BOUND_PACT_ENABLED = BUILDER.comment("是否启用魂缚之契物品").define("soulBoundPactEnabled", true);
     public static final ModConfigSpec.BooleanValue ABYSSAL_GAZE_ENABLED = BUILDER.comment("是否启用幽邃之视物品").define("abyssalGazeEnabled", true);
@@ -49,15 +68,34 @@ public class Config {
             .define("heroSkillSession", true);
 
     // ==========================================
-    // 全知视觉 (AI环境感知) 的开关与间隔
+    // 环境观察 (AI环境感知) 的开关与间隔
     // ==========================================
+    // 【命名说明】配置键沿用 aiVisionEnabled 以兼容老配置文件；它在游戏里显示为「环境观察(AI生成)」，
+    // 实际作用是决定环境观察台词是否由 AI（大模型）即时生成。要完全停止观察发话请用 aiVisionSpeechEnabled。
     public static final ModConfigSpec.BooleanValue AI_VISION_ENABLED = BUILDER
-            .comment("是否启用全知视觉（AI感知）")
+            .comment("Whether Herobrine's environment observation lines are generated live by the AI (LLM). When disabled, preset fallback lines are used instead (observation speech itself keeps running)")
+            .comment("环境观察台词是否由 AI（大模型）即时生成。关闭后改用内置预设台词，观察发话本身仍在继续")
             .define("aiVisionEnabled", true);
 
     public static final ModConfigSpec.IntValue AI_VISION_INTERVAL = BUILDER
-            .comment("全知视觉的每次主动发话最小间隔（秒），建议在 10 ~ 300 之间")
+            .comment("The global minimum interval (in seconds) between two environment observation lines, to avoid spam")
+            .comment("两次环境观察发话之间的最小间隔（秒），建议在 10 ~ 300 之间")
             .defineInRange("aiVisionInterval", 30, 5, 600);
+
+    public static final ModConfigSpec.BooleanValue AI_VISION_BUBBLE_ONLY = BUILDER
+            .comment("Whether environment observation lines are shown only as Herobrine's overhead speech bubble instead of being printed into the chat box")
+            .comment("环境观察台词是否只显示在 Herobrine 头顶的气泡中，不再打印到聊天框")
+            .define("aiVisionBubbleOnly", false);
+
+    public static final ModConfigSpec.BooleanValue AI_VISION_SPEECH_ENABLED = BUILDER
+            .comment("Master switch for Herobrine's environment observation speech (both AI-generated lines and preset fallback lines). When disabled, no observation line is generated, sent or displayed at all")
+            .comment("环境观察发话总开关（AI 生成台词与内置预设台词都算）。禁用后不再产生、发送或显示任何环境观察台词")
+            .define("aiVisionSpeechEnabled", true);
+
+    public static final ModConfigSpec.IntValue SPEECH_BUBBLE_DURATION_SECONDS = BUILDER
+            .comment("Minimum seconds a speech bubble stays on screen (longer lines are extended automatically by length, hard cap 30 seconds)")
+            .comment("头顶气泡至少显示的秒数（长台词会按字数自动延长，最长 30 秒）")
+            .defineInRange("speechBubbleDurationSeconds", 8, 2, 30);
 
     public static final ModConfigSpec.BooleanValue AWAKENED_MOB_AI_DIALOGUE_ENABLED = BUILDER
             .comment("是否启用觉醒怪物的AI对话")
@@ -92,55 +130,46 @@ public class Config {
             .comment("加入世界时是否在 Modrinth 检查模组更新")
             .define("enableUpdateChecker", true);
 
-    public static final ModConfigSpec.BooleanValue DESTRUCTION_GOD_TERRAIN_DAMAGE_ENABLED = BUILDER
-            .comment("Whether Destruction God Herobrine terrain destruction skills can really break blocks")
-            .comment("毁灭之神 Herobrine 的地形破坏技能是否允许真实破坏方块")
-            .define("destructionGodTerrainDamageEnabled", true);
+    // 战斗模式限制（与 ServerRule.BATTLE_MODE_* 对应）：信任门槛默认 200，单次 300 秒，冷却 300 秒，均可用 0 关闭。
+    public static final ModConfigSpec.IntValue BATTLE_MODE_TRUST_THRESHOLD = BUILDER
+            .comment("Trust required before a player may enable Herobrine's battle mode. 0 disables the gate")
+            .comment("开启 Herobrine 战斗模式所需的信任值。0 = 不设信任门槛")
+            .defineInRange("battleModeTrustThreshold", 200, 0, 1000);
 
-    public static final ModConfigSpec.ConfigValue<String> DESTRUCTION_GOD_TERRAIN_DAMAGE_MODE = BUILDER
-            .comment("Terrain destruction mode for Destruction God Herobrine: visual / safe / divine")
-            .comment("毁灭之神地形破坏模式：visual（纯视觉）/ safe（安全破坏）/ divine（神性破坏）")
-            .define("destructionGodTerrainDamageMode", "divine");
+    public static final ModConfigSpec.IntValue BATTLE_MODE_DURATION_SECONDS = BUILDER
+            .comment("Max seconds one battle-mode session lasts before Herobrine sheathes on his own. 0 = unlimited")
+            .comment("单次战斗模式的最长持续秒数，到时自动收刀。0 = 不限时")
+            .defineInRange("battleModeDurationSeconds", 300, 0, 3600);
 
-    public static final ModConfigSpec.BooleanValue DESTRUCTION_GOD_BREAK_CONTAINERS = BUILDER
-            .comment("Whether Destruction God Herobrine can break container or block-entity blocks")
-            .comment("毁灭之神是否可破坏容器和带方块实体的方块")
-            .define("destructionGodBreakContainers", true);
+    public static final ModConfigSpec.IntValue BATTLE_MODE_COOLDOWN_SECONDS = BUILDER
+            .comment("Seconds before battle mode can be re-enabled after it ends (manually or by timeout). 0 = no cooldown")
+            .comment("战斗模式收刀（手动或到时）后再次开启需等待的秒数。0 = 无冷却")
+            .defineInRange("battleModeCooldownSeconds", 300, 0, 3600);
 
-    public static final ModConfigSpec.BooleanValue DESTRUCTION_GOD_ARENA_RESTORE = BUILDER
-            .comment("Whether terrain broken by Destruction God Herobrine should restore itself after a while")
-            .comment("毁灭之神造成的地形破坏是否在一段时间后自动恢复")
-            .define("destructionGodArenaRestore", false);
+    // 毁灭之神的地形破坏行为已固定写死（神性破坏 / 可破容器 / 每刻 4096 块 / 允许终局世界崩塌），
+    // 不再暴露为配置项，也不写进 toml。相关常量见 destructiongod.world.DestructionTuning。
 
-    public static final ModConfigSpec.IntValue DESTRUCTION_GOD_MAX_BROKEN_BLOCKS_PER_TICK = BUILDER
-            .comment("Maximum number of blocks Destruction God Herobrine terrain skills may break per server tick")
-            .comment("毁灭之神地形技能每服务器刻最多破坏的方块数")
-
-            .defineInRange("destructionGodMaxBrokenBlocksPerTick", 4096, 64, 4096);
-
-    public static final ModConfigSpec.BooleanValue DESTRUCTION_GOD_FINAL_PHASE_WORLD_COLLAPSE = BUILDER
-            .comment("Whether Destruction God Herobrine may trigger final phase world collapse style terrain destruction")
-            .comment("毁灭之神最终阶段是否允许触发世界崩塌式地形破坏")
-            .define("destructionGodFinalPhaseWorldCollapse", true);
+    public static final ModConfigSpec.BooleanValue DEBUG_LOG_ENABLED = BUILDER
+            .comment("Print mod debug/diagnostic logs ([CookDiag], [HeroEFDebug], [HeroGift], [HeroScythe], ...) into latest.log")
+            .comment("是否把模组的调试/排障日志（[CookDiag]、[HeroEFDebug]、[HeroGift]、[HeroScythe] 等）输出到 latest.log。默认关闭，排障时再开")
+            .define("debugLogEnabled", false);
 
 
     public static final ModConfigSpec SPEC = BUILDER.build();
 
     public static boolean poemOfTheEndExplosion;
+    public static boolean poemActionsEnabled = true;
+    public static boolean poemOutlineEnabled = true;
     public static boolean heroKingAuraEnabled;
     public static boolean heroBlockRestoration;
     public static boolean heroCleanItems;
     public static boolean heroLeafVanishEnabled;
+    public static boolean pranksterFakeChestEnabled;
     public static boolean cleaveSkillEnabled;
     public static boolean soulBoundPactEnabled;
     public static boolean abyssalGazeEnabled;
     public static boolean transcendencePermitEnabled;
-    public static boolean destructionGodTerrainDamageEnabled;
-    public static String destructionGodTerrainDamageMode;
-    public static boolean destructionGodBreakContainers;
-    public static boolean destructionGodArenaRestore;
-    public static int destructionGodMaxBrokenBlocksPerTick;
-    public static boolean destructionGodFinalPhaseWorldCollapse;
+    public static boolean debugLogEnabled;
 
     public static boolean heroMemoryEnabled;
     public static boolean heroAutonomyEnabled;
@@ -149,6 +178,9 @@ public class Config {
     public static boolean heroSkillSession;
 
     public static boolean aiVisionEnabled;
+    public static boolean aiVisionSpeechEnabled;
+    public static boolean aiVisionBubbleOnly;
+    public static int speechBubbleDurationSeconds;
     public static int aiVisionInterval;
     public static boolean awakenedMobAiDialogueEnabled;
     public static int awakenedDialogueMinIntervalSeconds;
@@ -160,17 +192,29 @@ public class Config {
     // 【新增】更新检查器变量
     public static boolean enableUpdateChecker;
 
-    public static void onLoad(final ModConfigEvent event) {
-        poemOfTheEndExplosion = POEM_OF_THE_END_EXPLOSION.get();
-        heroKingAuraEnabled = HERO_KING_AURA_ENABLED.get();
-        heroBlockRestoration = HERO_BLOCK_RESTORATION.get();
-        heroCleanItems = HERO_CLEAN_ITEMS.get();
-        heroLeafVanishEnabled = HERO_LEAF_VANISH_ENABLED.get();
-        cleaveSkillEnabled = CLEAVE_SKILL_ENABLED.get();
-        soulBoundPactEnabled = SOUL_BOUND_PACT_ENABLED.get();
-        abyssalGazeEnabled = ABYSSAL_GAZE_ENABLED.get();
-        transcendencePermitEnabled = TRANSCENDENCE_PERMIT_ENABLED.get();
+    /**
+     * 落盘当前规范。
+     *
+     * <p>NeoForge 的 ModConfigSpec#save 需要 FML 的配置目录；在纯回归/单元环境里没有 FML 上下文，
+     * 此时只更新内存中的值，不抛异常。</p>
+     */
+    public static void saveSpec() {
+        try {
+            SPEC.save();
+        } catch (RuntimeException | LinkageError ignored) {
+            // 没有 FML 运行环境（回归检查）：内存值已更新，无需写盘
+        }
+    }
 
+    public static void onLoad(final ModConfigEvent event) {
+        if (event.getConfig().getSpec() != SPEC || event instanceof ModConfigEvent.Unloading) return;
+        ServerConfigAccess.reload();
+        reloadLocalValues();
+    }
+
+    /** 仅刷新尚未纳入服务器同步规则的本机选项。 */
+    public static void reloadLocalValues() {
+        poemOutlineEnabled = POEM_OUTLINE_ENABLED.get();
         heroMemoryEnabled = HERO_MEMORY_ENABLED.get();
         heroAutonomyEnabled = HERO_AUTONOMY_ENABLED.get();
         agentToolConfirmation = AGENT_TOOL_CONFIRMATION.get();
@@ -178,29 +222,24 @@ public class Config {
         heroSkillSession = HERO_SKILL_SESSION.get();
 
         aiVisionEnabled = AI_VISION_ENABLED.get();
-        aiVisionInterval = AI_VISION_INTERVAL.get();
-        awakenedMobAiDialogueEnabled = AWAKENED_MOB_AI_DIALOGUE_ENABLED.get();
+        aiVisionSpeechEnabled = AI_VISION_SPEECH_ENABLED.get();
+        aiVisionBubbleOnly = AI_VISION_BUBBLE_ONLY.get();
+        speechBubbleDurationSeconds = SPEECH_BUBBLE_DURATION_SECONDS.get();
         awakenedDialogueMinIntervalSeconds = AWAKENED_DIALOGUE_MIN_INTERVAL.get();
         giftDialogueMinIntervalSeconds = GIFT_DIALOGUE_MIN_INTERVAL.get();
         awakenedWorldCap = AWAKENED_WORLD_CAP.get();
         awakenedPlayerNearCap = AWAKENED_PLAYER_NEAR_CAP.get();
         awakenedPlayerNearRadius = AWAKENED_PLAYER_NEAR_RADIUS.get();
 
-        destructionGodTerrainDamageEnabled = DESTRUCTION_GOD_TERRAIN_DAMAGE_ENABLED.get();
-        destructionGodTerrainDamageMode = DESTRUCTION_GOD_TERRAIN_DAMAGE_MODE.get();
-        destructionGodBreakContainers = DESTRUCTION_GOD_BREAK_CONTAINERS.get();
-        destructionGodArenaRestore = DESTRUCTION_GOD_ARENA_RESTORE.get();
-        destructionGodMaxBrokenBlocksPerTick = DESTRUCTION_GOD_MAX_BROKEN_BLOCKS_PER_TICK.get();
-        destructionGodFinalPhaseWorldCollapse = DESTRUCTION_GOD_FINAL_PHASE_WORLD_COLLAPSE.get();
+        debugLogEnabled = DEBUG_LOG_ENABLED.get();
 
         // 【新增】获取更新检查器配置
         enableUpdateChecker = ENABLE_UPDATE_CHECKER.get();
 
-        LOGGER.info("Herobrine Companion Config Loaded: Explosion={}, Aura={}, BlockRestoration={}, CleanItems={}, LeafVanish={}, CleaveSkill={}, DGTerrainEnabled={}, DGTerrainMode={}, DGBreakContainers={}, DGArenaRestore={}, DGMaxBreakPerTick={}, DGWorldCollapse={}, Pact={}, Gaze={}, Permit={}, AIVision={}, AIInterval={}, AwakenedMobAI={}",
-                poemOfTheEndExplosion, heroKingAuraEnabled, heroBlockRestoration, heroCleanItems, heroLeafVanishEnabled, cleaveSkillEnabled,
-                destructionGodTerrainDamageEnabled, destructionGodTerrainDamageMode, destructionGodBreakContainers,
-                destructionGodArenaRestore, destructionGodMaxBrokenBlocksPerTick, destructionGodFinalPhaseWorldCollapse,
+        LOGGER.info("Herobrine Companion Config Loaded: Explosion={}, PoemActions={}, Aura={}, BlockRestoration={}, CleanItems={}, LeafVanish={}, CleaveSkill={}, DebugLog={}, Pact={}, Gaze={}, Permit={}, AIVision={}, AIInterval={}, AwakenedMobAI={}, AIVisionBubbleOnly={}, AIVisionSpeech={}, BubbleSeconds={}",
+                poemOfTheEndExplosion, poemActionsEnabled, heroKingAuraEnabled, heroBlockRestoration, heroCleanItems, heroLeafVanishEnabled, cleaveSkillEnabled,
+                debugLogEnabled,
                 soulBoundPactEnabled, abyssalGazeEnabled, transcendencePermitEnabled, aiVisionEnabled, aiVisionInterval,
-                awakenedMobAiDialogueEnabled);
+                awakenedMobAiDialogueEnabled, aiVisionBubbleOnly, aiVisionSpeechEnabled, speechBubbleDurationSeconds);
     }
 }

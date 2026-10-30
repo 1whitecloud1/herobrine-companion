@@ -24,7 +24,7 @@ public class SyncRewardsPacket implements CustomPacketPayload {
 
     public SyncRewardsPacket(int entityId, Set<Integer> claimedRewards) {
         this.entityId = entityId;
-        this.claimedRewards = claimedRewards;
+        this.claimedRewards = Set.copyOf(claimedRewards);
     }
 
     public SyncRewardsPacket(FriendlyByteBuf buf) {

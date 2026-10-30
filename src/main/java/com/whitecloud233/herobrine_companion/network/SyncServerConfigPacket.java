@@ -1,104 +1,67 @@
 package com.whitecloud233.herobrine_companion.network;
 
-import com.whitecloud233.herobrine_companion.config.Config;
-import net.minecraft.network.RegistryFriendlyByteBuf;
+import com.whitecloud233.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.herobrine_companion.config.ServerConfigAccess;
+import com.whitecloud233.herobrine_companion.config.ServerConfigSnapshot;
+import com.whitecloud233.herobrine_companion.config.ServerConfigUpdate;
+import com.whitecloud233.herobrine_companion.config.ServerRule;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/**
- * C→S：客户端在模组设置界面修改服务端相关开关时，把整组配置同步给服务端，
- * 让服务端逻辑（拔树叶、方块修复、清理掉落物、物品开关等）立即生效。
- *
- * <p>只允许单机主人或 OP 修改，避免普通玩家改动服务器配置。</p>
- */
-public record SyncServerConfigPacket(
-        boolean poemOfTheEndExplosion,
-        boolean heroKingAuraEnabled,
-        boolean heroBlockRestoration,
-        boolean heroCleanItems,
-        boolean cleaveSkillEnabled,
-        boolean soulBoundPactEnabled,
-        boolean abyssalGazeEnabled,
-        boolean transcendencePermitEnabled,
-        int aiVisionInterval,
-        boolean awakenedMobAiDialogueEnabled,
-        boolean heroLeafVanishEnabled
-) implements CustomPacketPayload {
+import java.util.Map;
+
+/** 兼容协议 3 的旧整组配置请求；实际授权与更新统一交给配置服务。 */
+public class SyncServerConfigPacket implements CustomPacketPayload {
 
     public static final Type<SyncServerConfigPacket> TYPE =
-            new Type<>(ResourceLocation.fromNamespaceAndPath("herobrine_companion", "sync_server_config"));
+            new Type<>(ResourceLocation.fromNamespaceAndPath(HerobrineCompanion.MODID, "sync_server_config"));
 
-    public static final StreamCodec<RegistryFriendlyByteBuf, SyncServerConfigPacket> STREAM_CODEC =
-            StreamCodec.of(
-                    (buf, pkt) -> {
-                        buf.writeBoolean(pkt.poemOfTheEndExplosion());
-                        buf.writeBoolean(pkt.heroKingAuraEnabled());
-                        buf.writeBoolean(pkt.heroBlockRestoration());
-                        buf.writeBoolean(pkt.heroCleanItems());
-                        buf.writeBoolean(pkt.cleaveSkillEnabled());
-                        buf.writeBoolean(pkt.soulBoundPactEnabled());
-                        buf.writeBoolean(pkt.abyssalGazeEnabled());
-                        buf.writeBoolean(pkt.transcendencePermitEnabled());
-                        buf.writeVarInt(pkt.aiVisionInterval());
-                        buf.writeBoolean(pkt.awakenedMobAiDialogueEnabled());
-                        buf.writeBoolean(pkt.heroLeafVanishEnabled());
-                    },
-                    buf -> new SyncServerConfigPacket(
-                            buf.readBoolean(),
-                            buf.readBoolean(),
-                            buf.readBoolean(),
-                            buf.readBoolean(),
-                            buf.readBoolean(),
-                            buf.readBoolean(),
-                            buf.readBoolean(),
-                            buf.readBoolean(),
-                            buf.readVarInt(),
-                            buf.readBoolean(),
-                            buf.readBoolean()
-                    )
-            );
+    public static final StreamCodec<FriendlyByteBuf, SyncServerConfigPacket> STREAM_CODEC =
+            StreamCodec.ofMember(SyncServerConfigPacket::encode, SyncServerConfigPacket::new);
+
+    private final ServerConfigUpdate update;
+
+    public SyncServerConfigPacket(ServerConfigSnapshot snapshot) {
+        this.update = ServerConfigUpdate.full(snapshot);
+    }
+
+    public SyncServerConfigPacket(boolean poemOfTheEndExplosion, boolean heroKingAuraEnabled,
+                                  boolean heroBlockRestoration, boolean heroCleanItems, boolean cleaveSkillEnabled,
+                                  boolean soulBoundPactEnabled, boolean abyssalGazeEnabled, boolean transcendencePermitEnabled,
+                                  int aiVisionInterval, boolean awakenedMobAiDialogueEnabled, boolean heroLeafVanishEnabled,
+                                  boolean pranksterFakeChestEnabled) {
+        this.update = new ServerConfigUpdate(Map.ofEntries(
+                Map.entry(ServerRule.POEM_EXPLOSION, poemOfTheEndExplosion ? 1 : 0),
+                Map.entry(ServerRule.KING_AURA, heroKingAuraEnabled ? 1 : 0),
+                Map.entry(ServerRule.BLOCK_RESTORATION, heroBlockRestoration ? 1 : 0),
+                Map.entry(ServerRule.CLEAN_ITEMS, heroCleanItems ? 1 : 0),
+                Map.entry(ServerRule.CLEAVE_SKILL, cleaveSkillEnabled ? 1 : 0),
+                Map.entry(ServerRule.SOUL_BOUND_PACT, soulBoundPactEnabled ? 1 : 0),
+                Map.entry(ServerRule.ABYSSAL_GAZE, abyssalGazeEnabled ? 1 : 0),
+                Map.entry(ServerRule.TRANSCENDENCE_PERMIT, transcendencePermitEnabled ? 1 : 0),
+                Map.entry(ServerRule.AI_VISION_INTERVAL, aiVisionInterval),
+                Map.entry(ServerRule.AWAKENED_DIALOGUE, awakenedMobAiDialogueEnabled ? 1 : 0),
+                Map.entry(ServerRule.LEAF_VANISH, heroLeafVanishEnabled ? 1 : 0),
+                Map.entry(ServerRule.PRANKSTER_FAKE_CHEST, pranksterFakeChestEnabled ? 1 : 0)));
+    }
+
+    public SyncServerConfigPacket(FriendlyByteBuf buffer) { update = ServerConfigCodec.readLegacy(buffer); }
+
+    public void encode(FriendlyByteBuf buffer) { ServerConfigCodec.writeLegacy(buffer, update); }
 
     @Override
-    public Type<? extends CustomPacketPayload> type() {
-        return TYPE;
-    }
+    public Type<? extends CustomPacketPayload> type() { return TYPE; }
 
     public static void handle(SyncServerConfigPacket payload, IPayloadContext context) {
         context.enqueueWork(() -> {
-            if (context.player() instanceof ServerPlayer serverPlayer) {
-                if (serverPlayer.getServer() != null
-                        && (serverPlayer.getServer().isSingleplayer() || serverPlayer.hasPermissions(2))) {
-                    Config.POEM_OF_THE_END_EXPLOSION.set(payload.poemOfTheEndExplosion());
-                    Config.HERO_KING_AURA_ENABLED.set(payload.heroKingAuraEnabled());
-                    Config.HERO_BLOCK_RESTORATION.set(payload.heroBlockRestoration());
-                    Config.HERO_CLEAN_ITEMS.set(payload.heroCleanItems());
-                    Config.CLEAVE_SKILL_ENABLED.set(payload.cleaveSkillEnabled());
-                    Config.SOUL_BOUND_PACT_ENABLED.set(payload.soulBoundPactEnabled());
-                    Config.ABYSSAL_GAZE_ENABLED.set(payload.abyssalGazeEnabled());
-                    Config.TRANSCENDENCE_PERMIT_ENABLED.set(payload.transcendencePermitEnabled());
-                    int safeVisionInterval = Math.max(5, Math.min(600, payload.aiVisionInterval()));
-                    Config.AI_VISION_INTERVAL.set(safeVisionInterval);
-                    Config.AWAKENED_MOB_AI_DIALOGUE_ENABLED.set(payload.awakenedMobAiDialogueEnabled());
-                    Config.HERO_LEAF_VANISH_ENABLED.set(payload.heroLeafVanishEnabled());
-
-                    Config.poemOfTheEndExplosion = payload.poemOfTheEndExplosion();
-                    Config.heroKingAuraEnabled = payload.heroKingAuraEnabled();
-                    Config.heroBlockRestoration = payload.heroBlockRestoration();
-                    Config.heroCleanItems = payload.heroCleanItems();
-                    Config.cleaveSkillEnabled = payload.cleaveSkillEnabled();
-                    Config.soulBoundPactEnabled = payload.soulBoundPactEnabled();
-                    Config.abyssalGazeEnabled = payload.abyssalGazeEnabled();
-                    Config.transcendencePermitEnabled = payload.transcendencePermitEnabled();
-                    Config.aiVisionInterval = safeVisionInterval;
-                    Config.awakenedMobAiDialogueEnabled = payload.awakenedMobAiDialogueEnabled();
-                    Config.heroLeafVanishEnabled = payload.heroLeafVanishEnabled();
-
-                    Config.SPEC.save();
-                }
-            }
+            if (!(context.player() instanceof ServerPlayer player)) return;
+            var result = ServerConfigAccess.update(player, payload.update);
+            ConfigSyncChannel.reply(player, 0, result.authorized());
+            if (result.changed()) ConfigSyncChannel.broadcast(player.getServer());
         });
     }
 }

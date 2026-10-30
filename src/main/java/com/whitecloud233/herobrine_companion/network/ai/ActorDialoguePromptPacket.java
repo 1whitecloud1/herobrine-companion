@@ -1,5 +1,7 @@
 package com.whitecloud233.herobrine_companion.network.ai;
 
+import com.whitecloud233.herobrine_companion.util.LanguageCodes;
+
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.client.network.ClientAiPrompts;
 import net.minecraft.network.FriendlyByteBuf;
@@ -38,7 +40,7 @@ public class ActorDialoguePromptPacket implements CustomPacketPayload {
         this.seedText = seedText == null ? "" : seedText;
         this.fallbackKey = fallbackKey == null ? "" : fallbackKey;
         this.fallbackArgs = fallbackArgs == null ? List.of() : List.copyOf(fallbackArgs);
-        this.outputLanguageCode = normalizeLanguageCode(outputLanguageCode);
+        this.outputLanguageCode = LanguageCodes.normalize(outputLanguageCode);
     }
 
     public ActorDialoguePromptPacket(FriendlyByteBuf buf) {
@@ -54,7 +56,7 @@ public class ActorDialoguePromptPacket implements CustomPacketPayload {
             args.add(buf.readUtf(512));
         }
         this.fallbackArgs = List.copyOf(args);
-        this.outputLanguageCode = normalizeLanguageCode(buf.readUtf(32));
+        this.outputLanguageCode = LanguageCodes.normalize(buf.readUtf(32));
     }
 
     public void encode(FriendlyByteBuf buf) {
@@ -89,11 +91,5 @@ public class ActorDialoguePromptPacket implements CustomPacketPayload {
         ));
     }
 
-    private static String normalizeLanguageCode(String rawLanguageCode) {
-        if (rawLanguageCode == null) {
-            return "en_us";
-        }
-        String normalized = rawLanguageCode.trim().toLowerCase(Locale.ROOT).replace('-', '_');
-        return normalized.isEmpty() ? "en_us" : normalized;
-    }
+
 }

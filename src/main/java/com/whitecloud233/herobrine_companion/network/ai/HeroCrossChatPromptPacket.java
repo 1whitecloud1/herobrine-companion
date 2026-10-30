@@ -1,5 +1,7 @@
 package com.whitecloud233.herobrine_companion.network.ai;
 
+import com.whitecloud233.herobrine_companion.util.LanguageCodes;
+
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.client.network.ClientAiPrompts;
 import net.minecraft.network.FriendlyByteBuf;
@@ -32,7 +34,7 @@ public class HeroCrossChatPromptPacket implements CustomPacketPayload {
         this.kind = kind;
         this.prompt = prompt == null ? "" : prompt;
         this.seedText = seedText == null ? "" : seedText;
-        this.outputLanguageCode = normalizeLanguageCode(outputLanguageCode);
+        this.outputLanguageCode = LanguageCodes.normalize(outputLanguageCode);
     }
 
     public HeroCrossChatPromptPacket(FriendlyByteBuf buf) {
@@ -41,7 +43,7 @@ public class HeroCrossChatPromptPacket implements CustomPacketPayload {
         this.kind = buf.readByte();
         this.prompt = buf.readUtf(16384);
         this.seedText = buf.readUtf(2048);
-        this.outputLanguageCode = normalizeLanguageCode(buf.readUtf(32));
+        this.outputLanguageCode = LanguageCodes.normalize(buf.readUtf(32));
     }
 
     public void encode(FriendlyByteBuf buf) {
@@ -63,11 +65,5 @@ public class HeroCrossChatPromptPacket implements CustomPacketPayload {
                 packet.jobId, packet.sessionId, packet.kind, packet.prompt, packet.seedText, packet.outputLanguageCode));
     }
 
-    private static String normalizeLanguageCode(String rawLanguageCode) {
-        if (rawLanguageCode == null) {
-            return "en_us";
-        }
-        String normalized = rawLanguageCode.trim().toLowerCase(Locale.ROOT).replace('-', '_');
-        return normalized.isEmpty() ? "en_us" : normalized;
-    }
+
 }

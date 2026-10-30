@@ -1,7 +1,9 @@
 package com.whitecloud233.herobrine_companion.network;
 
 import com.whitecloud233.herobrine_companion.compat.cooking.OpenCookSelectionPacket;
+import com.whitecloud233.herobrine_companion.compat.cooking.OpenMillstoneSelectionPacket;
 import com.whitecloud233.herobrine_companion.compat.cooking.SelectCookOptionPacket;
+import com.whitecloud233.herobrine_companion.compat.cooking.SelectMillstoneOptionPacket;
 import com.whitecloud233.herobrine_companion.destructiongod.network.DestructionGodFaultSplitPacket;
 import com.whitecloud233.herobrine_companion.destructiongod.network.DestructionGodLightningArcPacket;
 import com.whitecloud233.herobrine_companion.destructiongod.network.DestructionGodLightningPacket;
@@ -54,6 +56,7 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 public class PacketHandler {
 
     public static void register(PayloadRegistrar registrar) {
+        registrar.playToClient(SyncPeacefulPacket.TYPE, SyncPeacefulPacket.STREAM_CODEC, SyncPeacefulPacket::handle);
         registrar.playToServer(PoemAnimationRequestPacket.TYPE, PoemAnimationRequestPacket.STREAM_CODEC, PoemAnimationRequestPacket::handle);
         registrar.playToClient(PoemAnimationPacket.TYPE, PoemAnimationPacket.STREAM_CODEC, PoemAnimationPacket::handle);
         registrar.playToServer(PoemGesturePacket.TYPE, PoemGesturePacket.STREAM_CODEC, PoemGesturePacket::handle);
@@ -96,6 +99,16 @@ public class PacketHandler {
                 SelectCookOptionPacket.TYPE,
                 SelectCookOptionPacket.STREAM_CODEC,
                 SelectCookOptionPacket::handle
+        );
+        registrar.playToClient(
+                OpenMillstoneSelectionPacket.TYPE,
+                OpenMillstoneSelectionPacket.STREAM_CODEC,
+                OpenMillstoneSelectionPacket::handle
+        );
+        registrar.playToServer(
+                SelectMillstoneOptionPacket.TYPE,
+                SelectMillstoneOptionPacket.STREAM_CODEC,
+                SelectMillstoneOptionPacket::handle
         );
         registrar.playToClient(
                 SyncHeroVisitPacket.TYPE,
@@ -292,6 +305,12 @@ public class PacketHandler {
         // ---------- 客户端设置实时同步到服务端 ----------
         registrar.playToServer(SyncServerConfigPacket.TYPE, SyncServerConfigPacket.STREAM_CODEC, SyncServerConfigPacket::handle);
 
+        // ---------- 服务器规则同步(独立载荷,不占用旧消息编号) ----------
+        ConfigSyncChannel.register(registrar);
+
+        // ---------- Agent 扩展能力协商(独立载荷,旧端不注册即不启用) ----------
+        AgentFeatureChannel.register(registrar);
+
         // ---------- 结构清单同步(C→S 请求 / S→C 响应, 服务端权威) ----------
         // 注意：NeoForge 不允许同一 TYPE 双向注册，请求与响应必须拆成两个 payload 类型。
         registrar.playToServer(StructureIndexRequestPacket.TYPE, StructureIndexRequestPacket.STREAM_CODEC, StructureIndexRequestPacket::handle);
@@ -305,6 +324,19 @@ public class PacketHandler {
 
         // ---------- 无名之蛋糕:摆放/收回(绕开原版物品冷却门禁) ----------
         registrar.playToServer(BirthdayCakePlacePacket.TYPE, BirthdayCakePlacePacket.STREAM_CODEC, BirthdayCakePlacePacket::handle);
+
+        // ---------- 建筑模板(1.20.1 的独立 5 号通道并入主通道;对端支持性用 NetworkRegistry.hasChannel 判定) ----------
+        registrar.playToServer(TemplateLibraryRequest.TYPE, TemplateLibraryRequest.STREAM_CODEC, TemplateLibraryRequest::handle);
+        registrar.playToServer(TemplateUploadPacket.TYPE, TemplateUploadPacket.STREAM_CODEC, TemplateUploadPacket::handle);
+        registrar.playToClient(TemplateLibraryReply.TYPE, TemplateLibraryReply.STREAM_CODEC, TemplateLibraryReply::handle);
+        registrar.playToServer(TemplatePlacementRequest.TYPE, TemplatePlacementRequest.STREAM_CODEC, TemplatePlacementRequest::handle);
+        registrar.playToClient(TemplatePlacementReply.TYPE, TemplatePlacementReply.STREAM_CODEC, TemplatePlacementReply::handle);
+        // 建筑预览线框（约 28 字节，与建筑体积无关）。
+        registrar.playToClient(TemplatePreviewPacket.TYPE, TemplatePreviewPacket.STREAM_CODEC, TemplatePreviewPacket::handle);
+
+        // ---------- 同行手册回执(1.20.1 的独立通道改为 optional 载荷,发送侧先探测) ----------
+        CompanionGuideChannel.register(registrar);
+        HeroContentChannel.register(registrar);
     }
 
     // 统一的发包入口:泛型方法覆盖所有包,不再需要按类型抄重载。
