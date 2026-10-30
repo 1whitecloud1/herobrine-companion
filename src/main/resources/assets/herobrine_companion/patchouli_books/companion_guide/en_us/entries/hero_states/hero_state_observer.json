@@ -1,0 +1,18 @@
+{
+  "name": "Observer",
+  "icon": "herobrine_companion:tab_icon",
+  "category": "herobrine_companion:hero_states",
+  "sortnum": 1,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "Observer",
+      "text": "He usually keeps his distance, watching from behind, to one side or at the edge of your view. He may move away when approached, or briefly disappear while observing."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Practical Advice",
+      "text": "Distance does not mean your bond is broken. Watch for movement and traces behind you as you explore, and give him time to understand you."
+    }
+  ]
+}

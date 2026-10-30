@@ -1,0 +1,18 @@
+{
+  "name": "观察者",
+  "icon": "herobrine_companion:tab_icon",
+  "category": "herobrine_companion:hero_states",
+  "sortnum": 1,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "观察者",
+      "text": "他通常保持距离，站在背后、侧面或视野边缘，转头观察你的行动。靠得太近时，他可能主动退开；短暂隐去身影也是观察行为的一部分。"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "相处提示",
+      "text": "不要把他的疏远理解成绑定失效。探索时留意身后的动静与遗留痕迹，给他时间了解你。"
+    }
+  ]
+}

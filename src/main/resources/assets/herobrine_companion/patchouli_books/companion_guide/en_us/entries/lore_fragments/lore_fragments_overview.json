@@ -1,0 +1,38 @@
+{
+  "name": "Eleven Lore Fragments",
+  "icon": "herobrine_companion:lore_fragment",
+  "category": "herobrine_companion:lore_fragments",
+  "sortnum": 0,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "Record Your Fragments",
+      "text": "Carry a Lore Handbook, then right-click while holding a fragment. Recording consumes one fragment and unlocks the story.$(br2)$(thing)Fragment 1$(): at trust 2, claim it with the handbook from Rewards.$(br2)$(thing)Fragment 2$(): search abandoned mineshaft and stronghold library chests."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Fragments 3 & 4",
+      "text": "$(thing)Fragment 3$(): Zombie, Skeleton, Creeper, Spider, Witch and Enderman loot has a 5% chance to add this fragment.$(br2)$(thing)Fragment 4$(): progress through the End Ring story and successfully return to the Overworld."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Fragments 5 & 6",
+      "text": "$(thing)Fragment 5$(): hunt Ghost Zombies, Ghost Skeletons and Ghost Creepers for a chance at the fragment.$(br2)$(thing)Fragment 6$(): stay still in the Overworld at night for about 20 seconds, without moving or turning. Valid time: 14000–22000. Leave inventory space."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Fragments 7 & 8",
+      "text": "$(thing)Fragment 7$(): village house chests have a 10% chance.$(br2)$(thing)Fragment 8$(): End City treasure chests have a 30% chance.$(br2)Loot is resolved when generated. Reopening an old chest does not roll its rewards again."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Fragments 9 & 10",
+      "text": "$(thing)Fragment 9$(): before receiving it, each sleep event has a 20% chance to grant it and trigger its story presentation.$(br2)$(thing)Fragment 10$(): Ancient City chests have a 30% chance. Prepare an escape route from the Warden."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Fragment 11 & Beyond",
+      "text": "$(thing)Fragment 11$(): interact with a Glitch Villager.$(br2)First recordings track progress and grant trust. Duplicates can fill another handbook without another reward.$(br2)Read the full story in your Lore Handbook."
+    }
+  ]
+}

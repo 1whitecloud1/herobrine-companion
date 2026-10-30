@@ -1,0 +1,18 @@
+{
+  "name": "恶作剧者",
+  "icon": "herobrine_companion:tab_icon",
+  "category": "herobrine_companion:hero_states",
+  "sortnum": 4,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "恶作剧者",
+      "text": "他会在视野边缘闪现，制造脚步、开关门等声音，让你怀疑周围是否有其他人。突然出现又消失，是这种状态常见的表现。"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "相处提示",
+      "text": "留意光源、树叶和附近方块的变化。惊吓可能来自他正在观察你的反应；想恢复日常互动时，先确认主页面显示的状态。"
+    }
+  ]
+}

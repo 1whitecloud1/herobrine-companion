@@ -1,0 +1,18 @@
+{
+  "name": "Judge",
+  "icon": "herobrine_companion:tab_icon",
+  "category": "herobrine_companion:hero_states",
+  "sortnum": 3,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "Judge",
+      "text": "Repeated attacks and provocation build resentment. He may keep away, use lightning or other intimidating feedback, apply negative effects and restrict interactions."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Practical Advice",
+      "text": "Stop attacking, leave the conflict and allow him to calm down. Rejected requests during punishment do not necessarily indicate a broken chat, trade or follow system."
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "name": "不稳定区域与终末之环",
+  "icon": "herobrine_companion:eternal_key",
+  "category": "herobrine_companion:special_areas",
+  "sortnum": 0,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "不稳定区域",
+      "text": "主世界中的不稳定区域带有随机方块与异常变化，也是寻找幽灵怪物和相关材料的地点。$(br2)初次进入时留意提示与 Herobrine 的反应。他可能介入处理异常；采集前先观察周围威胁与地形。"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "进入终末之环",
+      "text": "先寻找永恒门钥。要塞图书馆、末地城与远古城市等宝箱是探索方向；记忆碎片与唱片机提供的故障回响也能给予线索。$(br2)在末地对基岩使用门钥，进入终末之环。首次造访会推进相关记录，主页面的保护功能也与此有关。"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "完成返程",
+      "text": "终末之环承载剧情和挑战。先按提示完成与 Herobrine 的互动；剧情达到可返程阶段后，持续仰望天空约 10 秒可回到主世界。$(br2)返程需要先推进剧情；挑战期间则遵循挑战流程。"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "name": "维护者",
+  "icon": "herobrine_companion:tab_icon",
+  "category": "herobrine_companion:hero_states",
+  "sortnum": 5,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "维护者",
+      "text": "环境异常会把他的注意力转向世界。他会处理附近火焰、暴露的岩浆等问题，暂时把日常互动放在次要位置。"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "相处提示",
+      "text": "启用清理掉落物规则时，他也会清理附近堆积较久的部分掉落物。修复与清理行为受服务器配置影响；看见他忙碌时，可先远离危险并整理现场。"
+    }
+  ]
+}

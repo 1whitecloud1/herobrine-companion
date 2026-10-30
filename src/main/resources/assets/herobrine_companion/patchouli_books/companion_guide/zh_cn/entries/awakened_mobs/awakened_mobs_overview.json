@@ -1,0 +1,32 @@
+{
+  "name": "觉醒怪物与醒魂容器",
+  "icon": "herobrine_companion:awakened_vessel",
+  "category": "herobrine_companion:awakened_mobs",
+  "sortnum": 0,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "辨认觉醒怪物",
+      "text": "部分普通怪物会在条件满足时随机觉醒，获得名字、独立意识与互动能力。Herobrine 在场会影响觉醒机会，同一区域与族群也有数量限制。$(br2)出现名字后，先观察它的语言与行动，不必立即攻击。"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "族群与关系",
+      "text": "可觉醒族群包括僵尸、骷髅、苦力怕、蜘蛛、末影、女巫、灾厄村民、史莱姆、烈焰、守卫者、幻翼、猪灵、野兽与监守者等。$(br2)它们会记录与玩家的关系。攻击会增加敌意；赠送族群偏好的物品可改善关系，并可能获得回礼。"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "同伴交流",
+      "text": "觉醒怪物会主动打招呼、闲聊、提醒危险，也会与 Herobrine 或其他觉醒怪物交流。$(br2)同伴之间可能合作、争执甚至交战。友好的对话不代表所有怪物都会服从你，仍需留意关系与现场威胁。"
+    },
+    {
+      "type": "patchouli:crafting",
+      "title": "醒魂容器",
+      "recipe": "herobrine_companion:awakened_vessel",
+      "text": "手持空容器对符合条件的觉醒怪物使用以收容。已有内容时，再对方块或空气使用以释放；释放位置需要足够空间。"
+    }
+  ],
+  "extra_recipe_mappings": {
+    "herobrine_companion:awakened_vessel": 3
+  }
+}

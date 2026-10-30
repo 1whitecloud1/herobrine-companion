@@ -1,0 +1,18 @@
+{
+  "name": "Prankster",
+  "icon": "herobrine_companion:tab_icon",
+  "category": "herobrine_companion:hero_states",
+  "sortnum": 4,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "Prankster",
+      "text": "He may flash into view at the edge of your vision and create footsteps or door sounds that suggest another presence. Sudden appearances and disappearances are common."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Practical Advice",
+      "text": "Watch for changes to lights, leaves and nearby blocks. He may be testing your reaction. Check the panel's state before assuming ordinary interaction has stopped working."
+    }
+  ]
+}

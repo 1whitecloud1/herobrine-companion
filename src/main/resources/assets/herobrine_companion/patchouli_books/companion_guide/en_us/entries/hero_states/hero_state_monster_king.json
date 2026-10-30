@@ -1,0 +1,18 @@
+{
+  "name": "Monster King",
+  "icon": "herobrine_companion:tab_icon",
+  "category": "herobrine_companion:hero_states",
+  "sortnum": 7,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "Monster King",
+      "text": "He directs his attention toward nearby monsters, suppressing or directing their behaviour. Mobs may stop attacking, form up around you or stare together."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Practical Advice",
+      "text": "Suppressed hostility depends on the situation. Quiet monsters are not a reason to attack: their state, your actions and his mood can still change the encounter."
+    }
+  ]
+}

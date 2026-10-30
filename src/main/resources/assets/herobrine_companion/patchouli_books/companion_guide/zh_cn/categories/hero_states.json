@@ -1,0 +1,6 @@
+{
+  "name": "Herobrine 状态",
+  "description": "从行为辨认他此刻的心境。",
+  "icon": "herobrine_companion:tab_icon",
+  "sortnum": 0
+}

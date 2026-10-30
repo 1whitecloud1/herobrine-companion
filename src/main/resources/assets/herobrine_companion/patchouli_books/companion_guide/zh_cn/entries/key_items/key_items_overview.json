@@ -1,0 +1,33 @@
+{
+  "name": "关键道具与用途",
+  "icon": "herobrine_companion:source_flow",
+  "category": "herobrine_companion:key_items",
+  "sortnum": 1,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "召回与传送",
+      "text": "$(item)创世神的庇护$()：签约后可召回或邀请 Herobrine，具体操作见$(l:herobrine_companion:key_items/hero_shelter)庇护的介绍$(/l)。$(br2)$(item)源流涌现$()：把你传到 Herobrine 身边。$(br2)$(item)回溯之石$()：返回记录的上一次死亡地点。使用前先确认落点环境。"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "信任给予的能力",
+      "text": "$(item)幽邃之视$()提供夜视。$(br2)$(item)魂缚之契$()启用后保留死亡时的物品与经验。$(br2)$(item)凌越之允$()启用后允许飞行。$(br2)$(item)终末之诗$()是高信任奖励，提供战斗与采掘能力；具体模式和操作见物品提示。"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "探索线索",
+      "text": "$(item)永恒门钥$()：在末地对基岩使用，打开前往终末之环的通道。$(br2)$(item)记忆碎片$()：与唱片机交互可唤出故障回响，获取探索线索。$(br2)源代码碎片与故障碎片是重要材料，可从幽灵生物相关掉落中收集。"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "保存故事与同伴",
+      "text": "$(item)传说手册$()：放在背包或手中，再右键传说残页，写入对应故事。$(br2)$(item)醒魂容器$()：对符合条件的觉醒怪物使用以收容，再对方块或空气使用以释放。它不是普通怪物的通用捕捉工具。"
+    }
+  ],
+  "extra_recipe_mappings": {
+    "herobrine_companion:eternal_key": 2,
+    "herobrine_companion:memory_shard": 2,
+    "herobrine_companion:lore_handbook": 3
+  }
+}

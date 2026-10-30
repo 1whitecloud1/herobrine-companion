@@ -1,0 +1,18 @@
+{
+  "name": "Trust & Rewards",
+  "icon": "herobrine_companion:abyssal_gaze",
+  "category": "herobrine_companion:key_items",
+  "sortnum": 3,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "Claim Your Rewards",
+      "text": "Open Rewards from the main panel. Entries show required trust and whether a reward is available or already claimed. Claim it when eligible.$(br2)Defaults:$(br)2: Lore Handbook + Fragment 1$(br)10: two Totems$(br)20: Abyssal Gaze$(br)30: 32 Diamonds"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Growing Trust",
+      "text": "Later rewards:$(br)50: Soul Bound Pact$(br)75: Transcendence Permit$(br)100: Poem of the End$(br2)First recordings of a fragment queue 20 trust. Duplicates can fill a new handbook without extra trust.$(br2)Modpacks may change these rewards."
+    }
+  ]
+}

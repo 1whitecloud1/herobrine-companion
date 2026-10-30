@@ -1,0 +1,33 @@
+{
+  "name": "Key Items & Uses",
+  "icon": "herobrine_companion:source_flow",
+  "category": "herobrine_companion:key_items",
+  "sortnum": 1,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "Recall & Teleport",
+      "text": "$(item)Shelter of the Creator$(): sign a contract to recall or invite Herobrine. See $(l:herobrine_companion:key_items/hero_shelter)the Shelter guide$(/l) for steps.$(br2)$(item)Source Flow$(): teleport to Herobrine.$(br2)$(item)Recall Stone$(): return to your recorded last death location. Consider the destination before travelling."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Trust Abilities",
+      "text": "$(item)Abyssal Gaze$() grants night vision.$(br2)$(item)Soul Bound Pact$() preserves items and experience on death while active.$(br2)$(item)Transcendence Permit$() enables flight while active.$(br2)$(item)Poem of the End$() is a high-trust reward. Its tooltip explains combat and mining modes."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Exploration Tools",
+      "text": "$(item)Eternal Key$(): use on bedrock in the End to open a route to the End Ring.$(br2)$(item)Memory Shard$(): use with a jukebox to call a Glitch Echo and obtain exploration clues.$(br2)Source Code Fragments and Glitch Fragments are important materials from ghost mobs."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Stories & Companions",
+      "text": "$(item)Lore Handbook$(): carry it in your inventory or hand, then use a lore fragment to record its story.$(br2)$(item)Awakened Vessel$(): capture an eligible awakened mob, then use it on a block or in the air to release. It is not a universal mob catcher."
+    }
+  ],
+  "extra_recipe_mappings": {
+    "herobrine_companion:eternal_key": 2,
+    "herobrine_companion:memory_shard": 2,
+    "herobrine_companion:lore_handbook": 3
+  }
+}

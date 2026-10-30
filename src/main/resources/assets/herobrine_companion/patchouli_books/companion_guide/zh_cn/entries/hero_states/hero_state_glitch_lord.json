@@ -1,0 +1,18 @@
+{
+  "name": "故障之主",
+  "icon": "herobrine_companion:tab_icon",
+  "category": "herobrine_companion:hero_states",
+  "sortnum": 6,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "故障之主",
+      "text": "接触异常事物后，他可能表现出底层故障般的特征：残影、频闪、短距离瞬移，以及周围不合常理的变化。"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "相处提示",
+      "text": "这与普通跟随不同。先观察环境和状态变化，再决定是否接近；探索异常区域时，可准备召回与传送道具。"
+    }
+  ]
+}

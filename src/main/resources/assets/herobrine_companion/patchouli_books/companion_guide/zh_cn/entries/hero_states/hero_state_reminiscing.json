@@ -1,0 +1,18 @@
+{
+  "name": "追忆者",
+  "icon": "herobrine_companion:tab_icon",
+  "category": "herobrine_companion:hero_states",
+  "sortnum": 8,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "追忆者",
+      "text": "旧日记忆会让他变得沉默，停下或放慢脚步，长时间望向天空，偶尔说出与往事有关的话。"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "相处提示",
+      "text": "给他一点时间与空间。留意这些话与已收集传说残页的联系；攻略只提供收集方向，完整故事仍需在传说手册中逐页解锁。"
+    }
+  ]
+}

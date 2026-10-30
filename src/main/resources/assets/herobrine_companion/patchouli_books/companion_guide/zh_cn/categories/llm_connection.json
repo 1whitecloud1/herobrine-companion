@@ -1,0 +1,6 @@
+{
+  "name": "AI 连接",
+  "description": "把 Herobrine 接入大模型（云端或本地），并排查连接错误。",
+  "icon": "herobrine_companion:memory_shard",
+  "sortnum": 7
+}

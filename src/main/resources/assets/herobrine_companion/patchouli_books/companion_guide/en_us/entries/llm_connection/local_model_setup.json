@@ -1,0 +1,68 @@
+{
+  "name": "Local Model Setup",
+  "icon": "herobrine_companion:source_code_fragment",
+  "category": "herobrine_companion:llm_connection",
+  "sortnum": 1,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "Start with the App",
+      "text": "A local model runs on your own computer instead of a cloud provider.$(br2)First run a model app outside Minecraft. Then let the mod connect to it. Think of it this way:$(br)$(bold)The app does the thinking; the mod passes the messages.$(br2)The mod will not download models, install apps or start programs for you."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "1. Prepare a Model App",
+      "text": "New to local models? $(bold)LM Studio$() has a graphical interface. Already using Ollama or llama.cpp? Keep using it.$(br2)Prepare the app and model yourself, outside the game. If you already have a suitable model file, import it into a compatible app.$(br2)Start with a smaller model. Minecraft and the model share your RAM and GPU memory; bigger is not always better for your PC."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "2. Try It in the App",
+      "text": "Before returning to Minecraft:$(li)Select your prepared chat model in the app.$(li)Wait for it to load.$(li)Say hello in the app's own chat window.$(br2)If it replies, move on.$(br2)If it reports an error, runs out of memory or never finishes loading, solve that in the app first. Changing game settings cannot fix a model that will not load."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "3. Start the Server",
+      "text": "Chatting inside the app does not automatically let the game connect.$(br2)In LM Studio, look for Developer or Local Server, select the model and click Start Server. Names may differ by version.$(br2)Wait for Running, then note the port and model ID. Keep the app open.$(br2)Use the OpenAI-compatible API: this is simply the message format the mod understands."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "4. Fill In Three Fields",
+      "text": "Open $(bold)Conversation Manager → LLM Settings → Local Models$(). There is also an entry in API setup.$(br2)Enter:$(li)Full chat URL: where the game finds your app.$(li)Model ID: which model it should use.$(li)API key: leave blank unless you enabled authentication.$(br2)Use your app's actual settings, not somebody else's model name. The next pages give URL examples."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "URL: LM Studio",
+      "text": "If LM Studio uses its usual port 1234, enter:$(br2)http://127.0.0.1:1234/v1/chat/completions$(br2)127.0.0.1 means this computer. The port, 1234, is like a door number.$(br2)If your app shows another port, replace that number.$(br2)Keep the full address, including /v1/chat/completions. Do not enter just /v1 or the app's website."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "URLs: Other Apps",
+      "text": "Ollama commonly uses:$(br)http://127.0.0.1:11434/v1/chat/completions$(br2)For llama.cpp configured to port 8090:$(br)http://127.0.0.1:8090/v1/chat/completions$(br2)These are examples, not commands to start a server. Change the port to match your setup.$(br2)This page connects only to your own computer, not a friend's PC, router or public website."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Model ID and API Key",
+      "text": "$(bold)Model ID:$() copy the model identifier from your app's server page. In Ollama, use the complete installed model name, including its tag.$(br2)This is not your character's name or a folder path. The mod will not pick a model for you.$(br2)$(bold)API key:$() leave it blank if you did not enable authentication. Otherwise use the key set in your local app, not a cloud provider's key."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "5. Test, Then Save",
+      "text": "Click $(bold)Test Connection$(). A pass means the address responds and lists your exact model ID.$(br2)Testing does not save settings or generate a reply. Click $(bold)Save & Enable$(), then say something to Herobrine.$(br2)If your server has no model-list API, you can still save the correct settings and try chatting.$(br2)Saved does not mean the external app is running."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Can't Connect?",
+      "text": "Check three things first:$(li)$(bold)Is the app running?$() Its server switch must also say Running.$(li)$(bold)Does the port match?$() If the app says 1234, the game must use 1234.$(li)$(bold)Is the URL complete?$() Check http:// and the /v1/chat/completions ending.$(br2)Local requests do not use a proxy. Enabling one or changing a cloud key will not start a stopped local server."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Read the Test Result",
+      "text": "$(li)$(bold)Model not listed:$() check the exact ID and prepare the model in the app.$(li)$(bold)401 / 403:$() check your local API key.$(li)$(bold)404 / invalid model list:$() check the URL path and whether this is the right service.$(li)$(bold)503 / loading:$() wait for the model to finish loading.$(br2)Test passes but chat fails? Read the app's logs or open AI Debug in the game."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Next Time, and Stopping",
+      "text": "Settings are remembered, but you must start your model service yourself before using it.$(br2)Disable Local Model clears the game's local settings only. Saving cloud settings switches chat back to cloud. Neither stops the app or deletes models.$(br2)Leaving Minecraft also leaves the app alone. Stop it yourself when finished to free memory.$(br2)Files from the old setup can be reused in a compatible app."
+    }
+  ]
+}
