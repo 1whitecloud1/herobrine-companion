@@ -1,6 +1,5 @@
 package com.whitecloud233.herobrine_companion.client.service;
 
-import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import com.whitecloud233.herobrine_companion.client.llm.LlmTask;
@@ -11,182 +10,99 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
-/**
- * 本地蒸馏模型（llama.cpp / Ollama 等本地 OpenAI 兼容服务）一键连接助手。
- *
- * <p>流程：探测本地候选端口（llama.cpp 8090、Ollama 11434）→ 读 /v1/models 拿到模型名 →
- * 自动写入独立"本地模型"槽位 + 聊天任务路由，实现"傻瓜式"接入，且不覆盖任何云端/自定义档案。
- * 玩家只需要：① 先启动本地服务器；② 在游戏设置里点一个按钮。
- */
+/** Connects only to a player-configured, already installed local OpenAI-compatible service. */
 public final class LocalModelConnector {
+    public static final String DEFAULT_ENDPOINT = "http://127.0.0.1:8090/v1/chat/completions";
+    private static final HttpClient CLIENT = HttpClients.direct(5);
 
-    /** 默认端口：llama.cpp 分发包（start_herobrine_cpu.bat）使用 8090。 */
-    public static final int DEFAULT_PORT = 8090;
-    public static final String DEFAULT_HOST = "127.0.0.1";
-    public static final String DEFAULT_MODEL = "herobrine";
-    public static final String DEFAULT_ENDPOINT = "http://" + DEFAULT_HOST + ":" + DEFAULT_PORT + "/v1/chat/completions";
+    public enum Status {
+        READY, INVALID_ENDPOINT, MISSING_MODEL, INVALID_KEY, AUTHENTICATION,
+        MODEL_NOT_FOUND, INVALID_RESPONSE, HTTP_ERROR, UNAVAILABLE;
 
-    /** 本地 OpenAI 兼容候选：先 llama.cpp 分发包，再 Ollama。 */
-    private static final List<String> CANDIDATE_BASES = List.of(
-            "http://127.0.0.1:8090",
-            "http://127.0.0.1:11434"
-    );
+        public String translationKey() {
+            return "message.herobrine_companion.local_model_probe." + name().toLowerCase(Locale.ROOT);
+        }
+    }
 
-    /** 本地服务任意 API Key 即可（llama.cpp 需要 Bearer，Ollama 忽略）。 */
-    private static final String LOCAL_API_KEY = "sk-local";
-
-    /** 聊天任务回退到的云端提供商（工具/元任务走全局，不受影响）。 */
-    private static final String CLOUD_FALLBACK = "qiniu_cloud";
-
-    // 回环地址由 SystemProxy.SELECTOR 判为直连，本地 llama 探测不受代理开关影响
-    private static final HttpClient CLIENT = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(5))
-            .proxy(SystemProxy.SELECTOR)
-            .build();
-
-    public record ProbeResult(boolean reachable, String modelId, String endpoint) {
+    public record ProbeResult(Status status, String modelId, String endpoint, int statusCode) {
+        public boolean reachable() {
+            return status == Status.READY;
+        }
     }
 
     private LocalModelConnector() {
     }
 
-    /** 异步探测本地服务器，返回首个可达节点的模型名与端点。带硬超时，永不无限期卡住。 */
-    public static CompletableFuture<ProbeResult> probeAsync() {
-        return probeCandidates(0)
-                .orTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
-                .exceptionally(e -> new ProbeResult(false, null, DEFAULT_ENDPOINT));
+    public static boolean isValidApiKey(String apiKey) {
+        String value = apiKey == null ? "" : apiKey.trim();
+        return value.chars().allMatch(character -> character >= 0x20 && character <= 0x7e);
     }
 
-    /** Probe the configured chat endpoint, so a healthy service on another port cannot mask a bad configuration. */
-    public static CompletableFuture<ProbeResult> probeEndpointAsync(String endpoint) {
-        String normalized = endpoint == null ? "" : endpoint.trim();
-        String suffix = "/v1/chat/completions";
-        if (!normalized.endsWith(suffix)) {
-            return CompletableFuture.completedFuture(new ProbeResult(false, null, normalized));
-        }
-        return probeSingle(normalized.substring(0, normalized.length() - suffix.length()))
-                .orTimeout(8, java.util.concurrent.TimeUnit.SECONDS)
-                .exceptionally(error -> new ProbeResult(false, null, normalized));
-    }
-
-    private static CompletableFuture<ProbeResult> probeCandidates(int index) {
-        if (index >= CANDIDATE_BASES.size()) {
-            return CompletableFuture.completedFuture(new ProbeResult(false, null, DEFAULT_ENDPOINT));
-        }
-        String base = CANDIDATE_BASES.get(index);
-        return probeSingle(base).thenCompose(result -> {
-            if (result.reachable()) {
-                return CompletableFuture.completedFuture(result);
-            }
-            return probeCandidates(index + 1);
-        });
-    }
-
-    static CompletableFuture<ProbeResult> probeSingle(String base) {
-        // llama.cpp can expose a process/listening port before its model is usable.
-        URI uri;
-        try {
-            uri = URI.create(base);
-            if (uri.getHost() == null || !("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme()))) {
-                return CompletableFuture.completedFuture(new ProbeResult(false, null, base + "/v1/chat/completions"));
-            }
-        } catch (IllegalArgumentException error) {
-            return CompletableFuture.completedFuture(new ProbeResult(false, null, base + "/v1/chat/completions"));
-        }
-        boolean llamaPort = uri.getPort() == DEFAULT_PORT;
-        CompletableFuture<Boolean> health = llamaPort
-                ? CLIENT.sendAsync(HttpRequest.newBuilder().uri(URI.create(base + "/health"))
-                        .timeout(Duration.ofSeconds(2)).GET().build(),
-                        HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
-                        .handle((response, error) -> error == null && response != null
-                                && isReadyHealthResponse(response.statusCode(), response.body()))
-                : CompletableFuture.completedFuture(true);
-        return health.thenCompose(ready -> ready ? probeModels(base)
-                : CompletableFuture.completedFuture(new ProbeResult(false, null, base + "/v1/chat/completions")));
-    }
-
-    private static CompletableFuture<ProbeResult> probeModels(String base) {
-        return CLIENT.sendAsync(HttpRequest.newBuilder()
-                        .uri(URI.create(base + "/v1/models"))
-                        .timeout(Duration.ofSeconds(6))
-                        .header("Authorization", "Bearer " + LOCAL_API_KEY)
-                        .header("Accept", "application/json")
-                        .GET().build(),
-                HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
+    /** Tests the exact address and model without scanning ports or selecting another model. */
+    public static CompletableFuture<ProbeResult> probeEndpointAsync(String endpoint, String modelId, String apiKey) {
+        String normalized = LocalModelEndpoint.normalize(endpoint);
+        String model = modelId == null ? "" : modelId.trim();
+        if (normalized.isEmpty()) return result(Status.INVALID_ENDPOINT, model, normalized, 0);
+        if (model.isEmpty()) return result(Status.MISSING_MODEL, model, normalized, 0);
+        if (!isValidApiKey(apiKey)) return result(Status.INVALID_KEY, model, normalized, 0);
+        String key = apiKey == null || apiKey.isBlank() ? LLMConfig.LOCAL_MODEL_KEY : apiKey.trim();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(LocalModelEndpoint.modelsEndpoint(normalized)))
+                .timeout(Duration.ofSeconds(6))
+                .header("Authorization", "Bearer " + key)
+                .header("Accept", "application/json")
+                .GET().build();
+        return CLIENT.sendAsync(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
+                .orTimeout(8, TimeUnit.SECONDS)
                 .thenApply(response -> {
-                    if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                        return new ProbeResult(false, null, base + "/v1/chat/completions");
-                    }
-                    String modelId = parseFirstModelId(response.body());
-                    return new ProbeResult(modelId != null, modelId, base + "/v1/chat/completions");
+                    int code = response.statusCode();
+                    if (code == 401 || code == 403) return new ProbeResult(Status.AUTHENTICATION, model, normalized, code);
+                    if (code < 200 || code >= 300) return new ProbeResult(Status.HTTP_ERROR, model, normalized, code);
+                    List<String> models = parseModelIds(response.body());
+                    Status status = models == null ? Status.INVALID_RESPONSE
+                            : models.contains(model) ? Status.READY : Status.MODEL_NOT_FOUND;
+                    return new ProbeResult(status, model, normalized, code);
                 })
-                .exceptionally(e -> new ProbeResult(false, null, base + "/v1/chat/completions"));
+                .exceptionally(error -> new ProbeResult(Status.UNAVAILABLE, model, normalized, 0));
     }
 
-    /** 解析 OpenAI 风格 /v1/models 响应里的第一个模型 id。 */
-    static String parseFirstModelId(String body) {
+    private static CompletableFuture<ProbeResult> result(Status status, String model, String endpoint, int code) {
+        return CompletableFuture.completedFuture(new ProbeResult(status, model, endpoint, code));
+    }
+
+    static List<String> parseModelIds(String body) {
         try {
             JsonElement root = JsonParser.parseString(body);
-            JsonElement arrayElement = null;
-            if (root.isJsonObject() && root.getAsJsonObject().has("data")) {
-                arrayElement = root.getAsJsonObject().get("data");
-            } else if (root.isJsonArray()) {
-                arrayElement = root;
-            }
-            if (arrayElement == null || !arrayElement.isJsonArray()) {
-                return null;
-            }
-            JsonArray data = arrayElement.getAsJsonArray();
-            for (JsonElement element : data) {
-                if (element.isJsonObject()) {
-                    JsonElement id = element.getAsJsonObject().get("id");
-                    if (id != null && id.isJsonPrimitive() && id.getAsJsonPrimitive().isString()) {
-                        String value = id.getAsString();
-                        if (value != null && !value.isBlank()) {
-                            return value.trim();
-                        }
-                    }
+            JsonElement data = root.isJsonArray() ? root
+                    : root.isJsonObject() ? root.getAsJsonObject().get("data") : null;
+            if (data == null || !data.isJsonArray()) return null;
+            List<String> models = new ArrayList<>();
+            for (JsonElement element : data.getAsJsonArray()) {
+                if (!element.isJsonObject()) continue;
+                JsonElement id = element.getAsJsonObject().get("id");
+                if (id != null && id.isJsonPrimitive() && id.getAsJsonPrimitive().isString()) {
+                    String value = id.getAsString().trim();
+                    if (!value.isEmpty()) models.add(value);
                 }
             }
-        } catch (Exception ignored) {
-            // An HTML error page or an empty model list is not a usable model server.
-        }
-        return null;
-    }
-
-    static boolean isReadyHealthResponse(int statusCode, String body) {
-        if (statusCode < 200 || statusCode >= 300) return false;
-        try {
-            JsonElement root = JsonParser.parseString(body);
-            if (!root.isJsonObject()) return false;
-            JsonElement status = root.getAsJsonObject().get("status");
-            return status != null && status.isJsonPrimitive() && status.getAsJsonPrimitive().isString()
-                    && "ok".equalsIgnoreCase(status.getAsString());
+            return List.copyOf(models);
         } catch (RuntimeException ignored) {
-            return false;
+            return null;
         }
     }
 
-    /**
-     * 写入本地模型完整配置：
-     * 1) 独立本地槽位（端点为本地服务、模型名取服务器实际模型）——不覆盖、不占用任何云端/自定义档案；
-     * 2) 聊天类任务路由 → 本地槽位（虚拟 id "local"），备用云端；
-     * 3) 本地模型不算云端模式：不改全局活跃提供商，也不要求云端 Key 才能使用。
-     */
-    public static void applyConfig(String endpoint, String modelId) {
-        String normalizedEndpoint = (endpoint == null || endpoint.isBlank()) ? DEFAULT_ENDPOINT : endpoint.trim();
-        String normalizedModel = (modelId == null || modelId.isBlank()) ? DEFAULT_MODEL : modelId.trim();
-
-        // 1) 只写独立本地模型槽位（内部已落盘），云端/自定义档案原样保留。
-        LLMConfig.setLocalModel(normalizedEndpoint, normalizedModel);
-
-        // 2) 聊天类任务路由 → 本地槽位，备用云端；不动全局活跃提供商。
-        LLMConfig.setTaskRoute(LlmTask.MAIN_CHAT, new LLMConfig.TaskRoute(LLMConfig.LOCAL_ROUTE_ID, CLOUD_FALLBACK));
-        LLMConfig.setTaskRoute(LlmTask.SCOPED_CHAT, new LLMConfig.TaskRoute(LLMConfig.LOCAL_ROUTE_ID, CLOUD_FALLBACK));
-        LLMConfig.setTaskRoute(LlmTask.CROSS_SESSION, new LLMConfig.TaskRoute(LLMConfig.LOCAL_ROUTE_ID, CLOUD_FALLBACK));
+    public static void applyConfig(String endpoint, String modelId, String apiKey) {
+        LLMConfig.setLocalModel(endpoint, modelId, apiKey);
+        // Local chat must not silently fall back to a cloud provider.
+        for (LlmTask task : List.of(LlmTask.MAIN_CHAT, LlmTask.SCOPED_CHAT, LlmTask.CROSS_SESSION)) {
+            LLMConfig.setTaskRoute(task, new LLMConfig.TaskRoute(LLMConfig.LOCAL_ROUTE_ID, ""));
+        }
         LLMConfig.save();
     }
 }

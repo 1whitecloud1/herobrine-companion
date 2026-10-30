@@ -1,9 +1,11 @@
 package com.whitecloud233.herobrine_companion.client.service;
 
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
-import com.whitecloud233.herobrine_companion.compat.accessories.HeroAccessoriesCompat;
+import com.whitecloud233.herobrine_companion.client.network.ClientTemplateLibrary;
+import com.whitecloud233.herobrine_companion.api.compat.HeroAccessoriesCompat;
 import com.whitecloud233.herobrine_companion.compat.curios.HeroCuriosCompat;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.herobrine_companion.structure.template.TemplateEntry;
 import com.whitecloud233.herobrine_companion.util.AiItemNaming;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.PlayerInfo;
@@ -22,6 +24,8 @@ import java.util.Map;
 import java.util.UUID;
 
 final class AIGameContextSupport {
+    /** 提示词里最多列出的模板数；更多的交给 registry_lookup，避免长目录挤占上下文。 */
+    private static final int MAX_TEMPLATES_IN_PROMPT = 12;
     private static final int MAX_SERVER_PLAYERS_IN_PROMPT = 12;
     private static final int MAX_NEARBY_PLAYERS_IN_PROMPT = 6;
     private static final double NEARBY_PLAYER_DETAIL_RADIUS = 96.0D;
@@ -33,6 +37,16 @@ final class AIGameContextSupport {
             EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET);
 
     private AIGameContextSupport() {}
+
+    /** 使用已同步的实体心境，不查询模型、不写入历史；跨会话同样不借用其他玩家的 Hero。 */
+    static String getHeroSpeechStyle() {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null || mc.level == null) {
+            return "";
+        }
+        HeroEntity hero = findPerceivedHero(mc);
+        return hero == null ? "" : HeroSpeechStyle.promptFor(hero.getMindState());
+    }
 
     static String getDynamicGameData() {
         Minecraft mc = Minecraft.getInstance();
@@ -56,10 +70,7 @@ final class AIGameContextSupport {
             }
             data.append("\n");
         } catch (Exception ignored) {}
-        data.append("- Custom NBT Structure Library (use place template): \n");
-        if (LLMConfig.nbtStructures != null && !LLMConfig.nbtStructures.isEmpty()) {
-            for (Map.Entry<String, String> entry : LLMConfig.nbtStructures.entrySet()) data.append("  * ").append(entry.getKey()).append(": ").append(entry.getValue()).append("\n");
-        } else data.append("  * (None configured)\n");
+        appendBuildingTemplates(data);
         appendOtherPlayerAwareness(data, mc);
         data.append("\n- [Omniscient Eye] Current Environment:\n");
         appendPlayerEquipment(data, mc.player);
@@ -138,25 +149,75 @@ final class AIGameContextSupport {
         }
     }
 
-    /** 优先返回本玩家结伴的 Hero，否则取最近一只已加载的 Hero。 */
+    /** 优先返回本玩家结伴的 Hero，否则取最近的无主 Hero，避免借用其他玩家的状态。 */
     private static HeroEntity findPerceivedHero(Minecraft mc) {
-        if (mc.level == null) {
+        if (mc.level == null || mc.player == null) {
             return null;
         }
+        HeroEntity owned = null;
         HeroEntity fallback = null;
         for (HeroEntity hero : mc.level.getEntitiesOfClass(HeroEntity.class, mc.player.getBoundingBox().inflate(HERO_PERCEPTION_RADIUS))) {
-            if (hero.isRemoved()) {
+            if (hero.isRemoved() || !hero.isAlive()) {
                 continue;
-            }
-            if (fallback == null) {
-                fallback = hero;
             }
             UUID owner = hero.getOwnerUUID();
             if (owner != null && owner.equals(mc.player.getUUID())) {
-                return hero;
+                if (owned == null || hero.distanceToSqr(mc.player) < owned.distanceToSqr(mc.player)) {
+                    owned = hero;
+                }
+            } else if (owner == null && (fallback == null || hero.distanceToSqr(mc.player) < fallback.distanceToSqr(mc.player))) {
+                fallback = hero;
             }
         }
-        return fallback;
+        return owned != null ? owned : fallback;
+    }
+
+    /**
+     * 玩家在当前世界导入、并由服务器确认的建筑模板（{@link ClientTemplateLibrary} 快照）。
+     *
+     * <p><b>为什么不用本地配置的 {@code nbtStructures}</b>：那份手写映射不会随导入更新，
+     * 模型会一直使用过期 ID（如已被删除的旧模板），最终以 command lattice 拒绝失败。
+     * 现在只呈现当前世界真实存在的模板，并把名称与精确 ID 一起给出，模型无需玩家提供模板 ID。</p>
+     *
+     * <p>列表为空时必须说清是「这个存档没有导入」，而不是拿随包模板或旧对话里的 ID 凑数：
+     * 模板按存档存储，换存档后旧模板不会跟着过来。</p>
+     */
+    private static void appendBuildingTemplates(StringBuilder data) {
+        data.append("- Your building templates (place with minecraft_command_skill action=place_template):\n");
+        if (!ClientTemplateLibrary.supported()) {
+            data.append("  * (Unavailable here: no world connection, or a server without the template channel.)\n");
+            return;
+        }
+        if (ClientTemplateLibrary.busy()) {
+            // 同步中是短暂状态：列出的仍是上一份快照，模型可以先用，但不应据此声称建筑已放置。
+            data.append("  * (The template index is refreshing; entries below may change until the sync finishes.)\n");
+        }
+        List<TemplateEntry> templates = ClientTemplateLibrary.entries();
+        if (templates.isEmpty()) {
+            data.append("  * (NONE. This save has no imported building templates. Templates are stored per world, so a building imported in another save is not available here.)\n");
+            data.append("  * Do not place anything and do not reuse a template id from another world or from memory. Tell the player to import the file in Herobrine > Building templates.\n");
+            return;
+        }
+        int shown = 0;
+        for (TemplateEntry template : templates) {
+            if (shown++ >= MAX_TEMPLATES_IN_PROMPT) {
+                data.append("  * ...and ").append(templates.size() - MAX_TEMPLATES_IN_PROMPT).append(" more templates (registry_lookup category=template, query='*').\n");
+                break;
+            }
+            data.append("  * name=\"").append(oneLine(template.name())).append("\" id=").append(template.id())
+                    .append(" size=").append(template.x()).append('x').append(template.y()).append('x').append(template.z())
+                    .append(" blocks=").append(template.blocks()).append('\n');
+        }
+        data.append("  * Pick the template whose NAME and SIZE best fit what the player asked for; a vague wish for something grand means the largest listed building. ")
+                .append("Place that exact id near the player, and never invent one.\n");
+    }
+
+    /** 模板名是玩家/文件名数据，压成单行并对引号做转义，避免它伪装成提示词结构。 */
+    private static String oneLine(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replace("\r", " ").replace("\n", " ").replace("\"", "'").strip();
     }
 
     private static void appendOtherPlayerAwareness(StringBuilder data, Minecraft mc) {

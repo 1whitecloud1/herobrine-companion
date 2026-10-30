@@ -69,6 +69,16 @@ public final class AIGameCommandExecutor {
                 return;
             }
 
+            // [建筑模板] 玩家上传的模板走独立通道（分批放置 + 服务器完成回执），
+            // 不经过原版 place template 命令。返回 null 表示这不是上传模板命令，继续原流程。
+            // 必须放在上面两道门禁之后：模板放置同样受常规命令权限约束。
+            CompletableFuture<Boolean> templatePlacement =
+                    com.whitecloud233.herobrine_companion.client.network.ClientTemplatePlacement.execute(command);
+            if (templatePlacement != null) {
+                templatePlacement.whenComplete((ok, error) -> future.complete(error == null && Boolean.TRUE.equals(ok)));
+                return;
+            }
+
             if (ACTION_MASSIVE_LIGHTNING.equals(command)) {
                 if (mc.hasSingleplayerServer() && mc.getSingleplayerServer() != null) {
                     mc.getSingleplayerServer().execute(() -> {
@@ -127,7 +137,8 @@ public final class AIGameCommandExecutor {
                                 return;
                             }
 
-                            serverPlayer.connection.disconnect(Component.literal("Herobrine has cast you out."));
+                            serverPlayer.connection.disconnect(
+                                    Component.translatable("message.herobrine_companion.punishment.kicked"));
                             future.complete(true);
                         } catch (Exception e) {
                             future.complete(false);

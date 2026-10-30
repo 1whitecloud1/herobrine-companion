@@ -1,6 +1,7 @@
 package com.whitecloud233.herobrine_companion.client.service;
 
 import com.google.gson.Gson;
+import com.whitecloud233.herobrine_companion.util.AtomicFiles;
 import com.google.gson.GsonBuilder;
 import com.google.gson.annotations.SerializedName;
 import com.google.gson.reflect.TypeToken;
@@ -90,8 +91,8 @@ public class LocalChatService {
         List<RuleData> fallback = new ArrayList<>();
         // 这里的 pattern 和 response 默认使用了多语言的翻译键
         fallback.add(new RuleData(1, "chat.herobrine_companion.rule_hello.pattern", "chat.herobrine_companion.rule_hello.response", 10));
-        try (OutputStreamWriter writer = new OutputStreamWriter(new FileOutputStream(jsonFile), StandardCharsets.UTF_8)) {
-            GSON.toJson(fallback, writer);
+        try {
+            AtomicFiles.writeJson(jsonFile.toPath(), GSON, fallback);
         } catch (IOException e) {
             LOGGER.error("生成 Fallback JSON 失败", e);
         }

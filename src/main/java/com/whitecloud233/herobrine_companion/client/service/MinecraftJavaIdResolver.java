@@ -6,6 +6,7 @@ import net.minecraft.core.particles.ParticleType;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.locale.Language;
+import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvent;
@@ -13,6 +14,7 @@ import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 
@@ -27,6 +29,9 @@ final class MinecraftJavaIdResolver {
     private static Map<String, String> blockNames;
     private static Map<String, String> entityTypeNames;
     private static Map<String, String> effectNames;
+    private static Map<String, String> enchantmentNames;
+    private static Registry<Enchantment> cachedEnchantmentRegistry;
+    private static Language cachedEnchantmentLanguage;
     private static Language cachedLanguage;
 
     private MinecraftJavaIdResolver() {}
@@ -48,7 +53,7 @@ final class MinecraftJavaIdResolver {
     }
 
     static String enchantmentId(String raw) {
-        return normalizeDynamicRegistryId(raw, Registries.ENCHANTMENT, null);
+        return normalizeDynamicRegistryId(raw, Registries.ENCHANTMENT, MinecraftJavaIdResolver::enchantmentNameIndex);
     }
 
     static String particleId(String raw) {
@@ -241,6 +246,36 @@ final class MinecraftJavaIdResolver {
                 || isRegisteredStructure(id);
     }
 
+    /**
+     * 命令级预检：把一条已生成命令里的每个 {@code ns:path} 令牌过一遍资源校验。
+     * 供 {@code AIGameCommandExecutor} 与回归测试共用，避免两处判定漂移。
+     *
+     * <p><b>为什么先查模板</b>：建筑模板不是注册表内容，而是按存档存储在服务器上、
+     * 由 {@code ClientTemplateLibrary} 同步来的快照。只看注册表会把玩家刚导入的模板判成
+     * 「未注册资源 ID」并在命令执行前拦下（日志里表现为 {@code [System Block] ... 已阻止}）。
+     * 因此模板命中必须在读注册表之前放行；不命中时才回落到注册表校验。</p>
+     */
+    static boolean hasOnlyRegisteredModResources(String command) {
+        java.util.regex.Matcher matcher =
+                RESOURCE_TOKEN.matcher(command == null ? "" : command.toLowerCase(java.util.Locale.ROOT));
+        while (matcher.find()) {
+            if ("minecraft".equals(matcher.group(1))) {
+                continue;
+            }
+            String token = matcher.group();
+            if (com.whitecloud233.herobrine_companion.client.network.ClientTemplateLibrary.has(token)) {
+                continue;
+            }
+            if (!isRegisteredModResource(token)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static final java.util.regex.Pattern RESOURCE_TOKEN =
+            java.util.regex.Pattern.compile("(?<![a-z0-9_.-])([a-z0-9_.-]+):[a-z0-9_/.-]+");
+
     /** 附魔在 1.21.1 是动态注册表：进存档后经 level.registryAccess() 查询（未进存档时按不存在处理）。 */
     private static boolean isRegisteredDynamicEnchantment(ResourceLocation id) {
         Minecraft minecraft = Minecraft.getInstance();
@@ -250,6 +285,39 @@ final class MinecraftJavaIdResolver {
         return minecraft.level.registryAccess().registry(Registries.ENCHANTMENT)
                 .map(registry -> registry.getOptional(id).isPresent())
                 .orElse(false);
+    }
+
+    /**
+     * 附魔显示名索引：1.21.1 附魔没有 descriptionId，显示名在 description 组件里。
+     * 附魔注册表按存档存在，注册表实例或语言变化时重建索引。
+     */
+    private static Map<String, String> enchantmentNameIndex() {
+        Registry<Enchantment> registry = currentEnchantmentRegistry();
+        Language language = Language.getInstance();
+        if (enchantmentNames == null || registry != cachedEnchantmentRegistry || language != cachedEnchantmentLanguage) {
+            cachedEnchantmentRegistry = registry;
+            cachedEnchantmentLanguage = language;
+            enchantmentNames = registry == null
+                    ? Map.of()
+                    : buildNameIndex(registry, MinecraftJavaIdResolver::enchantmentDescriptionKey);
+        }
+        return enchantmentNames;
+    }
+
+    private static Registry<Enchantment> currentEnchantmentRegistry() {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft == null || minecraft.level == null) {
+            return null;
+        }
+        return minecraft.level.registryAccess().registry(Registries.ENCHANTMENT).orElse(null);
+    }
+
+    private static String enchantmentDescriptionKey(Enchantment enchantment) {
+        // 原版与大多数模组的 description 都是 translatable 组件；字面量组件没有翻译键，跳过本地化条目。
+        if (enchantment.description().getContents() instanceof TranslatableContents translatable) {
+            return translatable.getKey();
+        }
+        return null;
     }
 
     private static Map<String, String> itemNameIndex() {

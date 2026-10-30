@@ -1,5 +1,7 @@
 package com.whitecloud233.herobrine_companion.client.service;
 
+import com.whitecloud233.herobrine_companion.util.JsonInputs;
+
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.whitecloud233.herobrine_companion.client.llm.LlmToolSpec;
@@ -58,7 +60,7 @@ public final class RegistryLookupSupport {
 
     /** 解析并校验模型给的参数；不合法返回带原因的 error。 */
     static ParseResult parseAction(JsonObject args) {
-        String query = getString(args, "query").trim();
+        String query = JsonInputs.string(args, "query", "").trim();
         if (query.isEmpty()) {
             return ParseResult.error("query 不能为空");
         }
@@ -66,7 +68,7 @@ public final class RegistryLookupSupport {
             return ParseResult.error("query 过长（最多 " + MAX_QUERY_LENGTH + " 字符）");
         }
         // category 是可选的：未传/为空时默认 any（与 schema 声明一致，勿误判为非法参数）。
-        String categoryId = getString(args, "category");
+        String categoryId = JsonInputs.string(args, "category", "");
         Category category = categoryId.isEmpty() ? Category.ANY : Category.fromId(categoryId);
         if (category == null) {
             return ParseResult.error("category 只能是 " + Category.ids());
@@ -86,14 +88,29 @@ public final class RegistryLookupSupport {
         }
 
         ModContentIndex.ensureReady();
+        // 建筑模板是客户端会话内快照（非注册表内容），单独分流；category=any 时与注册表结果合并。
+        if (request.category() == Category.TEMPLATE) {
+            return TemplateLookupSupport.search(request.query(), request.limit(), true);
+        }
+        String templates = request.category() == Category.ANY
+                ? TemplateLookupSupport.search(request.query(), request.limit(), false) : "";
+        String registryResults;
         if (ModContentIndex.isComplete()) {
-            return formatIndexResults(request, ModContentIndex.search(
+            registryResults = formatIndexResults(request, ModContentIndex.search(
                     queryNorm,
                     request.category() == Category.ANY ? "" : request.category().id(),
                     Math.max(request.limit(), FALLBACK_SCAN_CAP)));
+        } else {
+            // 索引未就绪或不完整（构建时存档未加载，缺维度/结构）：直接扫注册表，保证可用性。
+            registryResults = scanRegistriesFallback(request, queryNorm);
         }
-        // 索引未就绪或不完整（构建时存档未加载，缺维度/结构）：直接扫注册表，保证可用性。
-        return scanRegistriesFallback(request, queryNorm);
+        if (templates.isEmpty()) {
+            return registryResults;
+        }
+        if (registryResults.equals(noMatchText(request.query()))) {
+            return templates;
+        }
+        return templates + "\n" + registryResults;
     }
 
     private static String formatIndexResults(RegistryLookupRequest request, ModContentIndex.SearchResult result) {
@@ -294,16 +311,7 @@ public final class RegistryLookupSupport {
         return schema;
     }
 
-    private static String getString(JsonObject args, String name) {
-        if (args == null || !args.has(name) || args.get(name).isJsonNull() || !args.get(name).isJsonPrimitive()) {
-            return "";
-        }
-        try {
-            return args.get(name).getAsString();
-        } catch (RuntimeException ignored) {
-            return "";
-        }
-    }
+
 
     private static int getInt(JsonObject args, String name, int fallback) {
         if (args == null || !args.has(name) || args.get(name).isJsonNull() || !args.get(name).isJsonPrimitive()) {
@@ -327,7 +335,9 @@ public final class RegistryLookupSupport {
         PARTICLE("particle", BuiltInRegistries.PARTICLE_TYPE, null),
         SOUND("sound", BuiltInRegistries.SOUND_EVENT, null),
         DIMENSION("dimension", null, null),
-        STRUCTURE("structure", null, null);
+        STRUCTURE("structure", null, null),
+        /** 玩家在当前世界上传、由服务器确认的建筑模板（见 {@link ClientTemplateLibrary}）。 */
+        TEMPLATE("template", null, null);
 
         private final String id;
         private final Registry<?> registry;

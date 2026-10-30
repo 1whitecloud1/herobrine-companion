@@ -1,6 +1,7 @@
 package com.whitecloud233.herobrine_companion.client.service;
 
 import com.google.gson.Gson;
+import com.whitecloud233.herobrine_companion.util.AtomicFiles;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import net.minecraft.client.Minecraft;
@@ -351,7 +352,7 @@ public class CrossChatHistoryStore {
             }
             writer.write("Peer: " + peerName);
             writer.newLine();
-            writer.write("Mode: " + (hbMode ? "HB鈫擧B" : "Player鈫擧B"));
+            writer.write("Mode: " + (hbMode ? "HB↔HB" : "Player↔HB"));
             writer.newLine();
             writer.write("Updated: " + this.formatTimestamp(updatedAt));
             writer.newLine();
@@ -384,9 +385,7 @@ public class CrossChatHistoryStore {
             if (parent != null && !parent.exists()) {
                 parent.mkdirs();
             }
-            try (var writer = Files.newBufferedWriter(this.loadedFile.toPath(), StandardCharsets.UTF_8)) {
-                GSON.toJson(this.storeData, writer);
-            }
+            AtomicFiles.writeJson(this.loadedFile.toPath(), GSON, this.storeData);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -492,9 +491,7 @@ public class CrossChatHistoryStore {
             if (parent != null && !parent.exists()) {
                 parent.mkdirs();
             }
-            try (var writer = Files.newBufferedWriter(file.toPath(), StandardCharsets.UTF_8)) {
-                GSON.toJson(normalizeStore(data), writer);
-            }
+            AtomicFiles.writeJson(file.toPath(), GSON, normalizeStore(data));
         } catch (Exception e) {
             e.printStackTrace();
         }

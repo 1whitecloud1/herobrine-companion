@@ -1,5 +1,7 @@
 package com.whitecloud233.herobrine_companion.client.service;
 
+import com.whitecloud233.herobrine_companion.util.JsonInputs;
+
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -119,7 +121,7 @@ final class AICommandSkillSupport {
     }
 
     static String buildMinecraftSkillCommand(JsonObject args, String actionTeleportToHero, String actionMassiveLightning, String actionSummonHeroToPlayer) {
-        String action = getOptionalString(args, "action", "").trim().toLowerCase(Locale.ROOT);
+        String action = JsonInputs.optionalString(args, "action", "").trim().toLowerCase(Locale.ROOT);
         return switch (action) {
             case "clear" -> buildClearInventoryCommand(args);
             case "clone" -> buildCloneCommand(args);
@@ -318,7 +320,7 @@ final class AICommandSkillSupport {
         addStringProperty(properties, "biome_id", "For locate_biome. Vanilla biome id like minecraft:cherry_grove or cherry_grove.");
         addStringProperty(properties, "poi_id", "For locate poi. Vanilla point-of-interest id.");
         addStringProperty(properties, "feature_id", "For place feature. Vanilla configured feature id.");
-        addStringProperty(properties, "template_id", "For place_template. Vanilla/configured structure template id.");
+        addStringProperty(properties, "template_id", "For place_template or place_type=template. Exact uploaded building id listed in the world context, or the template's name; find uploads with registry_lookup category=template, query=name or '*'.");
         addStringProperty(properties, "dimension_id", "For teleport_to_dimension or execute in. Registered dimension id like minecraft:the_nether, the_nether, or modid:dimension_id for installed mods; checked against the connected server's dimension list.");
         addStringProperty(properties, "advancement_id", "For advancement grant/revoke. Vanilla advancement id, or omit when advancement_mode=everything.");
         addStringProperty(properties, "attribute_id", "For attribute commands. Vanilla attribute id like minecraft:generic.max_health; checked against the runtime registry.");
@@ -499,7 +501,7 @@ final class AICommandSkillSupport {
     }
 
     private static String buildSetTimeCommand(JsonObject args) {
-        String value = getOptionalString(args, "time", "").trim().toLowerCase(Locale.ROOT);
+        String value = JsonInputs.optionalString(args, "time", "").trim().toLowerCase(Locale.ROOT);
         if (!Set.of("day", "noon", "night", "midnight").contains(value)) {
             return null;
         }
@@ -507,7 +509,7 @@ final class AICommandSkillSupport {
     }
 
     private static String buildSetWeatherCommand(JsonObject args) {
-        String value = getOptionalString(args, "weather", "").trim().toLowerCase(Locale.ROOT);
+        String value = JsonInputs.optionalString(args, "weather", "").trim().toLowerCase(Locale.ROOT);
         if (!Set.of("clear", "rain", "thunder").contains(value)) {
             return null;
         }
@@ -515,7 +517,7 @@ final class AICommandSkillSupport {
     }
 
     private static String buildSetDifficultyCommand(JsonObject args) {
-        String value = getOptionalString(args, "difficulty", "").trim().toLowerCase(Locale.ROOT);
+        String value = JsonInputs.optionalString(args, "difficulty", "").trim().toLowerCase(Locale.ROOT);
         if (!Set.of("peaceful", "easy", "normal", "hard").contains(value)) {
             return null;
         }
@@ -523,7 +525,7 @@ final class AICommandSkillSupport {
     }
 
     private static String buildSetGamemodeCommand(JsonObject args) {
-        String value = getOptionalString(args, "gamemode", "").trim().toLowerCase(Locale.ROOT);
+        String value = JsonInputs.optionalString(args, "gamemode", "").trim().toLowerCase(Locale.ROOT);
         if (!Set.of("survival", "creative", "adventure", "spectator").contains(value)) {
             return null;
         }
@@ -531,7 +533,7 @@ final class AICommandSkillSupport {
     }
 
     private static String buildSetGameruleCommand(JsonObject args) {
-        String rule = normalizeGameRule(getOptionalString(args, "gamerule", ""));
+        String rule = normalizeGameRule(JsonInputs.optionalString(args, "gamerule", ""));
         if (rule == null || !hasNonNull(args, "gamerule_value")) {
             return null;
         }
@@ -539,7 +541,7 @@ final class AICommandSkillSupport {
     }
 
     private static String buildDefaultGamemodeCommand(JsonObject args) {
-        String value = getOptionalString(args, "gamemode", getOptionalString(args, "publish_mode", "")).trim().toLowerCase(Locale.ROOT);
+        String value = JsonInputs.optionalString(args, "gamemode", JsonInputs.optionalString(args, "publish_mode", "")).trim().toLowerCase(Locale.ROOT);
         if (!Set.of("survival", "creative", "adventure", "spectator").contains(value)) {
             return null;
         }
@@ -571,7 +573,7 @@ final class AICommandSkillSupport {
             return null;
         }
         int amount = clamp(getOptionalInt(args, "damage_amount", getOptionalInt(args, "amount", 1)), 1, 1000000);
-        String damageType = hasText(args, "damage_type") ? normalizeResourceId(getOptionalString(args, "damage_type", "")) : null;
+        String damageType = hasText(args, "damage_type") ? normalizeResourceId(JsonInputs.optionalString(args, "damage_type", "")) : null;
         if (hasText(args, "damage_type") && damageType == null) {
             return null;
         }
@@ -579,12 +581,12 @@ final class AICommandSkillSupport {
     }
 
     private static String buildDeopCommand(JsonObject args) {
-        String player = normalizePlayerName(getOptionalString(args, "player_name", ""));
+        String player = normalizePlayerName(JsonInputs.optionalString(args, "player_name", ""));
         return player == null ? null : "deop " + player;
     }
 
     private static String buildEffectCommand(JsonObject args) {
-        String operation = getOptionalString(args, "effect_operation", hasText(args, "effect_id") ? "give" : "clear").trim().toLowerCase(Locale.ROOT);
+        String operation = JsonInputs.optionalString(args, "effect_operation", hasText(args, "effect_id") ? "give" : "clear").trim().toLowerCase(Locale.ROOT);
         return switch (operation) {
             case "give" -> buildEffectGiveCommand(args);
             case "clear" -> buildEffectClearCommand(args);
@@ -593,13 +595,13 @@ final class AICommandSkillSupport {
     }
 
     private static String buildExecuteCommand(JsonObject args) {
-        String runCommand = normalizeEmbeddedRunCommand(getOptionalString(args, "run_command", ""));
+        String runCommand = normalizeEmbeddedRunCommand(JsonInputs.optionalString(args, "run_command", ""));
         if (runCommand == null) {
             return null;
         }
         StringBuilder command = new StringBuilder("execute");
         if (hasText(args, "dimension_id")) {
-            String dimensionId = MinecraftJavaIdResolver.dimensionId(getOptionalString(args, "dimension_id", ""));
+            String dimensionId = MinecraftJavaIdResolver.dimensionId(JsonInputs.optionalString(args, "dimension_id", ""));
             if (dimensionId == null) {
                 return null;
             }
@@ -620,7 +622,7 @@ final class AICommandSkillSupport {
     }
 
     private static String buildFunctionCommand(JsonObject args) {
-        String functionId = normalizeResourceId(getOptionalString(args, "function_id", ""));
+        String functionId = normalizeResourceId(JsonInputs.optionalString(args, "function_id", ""));
         return functionId == null ? null : "function " + functionId;
     }
 
@@ -628,7 +630,7 @@ final class AICommandSkillSupport {
         if (!hasText(args, "command_name")) {
             return "help";
         }
-        String commandName = normalizeSimpleName(getOptionalString(args, "command_name", ""), 32);
+        String commandName = normalizeSimpleName(JsonInputs.optionalString(args, "command_name", ""), 32);
         return commandName == null ? null : "help " + commandName;
     }
 
@@ -647,20 +649,20 @@ final class AICommandSkillSupport {
 
     private static String buildAdvancementCommand(JsonObject args, String operation) {
         String target = buildTargetSelector(args, false, true);
-        String mode = getOptionalString(args, "advancement_mode", "only").trim().toLowerCase(Locale.ROOT);
+        String mode = JsonInputs.optionalString(args, "advancement_mode", "only").trim().toLowerCase(Locale.ROOT);
         if (target == null || !Set.of("only", "from", "through", "until", "everything").contains(mode)) {
             return null;
         }
         if ("everything".equals(mode)) {
             return "advancement " + operation + " " + target + " everything";
         }
-        String advancementId = normalizeResourceId(getOptionalString(args, "advancement_id", ""));
+        String advancementId = normalizeResourceId(JsonInputs.optionalString(args, "advancement_id", ""));
         return advancementId == null ? null : "advancement " + operation + " " + target + " " + mode + " " + advancementId;
     }
 
     private static String buildAttributeGetCommand(JsonObject args) {
         String target = buildTargetSelector(args, true, false);
-        String attributeId = MinecraftJavaIdResolver.attributeId(getOptionalString(args, "attribute_id", ""));
+        String attributeId = MinecraftJavaIdResolver.attributeId(JsonInputs.optionalString(args, "attribute_id", ""));
         if (target == null || attributeId == null) {
             return null;
         }
@@ -672,7 +674,7 @@ final class AICommandSkillSupport {
 
     private static String buildAttributeSetBaseCommand(JsonObject args) {
         String target = buildTargetSelector(args, true, false);
-        String attributeId = MinecraftJavaIdResolver.attributeId(getOptionalString(args, "attribute_id", ""));
+        String attributeId = MinecraftJavaIdResolver.attributeId(JsonInputs.optionalString(args, "attribute_id", ""));
         if (target == null || attributeId == null) {
             return null;
         }
@@ -681,7 +683,7 @@ final class AICommandSkillSupport {
     }
 
     private static String buildGiveItemCommand(JsonObject args) {
-        String itemId = MinecraftJavaIdResolver.itemId(getOptionalString(args, "item_id", ""));
+        String itemId = MinecraftJavaIdResolver.itemId(JsonInputs.optionalString(args, "item_id", ""));
         if (itemId == null) {
             return null;
         }
@@ -690,7 +692,7 @@ final class AICommandSkillSupport {
     }
 
     private static String buildClearInventoryCommand(JsonObject args) {
-        String itemId = hasText(args, "item_id") ? MinecraftJavaIdResolver.itemId(getOptionalString(args, "item_id", "")) : null;
+        String itemId = hasText(args, "item_id") ? MinecraftJavaIdResolver.itemId(JsonInputs.optionalString(args, "item_id", "")) : null;
         if (hasText(args, "item_id") && itemId == null) {
             return null;
         }
@@ -702,7 +704,7 @@ final class AICommandSkillSupport {
     }
 
     private static String buildEnchantHeldItemCommand(JsonObject args) {
-        String enchantmentId = MinecraftJavaIdResolver.enchantmentId(getOptionalString(args, "enchantment_id", ""));
+        String enchantmentId = MinecraftJavaIdResolver.enchantmentId(JsonInputs.optionalString(args, "enchantment_id", ""));
         if (enchantmentId == null) {
             return null;
         }
@@ -711,7 +713,7 @@ final class AICommandSkillSupport {
     }
 
     private static String buildExperienceCommand(JsonObject args) {
-        String mode = getOptionalString(args, "experience_mode", "").trim().toLowerCase(Locale.ROOT);
+        String mode = JsonInputs.optionalString(args, "experience_mode", "").trim().toLowerCase(Locale.ROOT);
         if (!Set.of("add_points", "add_levels", "set_points", "set_levels").contains(mode)) {
             return null;
         }
@@ -722,7 +724,7 @@ final class AICommandSkillSupport {
     }
 
     private static String buildSummonEntityCommand(JsonObject args) {
-        String entityId = MinecraftJavaIdResolver.entityTypeId(getOptionalString(args, "entity_id", ""));
+        String entityId = MinecraftJavaIdResolver.entityTypeId(JsonInputs.optionalString(args, "entity_id", ""));
         if (entityId == null) {
             return null;
         }
@@ -758,11 +760,11 @@ final class AICommandSkillSupport {
     }
 
     private static String buildSetBlockNearbyCommand(JsonObject args) {
-        String blockId = MinecraftJavaIdResolver.blockId(getOptionalString(args, "block_id", ""));
+        String blockId = MinecraftJavaIdResolver.blockId(JsonInputs.optionalString(args, "block_id", ""));
         if (blockId == null) {
             return null;
         }
-        String mode = getOptionalString(args, "setblock_mode", "replace").trim().toLowerCase(Locale.ROOT);
+        String mode = JsonInputs.optionalString(args, "setblock_mode", "replace").trim().toLowerCase(Locale.ROOT);
         if (!Set.of("replace", "destroy", "keep").contains(mode)) {
             return null;
         }
@@ -771,11 +773,11 @@ final class AICommandSkillSupport {
     }
 
     private static String buildFillNearbyRegionCommand(JsonObject args) {
-        String blockId = MinecraftJavaIdResolver.blockId(getOptionalString(args, "block_id", ""));
+        String blockId = MinecraftJavaIdResolver.blockId(JsonInputs.optionalString(args, "block_id", ""));
         if (blockId == null) {
             return null;
         }
-        String mode = getOptionalString(args, "fill_mode", "replace").trim().toLowerCase(Locale.ROOT);
+        String mode = JsonInputs.optionalString(args, "fill_mode", "replace").trim().toLowerCase(Locale.ROOT);
         if (!Set.of("replace", "destroy", "keep", "hollow", "outline").contains(mode)) {
             return null;
         }
@@ -793,7 +795,7 @@ final class AICommandSkillSupport {
     }
 
     private static String buildFillBiomeNearbyRegionCommand(JsonObject args) {
-        String biomeId = normalizeResourceId(getOptionalString(args, "biome_id", ""));
+        String biomeId = normalizeResourceId(JsonInputs.optionalString(args, "biome_id", ""));
         if (biomeId == null) {
             return null;
         }
@@ -810,7 +812,7 @@ final class AICommandSkillSupport {
     }
 
     private static String buildEffectGiveCommand(JsonObject args) {
-        String effectId = MinecraftJavaIdResolver.effectId(getOptionalString(args, "effect_id", ""));
+        String effectId = MinecraftJavaIdResolver.effectId(JsonInputs.optionalString(args, "effect_id", ""));
         String target = buildTargetSelector(args, true, true);
         if (effectId == null || target == null) {
             return null;
@@ -829,12 +831,12 @@ final class AICommandSkillSupport {
         if (!hasText(args, "effect_id")) {
             return "effect clear " + target;
         }
-        String effectId = MinecraftJavaIdResolver.effectId(getOptionalString(args, "effect_id", ""));
+        String effectId = MinecraftJavaIdResolver.effectId(JsonInputs.optionalString(args, "effect_id", ""));
         return effectId == null ? null : "effect clear " + target + " " + effectId;
     }
 
     private static String buildParticleCommand(JsonObject args) {
-        String particleId = MinecraftJavaIdResolver.particleId(getOptionalString(args, "particle_id", ""));
+        String particleId = MinecraftJavaIdResolver.particleId(JsonInputs.optionalString(args, "particle_id", ""));
         if (particleId == null) {
             return null;
         }
@@ -847,11 +849,11 @@ final class AICommandSkillSupport {
     }
 
     private static String buildPlaySoundCommand(JsonObject args) {
-        String soundId = MinecraftJavaIdResolver.soundId(getOptionalString(args, "sound_id", ""));
+        String soundId = MinecraftJavaIdResolver.soundId(JsonInputs.optionalString(args, "sound_id", ""));
         if (soundId == null) {
             return null;
         }
-        String source = getOptionalString(args, "sound_source", "master").trim().toLowerCase(Locale.ROOT);
+        String source = JsonInputs.optionalString(args, "sound_source", "master").trim().toLowerCase(Locale.ROOT);
         if (!Set.of("master", "music", "record", "weather", "block", "hostile", "neutral", "player", "ambient", "voice").contains(source)) {
             return null;
         }
@@ -867,13 +869,13 @@ final class AICommandSkillSupport {
 
     private static String buildLocateCommand(JsonObject args, String fieldName, String locateType) {
         String id = "structure".equals(locateType)
-                ? MinecraftJavaIdResolver.structureId(getOptionalString(args, fieldName, ""))
-                : normalizeResourceId(getOptionalString(args, fieldName, ""));
+                ? MinecraftJavaIdResolver.structureId(JsonInputs.optionalString(args, fieldName, ""))
+                : normalizeResourceId(JsonInputs.optionalString(args, fieldName, ""));
         return id == null ? null : "locate " + locateType + " " + id;
     }
 
     private static String buildLocateGeneralCommand(JsonObject args) {
-        String type = getOptionalString(args, "locate_type", "structure").trim().toLowerCase(Locale.ROOT);
+        String type = JsonInputs.optionalString(args, "locate_type", "structure").trim().toLowerCase(Locale.ROOT);
         return switch (type) {
             case "structure" -> buildLocateCommand(args, "structure_id", "structure");
             case "biome" -> buildLocateCommand(args, "biome_id", "biome");
@@ -883,11 +885,11 @@ final class AICommandSkillSupport {
     }
 
     private static String buildLootCommand(JsonObject args) {
-        String lootTarget = getOptionalString(args, "loot_target", "give").trim().toLowerCase(Locale.ROOT);
-        String lootSource = getOptionalString(args, "loot_source", "loot").trim().toLowerCase(Locale.ROOT);
+        String lootTarget = JsonInputs.optionalString(args, "loot_target", "give").trim().toLowerCase(Locale.ROOT);
+        String lootSource = JsonInputs.optionalString(args, "loot_source", "loot").trim().toLowerCase(Locale.ROOT);
         String sourceClause;
         if ("loot".equals(lootSource)) {
-            String table = normalizeResourceId(getOptionalString(args, "loot_table_id", ""));
+            String table = normalizeResourceId(JsonInputs.optionalString(args, "loot_table_id", ""));
             if (table == null) {
                 return null;
             }
@@ -909,7 +911,7 @@ final class AICommandSkillSupport {
             case "insert" -> "loot insert " + buildRelativePosition(args, MAX_BLOCK_OFFSET) + " " + sourceClause;
             case "spawn" -> "loot spawn " + buildRelativePosition(args, MAX_BLOCK_OFFSET) + " " + sourceClause;
             case "replace_entity" -> {
-                String slot = getOptionalString(args, "slot", "weapon.mainhand").trim().toLowerCase(Locale.ROOT);
+                String slot = JsonInputs.optionalString(args, "slot", "weapon.mainhand").trim().toLowerCase(Locale.ROOT);
                 if (!isSafeSlot(slot)) {
                     yield null;
                 }
@@ -920,38 +922,38 @@ final class AICommandSkillSupport {
     }
 
     private static String buildMeCommand(JsonObject args) {
-        String message = normalizePlainText(getOptionalString(args, "message", ""), 160);
+        String message = normalizePlainText(JsonInputs.optionalString(args, "message", ""), 160);
         return message == null ? null : "me " + message;
     }
 
     private static String buildOpCommand(JsonObject args) {
-        String player = normalizePlayerName(getOptionalString(args, "player_name", ""));
+        String player = normalizePlayerName(JsonInputs.optionalString(args, "player_name", ""));
         return player == null ? null : "op " + player;
     }
 
     private static String buildPlaceTemplateCommand(JsonObject args) {
-        String templateId = normalizeResourceId(getOptionalString(args, "template_id", ""));
+        String templateId = normalizeTemplateId(JsonInputs.optionalString(args, "template_id", ""));
         return templateId == null ? null : "place template " + templateId + " ~5 ~ ~";
     }
 
     private static String buildPlaceCommand(JsonObject args) {
-        String type = getOptionalString(args, "place_type", "template").trim().toLowerCase(Locale.ROOT);
+        String type = JsonInputs.optionalString(args, "place_type", "template").trim().toLowerCase(Locale.ROOT);
         String pos = buildRelativePosition(args, MAX_BLOCK_OFFSET);
         return switch (type) {
             case "template" -> {
-                String id = normalizeResourceId(getOptionalString(args, "template_id", ""));
+                String id = normalizeTemplateId(JsonInputs.optionalString(args, "template_id", ""));
                 yield id == null ? null : "place template " + id + " " + pos;
             }
             case "feature" -> {
-                String id = normalizeResourceId(getOptionalString(args, "feature_id", getOptionalString(args, "structure_id", "")));
+                String id = normalizeResourceId(JsonInputs.optionalString(args, "feature_id", JsonInputs.optionalString(args, "structure_id", "")));
                 yield id == null ? null : "place feature " + id + " " + pos;
             }
             case "structure" -> {
-                String id = MinecraftJavaIdResolver.structureId(getOptionalString(args, "structure_id", ""));
+                String id = MinecraftJavaIdResolver.structureId(JsonInputs.optionalString(args, "structure_id", ""));
                 yield id == null ? null : "place structure " + id + " " + pos;
             }
             case "jigsaw" -> {
-                String id = normalizeResourceId(getOptionalString(args, "template_id", ""));
+                String id = normalizeResourceId(JsonInputs.optionalString(args, "template_id", ""));
                 int depth = clamp(getOptionalInt(args, "value", 7), 1, 20);
                 yield id == null ? null : "place jigsaw " + id + " minecraft:empty " + depth + " " + pos;
             }
@@ -960,19 +962,19 @@ final class AICommandSkillSupport {
     }
 
     private static String buildRecipeCommand(JsonObject args) {
-        String mode = getOptionalString(args, "recipe_mode", "give").trim().toLowerCase(Locale.ROOT);
+        String mode = JsonInputs.optionalString(args, "recipe_mode", "give").trim().toLowerCase(Locale.ROOT);
         if (!Set.of("give", "take").contains(mode)) {
             return null;
         }
         if (!hasText(args, "recipe_id")) {
             return "recipe " + mode + " @s *";
         }
-        String recipeId = normalizeResourceId(getOptionalString(args, "recipe_id", ""));
+        String recipeId = normalizeResourceId(JsonInputs.optionalString(args, "recipe_id", ""));
         return recipeId == null ? null : "recipe " + mode + " @s " + recipeId;
     }
 
     private static String buildRideCommand(JsonObject args) {
-        String operation = getOptionalString(args, "ride_operation", "mount").trim().toLowerCase(Locale.ROOT);
+        String operation = JsonInputs.optionalString(args, "ride_operation", "mount").trim().toLowerCase(Locale.ROOT);
         String target = buildTargetSelector(args, true, false);
         if (target == null) {
             return null;
@@ -983,7 +985,7 @@ final class AICommandSkillSupport {
         if (!"mount".equals(operation)) {
             return null;
         }
-        String entityId = hasText(args, "entity_id") ? MinecraftJavaIdResolver.entityTypeId(getOptionalString(args, "entity_id", "")) : null;
+        String entityId = hasText(args, "entity_id") ? MinecraftJavaIdResolver.entityTypeId(JsonInputs.optionalString(args, "entity_id", "")) : null;
         if (hasText(args, "entity_id") && entityId == null) {
             return null;
         }
@@ -992,13 +994,13 @@ final class AICommandSkillSupport {
     }
 
     private static String buildSayCommand(JsonObject args) {
-        String message = normalizePlainText(getOptionalString(args, "message", ""), 160);
+        String message = normalizePlainText(JsonInputs.optionalString(args, "message", ""), 160);
         return message == null ? null : "say " + message;
     }
 
     private static String buildScheduleCommand(JsonObject args) {
-        String operation = getOptionalString(args, "schedule_operation", "function").trim().toLowerCase(Locale.ROOT);
-        String functionId = normalizeResourceId(getOptionalString(args, "function_id", ""));
+        String operation = JsonInputs.optionalString(args, "schedule_operation", "function").trim().toLowerCase(Locale.ROOT);
+        String functionId = normalizeResourceId(JsonInputs.optionalString(args, "function_id", ""));
         if (functionId == null) {
             return null;
         }
@@ -1008,8 +1010,8 @@ final class AICommandSkillSupport {
         if (!"function".equals(operation)) {
             return null;
         }
-        String time = normalizeTimeSpec(getOptionalString(args, "time_spec", "20t"));
-        String mode = getOptionalString(args, "schedule_mode", "replace").trim().toLowerCase(Locale.ROOT);
+        String time = normalizeTimeSpec(JsonInputs.optionalString(args, "time_spec", "20t"));
+        String mode = JsonInputs.optionalString(args, "schedule_mode", "replace").trim().toLowerCase(Locale.ROOT);
         if (time == null || !Set.of("append", "replace").contains(mode)) {
             return null;
         }
@@ -1017,32 +1019,32 @@ final class AICommandSkillSupport {
     }
 
     private static String buildScoreboardCommand(JsonObject args) {
-        String operation = getOptionalString(args, "scoreboard_operation", "").trim().toLowerCase(Locale.ROOT);
+        String operation = JsonInputs.optionalString(args, "scoreboard_operation", "").trim().toLowerCase(Locale.ROOT);
         return switch (operation) {
             case "objectives_list" -> "scoreboard objectives list";
             case "objectives_add" -> {
-                String objective = normalizeSimpleName(getOptionalString(args, "objective", ""), 32);
-                String criteria = normalizeCommandPath(getOptionalString(args, "criteria", "dummy"));
+                String objective = normalizeSimpleName(JsonInputs.optionalString(args, "objective", ""), 32);
+                String criteria = normalizeCommandPath(JsonInputs.optionalString(args, "criteria", "dummy"));
                 if (objective == null || criteria == null) {
                     yield null;
                 }
-                String display = hasText(args, "display_name") ? " " + quoteJsonText(getOptionalString(args, "display_name", "")) : "";
+                String display = hasText(args, "display_name") ? " " + quoteJsonText(JsonInputs.optionalString(args, "display_name", "")) : "";
                 yield "scoreboard objectives add " + objective + " " + criteria + display;
             }
             case "objectives_remove" -> {
-                String objective = normalizeSimpleName(getOptionalString(args, "objective", ""), 32);
+                String objective = normalizeSimpleName(JsonInputs.optionalString(args, "objective", ""), 32);
                 yield objective == null ? null : "scoreboard objectives remove " + objective;
             }
             case "objectives_setdisplay" -> {
-                String slot = normalizeDisplaySlot(getOptionalString(args, "display_slot", "sidebar"));
-                String objective = normalizeSimpleName(getOptionalString(args, "objective", ""), 32);
+                String slot = normalizeDisplaySlot(JsonInputs.optionalString(args, "display_slot", "sidebar"));
+                String objective = normalizeSimpleName(JsonInputs.optionalString(args, "objective", ""), 32);
                 yield slot == null || objective == null ? null : "scoreboard objectives setdisplay " + slot + " " + objective;
             }
             case "players_list" -> {
                 if (!hasText(args, "score_holder")) {
                     yield "scoreboard players list";
                 }
-                String holder = normalizeScoreHolder(getOptionalString(args, "score_holder", ""));
+                String holder = normalizeScoreHolder(JsonInputs.optionalString(args, "score_holder", ""));
                 yield holder == null ? null : "scoreboard players list " + holder;
             }
             case "players_get" -> buildScoreboardPlayersValueCommand(args, "get");
@@ -1051,8 +1053,8 @@ final class AICommandSkillSupport {
             case "players_remove" -> buildScoreboardPlayersValueCommand(args, "remove");
             case "players_reset" -> buildScoreboardPlayersResetCommand(args);
             case "players_enable" -> {
-                String holder = normalizeScoreHolder(getOptionalString(args, "score_holder", "@s"));
-                String objective = normalizeSimpleName(getOptionalString(args, "objective", ""), 32);
+                String holder = normalizeScoreHolder(JsonInputs.optionalString(args, "score_holder", "@s"));
+                String objective = normalizeSimpleName(JsonInputs.optionalString(args, "objective", ""), 32);
                 yield holder == null || objective == null ? null : "scoreboard players enable " + holder + " " + objective;
             }
             case "players_operation" -> buildScoreboardPlayersOperationCommand(args);
@@ -1061,8 +1063,8 @@ final class AICommandSkillSupport {
     }
 
     private static String buildScoreboardPlayersValueCommand(JsonObject args, String operation) {
-        String holder = normalizeScoreHolder(getOptionalString(args, "score_holder", "@s"));
-        String objective = normalizeSimpleName(getOptionalString(args, "objective", ""), 32);
+        String holder = normalizeScoreHolder(JsonInputs.optionalString(args, "score_holder", "@s"));
+        String objective = normalizeSimpleName(JsonInputs.optionalString(args, "objective", ""), 32);
         if (holder == null || objective == null) {
             return null;
         }
@@ -1074,23 +1076,23 @@ final class AICommandSkillSupport {
     }
 
     private static String buildScoreboardPlayersResetCommand(JsonObject args) {
-        String holder = normalizeScoreHolder(getOptionalString(args, "score_holder", "@s"));
+        String holder = normalizeScoreHolder(JsonInputs.optionalString(args, "score_holder", "@s"));
         if (holder == null) {
             return null;
         }
         if (!hasText(args, "objective")) {
             return "scoreboard players reset " + holder;
         }
-        String objective = normalizeSimpleName(getOptionalString(args, "objective", ""), 32);
+        String objective = normalizeSimpleName(JsonInputs.optionalString(args, "objective", ""), 32);
         return objective == null ? null : "scoreboard players reset " + holder + " " + objective;
     }
 
     private static String buildScoreboardPlayersOperationCommand(JsonObject args) {
-        String holder = normalizeScoreHolder(getOptionalString(args, "score_holder", "@s"));
-        String objective = normalizeSimpleName(getOptionalString(args, "objective", ""), 32);
-        String operator = getOptionalString(args, "scoreboard_operator", "=").trim();
-        String holder2 = normalizeScoreHolder(getOptionalString(args, "score_holder2", "@s"));
-        String objective2 = normalizeSimpleName(getOptionalString(args, "objective2", ""), 32);
+        String holder = normalizeScoreHolder(JsonInputs.optionalString(args, "score_holder", "@s"));
+        String objective = normalizeSimpleName(JsonInputs.optionalString(args, "objective", ""), 32);
+        String operator = JsonInputs.optionalString(args, "scoreboard_operator", "=").trim();
+        String holder2 = normalizeScoreHolder(JsonInputs.optionalString(args, "score_holder2", "@s"));
+        String objective2 = normalizeSimpleName(JsonInputs.optionalString(args, "objective2", ""), 32);
         if (holder == null || objective == null || holder2 == null || objective2 == null
                 || !Set.of("=", "+=", "-=", "*=", "/=", "%=", "<", ">", "><").contains(operator)) {
             return null;
@@ -1113,8 +1115,8 @@ final class AICommandSkillSupport {
         if (target == null) {
             return null;
         }
-        String source = getOptionalString(args, "sound_source", "").trim().toLowerCase(Locale.ROOT);
-        String sound = hasText(args, "sound_id") ? MinecraftJavaIdResolver.soundId(getOptionalString(args, "sound_id", "")) : null;
+        String source = JsonInputs.optionalString(args, "sound_source", "").trim().toLowerCase(Locale.ROOT);
+        String sound = hasText(args, "sound_id") ? MinecraftJavaIdResolver.soundId(JsonInputs.optionalString(args, "sound_id", "")) : null;
         if (hasText(args, "sound_id") && sound == null) {
             return null;
         }
@@ -1136,35 +1138,35 @@ final class AICommandSkillSupport {
         if (target == null) {
             return null;
         }
-        String operation = getOptionalString(args, "tag_operation", "list").trim().toLowerCase(Locale.ROOT);
+        String operation = JsonInputs.optionalString(args, "tag_operation", "list").trim().toLowerCase(Locale.ROOT);
         if ("list".equals(operation)) {
             return "tag " + target + " list";
         }
         if (!Set.of("add", "remove").contains(operation)) {
             return null;
         }
-        String tag = normalizeSimpleName(getOptionalString(args, "tag_name", ""), 64);
+        String tag = normalizeSimpleName(JsonInputs.optionalString(args, "tag_name", ""), 64);
         return tag == null ? null : "tag " + target + " " + operation + " " + tag;
     }
 
     private static String buildPrivateMessageCommand(JsonObject args) {
         String target = buildTargetSelector(args, false, true);
-        String message = normalizePlainText(getOptionalString(args, "message", ""), 240);
+        String message = normalizePlainText(JsonInputs.optionalString(args, "message", ""), 240);
         return target == null || message == null ? null : "tell " + target + " " + message;
     }
 
     private static String buildTellRawCommand(JsonObject args) {
         String target = buildTargetSelector(args, false, true);
-        String json = normalizeJsonText(getOptionalString(args, "json_text", ""));
+        String json = normalizeJsonText(JsonInputs.optionalString(args, "json_text", ""));
         if (json == null && hasText(args, "message")) {
-            json = quoteJsonText(getOptionalString(args, "message", ""));
+            json = quoteJsonText(JsonInputs.optionalString(args, "message", ""));
         }
         return target == null || json == null ? null : "tellraw " + target + " " + json;
     }
 
     private static String buildTitleCommand(JsonObject args) {
         String target = buildTargetSelector(args, false, true);
-        String operation = getOptionalString(args, "title_operation", "title").trim().toLowerCase(Locale.ROOT);
+        String operation = JsonInputs.optionalString(args, "title_operation", "title").trim().toLowerCase(Locale.ROOT);
         if (target == null || !Set.of("title", "subtitle", "actionbar", "times", "clear", "reset").contains(operation)) {
             return null;
         }
@@ -1177,15 +1179,15 @@ final class AICommandSkillSupport {
             int fadeOut = clamp(getOptionalInt(args, "to_offset_x", 20), 0, 72000);
             return "title " + target + " times " + fadeIn + " " + stay + " " + fadeOut;
         }
-        String json = normalizeJsonText(getOptionalString(args, "json_text", ""));
+        String json = normalizeJsonText(JsonInputs.optionalString(args, "json_text", ""));
         if (json == null && hasText(args, "message")) {
-            json = quoteJsonText(getOptionalString(args, "message", ""));
+            json = quoteJsonText(JsonInputs.optionalString(args, "message", ""));
         }
         return json == null ? null : "title " + target + " " + operation + " " + json;
     }
 
     private static String buildTransferCommand(JsonObject args) {
-        String host = normalizeHost(getOptionalString(args, "host", ""));
+        String host = normalizeHost(JsonInputs.optionalString(args, "host", ""));
         if (host == null) {
             return null;
         }
@@ -1195,19 +1197,19 @@ final class AICommandSkillSupport {
     }
 
     private static String buildWhitelistCommand(JsonObject args) {
-        String operation = getOptionalString(args, "whitelist_operation", "list").trim().toLowerCase(Locale.ROOT);
+        String operation = JsonInputs.optionalString(args, "whitelist_operation", "list").trim().toLowerCase(Locale.ROOT);
         if (Set.of("on", "off", "list", "reload").contains(operation)) {
             return "whitelist " + operation;
         }
         if (!Set.of("add", "remove").contains(operation)) {
             return null;
         }
-        String player = normalizePlayerName(getOptionalString(args, "player_name", ""));
+        String player = normalizePlayerName(JsonInputs.optionalString(args, "player_name", ""));
         return player == null ? null : "whitelist " + operation + " " + player;
     }
 
     private static String buildTeleportDimensionCommand(JsonObject args) {
-        String dimensionId = MinecraftJavaIdResolver.dimensionId(getOptionalString(args, "dimension_id", ""));
+        String dimensionId = MinecraftJavaIdResolver.dimensionId(JsonInputs.optionalString(args, "dimension_id", ""));
         if (dimensionId == null) {
             return null;
         }
@@ -1227,8 +1229,8 @@ final class AICommandSkillSupport {
     }
 
     private static String buildItemReplaceHeldCommand(JsonObject args) {
-        String itemId = MinecraftJavaIdResolver.itemId(getOptionalString(args, "item_id", ""));
-        String slot = getOptionalString(args, "slot", "weapon.mainhand").trim().toLowerCase(Locale.ROOT);
+        String itemId = MinecraftJavaIdResolver.itemId(JsonInputs.optionalString(args, "item_id", ""));
+        String slot = JsonInputs.optionalString(args, "slot", "weapon.mainhand").trim().toLowerCase(Locale.ROOT);
         if (itemId == null || !isSafeSlot(slot)) {
             return null;
         }
@@ -1241,18 +1243,18 @@ final class AICommandSkillSupport {
     }
 
     private static String buildBossbarAddCommand(JsonObject args) {
-        String id = normalizeResourceId(getOptionalString(args, "bossbar_id", ""));
-        String name = quoteJsonText(getOptionalString(args, "display_name", "Herobrine"));
+        String id = normalizeResourceId(JsonInputs.optionalString(args, "bossbar_id", ""));
+        String name = quoteJsonText(JsonInputs.optionalString(args, "display_name", "Herobrine"));
         return id == null ? null : "bossbar add " + id + " " + name;
     }
 
     private static String buildBossbarRemoveCommand(JsonObject args) {
-        String id = normalizeResourceId(getOptionalString(args, "bossbar_id", ""));
+        String id = normalizeResourceId(JsonInputs.optionalString(args, "bossbar_id", ""));
         return id == null ? null : "bossbar remove " + id;
     }
 
     private static String buildBossbarSetIntCommand(JsonObject args, String field) {
-        String id = normalizeResourceId(getOptionalString(args, "bossbar_id", ""));
+        String id = normalizeResourceId(JsonInputs.optionalString(args, "bossbar_id", ""));
         if (id == null) {
             return null;
         }
@@ -1261,7 +1263,7 @@ final class AICommandSkillSupport {
     }
 
     private static String buildBossbarSetVisibleCommand(JsonObject args) {
-        String id = normalizeResourceId(getOptionalString(args, "bossbar_id", ""));
+        String id = normalizeResourceId(JsonInputs.optionalString(args, "bossbar_id", ""));
         if (id == null || !hasNonNull(args, "visible")) {
             return null;
         }
@@ -1275,7 +1277,7 @@ final class AICommandSkillSupport {
         }
         String command = "data get entity " + target;
         if (hasText(args, "nbt_path")) {
-            String path = normalizeNbtPath(getOptionalString(args, "nbt_path", ""));
+            String path = normalizeNbtPath(JsonInputs.optionalString(args, "nbt_path", ""));
             if (path == null) {
                 return null;
             }
@@ -1293,7 +1295,7 @@ final class AICommandSkillSupport {
     }
 
     private static String buildDataGetStorageCommand(JsonObject args) {
-        String storageId = normalizeResourceId(getOptionalString(args, "storage_id", ""));
+        String storageId = normalizeResourceId(JsonInputs.optionalString(args, "storage_id", ""));
         if (storageId == null) {
             return null;
         }
@@ -1302,7 +1304,7 @@ final class AICommandSkillSupport {
 
     private static String appendDataPathAndScale(String command, JsonObject args) {
         if (hasText(args, "nbt_path")) {
-            String path = normalizeNbtPath(getOptionalString(args, "nbt_path", ""));
+            String path = normalizeNbtPath(JsonInputs.optionalString(args, "nbt_path", ""));
             if (path == null) {
                 return null;
             }
@@ -1316,22 +1318,22 @@ final class AICommandSkillSupport {
 
     private static String buildDataMergeEntityCommand(JsonObject args) {
         String target = buildTargetSelector(args, true, false);
-        String nbt = normalizeNbtValue(getOptionalString(args, "nbt_value", ""));
+        String nbt = normalizeNbtValue(JsonInputs.optionalString(args, "nbt_value", ""));
         return target == null || nbt == null ? null : "data merge entity " + target + " " + nbt;
     }
 
     private static String buildDataRemoveEntityCommand(JsonObject args) {
         String target = buildTargetSelector(args, true, false);
-        String path = normalizeNbtPath(getOptionalString(args, "nbt_path", ""));
+        String path = normalizeNbtPath(JsonInputs.optionalString(args, "nbt_path", ""));
         return target == null || path == null ? null : "data remove entity " + target + " " + path;
     }
 
     private static String buildDatapackEnableCommand(JsonObject args) {
-        String name = normalizeDatapackName(getOptionalString(args, "datapack_name", ""));
+        String name = normalizeDatapackName(JsonInputs.optionalString(args, "datapack_name", ""));
         if (name == null) {
             return null;
         }
-        String position = getOptionalString(args, "datapack_position", "default").trim().toLowerCase(Locale.ROOT);
+        String position = JsonInputs.optionalString(args, "datapack_position", "default").trim().toLowerCase(Locale.ROOT);
         if ("default".equals(position)) {
             return "datapack enable " + name;
         }
@@ -1339,29 +1341,29 @@ final class AICommandSkillSupport {
             return "datapack enable " + name + " " + position;
         }
         if (Set.of("before", "after").contains(position)) {
-            String existing = normalizeDatapackName(getOptionalString(args, "existing_datapack_name", ""));
+            String existing = normalizeDatapackName(JsonInputs.optionalString(args, "existing_datapack_name", ""));
             return existing == null ? null : "datapack enable " + name + " " + position + " " + existing;
         }
         return null;
     }
 
     private static String buildDatapackDisableCommand(JsonObject args) {
-        String name = normalizeDatapackName(getOptionalString(args, "datapack_name", ""));
+        String name = normalizeDatapackName(JsonInputs.optionalString(args, "datapack_name", ""));
         return name == null ? null : "datapack disable " + name;
     }
 
     private static String buildBanPlayerCommand(JsonObject args) {
-        String player = normalizePlayerName(getOptionalString(args, "player_name", ""));
+        String player = normalizePlayerName(JsonInputs.optionalString(args, "player_name", ""));
         return player == null ? null : "ban " + player + optionalReason(args);
     }
 
     private static String buildBanIpCommand(JsonObject args) {
-        String ip = normalizeIp(getOptionalString(args, "ip", ""));
+        String ip = normalizeIp(JsonInputs.optionalString(args, "ip", ""));
         return ip == null ? null : "ban-ip " + ip + optionalReason(args);
     }
 
     private static String buildBanlistCommand(JsonObject args) {
-        String type = getOptionalString(args, "banlist_type", "").trim().toLowerCase(Locale.ROOT);
+        String type = JsonInputs.optionalString(args, "banlist_type", "").trim().toLowerCase(Locale.ROOT);
         if (type.isEmpty()) {
             return "banlist";
         }
@@ -1369,23 +1371,23 @@ final class AICommandSkillSupport {
     }
 
     private static String buildPardonPlayerCommand(JsonObject args) {
-        String player = normalizePlayerName(getOptionalString(args, "player_name", ""));
+        String player = normalizePlayerName(JsonInputs.optionalString(args, "player_name", ""));
         return player == null ? null : "pardon " + player;
     }
 
     private static String buildPardonIpCommand(JsonObject args) {
-        String ip = normalizeIp(getOptionalString(args, "ip", ""));
+        String ip = normalizeIp(JsonInputs.optionalString(args, "ip", ""));
         return ip == null ? null : "pardon-ip " + ip;
     }
 
     private static String buildDebugFunctionCommand(JsonObject args) {
-        String functionId = normalizeResourceId(getOptionalString(args, "function_id", ""));
+        String functionId = normalizeResourceId(JsonInputs.optionalString(args, "function_id", ""));
         return functionId == null ? null : "debug function " + functionId;
     }
 
     private static String buildPublishCommand(JsonObject args) {
         boolean allowCommands = getOptionalBoolean(args, "allow_commands", false);
-        String gamemode = getOptionalString(args, "publish_mode", getOptionalString(args, "gamemode", "survival")).trim().toLowerCase(Locale.ROOT);
+        String gamemode = JsonInputs.optionalString(args, "publish_mode", JsonInputs.optionalString(args, "gamemode", "survival")).trim().toLowerCase(Locale.ROOT);
         if (!Set.of("survival", "creative", "adventure", "spectator").contains(gamemode)) {
             return null;
         }
@@ -1405,7 +1407,7 @@ final class AICommandSkillSupport {
     }
 
     private static String buildRandomResetCommand(JsonObject args) {
-        String id = normalizeResourceId(getOptionalString(args, "random_sequence_id", getOptionalString(args, "bossbar_id", "minecraft:default")));
+        String id = normalizeResourceId(JsonInputs.optionalString(args, "random_sequence_id", JsonInputs.optionalString(args, "bossbar_id", "minecraft:default")));
         return id == null ? null : "random reset " + id;
     }
 
@@ -1420,17 +1422,17 @@ final class AICommandSkillSupport {
     }
 
     private static String buildSwingCommand(JsonObject args) {
-        String hand = getOptionalString(args, "hand", "mainhand").trim().toLowerCase(Locale.ROOT);
+        String hand = JsonInputs.optionalString(args, "hand", "mainhand").trim().toLowerCase(Locale.ROOT);
         return Set.of("mainhand", "offhand").contains(hand) ? "swing " + hand : null;
     }
 
     private static String buildStopwatchCommand(JsonObject args, String operation) {
-        String name = normalizeSimpleName(getOptionalString(args, "name", getOptionalString(args, "waypoint_name", "herobrine")), 32);
+        String name = normalizeSimpleName(JsonInputs.optionalString(args, "name", JsonInputs.optionalString(args, "waypoint_name", "herobrine")), 32);
         return name == null ? null : "stopwatch " + operation + " " + name;
     }
 
     private static String buildTestCommand(JsonObject args) {
-        String id = normalizeCommandPath(getOptionalString(args, "test_id", ""));
+        String id = normalizeCommandPath(JsonInputs.optionalString(args, "test_id", ""));
         return id == null ? null : "test run " + id;
     }
 
@@ -1445,21 +1447,21 @@ final class AICommandSkillSupport {
     }
 
     private static String buildTeamAddCommand(JsonObject args) {
-        String team = normalizeSimpleName(getOptionalString(args, "team_name", ""), 16);
+        String team = normalizeSimpleName(JsonInputs.optionalString(args, "team_name", ""), 16);
         if (team == null) {
             return null;
         }
-        String displayName = hasText(args, "display_name") ? " " + quoteJsonText(getOptionalString(args, "display_name", "")) : "";
+        String displayName = hasText(args, "display_name") ? " " + quoteJsonText(JsonInputs.optionalString(args, "display_name", "")) : "";
         return "team add " + team + displayName;
     }
 
     private static String buildTeamRemoveCommand(JsonObject args) {
-        String team = normalizeSimpleName(getOptionalString(args, "team_name", ""), 16);
+        String team = normalizeSimpleName(JsonInputs.optionalString(args, "team_name", ""), 16);
         return team == null ? null : "team remove " + team;
     }
 
     private static String buildTeamJoinCommand(JsonObject args) {
-        String team = normalizeSimpleName(getOptionalString(args, "team_name", ""), 16);
+        String team = normalizeSimpleName(JsonInputs.optionalString(args, "team_name", ""), 16);
         String target = buildTargetSelector(args, true, true);
         return team == null || target == null ? null : "team join " + team + " " + target;
     }
@@ -1470,7 +1472,7 @@ final class AICommandSkillSupport {
     }
 
     private static String buildTeamMessageCommand(JsonObject args) {
-        String message = normalizePlainText(getOptionalString(args, "message", ""), 160);
+        String message = normalizePlainText(JsonInputs.optionalString(args, "message", ""), 160);
         return message == null ? null : "teammsg " + message;
     }
 
@@ -1478,7 +1480,7 @@ final class AICommandSkillSupport {
         if (!hasText(args, "waypoint_name")) {
             return "waypoint list";
         }
-        String name = normalizeCommandPath(getOptionalString(args, "waypoint_name", ""));
+        String name = normalizeCommandPath(JsonInputs.optionalString(args, "waypoint_name", ""));
         return name == null ? null : "waypoint list " + name;
     }
 
@@ -1488,16 +1490,16 @@ final class AICommandSkillSupport {
     }
 
     private static String buildFetchProfileCommand(JsonObject args) {
-        String profile = normalizeProfileId(getOptionalString(args, "profile_id", getOptionalString(args, "player_name", "")));
+        String profile = normalizeProfileId(JsonInputs.optionalString(args, "profile_id", JsonInputs.optionalString(args, "player_name", "")));
         return profile == null ? null : "fetchprofile " + profile;
     }
 
     private static String buildTriggerCommand(JsonObject args) {
-        String objective = normalizeSimpleName(getOptionalString(args, "objective", ""), 32);
+        String objective = normalizeSimpleName(JsonInputs.optionalString(args, "objective", ""), 32);
         if (objective == null) {
             return null;
         }
-        String mode = getOptionalString(args, "trigger_mode", "none").trim().toLowerCase(Locale.ROOT);
+        String mode = JsonInputs.optionalString(args, "trigger_mode", "none").trim().toLowerCase(Locale.ROOT);
         if ("none".equals(mode)) {
             return "trigger " + objective;
         }
@@ -1536,7 +1538,7 @@ final class AICommandSkillSupport {
     }
 
     private static String buildTargetSelector(JsonObject args, boolean allowEntities, boolean allowAllPlayers) {
-        String target = getOptionalString(args, "target", "self").trim().toLowerCase(Locale.ROOT);
+        String target = JsonInputs.optionalString(args, "target", "self").trim().toLowerCase(Locale.ROOT);
         int radius = clamp(getOptionalInt(args, "radius", 16), 1, MAX_SELECTOR_RADIUS);
         return switch (target) {
             case "self" -> "@s";
@@ -1551,7 +1553,7 @@ final class AICommandSkillSupport {
     }
 
     private static String buildPosition(JsonObject args) {
-        String mode = getOptionalString(args, "coordinate_mode", "relative").trim().toLowerCase(Locale.ROOT);
+        String mode = JsonInputs.optionalString(args, "coordinate_mode", "relative").trim().toLowerCase(Locale.ROOT);
         return switch (mode) {
             case "absolute" -> buildAbsolutePosition(args);
             case "local_forward" -> "^ ^ ^" + clamp(getOptionalInt(args, "distance", 5), 1, MAX_SKILL_SUMMON_DISTANCE);
@@ -1684,7 +1686,7 @@ final class AICommandSkillSupport {
         if (!hasText(args, "reason")) {
             return "";
         }
-        String reason = normalizePlainText(getOptionalString(args, "reason", ""), 120);
+        String reason = normalizePlainText(JsonInputs.optionalString(args, "reason", ""), 120);
         return reason == null ? "" : " " + reason;
     }
 
@@ -1771,10 +1773,9 @@ final class AICommandSkillSupport {
 
     private static String quoteJsonText(String raw) {
         String text = normalizePlainText(raw, 80);
-        if (text == null) {
-            text = "Herobrine";
-        }
-        return "{\"text\":\"" + escapeJson(text) + "\"}";
+        JsonObject component = new JsonObject();
+        component.addProperty("text", text == null ? "Herobrine" : text);
+        return component.toString();
     }
 
     private static String escapeJson(String text) {
@@ -1799,21 +1800,33 @@ final class AICommandSkillSupport {
         return VANILLA_NAMESPACE.equals(namespace) ? value : null;
     }
 
+    private static String normalizeTemplateId(String rawId) {
+        String trimmed = rawId == null ? "" : rawId.strip();
+        // 1. 玩家在当前世界导入、由服务器确认的模板：完整 ID、精确名称或唯一名称片段
+        //    （玩家通常只说建筑名字，模型也可能回填带扩展名的文件名）。
+        String uploaded = TemplateLookupSupport.resolvePlaceable(trimmed);
+        if (uploaded != null) {
+            return uploaded;
+        }
+        // 2. 显式写了 minecraft: 命名空间的原版结构模板（minecraft:igloo）。
+        //    裸名字不再补 minecraft: 前缀：那会把拼错或过期的模板名悄悄变成一个不存在的原版模板，
+        //    命令必然失败——正是玩家看到的 "command lattice rejects that malformed invocation"。
+        //    也不放行模组自带模板：玩家要的是自己导入的那一栋，不能拿随包模板凑数。
+        if (trimmed.indexOf(':') < 0) {
+            return null;
+        }
+        return normalizeResourceId(trimmed);
+    }
+
     private static boolean hasText(JsonObject object, String propertyName) {
-        return hasNonNull(object, propertyName) && !getOptionalString(object, propertyName, "").trim().isEmpty();
+        return hasNonNull(object, propertyName) && !JsonInputs.optionalString(object, propertyName, "").trim().isEmpty();
     }
 
     private static boolean hasNonNull(JsonObject object, String propertyName) {
         return object != null && object.has(propertyName) && object.get(propertyName) != null && !object.get(propertyName).isJsonNull();
     }
 
-    private static String getOptionalString(JsonObject object, String propertyName, String fallback) {
-        if (object == null || !object.has(propertyName)) {
-            return fallback;
-        }
-        JsonElement element = object.get(propertyName);
-        return element == null || element.isJsonNull() ? fallback : element.getAsString();
-    }
+
 
     private static int getOptionalInt(JsonObject object, String propertyName, int fallback) {
         try {
