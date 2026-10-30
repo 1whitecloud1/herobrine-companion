@@ -1,0 +1,40 @@
+def accessoriesRuntime = providers.gradleProperty('enableAccessoriesRuntime')
+        .map { it.toBoolean() }.orElse(false)
+def epicFightRuntime = providers.gradleProperty('enableEpicFightCompat')
+        .map { it.toBoolean() }.orElse(providers.gradleProperty('withCompat').map { it.toBoolean() }.orElse(true).get())
+def cosmeticRuntime = providers.gradleProperty('enableCosmeticRuntime')
+        .map { it.toBoolean() }.orElse(providers.gradleProperty('withCompat').map { it.toBoolean() }.orElse(true).get())
+
+configurations {
+    compatRuntime {
+        canBeConsumed = false
+        canBeResolved = true
+    }
+    runtimeOnly.extendsFrom compatRuntime
+}
+
+dependencies {
+
+    compileOnly fg.deobf('curse.maven:accessories-938917:7164863')
+    compileOnly fg.deobf('curse.maven:simplehats-631990:7598404')
+    compileOnly fg.deobf('com.whitecloud233.localmods:waveycapes-forge:1.9.2-mc1.20.1')
+    compileOnly fg.deobf('curse.maven:epic-fight-mod-405076:8049910')
+    // Supplies the optional Mixin target to the annotation processor for its refmap.
+    compileOnly fg.deobf('curse.maven:armourers-workshop-229523:7165521')
+
+    if (accessoriesRuntime.get()) {
+        compatRuntime fg.deobf('curse.maven:accessories-938917:7164863')
+        compatRuntime fg.deobf('com.whitecloud233.localmods:cloth-config-forge:11.1.136')
+        compatRuntime fg.deobf('curse.maven:simplehats-631990:7598404')
+    }
+    if (epicFightRuntime.get()) {
+        compatRuntime fg.deobf('curse.maven:epic-fight-mod-405076:8049910')
+    }
+    if (cosmeticRuntime.get()) {
+        compatRuntime fg.deobf('com.whitecloud233.localmods:waveycapes-forge:1.9.2-mc1.20.1')
+        compatRuntime fg.deobf('curse.maven:armourers-workshop-229523:7165521')
+        compatRuntime fg.deobf('com.whitecloud233.localmods:TRansition:1.0.17-1.20.1-forge-SNAPSHOT')
+        compatRuntime fg.deobf('com.whitecloud233.localmods:TRender:1.0.12-1.20.1-forge-SNAPSHOT')
+    }
+}
+

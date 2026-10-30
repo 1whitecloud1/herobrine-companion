@@ -24,13 +24,10 @@ apply plugin: 'maven-publish'
 apply plugin: 'java'
 
 
-// 安全版/完整版开关：普通构建（不带参数）默认就是安全版，排除
-//   1) 本机电脑控制（cmd 执行）
-//   2) JVM 代码注入
-//   3) 联网查找（web_lookup）
-//   4) 本地模型（运行时下载 llama.cpp 推理引擎/GGUF 模型并启动 llama-server 进程）
-// 四个功能；需要完整功能时显式传 -Pfull=true（产物 jar 文件名追加 -full 后缀，避免与普通构建混淆）。
-// 旧的 -PcfSafe=true 仍可用作显式安全版声明（默认值已翻转：cfSafe = !full）。
+// 普通构建默认排除电脑控制、JVM 代码注入和联网查找三个功能。
+// 手动配置的本地模型连接位于 src/main/java，两种构建均包含；不下载或启动外部程序。
+// 需要完整功能时传 -Pfull=true（jar 文件名追加 -full 后缀）。
+// 旧的 -PcfSafe=true 仍可用作显式安全版声明。
 def fullBuild = providers.gradleProperty("full")
         .map { it.toBoolean() }
         .orElse(false)
@@ -45,56 +42,22 @@ archivesBaseName = "${mod_name}-${minecraft_version}-forge"
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 
-def enableAccessoriesRuntime = providers.gradleProperty("enableAccessoriesRuntime")
-        .map { it.toBoolean() }
-        .orElse(false)
 
 // Kaleidoscope Cookery 运行版本切换：默认 1.4.1（8266769），
 // runClient/build -PcookeryFileId=7966280 切换到 1.3.0 验证兼容。
 // 兼容层（HeroKaleidoscopeCompat）用反射处理两版字段差异，须同时对两版可编译。
 def cookeryFileId = providers.gradleProperty("cookeryFileId").orElse("8266769").get()
-/*def enableEpicFightCompat = providers.gradleProperty("enableEpicFightCompat")
+
+// spark 性能分析器：默认不加载，需要时用 -PwithSpark=true 打开。
+//   gradlew runClient -PwithSpark=true
+//   gradlew runClient -PwithSpark=true -PsparkVersion=1.10.53-forge
+// 说明：1.20.1 Forge 最后一个 spark 版本是 1.10.53（2023-09-05，Modrinth），
+// 更新的 1.10.1xx 只支持 1.21+，不要改成那些版本号。
+// 只加 runtimeOnly，不参与编译，也不会进 build/libs 的产物 jar。
+def withSpark = providers.gradleProperty("withSpark")
         .map { it.toBoolean() }
         .orElse(false)
-def epicFightCompatSourceExcludes = [
-        'com/whitecloud233/modid/herobrine_companion/compat/epicfight/HeroEpicFightBridge.java',
-        'com/whitecloud233/modid/herobrine_companion/compat/epicfight/HeroEpicFightClientBridge.java',
-        'com/whitecloud233/modid/herobrine_companion/compat/epicfight/HeroEpicFightPatch.java',
-        'com/whitecloud233/modid/herobrine_companion/compat/epicfight/HeroEpicFightRangedAttackGoal.java',
-        'com/whitecloud233/modid/herobrine_companion/compat/epicfight/HeroEpicFightWeaponProfiles.java',
-        'com/whitecloud233/modid/herobrine_companion/compat/epicfight/HeroNightfallAnimationRegistry.java',
-        'com/whitecloud233/modid/herobrine_companion/compat/epicfight/HeroNightfallMovesets.java',
-        'com/whitecloud233/modid/herobrine_companion/compat/epicfight/HeroNightfallSkillEffects.java',
-        'com/whitecloud233/modid/herobrine_companion/compat/epicfight/HeroNightfallSkillSpec.java',
-        'com/whitecloud233/modid/herobrine_companion/compat/epicfight/HeroPatchedEyesLayer.java',
-        'com/whitecloud233/modid/herobrine_companion/compat/epicfight/HeroPatchedHumanoidRenderer.java',
-        'com/whitecloud233/modid/herobrine_companion/compat/epicfight/HeroPatchedItemInHandLayer.java'
-]
-
-sourceSets {
-    main {
-        java {
-            exclude epicFightCompatSourceExcludes
-        }
-    }
-    if (enableEpicFightCompat.get()) {
-        epicfightCompat {
-            java {
-                srcDir 'src/main/java'
-                include epicFightCompatSourceExcludes
-            }
-            compileClasspath += sourceSets.main.output + configurations.compileClasspath
-            runtimeClasspath += output + compileClasspath + sourceSets.main.runtimeClasspath
-        }
-    }
-}
-
-configurations.configureEach { configuration ->
-    if (configuration.name.startsWith('epicfightCompat')) {
-        configuration.extendsFrom configurations.implementation
-    }
-}
-*/
+def sparkVersion = providers.gradleProperty("sparkVersion").orElse("1.10.53-forge").get()
 println "Java: ${System.getProperty 'java.version'}, JVM: ${System.getProperty 'java.vm.version'} (${System.getProperty 'java.vendor'}), Arch: ${System.getProperty 'os.arch'}"
 
 minecraft {
@@ -111,9 +74,6 @@ minecraft {
             mods {
                 "${mod_id}" {
                     source sourceSets.main
-                    //if (enableEpicFightCompat.get()) {
-                    //    source sourceSets.epicfightCompat
-                    //}
                 }
             }
         }
@@ -136,6 +96,7 @@ minecraft {
 mixin {
     add sourceSets.main, "herobrine_companion.refmap.json"
     config "herobrine_companion.mixins.json"
+    config "herobrine_companion.compat.mixins.json"
 }
 
 sourceSets.main.resources {
@@ -143,11 +104,10 @@ sourceSets.main.resources {
 }
 
 // === 安全版 / 完整版（full）===
-// 四个会被 CurseForge 静态扫描或玩家安全审查标记的功能源码放在独立的 src/full/java：
+// 三个需要独立构建的功能源码放在 src/full/java：
 //  1) 本机电脑控制（SafeComputerControlService -> ProcessBuilder + cmd.exe）
 //  2) JVM 代码注入（InMemoryJvmCodeCompiler -> 运行时编译 + defineClass）
 //  3) 联网查找（WebLookupService -> 白名单站点的 HTTP 搜索/抓取）
-//  4) 本地模型（LocalModelLauncher -> 运行时下载 llama.cpp 引擎/GGUF 模型并启动进程）
 // 普通构建（默认、无参数）不加入 src/full/java，改用 src/cfsafe/java 下的惰性 stub
 // （同 FQCN、恒不可用），保证 AIService / AIPromptAssembler / AIActionIntentInference
 // 等引用方仍可编译，但 jar 内不含任何危险字节码。
@@ -308,34 +268,11 @@ configurations {
 dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
-    // compileOnly fg.deobf(files("libs/armourersworkshop-forge-1.20.1-3.2.7-beta.jar"))
-
-    compileOnly fg.deobf("curse.maven:accessories-938917:7164863")
-    if (enableAccessoriesRuntime.get()) {
-        runtimeOnly fg.deobf("curse.maven:accessories-938917:7164863")
+    // 同行手册使用 Patchouli 的数据驱动书本；发布时仍为可选依赖。
+    // runClient -PwithPatchouli=false 可检查未安装 Patchouli 的环境。
+    if (providers.gradleProperty("withPatchouli").map { it.toBoolean() }.orElse(true).get()) {
+        runtimeOnly fg.deobf("vazkii.patchouli:Patchouli:1.20.1-85-FORGE")
     }
-
-
-    compileOnly fg.deobf("com.whitecloud233.localmods:cloth-config-forge:11.1.136")
-    if (enableAccessoriesRuntime.get()) {
-        runtimeOnly fg.deobf("com.whitecloud233.localmods:cloth-config-forge:11.1.136")
-    }
-
-    compileOnly fg.deobf("curse.maven:simplehats-631990:7598404")
-    if (enableAccessoriesRuntime.get()) {
-        runtimeOnly fg.deobf("curse.maven:simplehats-631990:7598404")
-    }
-
-
-    compileOnly fg.deobf("com.whitecloud233.localmods:waveycapes-forge:1.9.2-mc1.20.1")
-    runtimeOnly fg.deobf("com.whitecloud233.localmods:waveycapes-forge:1.9.2-mc1.20.1")
-
-    runtimeOnly fg.deobf("com.whitecloud233.localmods:TRansition:1.0.17-1.20.1-forge-SNAPSHOT")
-    runtimeOnly fg.deobf("com.whitecloud233.localmods:TRender:1.0.12-1.20.1-forge-SNAPSHOT")
-
-     compileOnly fg.deobf("curse.maven:weapons-of-miracles-epicfight-918614:8632596")
-      runtimeOnly fg.deobf("curse.maven:weapons-of-miracles-epicfight-918614:8632596")
-   // https://www.curseforge.com/minecraft/mc-mods/weapons-of-miracles-epicfight/download/8632596
   //  compileOnly fg.deobf("local.libs:kaleidoscope_end:1.0.3-forge+mc1.20.1")
    // runtimeOnly fg.deobf("local.libs:kaleidoscope_end:1.0.3-forge+mc1.20.1")
    // compileOnly fg.deobf("local.libs:kaleidoscope_compat:2.4.3-forge+mc1.20.1")
@@ -376,26 +313,13 @@ dependencies {
    // runtimeOnly fg.deobf("curse.maven:kaleidoscope-end-1456076:7987176")
     //https://www.curseforge.com/minecraft/mc-mods/kaleidoscope-end/download/7987176
 
-  //compileOnly fg.deobf("com.whitecloud233.localmods:epic-fight-invincible-lib:20.14.8.2-mc1.20.1-forge")
-  //runtimeOnly fg.deobf("com.whitecloud233.localmods:epic-fight-invincible-lib:20.14.8.2-mc1.20.1-forge")
-
-  // compileOnly fg.deobf("curse.maven:epic-fight-avalon-1268823:7619938")
- //  runtimeOnly fg.deobf("curse.maven:epic-fight-avalon-1268823:7619938")
 
 
-    //if (enableEpicFightCompat.get()) {
-      //  epicfightCompatRuntimeOnly fg.deobf("curse.maven:epicfight-nightfall-1307848:8366962")
-
- //   compileOnly fg.deobf("curse.maven:epicfight-nightfall-1307848:8366962")
-  //  runtimeOnly fg.deobf("curse.maven:epicfight-nightfall-1307848:8366962")
-
-     compileOnly fg.deobf("curse.maven:epic-fight-mod-405076:8049910")
-    runtimeOnly fg.deobf("curse.maven:epic-fight-mod-405076:8049910")
 
 
-    // 引入 Armourer's Workshop 进行测试和 API 调用 (软依赖声明)
-    compileOnly fg.deobf("curse.maven:armourers-workshop-229523:7165521")
-   runtimeOnly fg.deobf("curse.maven:armourers-workshop-229523:7165521")
+
+
+
     // JEI
 
     compileOnly fg.deobf("curse.maven:jei-238222:7920915")
@@ -408,8 +332,12 @@ dependencies {
     implementation fg.deobf("dev.architectury:architectury-forge:9.2.14")
 
     // === KubeJS & Rhino ===
-    implementation fg.deobf("dev.latvian.mods:kubejs-forge:2001.6.5-build.16")
-    implementation fg.deobf("dev.latvian.mods:rhino-forge:2001.2.3-build.10")
+    compileOnly fg.deobf("dev.latvian.mods:kubejs-forge:2001.6.5-build.16")
+    compileOnly fg.deobf("dev.latvian.mods:rhino-forge:2001.2.3-build.10")
+    if (providers.gradleProperty('withKubeJS').map { it.toBoolean() }.orElse(true).get()) {
+        runtimeOnly fg.deobf("dev.latvian.mods:kubejs-forge:2001.6.5-build.16")
+        runtimeOnly fg.deobf("dev.latvian.mods:rhino-forge:2001.2.3-build.10")
+    }
 
     // 引入 Curios API (1.20.1 Forge)
     compileOnly fg.deobf("top.theillusivec4.curios:curios-forge:5.9.1+1.20.1:api")
@@ -418,10 +346,22 @@ dependencies {
 // 引入 FDLib (以 1.20.1 的常用版本为例)
     // 请根据 Modrinth 上的最新版本号替换下面的版本号
    // implementation fg.deobf("maven.modrinth:fdlib:1.0.8")
+
+    // === spark 性能分析器（仅性能排查时加载）===
+    // 发布版 jar 内部是 SRG 方法名（m_xxxxx_），而 dev 运行环境（--launchTarget
+    // forgeclientuserdev）是全官方映射，所以必须 fg.deobf 重映射，否则运行期会
+    // NoSuchMethodError。四个 run 配置（client/client2/server/data）都继承
+    // configureEach，因此都会自动带上。
+    //   runClient:  gradlew runClient -PwithSpark=true   → 游戏内 /sparkc
+    //   runServer:  gradlew runServer -PwithSpark=true   → 游戏内 /spark
+    if (withSpark.get()) {
+        runtimeOnly fg.deobf("maven.modrinth:spark:${sparkVersion}")
+    }
 }
 
 // 资源替换逻辑
 tasks.named('processResources', ProcessResources).configure {
+    exclude '**/*.bak'
     def replaceProperties = [
             minecraft_version: minecraft_version, minecraft_version_range: minecraft_version_range,
             forge_version: forge_version, forge_version_range: forge_version_range,
@@ -434,42 +374,193 @@ tasks.named('processResources', ProcessResources).configure {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 // === 原生 Jar 构建逻辑 ===
-/*tasks.named('jar', Jar).configure {
-    if (enableEpicFightCompat.get()) {
-        from sourceSets.epicfightCompat.output
-    }
-
-    manifest {
-        attributes([
-                "Specification-Title": mod_id,
-                "Specification-Vendor": mod_authors,
-                "Specification-Version": "1",
-                "Implementation-Title": project.name,
-                "Implementation-Version": project.jar.archiveVersion,
-                "Implementation-Vendor": mod_authors,
-                "Implementation-Timestamp": new Date().format("yyyy-MM-dd'T'HH:mm:ssZ"),
-                "MixinConfigs": "herobrine_companion.mixins.json"
-        ])
-    }
-
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-    finalizedBy 'reobfJar'
-}
-*/
 // 配置 Forge 重混淆处理 shadowJar 的产物
 
 // 恢复 jar 任务自动重混淆：否则 gradlew build 只产出 raw(未 reobf) jar，
 // @Shadow 字段等会在运行期崩（oFlapTime not located）。每次构建后装 build/libs 里的 jar 即可。
-tasks.named('jar').configure { finalizedBy 'reobfJar' }
+tasks.named('jar').configure {
+    manifest.attributes('MixinConfigs': 'herobrine_companion.mixins.json,herobrine_companion.compat.mixins.json')
+    finalizedBy 'reobfJar'
+}
 
 // 避免编码错误
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
+    options.incremental = false
 }
 
+// 独立运行快速回归，不解析仅供游戏启动的 runtimeOnly 模组。
+sourceSets {
+    regression {
+        java.setSrcDirs(['src/test/java'])
+        java.include '**/*Checks.java'
+        resources.setSrcDirs(['src/test/resources'])
+        compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+        runtimeClasspath = output + compileClasspath
+    }
+    test {
+        java.exclude '**/*Checks.java'
+    }
+}
+
+// 必需回归检查随仓库提交，不依赖本地 scripts/ 或额外测试框架下载。
+tasks.register('verifyEndRing', JavaExec) {
+    group = 'verification'
+    dependsOn tasks.named('regressionClasses')
+    mainClass = 'com.whitecloud233.modid.herobrine_companion.entity.logic.event.EndRingRegressionChecks'
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(17) }
+    classpath = sourceSets.regression.runtimeClasspath
+}
+tasks.named('check') { dependsOn 'verifyEndRing' }
+
+tasks.register('verifyCombatPursuit', JavaExec) {
+    group = 'verification'
+    description = 'Verify ground combo continuation, flight escape and safe melee landing.'
+    dependsOn tasks.named('regressionClasses')
+    mainClass = 'com.whitecloud233.modid.herobrine_companion.compat.epicfight.CombatPursuitChecks'
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(17) }
+    classpath = sourceSets.regression.output
+    args projectDir.absolutePath
+}
+tasks.named('check') { dependsOn 'verifyCombatPursuit' }
+
+tasks.register('verifyProtectionAndEndRing', JavaExec) {
+    group = 'verification'
+    description = 'Verify protection UI sync and permanent End Ring story positioning.'
+    dependsOn tasks.named('regressionClasses')
+    mainClass = 'com.whitecloud233.modid.herobrine_companion.regression.ProtectionAndEndRingChecks'
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(17) }
+    classpath = sourceSets.regression.output
+    args projectDir.absolutePath
+}
+tasks.named('check') { dependsOn 'verifyProtectionAndEndRing' }
+
+tasks.register('verifyClientSyncAudit', JavaExec) {
+    group = 'verification'
+    description = 'Verify reward snapshots, UI acknowledgements, quest cloning and connection cleanup.'
+    dependsOn tasks.named('regressionClasses')
+    mainClass = 'com.whitecloud233.modid.herobrine_companion.regression.ClientSyncAuditChecks'
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(17) }
+    classpath = sourceSets.regression.output
+    args projectDir.absolutePath
+}
+tasks.named('check') { dependsOn 'verifyClientSyncAudit' }
+
+/*def regressionChecks = [
+        verifyTerrainBudget: 'com.whitecloud233.modid.herobrine_companion.destructiongod.world.TerrainBudgetChecks',
+        verifyAgentFeedback: 'com.whitecloud233.modid.herobrine_companion.client.service.AgentFeedbackChecks',
+        verifyAgentReliability: 'com.whitecloud233.modid.herobrine_companion.entity.ai.agent.AgentReliabilityChecks',
+        verifyTaskLifecycle: 'com.whitecloud233.modid.herobrine_companion.entity.ai.agent.task.TaskLifecycleChecks',
+        verifyAgentToolContract: 'com.whitecloud233.modid.herobrine_companion.entity.ai.agent.tool.AgentToolContractChecks',
+        verifyAgentProtocol: 'com.whitecloud233.modid.herobrine_companion.network.AgentProtocolChecks',
+        verifyTemplateScale: 'com.whitecloud233.modid.herobrine_companion.structure.template.TemplateScaleChecks',
+        verifyAgentFeatures: 'com.whitecloud233.modid.herobrine_companion.network.AgentFeatureNegotiationChecks',
+        verifyDestructionRefactor: 'com.whitecloud233.modid.herobrine_companion.destructiongod.world.DestructionRefactorChecks',
+        verifyRenderReuse: 'com.whitecloud233.modid.herobrine_companion.client.particle.RenderReuseChecks',
+        verifyPoemOutlineBounds: 'com.whitecloud233.modid.herobrine_companion.client.render.PoemOutlineBoundsChecks',
+        verifyPoemGlow: 'com.whitecloud233.modid.herobrine_companion.client.render.PoemGlowChecks',
+        verifyHeroPoemAnimation: 'com.whitecloud233.modid.herobrine_companion.client.animation.HeroPoemAnimationChecks',
+        verifyEffectPacketCodecs: 'com.whitecloud233.modid.herobrine_companion.network.EffectPacketCodecChecks',
+        verifyPlatformInputs: 'com.whitecloud233.modid.herobrine_companion.util.PlatformInputsChecks',
+        verifyMultilineEditor: 'com.whitecloud233.modid.herobrine_companion.config.MultilineEditorChecks',
+        verifySpeechOutput: 'com.whitecloud233.modid.herobrine_companion.client.tts.SpeechOutputChecks',
+        verifyTemplateImport: 'com.whitecloud233.modid.herobrine_companion.structure.template.TemplateImportChecks',
+        verifyTemplatePackets: 'com.whitecloud233.modid.herobrine_companion.network.TemplatePacketChecks',
+        verifyTemplateLlm: 'com.whitecloud233.modid.herobrine_companion.client.service.TemplateLlmChecks',
+        verifyTemplatePlacement: 'com.whitecloud233.modid.herobrine_companion.structure.template.TemplatePlacementChecks',
+        verifyCompanionRules: 'com.whitecloud233.modid.herobrine_companion.entity.companion.CompanionModeChecks',
+        verifyCompanionCommands: 'com.whitecloud233.modid.herobrine_companion.command.HeroCommandChecks',
+        verifyPersistenceState: 'com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroPersistenceChecks',
+        verifyHeroEntityRefactor: 'com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroEntityRefactorChecks',
+        verifyHeroVisualState: 'com.whitecloud233.modid.herobrine_companion.entity.visual.HeroVisualStateChecks',
+        verifyWorldData: 'com.whitecloud233.modid.herobrine_companion.entity.logic.data.HeroWorldDataChecks',
+        verifyPacketCodecs: 'com.whitecloud233.modid.herobrine_companion.network.PacketCodecChecks',
+        verifyLlmAdapters: 'com.whitecloud233.modid.herobrine_companion.client.llm.LlmAdapterChecks',
+        verifyLocalModelConnections: 'com.whitecloud233.modid.herobrine_companion.client.service.LocalModelConnectionChecks',
+        verifyAiChatContext: 'com.whitecloud233.modid.herobrine_companion.client.service.AIChatContextChecks',
+        verifyHeroSpeechStyle: 'com.whitecloud233.modid.herobrine_companion.client.service.HeroSpeechStyleChecks',
+        verifyToolCallReply: 'com.whitecloud233.modid.herobrine_companion.client.service.ToolCallReplyChecks',
+        verifyAiArchitecture: 'com.whitecloud233.modid.herobrine_companion.architecture.AIArchitectureChecks',
+        verifyCooking: 'com.whitecloud233.modid.herobrine_companion.entity.cooking.CookingChecks',
+        verifyKitchenActionCooldown: 'com.whitecloud233.modid.herobrine_companion.compat.kaleidoscope.KitchenActionCooldownChecks',
+        verifyKitchenRecipes: 'com.whitecloud233.modid.herobrine_companion.compat.kaleidoscope.KitchenRecipeChecks',
+        verifyKitchenCompatibility: 'com.whitecloud233.modid.herobrine_companion.compat.kaleidoscope.KitchenCompatibilityChecks',
+        verifyCookingLegacy: 'com.whitecloud233.modid.herobrine_companion.compat.cooking.CookingLegacyChecks',
+        verifyCookingPackets: 'com.whitecloud233.modid.herobrine_companion.compat.cooking.CookingPacketChecks',
+        verifyCookingArchitecture: 'com.whitecloud233.modid.herobrine_companion.architecture.CookingArchitectureChecks',
+        verifyServerConfig: 'com.whitecloud233.modid.herobrine_companion.config.ServerConfigChecks',
+        verifyForgeConfig: 'com.whitecloud233.modid.herobrine_companion.config.ForgeConfigChecks',
+        verifyConfigArchitecture: 'com.whitecloud233.modid.herobrine_companion.architecture.ConfigArchitectureChecks',
+        verifyServerConfigCodecs: 'com.whitecloud233.modid.herobrine_companion.network.ServerConfigCodecChecks',
+        verifyMemoryImport: 'com.whitecloud233.modid.herobrine_companion.client.memory.MemoryImportChecks',
+        verifyConversationImport: 'com.whitecloud233.modid.herobrine_companion.client.service.ConversationImportChecks',
+        verifyMemoryArchitecture: 'com.whitecloud233.modid.herobrine_companion.architecture.MemoryArchitectureChecks',
+        verifyArchitecture: 'com.whitecloud233.modid.herobrine_companion.architecture.ArchitectureChecks',
+        verifyGlitchText: 'com.whitecloud233.modid.herobrine_companion.util.GlitchTextChecks'
+]
+regressionChecks.each { taskName, entryPoint ->
+    tasks.register(taskName, JavaExec) {
+        group = 'verification'
+        dependsOn tasks.named('regressionClasses')
+        mainClass = entryPoint
+        javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(17) }
+        classpath = sourceSets.regression.runtimeClasspath
+        if (taskName == 'verifyHeroPoemAnimation') {
+            classpath = sourceSets.regression.runtimeClasspath.filter { entry ->
+                if (!entry.name.endsWith('.jar')) return true
+                def archive = new java.util.zip.ZipFile(entry)
+                try {
+                    return archive.getEntry('yesman/epicfight/main/EpicFightMod.class') == null &&
+                            archive.getEntry('software/bernie/geckolib/GeckoLib.class') == null
+                } finally { archive.close() }
+            }
+        }
+        if (taskName in ['verifyArchitecture', 'verifyAiArchitecture', 'verifyCookingArchitecture', 'verifyConfigArchitecture', 'verifyMemoryArchitecture']) {
+            classpath = sourceSets.regression.output
+            args projectDir.absolutePath
+        }
+    }
+}
+tasks.named('check') {
+    dependsOn regressionChecks.keySet()
+}
+
+// Validate the final reobfuscated archive, including animation helpers loaded lazily in-game.
+def verifyModJar = tasks.register('verifyModJar', JavaExec) {
+    group = 'verification'
+    description = 'Check packaged mod classes and execute hero locomotion from the final JAR.'
+    dependsOn tasks.named('regressionClasses'), 'reobfJar'
+    mainClass = 'com.whitecloud233.modid.herobrine_companion.packaging.ModJarChecks'
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(17) }
+    classpath = sourceSets.regression.output
+    doFirst {
+        setArgs([tasks.named('jar', Jar).get().archiveFile.get().asFile.absolutePath] +
+                sourceSets.main.output.classesDirs.files.collect { it.absolutePath })
+    }
+}
+tasks.matching { it.name == 'reobfJar' }.configureEach { finalizedBy verifyModJar }
+tasks.named('assemble').configure { dependsOn verifyModJar }
+tasks.named('check').configure { dependsOn verifyModJar }
+
+tasks.register('verifyTemplateSample', JavaExec) {
+    group = 'verification'
+    dependsOn tasks.named('regressionClasses')
+    mainClass = 'com.whitecloud233.modid.herobrine_companion.structure.template.TemplateSampleChecks'
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(17) }
+    classpath = sourceSets.regression.runtimeClasspath
+    maxHeapSize = '256m'
+    if (providers.gradleProperty('templateFixture').isPresent()) args providers.gradleProperty('templateFixture').get()
+}
+*/
 // scripts/ 是本地开发辅助脚本（动作烘焙、动画/资源校验），不纳入版本控制。
 // 存在时挂上资源校验任务，不存在时静默跳过，保证新克隆的仓库也能正常配置与构建。
 def verifyAnimationResourcesScript = file('scripts/poem/verify_animation_resources.gradle')
 if (verifyAnimationResourcesScript.exists()) {
     apply from: verifyAnimationResourcesScript
 }
+
+apply from: 'gradle/compat-dependencies.gradle'
+
+apply from: 'gradle/verify-compat.gradle'
+
+apply from: 'gradle/verify-kubejs.gradle'
