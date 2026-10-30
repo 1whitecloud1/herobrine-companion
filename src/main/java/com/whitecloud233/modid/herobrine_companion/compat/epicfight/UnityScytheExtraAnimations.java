@@ -52,7 +52,7 @@ final class UnityScytheExtraAnimations {
     }
 
     static Timeline readTimeline() {
-        try (var input = Objects.requireNonNull(UnityScytheExtraAnimations.class.getResourceAsStream(
+        try (var input = Objects.requireNonNull(com.whitecloud233.modid.herobrine_companion.HerobrineCompanion.class.getResourceAsStream(
                 "/assets/herobrine_companion/epicfight/poem_unity09_extras.json"));
              var reader = new InputStreamReader(input, StandardCharsets.UTF_8)) {
             Timeline timeline = new Gson().fromJson(reader, Timeline.class);

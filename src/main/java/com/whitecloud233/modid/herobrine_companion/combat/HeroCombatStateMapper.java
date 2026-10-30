@@ -1,4 +1,4 @@
-package com.whitecloud233.modid.herobrine_companion.compat.epicfight;
+package com.whitecloud233.modid.herobrine_companion.combat;
 
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.item.PoemOfTheEndItem;
@@ -8,7 +8,7 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-public final class HeroEpicFightStateMapper {
+public final class HeroCombatStateMapper {
     public static final String HERO_BATTLE_IDLE = "hero_battle_idle";
     public static final String HERO_APPROACH = "hero_approach";
     public static final String HERO_LIGHT_COMBO_1 = "hero_light_combo_1";
@@ -24,7 +24,7 @@ public final class HeroEpicFightStateMapper {
     public static final String HERO_WEAPON_STYLE_VOID_SHATTER = "hero_weapon_style_void_shatter";
     private static final Set<String> EXPORTED_STATE_NAMES = createExportedStateNames();
 
-    private HeroEpicFightStateMapper() {}
+    private HeroCombatStateMapper() {}
 
     private static Set<String> createExportedStateNames() {
         LinkedHashSet<String> states = new LinkedHashSet<>();

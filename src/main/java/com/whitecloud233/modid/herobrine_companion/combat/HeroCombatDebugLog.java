@@ -1,7 +1,8 @@
-package com.whitecloud233.modid.herobrine_companion.compat.epicfight;
+package com.whitecloud233.modid.herobrine_companion.combat;
 
 import com.mojang.logging.LogUtils;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.modid.herobrine_companion.util.DebugLog;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.registries.ForgeRegistries;
@@ -13,22 +14,27 @@ import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-public final class HeroEpicFightDebugLog {
+public final class HeroCombatDebugLog {
     private static final Logger LOGGER = LogUtils.getLogger();
-    // 默认关闭，防止 [HeroEFDebug] 刷屏；排障时用 -Dherobrine.debug.epicfight=true 开启
-    private static final boolean ENABLED = Boolean.parseBoolean(System.getProperty("herobrine.debug.epicfight", "false"));
     private static final Map<String, String> LAST_STATES = new ConcurrentHashMap<>();
     private static final Map<String, Integer> REPEAT_COUNTS = new ConcurrentHashMap<>();
 
-    private HeroEpicFightDebugLog() {
+    private HeroCombatDebugLog() {
     }
 
+    /**
+     * 是否输出排障日志。
+     *
+     * <p>唯一开关是 common 配置 {@code debugLogEnabled}（默认关闭）；
+     * 旧启动参数 {@code -Dherobrine.debug.epicfight=true} 仍然兼容，便于不重启游戏改配置时排障。</p>
+     */
     public static boolean enabled() {
-        return ENABLED;
+        return DebugLog.enabled()
+                || Boolean.parseBoolean(System.getProperty("herobrine.debug.epicfight", "false"));
     }
 
     public static void event(@Nullable HeroEntity hero, String tag, String detail) {
-        if (!ENABLED) {
+        if (!enabled()) {
             return;
         }
 
@@ -36,7 +42,7 @@ public final class HeroEpicFightDebugLog {
     }
 
     public static void transition(@Nullable HeroEntity hero, String scope, String stateKey, String detail) {
-        if (!ENABLED) {
+        if (!enabled()) {
             return;
         }
 
@@ -51,7 +57,7 @@ public final class HeroEpicFightDebugLog {
     }
 
     public static void repeatedEvent(@Nullable HeroEntity hero, String scope, String repeatKey, String detail) {
-        if (!ENABLED) {
+        if (!enabled()) {
             return;
         }
 
@@ -279,7 +285,7 @@ public final class HeroEpicFightDebugLog {
         if (className.equals(Thread.class.getName())) {
             return true;
         }
-        if (className.equals(HeroEpicFightDebugLog.class.getName())) {
+        if (className.equals(HeroCombatDebugLog.class.getName())) {
             return true;
         }
         if (className.equals(HeroEntity.class.getName())

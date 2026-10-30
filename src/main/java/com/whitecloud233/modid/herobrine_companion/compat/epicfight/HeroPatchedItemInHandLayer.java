@@ -1,5 +1,6 @@
 package com.whitecloud233.modid.herobrine_companion.compat.epicfight;
 
+import com.whitecloud233.modid.herobrine_companion.combat.HeroCombatDebugLog;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
@@ -42,7 +43,7 @@ public class HeroPatchedItemInHandLayer<E extends LivingEntity, T extends Living
             ResourceLocation itemId = ForgeRegistries.ITEMS.getKey(stack.getItem());
             if (itemId != null && "efn".equals(itemId.getNamespace())) {
                 HeroEntity hero = entitypatch.getOriginal() instanceof HeroEntity h ? h : null;
-                HeroEpicFightDebugLog.repeatedEvent(hero, "weaponRender", itemId.toString(),
+                HeroCombatDebugLog.repeatedEvent(hero, "weaponRender", itemId.toString(),
                         "renderer=" + renderEngine.getItemRenderer(stack).getClass().getName()
                                 + ",armatureJoints=" + (entitypatch.getArmature() != null ? entitypatch.getArmature().getJointNumber() : -1)
                                 + ",hand=" + hand);

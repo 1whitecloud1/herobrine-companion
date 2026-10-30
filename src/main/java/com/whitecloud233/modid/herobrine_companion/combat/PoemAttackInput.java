@@ -81,8 +81,14 @@ public final class PoemAttackInput {
     public boolean holdsUse() { return useHeld; }
 
     public void reset() {
+        reset(true);
+    }
+
+    /** Only EF has an engine consumer that can acknowledge a deferred input clear. */
+    public void reset(boolean epicFight) {
         // A context change cancels both a pending tap and EF's reserved replay.
-        engineControl = ownedEngineInput ? CLEAR_ENGINE_INPUT : engineControl & CLEAR_ENGINE_INPUT;
+        // Without EF, retaining CLEAR_ENGINE_INPUT makes every later context reset eat vanilla clicks.
+        engineControl = epicFight ? (ownedEngineInput ? CLEAR_ENGINE_INPUT : engineControl & CLEAR_ENGINE_INPUT) : 0;
         ownedEngineInput = false;
         attackHeld = false;
         attackIssued = false;

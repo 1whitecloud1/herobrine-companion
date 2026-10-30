@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.mixin;
 
 import com.whitecloud233.modid.herobrine_companion.entity.family.HerobrineFamilyMemberType;
+import com.whitecloud233.modid.herobrine_companion.util.NbtKeys;
 import com.whitecloud233.modid.herobrine_companion.entity.family.HerobrineFamilyMembers;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
@@ -14,7 +15,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(Entity.class)
 public abstract class JeanDragonPassengerMixin {
-    private static final String HEROBRINE_COMPANION_JEAN_FRONT_HERO_TAG = "HerobrineCompanionJeanFrontHero";
+    private static final String HEROBRINE_COMPANION_JEAN_FRONT_HERO_TAG = NbtKeys.JEAN_FRONT_HERO;
     private static final double HEROBRINE_COMPANION_JEAN_PLAYER_SEAT_Y = 5.65D;
     private static final double HEROBRINE_COMPANION_JEAN_PLAYER_SEAT = 4.2D;
     private static final double HEROBRINE_COMPANION_JEAN_PLAYER_SIDE = 0.0D;

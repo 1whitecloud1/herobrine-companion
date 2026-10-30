@@ -48,6 +48,7 @@ final class PoemGestureController {
     }
 
     private static void onTick(TickEvent.PlayerTickEvent event) {
+        com.whitecloud233.modid.herobrine_companion.compat.safety.CompatSafety.run("epicfight", "onTick", () -> {
         if (event.phase != TickEvent.Phase.END) return;
         if (!(event.player instanceof ServerPlayer player)) return;
         Pending pending = PLAYERS.get(player);
@@ -55,6 +56,8 @@ final class PoemGestureController {
         if (!eligible(player)) { pending.queue.cancel(); return; }
         updateContext(player, pending);
         attempt(player, pending);
+
+        });
     }
 
     private static void updateContext(ServerPlayer player, Pending pending) {

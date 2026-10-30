@@ -1,5 +1,6 @@
 package com.whitecloud233.modid.herobrine_companion.compat.epicfight;
 
+import com.whitecloud233.modid.herobrine_companion.combat.HeroCombatDebugLog;
 import yesman.epicfight.api.animation.AnimationManager;
 import yesman.epicfight.api.animation.AnimationManager.AnimationAccessor;
 import yesman.epicfight.api.animation.types.StaticAnimation;
@@ -32,7 +33,7 @@ final class HeroNightfallAnimationLookup {
             // 跳过空/延迟动画字段：避免 remap 触发 EF AnimationManager.checkNull 的 dev 栈刷屏
             // （空 accessor 本就不能播放，视为无此动画即可）
             if (LOGGED_MISSING_FIELDS.add(owner + "#" + fieldName)) {
-                HeroEpicFightDebugLog.event(null, "nightfallAnimLookup", "missing/empty animation field: " + owner + "#" + fieldName);
+                HeroCombatDebugLog.event(null, "nightfallAnimLookup", "missing/empty animation field: " + owner + "#" + fieldName);
             }
             return null;
         }

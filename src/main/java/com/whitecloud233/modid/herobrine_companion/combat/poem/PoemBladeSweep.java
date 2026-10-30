@@ -12,7 +12,18 @@ import org.joml.Vector3f;
 
 /** Server animation sampling; neither fading trail history nor recovery poses deal damage. */
 public final class PoemBladeSweep {
-    public static final double BLADE_PADDING = .10;
+    /** Thickness/length tolerance around the visible blade edge. */
+    public static final double BLADE_PADDING = .14;
+    /**
+     * Vertical reach of a cut, from the target's point of view. Small, low entities (silverfish,
+     * small slimes, baby mobs) sit far below a chest-height arc, so the target box may extend
+     * this far up to meet the blade. The smaller downward value still lets low sweeps catch
+     * targets standing on a ledge or slab without turning every cut into a full-height column.
+     */
+    public static final double HIT_REACH_UP = 1.05;
+    public static final double HIT_REACH_DOWN = .45;
+    /** Broad-phase margin on the horizontal axes so the vertical expansion is actually queried. */
+    public static final double HIT_QUERY_MARGIN = .10;
     private static final int SAMPLE_RATE = PoemBladeTrail.SAMPLES_PER_SECOND * 2;
     private final PoemMotionLibrary.Clip clip;
     private final int toolJoint;
@@ -112,9 +123,19 @@ public final class PoemBladeSweep {
     private record Edge(Vec3 inner, Vec3 outer) { }
 
     public record Sweep(int contact, List<PoemOBB> boxes, AABB bounds) {
+        /** Broad-phase volume including the vertical reach; also used for the entity query. */
+        public AABB queryBounds() {
+            return new AABB(bounds.minX - HIT_QUERY_MARGIN, bounds.minY - HIT_REACH_DOWN, bounds.minZ - HIT_QUERY_MARGIN,
+                    bounds.maxX + HIT_QUERY_MARGIN, bounds.maxY + HIT_REACH_UP, bounds.maxZ + HIT_QUERY_MARGIN);
+        }
+
         public boolean intersects(AABB target) {
-            if (!bounds.inflate(1e-7).intersects(target)) return false;
-            for (PoemOBB box : boxes) if (box.intersects(target)) return true;
+            // Expanding the target is the Minkowski equivalent of a taller cut volume and keeps the
+            // exact blade SAT untouched, so the sampled sweep stays a few small OBBs.
+            AABB reached = new AABB(target.minX, target.minY - HIT_REACH_DOWN, target.minZ,
+                    target.maxX, target.maxY + HIT_REACH_UP, target.maxZ);
+            if (!bounds.inflate(1e-7).intersects(reached)) return false;
+            for (PoemOBB box : boxes) if (box.intersects(reached)) return true;
             return false;
         }
     }

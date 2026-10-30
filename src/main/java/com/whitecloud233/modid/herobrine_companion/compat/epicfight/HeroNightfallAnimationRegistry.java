@@ -50,7 +50,7 @@ final class HeroNightfallAnimationRegistry {
 
         // Hero 骨架（含爪/刺轮关节）的注册改在 FMLCommonSetupEvent（实体已注册后）进行，
         // 见 HeroEpicFightBridge.onCommonSetup；这里只负责动画克隆
-        event.newBuilder(HerobrineCompanion.MODID, HeroNightfallAnimationRegistry::buildHeroNightfallAnimations);
+        event.newBuilder(HerobrineCompanion.MODID, builder -> com.whitecloud233.modid.herobrine_companion.compat.safety.CompatSafety.run("epicfight", "build registered animations", () -> buildHeroNightfallAnimations(builder)));
     }
 
     @Nullable
@@ -75,7 +75,7 @@ final class HeroNightfallAnimationRegistry {
         // Both built-in scythe movesets work with Epic Fight alone.
         HeroScytheComboBehaviors.registerAnimation(builder);
         PoemScythePlayerAnimations.registerAnimations(builder);
-        if (!net.minecraftforge.fml.ModList.get().isLoaded(EFN_MOD_ID)) {
+        if (!com.whitecloud233.modid.herobrine_companion.compat.safety.CompatPreflight.available("efn")) {
             return;
         }
 

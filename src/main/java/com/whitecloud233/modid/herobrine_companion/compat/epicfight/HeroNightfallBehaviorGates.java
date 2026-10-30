@@ -1,5 +1,6 @@
 package com.whitecloud233.modid.herobrine_companion.compat.epicfight;
 
+import com.whitecloud233.modid.herobrine_companion.combat.HeroCombatDebugLog;
 import com.whitecloud233.modid.herobrine_companion.compat.epicfight.effect.HeroBloodCurseStore;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.combat.HeroCombatPlanner;
@@ -38,21 +39,23 @@ final class HeroNightfallBehaviorGates {
             // 悬停兜底：浮空追击中没有空中招式可用（武器缺 airAttack 技能系列）时，
             // 贴近目标周期性直接结算一次近战伤害，避免 Hero 悬停在树顶/高处目标旁干瞪眼
             maybeFallbackHoverMelee(hero, target, comboRange);
-            HeroEpicFightDebugLog.repeatedEvent(hero, "comboGate", "ground", "comboBlocked=airborne");
+            HeroCombatDebugLog.repeatedEvent(hero, "comboGate", "ground", "comboBlocked=airborne");
             return false;
         }
 
         // 连段是"贴身必打"的保底行为：不再依赖工具分偏好（否则技能分高时连段被饿死、技能冷却期卡住），
         // 只要贴身 + 面向即可起手；技能系列仍由 prefersAction(SKILL) 自己把关。
         if (!hero.isBattleModeActive() || hero.isBattleHoldAction() || hero.isBattleReleaseAction()) {
-            HeroEpicFightDebugLog.repeatedEvent(hero, "comboGate", "state",
-                    "comboBlocked=state battle=" + hero.isBattleModeActive()
-                            + ",hold=" + hero.isBattleHoldAction() + ",release=" + hero.isBattleReleaseAction()
-                            + ",action=" + hero.getBattleActionState() + ",shock=" + hero.shockTicks);
+            if (HeroCombatDebugLog.enabled()) {
+                HeroCombatDebugLog.repeatedEvent(hero, "comboGate", "state",
+                        "comboBlocked=state battle=" + hero.isBattleModeActive()
+                                + ",hold=" + hero.isBattleHoldAction() + ",release=" + hero.isBattleReleaseAction()
+                                + ",action=" + hero.getBattleActionState() + ",shock=" + hero.shockTicks);
+            }
             return false;
         }
         if (!hero.hasLineOfSight(target)) {
-            HeroEpicFightDebugLog.repeatedEvent(hero, "comboGate", "los", "comboBlocked=los");
+            HeroCombatDebugLog.repeatedEvent(hero, "comboGate", "los", "comboBlocked=los");
             return false;
         }
 
@@ -62,15 +65,17 @@ final class HeroNightfallBehaviorGates {
         int windupTicks = 4 + Math.min(comboIndex, 3);
         double predictedDistanceSqr = HeroCombatPlanner.predictedDistanceSqr(hero, target, windupTicks, 0.5D);
         if (predictedDistanceSqr > reach * reach) {
-            HeroEpicFightDebugLog.repeatedEvent(hero, "comboGate", "range",
-                    "comboBlocked=range dist=" + String.format(java.util.Locale.ROOT, "%.2f", Math.sqrt(predictedDistanceSqr))
-                            + ",reach=" + String.format(java.util.Locale.ROOT, "%.2f", reach));
+            if (HeroCombatDebugLog.enabled()) {
+                HeroCombatDebugLog.repeatedEvent(hero, "comboGate", "range",
+                        "comboBlocked=range dist=" + String.format(java.util.Locale.ROOT, "%.2f", Math.sqrt(predictedDistanceSqr))
+                                + ",reach=" + String.format(java.util.Locale.ROOT, "%.2f", reach));
+            }
             return false;
         }
 
         // 软朝向：允许 EF 技能动画收尾时略微偏角仍可接连段，避免"打完技能回不了身"的呆滞
         if (!isSoftlyFacingTarget(hero, target, windupTicks)) {
-            HeroEpicFightDebugLog.repeatedEvent(hero, "comboGate", "facing", "comboBlocked=facing");
+            HeroCombatDebugLog.repeatedEvent(hero, "comboGate", "facing", "comboBlocked=facing");
             return false;
         }
         return true;
@@ -101,10 +106,8 @@ final class HeroNightfallBehaviorGates {
             return hero == null;
         }
 
-        // 接续也放宽到与起手一致：命中后目标被击退/略微偏角时仍然衔接，避免"打一下断一下"
-        if (!hero.onGround()) {
-            return false;
-        }
+        // Only the opener requires ground contact. Authored jumps/root motion
+        // during a running series must not make tryProceed discard the combo.
         if (!hero.isBattleModeActive() || hero.isBattleHoldAction() || hero.isBattleReleaseAction()) {
             return false;
         }

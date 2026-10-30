@@ -1,5 +1,6 @@
 package com.whitecloud233.modid.herobrine_companion.compat.epicfight;
 
+import com.whitecloud233.modid.herobrine_companion.combat.HeroCombatDebugLog;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import org.jetbrains.annotations.Nullable;
 import yesman.epicfight.api.animation.AnimationPlayer;
@@ -162,7 +163,7 @@ final class HeroNightfallSkillTicker {
 
         int idleTicks = IDLE_STALL_TICKS.merge(hero.getId(), 1, Integer::sum);
         if (idleTicks > 40 && (idleTicks & (idleTicks - 1)) == 0) {
-            HeroEpicFightDebugLog.event(hero, "nightfallStall",
+            HeroCombatDebugLog.event(hero, "nightfallStall",
                     "idle-stalled ticks=" + idleTicks + ",action=" + hero.getBattleActionState()
                             + ",combo=" + hero.getBattleComboStep() + ",targetAlive=" + hasTarget);
         }

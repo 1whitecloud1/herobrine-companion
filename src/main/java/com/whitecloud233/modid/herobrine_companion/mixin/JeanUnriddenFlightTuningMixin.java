@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.mixin;
 
 import com.whitecloud233.modid.herobrine_companion.entity.family.HerobrineFamilyMemberType;
+import com.whitecloud233.modid.herobrine_companion.util.NbtKeys;
 import com.whitecloud233.modid.herobrine_companion.entity.family.HerobrineFamilyMembers;
 import com.whitecloud233.modid.herobrine_companion.entity.family.JeanCombatResponseService;
 import net.minecraft.world.entity.Entity;
@@ -21,11 +22,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(EnderDragon.class)
 public abstract class JeanUnriddenFlightTuningMixin extends Mob {
     @Unique
-    private static final String HEROBRINE_COMPANION_JEAN_FRONT_HERO_TAG = "HerobrineCompanionJeanFrontHero";
+    private static final String HEROBRINE_COMPANION_JEAN_FRONT_HERO_TAG = NbtKeys.JEAN_FRONT_HERO;
     @Unique
-    private static final String HEROBRINE_COMPANION_JEAN_PLAYER_RIDDEN_TAG = "HerobrineCompanionJeanPlayerRidden";
+    private static final String HEROBRINE_COMPANION_JEAN_PLAYER_RIDDEN_TAG = NbtKeys.JEAN_PLAYER_RIDDEN;
     @Unique
-    private static final String HEROBRINE_COMPANION_JEAN_ENTITY_TAG = "herobrine_companion_jean";
+    private static final String HEROBRINE_COMPANION_JEAN_ENTITY_TAG = NbtKeys.JEAN_ENTITY_TAG;
     @Unique
     private static final double HEROBRINE_COMPANION_UNRIDDEN_FLIGHT_SPEED_SCALE = 0.45D;
     @Unique

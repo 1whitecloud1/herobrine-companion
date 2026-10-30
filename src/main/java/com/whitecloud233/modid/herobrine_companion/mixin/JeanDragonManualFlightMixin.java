@@ -1,6 +1,7 @@
 package com.whitecloud233.modid.herobrine_companion.mixin;
 
 import com.whitecloud233.modid.herobrine_companion.entity.family.HerobrineFamilyMemberType;
+import com.whitecloud233.modid.herobrine_companion.util.NbtKeys;
 import com.whitecloud233.modid.herobrine_companion.entity.family.HerobrineFamilyMembers;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -15,7 +16,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(EnderDragon.class)
 public abstract class JeanDragonManualFlightMixin extends Mob {
-    private static final String HEROBRINE_COMPANION_JEAN_FRONT_HERO_TAG = "HerobrineCompanionJeanFrontHero";
+    private static final String HEROBRINE_COMPANION_JEAN_FRONT_HERO_TAG = NbtKeys.JEAN_FRONT_HERO;
 
     protected JeanDragonManualFlightMixin(EntityType<? extends Mob> entityType, Level level) {
         super(entityType, level);

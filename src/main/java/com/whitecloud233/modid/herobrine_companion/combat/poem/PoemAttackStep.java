@@ -21,10 +21,12 @@ public final class PoemAttackStep {
     }
 
     public static Vec3 velocity(Vec3 current, float yaw, int step) {
-        if (step < 0 || step > 3 || !Float.isFinite(yaw)
+        if (!PoemMotionLibrary.validMove(step) || !Float.isFinite(yaw)
                 || !Double.isFinite(current.x) || !Double.isFinite(current.y) || !Double.isFinite(current.z)) return current;
         double speed = current.horizontalDistance();
-        double impulse = Math.min(.16 + .015 * step, Math.max(0, MAX_HORIZONTAL_SPEED - speed));
+        double limit = step == PoemMotionLibrary.DASH ? .5 : MAX_HORIZONTAL_SPEED;
+        double strength = step == PoemMotionLibrary.DASH ? .3 : PoemMotionLibrary.combo(step) ? .16 + .015 * step : .12;
+        double impulse = Math.min(strength, Math.max(0, limit - speed));
         if (impulse <= .00001) return current;
         double radians = Math.toRadians(yaw);
         // Leave gravity, jumps, sideways input and existing fast movement to vanilla.

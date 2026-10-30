@@ -1,5 +1,6 @@
 package com.whitecloud233.modid.herobrine_companion.compat.epicfight;
 
+import com.whitecloud233.modid.herobrine_companion.combat.HeroCombatDebugLog;
 import com.whitecloud233.modid.herobrine_companion.compat.epicfight.HeroNightfallSkillSeries.Trigger;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import net.minecraft.world.InteractionHand;
@@ -69,7 +70,7 @@ final class HeroNightfallCombatBehaviors {
             builder.newBehaviorSeries(comboSeries);
             addedAnySeries = true;
         } else {
-            HeroEpicFightDebugLog.event(null, "nightfallBuild",
+            HeroCombatDebugLog.event(null, "nightfallBuild",
                     "combo series SKIPPED for " + profile.itemPaths() + " (no playable combo animation)");
         }
 
@@ -80,7 +81,7 @@ final class HeroNightfallCombatBehaviors {
         }
 
         if (!addedAnySeries) {
-            HeroEpicFightDebugLog.event(null, "nightfallBuild",
+            HeroCombatDebugLog.event(null, "nightfallBuild",
                     "NO behavior series built for " + profile.itemPaths());
         }
 

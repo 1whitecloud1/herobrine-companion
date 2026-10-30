@@ -1,11 +1,12 @@
 package com.whitecloud233.modid.herobrine_companion.compat.epicfight;
 
+import com.whitecloud233.modid.herobrine_companion.combat.HeroCombatDebugLog;
 import com.mojang.datafixers.util.Pair;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.HeroCombatWeaponHelper;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.combat.HeroCombatPlanner;
 import com.whitecloud233.modid.herobrine_companion.entity.ai.combat.HeroCombatPursuit;
-import com.whitecloud233.modid.herobrine_companion.entity.ai.goal.HeroEpicFightChaseGoal;
+import com.whitecloud233.modid.herobrine_companion.compat.epicfight.HeroEpicFightChaseGoal;
 import com.whitecloud233.modid.herobrine_companion.item.PoemOfTheEndItem;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.LivingEntity;
@@ -57,6 +58,7 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
 
     @Override
     public boolean overrideRender() {
+        if (!com.whitecloud233.modid.herobrine_companion.compat.safety.CompatSafety.allowed("epicfight")) return false;
         HeroEntity hero = this.getOriginal();
         if (hero == null
                 || hero.getEntityData().get(HeroEntity.IS_CHALLENGE_ACTIVE)
@@ -74,16 +76,20 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
 
     @Override
     public void tick(LivingEvent.LivingTickEvent event) {
+        if (!com.whitecloud233.modid.herobrine_companion.compat.safety.CompatSafety.run("epicfight", "tick", () -> {
         HeroEntity hero = this.getOriginal();
         if (hero != null) {
             this.sanitizeAnimatorBeforeTick(hero);
         }
 
         super.tick(event);
+
+        })) suspendCompatibility();
     }
 
     @Override
     protected void initAI() {
+        if (!com.whitecloud233.modid.herobrine_companion.compat.safety.CompatSafety.allowed("epicfight")) { suspendCompatibility(); return; }
         HeroEntity hero = this.getOriginal();
         if (hero == null || hero.isRemoved() || !hero.isBattleModeActive()) {
             this.removeHeroCombatGoals();
@@ -97,6 +103,7 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
     @Override
     public void onJoinWorld(HeroEntity hero, net.minecraftforge.event.entity.EntityJoinLevelEvent event) {
         super.onJoinWorld(hero, event);
+        if (!com.whitecloud233.modid.herobrine_companion.compat.safety.CompatSafety.allowed("epicfight")) return;
         HeroEpicFightWeaponProfiles.bootstrap();
         this.ensureInfantryAiConfigured();
         if (this.isEquipmentReady(hero)) {
@@ -107,6 +114,7 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
     @Override
     public void initAnimator(Animator animator) {
         super.initAnimator(animator);
+        if (!com.whitecloud233.modid.herobrine_companion.compat.safety.CompatSafety.allowed("epicfight")) return;
 
         HeroEntity hero = this.getOriginal();
         boolean battleMode = hero != null && hero.isBattleModeActive();
@@ -117,13 +125,17 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
 
     @Override
     public void onStartTracking(ServerPlayer trackingPlayer) {
+        if (!com.whitecloud233.modid.herobrine_companion.compat.safety.CompatSafety.run("epicfight", "onStartTracking", () -> {
         if (this.isEquipmentReady(this.getOriginal())) {
             this.syncWeaponLivingMotions(true);
         }
+
+        })) suspendCompatibility();
     }
 
     @Override
     protected void serverTick(LivingEvent.LivingTickEvent event) {
+        if (!com.whitecloud233.modid.herobrine_companion.compat.safety.CompatSafety.run("epicfight", "serverTick", () -> {
         HeroEpicFightWeaponProfiles.bootstrap();
         HeroEntity hero = this.getOriginal();
         String currentProfileKey = this.getCurrentWeaponProfileKey(hero);
@@ -145,18 +157,21 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
                     HeroEpicFightCompat.isHeroMidAttack(hero));
         }
         this.logTickState("HeroEpicFightPatch.serverTick");
+
+        })) suspendCompatibility();
     }
 
     @Override
     public void updateHeldItem(CapabilityItem fromCap, CapabilityItem toCap, ItemStack from, ItemStack to, InteractionHand hand) {
+        if (!com.whitecloud233.modid.herobrine_companion.compat.safety.CompatSafety.run("epicfight", "updateHeldItem", () -> {
         HeroEntity hero = this.getOriginal();
         if (hero == null || hero.isRemoved()) {
             return;
         }
 
-        HeroEpicFightDebugLog.event(hero, "HeroEpicFightPatch.updateHeldItem.begin", "hand=" + hand
-                + ",from=" + HeroEpicFightDebugLog.itemKey(from)
-                + ",to=" + HeroEpicFightDebugLog.itemKey(to)
+        HeroCombatDebugLog.event(hero, "HeroEpicFightPatch.updateHeldItem.begin", "hand=" + hand
+                + ",from=" + HeroCombatDebugLog.itemKey(from)
+                + ",to=" + HeroCombatDebugLog.itemKey(to)
                 + ",state=" + this.debugPatchState(hero));
 
         this.infantryAiConfigured = false;
@@ -171,9 +186,9 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
             this.removeHeroCombatGoals();
             this.resetActionAnimator();
             this.syncWeaponLivingMotions(true);
-            HeroEpicFightDebugLog.transition(hero, "HeroEpicFightPatch.updateHeldItem.outOfBattle",
-                    HeroEpicFightDebugLog.itemKey(from) + "->" + HeroEpicFightDebugLog.itemKey(to) + "|" + this.debugPatchTransitionState(hero),
-                    "from=" + HeroEpicFightDebugLog.itemKey(from) + ",to=" + HeroEpicFightDebugLog.itemKey(to)
+            HeroCombatDebugLog.transition(hero, "HeroEpicFightPatch.updateHeldItem.outOfBattle",
+                    HeroCombatDebugLog.itemKey(from) + "->" + HeroCombatDebugLog.itemKey(to) + "|" + this.debugPatchTransitionState(hero),
+                    "from=" + HeroCombatDebugLog.itemKey(from) + ",to=" + HeroCombatDebugLog.itemKey(to)
                             + ",state=" + this.debugPatchState(hero));
             return;
         }
@@ -183,19 +198,24 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
         if (!hero.level().isClientSide) {
             this.ensureInfantryAiConfigured();
             this.syncWeaponLivingMotions(true);
-            HeroEpicFightDebugLog.transition(hero, "HeroEpicFightPatch.updateHeldItem.server",
-                    HeroEpicFightDebugLog.itemKey(from) + "->" + HeroEpicFightDebugLog.itemKey(to) + "|" + this.debugPatchTransitionState(hero),
-                    "from=" + HeroEpicFightDebugLog.itemKey(from) + ",to=" + HeroEpicFightDebugLog.itemKey(to)
+            HeroCombatDebugLog.transition(hero, "HeroEpicFightPatch.updateHeldItem.server",
+                    HeroCombatDebugLog.itemKey(from) + "->" + HeroCombatDebugLog.itemKey(to) + "|" + this.debugPatchTransitionState(hero),
+                    "from=" + HeroCombatDebugLog.itemKey(from) + ",to=" + HeroCombatDebugLog.itemKey(to)
                             + ",state=" + this.debugPatchState(hero));
         }
+
+        })) suspendCompatibility();
     }
 
     @Override
     protected void clientTick(LivingEvent.LivingTickEvent event) {
+        if (!com.whitecloud233.modid.herobrine_companion.compat.safety.CompatSafety.run("epicfight", "clientTick", () -> {
         HeroEpicFightWeaponProfiles.bootstrap();
         super.clientTick(event);
         this.syncWeaponLivingMotions(false);
         this.logTickState("HeroEpicFightPatch.clientTick");
+
+        })) suspendCompatibility();
     }
 
     private void sanitizeAnimatorBeforeTick(HeroEntity hero) {
@@ -208,7 +228,7 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
             return;
         }
 
-        HeroEpicFightDebugLog.event(hero, "HeroEpicFightPatch.sanitizeAnimatorBeforeTick", "state=" + this.debugPatchState(hero));
+        HeroCombatDebugLog.event(hero, "HeroEpicFightPatch.sanitizeAnimatorBeforeTick", "state=" + this.debugPatchState(hero));
         this.resetActionAnimator();
     }
 
@@ -232,7 +252,7 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
             return false;
         }
 
-        HeroEpicFightDebugLog.event(hero, "HeroEpicFightPatch.sanitizeAnimatorBeforeTick.needsReset",
+        HeroCombatDebugLog.event(hero, "HeroEpicFightPatch.sanitizeAnimatorBeforeTick.needsReset",
                 "animId=" + animationId + ",state=" + this.debugPatchState(hero));
         return true;
     }
@@ -271,7 +291,7 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
         }
 
         HeroEntity hero = this.getOriginal();
-        HeroEpicFightDebugLog.event(hero, "HeroEpicFightPatch.resetActionAnimator.begin", "animBefore=" + HeroEpicFightDebugLog.animatorKey(animator) + ",state=" + this.debugPatchState(hero));
+        HeroCombatDebugLog.event(hero, "HeroEpicFightPatch.resetActionAnimator.begin", "animBefore=" + HeroCombatDebugLog.animatorKey(animator) + ",state=" + this.debugPatchState(hero));
 
         this.currentLivingMotion = LivingMotions.IDLE;
         this.currentCompositeMotion = LivingMotions.IDLE;
@@ -280,7 +300,7 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
             clientAnimator.iterAllLayers(layer -> layer.animationPlayer.setPlayAnimation(Animations.EMPTY_ANIMATION));
             clientAnimator.offAllLayers();
             clientAnimator.playAnimationInstantly(Animations.BIPED_IDLE);
-            HeroEpicFightDebugLog.event(hero, "HeroEpicFightPatch.resetActionAnimator.clientDone", "animAfter=" + HeroEpicFightDebugLog.animatorKey(animator) + ",state=" + this.debugPatchState(hero));
+            HeroCombatDebugLog.event(hero, "HeroEpicFightPatch.resetActionAnimator.clientDone", "animAfter=" + HeroCombatDebugLog.animatorKey(animator) + ",state=" + this.debugPatchState(hero));
             return;
         }
 
@@ -289,7 +309,7 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
             animationPlayer.setPlayAnimation(Animations.EMPTY_ANIMATION);
         }
         animator.setSoftPause(true);
-        HeroEpicFightDebugLog.event(hero, "HeroEpicFightPatch.resetActionAnimator.serverDone", "animAfter=" + HeroEpicFightDebugLog.animatorKey(animator) + ",state=" + this.debugPatchState(hero));
+        HeroCombatDebugLog.event(hero, "HeroEpicFightPatch.resetActionAnimator.serverDone", "animAfter=" + HeroCombatDebugLog.animatorKey(animator) + ",state=" + this.debugPatchState(hero));
     }
 
 
@@ -334,6 +354,7 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
 
     @Override
     public void setAIAsInfantry(boolean holdingRanedWeapon) {
+        if (!com.whitecloud233.modid.herobrine_companion.compat.safety.CompatSafety.run("epicfight", "setAIAsInfantry", () -> {
         HeroEntity hero = this.getOriginal();
         if (hero == null) {
             return;
@@ -372,10 +393,13 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
             hero.goalSelector.addGoal(0, this.heroAttackGoal);
             hero.goalSelector.addGoal(1, this.heroChasingGoal);
         }
+
+        })) suspendCompatibility();
     }
 
     @Override
     public void updateMotion(boolean considerInaction) {
+        if (!com.whitecloud233.modid.herobrine_companion.compat.safety.CompatSafety.run("epicfight", "updateMotion", () -> {
         HeroEntity hero = this.getOriginal();
         if (hero == null) {
             return;
@@ -409,6 +433,8 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
         }
 
         this.currentCompositeMotion = this.resolveCompositeMotion(hero, this.currentLivingMotion);
+
+        })) suspendCompatibility();
     }
 
     private void syncWeaponLivingMotions(boolean force) {
@@ -424,7 +450,7 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
             return;
         }
 
-        HeroEpicFightDebugLog.event(hero, "HeroEpicFightPatch.syncWeaponLivingMotions.begin", "force=" + force + ",battle=" + battleMode + ",profile=" + currentProfileKey + ",lastProfile=" + this.lastWeaponProfileKey + ",anim=" + HeroEpicFightDebugLog.animatorKey(animator));
+        HeroCombatDebugLog.event(hero, "HeroEpicFightPatch.syncWeaponLivingMotions.begin", "force=" + force + ",battle=" + battleMode + ",profile=" + currentProfileKey + ",lastProfile=" + this.lastWeaponProfileKey + ",anim=" + HeroCombatDebugLog.animatorKey(animator));
 
         Map<LivingMotion, AssetAccessor<? extends StaticAnimation>> livingAnimations = new LinkedHashMap<>();
         this.applyBaseLivingAnimations(livingAnimations, battleMode);
@@ -440,11 +466,11 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
             HeroScytheComboBehaviors.applyLivingAnimations(hero.getMainHandItem(), livingAnimations);
         }
 
-        HeroEpicFightDebugLog.event(hero, "HeroEpicFightPatch.syncWeaponLivingMotions.mapReady", "count=" + livingAnimations.size() + ",motions=" + livingAnimations.keySet());
+        HeroCombatDebugLog.event(hero, "HeroEpicFightPatch.syncWeaponLivingMotions.mapReady", "count=" + livingAnimations.size() + ",motions=" + livingAnimations.keySet());
 
         animator.resetLivingAnimations();
         livingAnimations.forEach(animator::addLivingAnimation);
-        HeroEpicFightDebugLog.event(hero, "HeroEpicFightPatch.syncWeaponLivingMotions.animatorApplied", "anim=" + HeroEpicFightDebugLog.animatorKey(animator) + ",state=" + this.debugPatchState(hero));
+        HeroCombatDebugLog.event(hero, "HeroEpicFightPatch.syncWeaponLivingMotions.animatorApplied", "anim=" + HeroCombatDebugLog.animatorKey(animator) + ",state=" + this.debugPatchState(hero));
 
         if (animator instanceof ClientAnimator clientAnimator) {
             clientAnimator.setCurrentMotionsAsDefault();
@@ -457,7 +483,7 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
         }
 
         this.lastWeaponProfileKey = currentProfileKey;
-        HeroEpicFightDebugLog.event(hero, "HeroEpicFightPatch.syncWeaponLivingMotions.end", "lastProfile=" + this.lastWeaponProfileKey + ",state=" + this.debugPatchState(hero));
+        HeroCombatDebugLog.event(hero, "HeroEpicFightPatch.syncWeaponLivingMotions.end", "lastProfile=" + this.lastWeaponProfileKey + ",state=" + this.debugPatchState(hero));
     }
 
     private void applyBaseLivingAnimations(Map<LivingMotion, AssetAccessor<? extends StaticAnimation>> livingAnimations, boolean battleMode) {
@@ -936,14 +962,16 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
         }
 
         HeroCombatPlanner.CombatTuning tuning = this.getPlayerLikeCombatTuning(profile);
+        boolean continuingCombo = comboIndex > 0;
 
-        return this.isPlayerLikeGroundState(hero)
-                && !this.isDashLikeMovement(hero, profile)
+        return (continuingCombo
+                ? hero.isBattleModeActive() && !hero.isBattleHoldAction() && !hero.isBattleReleaseAction()
+                : this.isPlayerLikeGroundState(hero) && !this.isDashLikeMovement(hero, profile))
                 && !HeroCombatPlanner.isAttackReplayLocked(hero, 6)
                 && this.getExpectedPlayerLikeComboIndex(hero, profile.comboAnimations().size()) == comboIndex
                 && (HeroCombatPlanner.canStartPredictedMeleeCombo(hero, target, this.getPlayerLikeComboContinueDistance(profile), 4 + Math.min(comboIndex, 2))
                 || (comboIndex > 0 && HeroCombatPlanner.canQueueComboFollowUp(hero, target, this.getPlayerLikeComboContinueDistance(profile) * this.getPlayerLikeComboContinueDistance(profile), 3)))
-                && HeroCombatPlanner.prefersAction(hero, target, tuning, HeroCombatPlanner.PlannedAction.LIGHT_COMBO);
+                && (continuingCombo || HeroCombatPlanner.prefersAction(hero, target, tuning, HeroCombatPlanner.PlannedAction.LIGHT_COMBO));
     }
 
     private boolean canStartPlayerLikeDashAttack(HumanoidMobPatch<?> mobPatch, PlayerLikeAttackProfile profile) {
@@ -1181,7 +1209,7 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
         }
         if (!hero.isBattleModeActive()) {
             if (this.infantryAiConfigured || this.heroAttackGoal != null || this.heroChasingGoal != null) {
-                HeroEpicFightDebugLog.event(hero, "HeroEpicFightPatch.ensureInfantryAiConfigured", "step=disableOutOfBattle,state=" + this.debugPatchState(hero));
+                HeroCombatDebugLog.event(hero, "HeroEpicFightPatch.ensureInfantryAiConfigured", "step=disableOutOfBattle,state=" + this.debugPatchState(hero));
             }
             this.removeHeroCombatGoals();
             this.infantryAiConfigured = false;
@@ -1191,10 +1219,10 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
             return;
         }
 
-        HeroEpicFightDebugLog.event(hero, "HeroEpicFightPatch.ensureInfantryAiConfigured", "step=configureBegin,state=" + this.debugPatchState(hero));
+        HeroCombatDebugLog.event(hero, "HeroEpicFightPatch.ensureInfantryAiConfigured", "step=configureBegin,state=" + this.debugPatchState(hero));
         this.setAIAsInfantry(this.isRangedWeaponEquipped());
         this.infantryAiConfigured = true;
-        HeroEpicFightDebugLog.event(hero, "HeroEpicFightPatch.ensureInfantryAiConfigured", "step=configureDone,state=" + this.debugPatchState(hero));
+        HeroCombatDebugLog.event(hero, "HeroEpicFightPatch.ensureInfantryAiConfigured", "step=configureDone,state=" + this.debugPatchState(hero));
     }
 
     boolean isRangedWeaponEquipped() {
@@ -1206,13 +1234,32 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
         return HeroCombatWeaponHelper.fireCrossbow(hero, target, stack);
     }
 
+    private boolean compatibilitySuspended;
+
+    private void suspendCompatibility() {
+        if (compatibilitySuspended) return;
+        compatibilitySuspended = true;
+        HeroEntity hero = this.getOriginal();
+        if (hero == null) return;
+        // Remove only goals owned by this patch; native companion goals remain available.
+        if (heroAttackGoal != null) hero.goalSelector.removeGoal(heroAttackGoal);
+        if (heroChasingGoal != null) hero.goalSelector.removeGoal(heroChasingGoal);
+        heroAttackGoal = null;
+        heroChasingGoal = null;
+        infantryAiConfigured = false;
+        if (!hero.level().isClientSide) {
+            hero.getNavigation().stop();
+            hero.resetBattleCombatState();
+        }
+    }
+
     private void removeHeroCombatGoals() {
         HeroEntity hero = this.getOriginal();
         if (hero == null) {
             return;
         }
         if (this.heroAttackGoal != null || this.heroChasingGoal != null) {
-            HeroEpicFightDebugLog.event(hero, "HeroEpicFightPatch.removeHeroCombatGoals", "attackGoal=" + (this.heroAttackGoal != null) + ",chasingGoal=" + (this.heroChasingGoal != null) + ",state=" + this.debugPatchState(hero));
+            HeroCombatDebugLog.event(hero, "HeroEpicFightPatch.removeHeroCombatGoals", "attackGoal=" + (this.heroAttackGoal != null) + ",chasingGoal=" + (this.heroChasingGoal != null) + ",state=" + this.debugPatchState(hero));
         }
         if (this.heroAttackGoal != null) {
             hero.goalSelector.removeGoal(this.heroAttackGoal);
@@ -1231,14 +1278,14 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
         }
 
         String transitionState = this.debugPatchTransitionState(hero);
-        HeroEpicFightDebugLog.transition(hero, scope, transitionState, "state=" + this.debugPatchState(hero));
+        HeroCombatDebugLog.transition(hero, scope, transitionState, "state=" + this.debugPatchState(hero));
     }
 
     private String debugPatchState(HeroEntity hero) {
-        return HeroEpicFightDebugLog.heroCoreState(hero)
+        return HeroCombatDebugLog.heroCoreState(hero)
                 + ",living=" + this.currentLivingMotion
                 + ",composite=" + this.currentCompositeMotion
-                + ",anim=" + HeroEpicFightDebugLog.animatorKey(this.getAnimator())
+                + ",anim=" + HeroCombatDebugLog.animatorKey(this.getAnimator())
                 + ",profile=" + this.getCurrentWeaponProfileKey(hero)
                 + ",lastProfile=" + this.lastWeaponProfileKey
                 + ",ai=" + this.infantryAiConfigured;
@@ -1248,11 +1295,11 @@ public class HeroEpicFightPatch extends HumanoidMobPatch<HeroEntity> {
         return "battle=" + hero.isBattleModeActive()
                 + ",action=" + hero.getBattleActionState()
                 + ",combo=" + hero.getBattleComboStep()
-                + ",main=" + HeroEpicFightDebugLog.itemKey(hero.getMainHandItem())
-                + ",off=" + HeroEpicFightDebugLog.itemKey(hero.getOffhandItem())
+                + ",main=" + HeroCombatDebugLog.itemKey(hero.getMainHandItem())
+                + ",off=" + HeroCombatDebugLog.itemKey(hero.getOffhandItem())
                 + ",living=" + this.currentLivingMotion
                 + ",composite=" + this.currentCompositeMotion
-                + ",anim=" + HeroEpicFightDebugLog.animatorId(this.getAnimator())
+                + ",anim=" + HeroCombatDebugLog.animatorId(this.getAnimator())
                 + ",profile=" + this.getCurrentWeaponProfileKey(hero)
                 + ",lastProfile=" + this.lastWeaponProfileKey
                 + ",ai=" + this.infantryAiConfigured;

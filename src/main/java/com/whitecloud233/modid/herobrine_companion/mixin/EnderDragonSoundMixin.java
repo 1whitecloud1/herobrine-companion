@@ -1,5 +1,9 @@
 package com.whitecloud233.modid.herobrine_companion.mixin;
 
+import com.whitecloud233.modid.herobrine_companion.config.ServerConfigAccess;
+import com.whitecloud233.modid.herobrine_companion.util.NbtKeys;
+import com.whitecloud233.modid.herobrine_companion.config.ServerRule;
+
 import com.whitecloud233.modid.herobrine_companion.config.Config;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
@@ -30,7 +34,7 @@ public abstract class EnderDragonSoundMixin extends Mob {
         this.herobrine_companion$wasSilent = this.isSilent();
 
         // 0. 检查配置是否启用
-        if (!Config.heroKingAuraEnabled) {
+        if (!ServerConfigAccess.snapshot().enabled(ServerRule.KING_AURA)) {
             return;
         }
 
@@ -39,7 +43,7 @@ public abstract class EnderDragonSoundMixin extends Mob {
         // 1. 必须同时满足：处于坐下状态 AND 拥有臣服标记
         // 这样就不会误伤原版正在回血的龙
         boolean isSitting = dragon.getPhaseManager().getCurrentPhase().getPhase() == EnderDragonPhase.SITTING_SCANNING;
-        boolean isSubmission = dragon.getPersistentData().getBoolean("HeroSubmission");
+        boolean isSubmission = dragon.getPersistentData().getBoolean(NbtKeys.MOB_SUBMISSION);
 
         if (isSitting && isSubmission) {
             // 临时开启静音！

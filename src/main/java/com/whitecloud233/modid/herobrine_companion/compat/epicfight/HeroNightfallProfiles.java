@@ -548,7 +548,7 @@ final class HeroNightfallProfiles {
 
     @Nullable
     static HeroNightfallProfile resolve(ItemStack stack) {
-        if (!net.minecraftforge.fml.ModList.get().isLoaded("efn") || stack == null || stack.isEmpty()) {
+        if (!com.whitecloud233.modid.herobrine_companion.compat.safety.CompatPreflight.available("efn") || stack == null || stack.isEmpty()) {
             return null;
         }
 

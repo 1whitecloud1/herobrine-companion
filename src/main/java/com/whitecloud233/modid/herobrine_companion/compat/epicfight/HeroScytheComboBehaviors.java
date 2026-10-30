@@ -2,6 +2,7 @@ package com.whitecloud233.modid.herobrine_companion.compat.epicfight;
 
 import com.mojang.logging.LogUtils;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.modid.herobrine_companion.util.DebugLog;
 import com.whitecloud233.modid.herobrine_companion.item.PoemOfTheEndItem;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
@@ -48,8 +49,9 @@ public final class HeroScytheComboBehaviors {
         try {
             legacyMotionSet = MediaPipeScytheAnimations.registerHero(builder);
             motionSets = UnityScytheAnimations.registerHero(builder);
-            LOGGER.info("[HeroScythe] registered {} native scythe modes, each with combo, dash and air attacks", motionSets.size());
+            DebugLog.info(LOGGER, "[HeroScythe] registered {} native scythe modes, each with combo, dash and air attacks", motionSets.size());
         } catch (Throwable throwable) {
+            com.whitecloud233.modid.herobrine_companion.compat.safety.CompatSafety.rethrowFatal(throwable);
             LOGGER.error("[HeroScythe] failed to register the native scythe modes", throwable);
         }
     }
@@ -147,9 +149,9 @@ public final class HeroScytheComboBehaviors {
             return false;
         }
         long now = System.currentTimeMillis();
-        if (now - lastStartLog > 2000L) {
+        if (DebugLog.isEnabled(LOGGER) && now - lastStartLog > 2000L) {
             lastStartLog = now;
-            LOGGER.info("[HeroScythe] combo start");
+            DebugLog.info(LOGGER, "[HeroScythe] combo start");
         }
         return true;
     }
@@ -208,7 +210,7 @@ public final class HeroScytheComboBehaviors {
      * 客户端排障(每秒最多一条):说明"这段动画在客户端到底播没播、EF 认为它多长"。
      */
     static void clientDiag(@Nullable HeroEpicFightPatch patch, @Nullable HeroEntity hero) {
-        if (patch == null || hero == null || !isSupported(hero.getMainHandItem())) {
+        if (patch == null || hero == null || !DebugLog.enabled() || !isSupported(hero.getMainHandItem())) {
             return;
         }
         long now = System.currentTimeMillis();
@@ -233,7 +235,7 @@ public final class HeroScytheComboBehaviors {
                 }
             }
         }
-        LOGGER.info("[HeroScythe-diag] battle={} efPose={} animator={} {} registeredSegments={}",
+        DebugLog.info(LOGGER, "[HeroScythe-diag] battle={} efPose={} animator={} {} registeredSegments={}",
                 hero.isBattleModeActive(),
                 HeroEpicFightCompat.shouldUseEpicFightPose(hero),
                 animator != null,
@@ -242,8 +244,11 @@ public final class HeroScytheComboBehaviors {
     }
 
     private static void onceLog(String key, String format, Object... args) {
+        if (!DebugLog.enabled()) {
+            return;
+        }
         if (LOGGED.add(key)) {
-            LOGGER.info(format, args);
+            DebugLog.info(LOGGER, format, args);
         }
     }
 }

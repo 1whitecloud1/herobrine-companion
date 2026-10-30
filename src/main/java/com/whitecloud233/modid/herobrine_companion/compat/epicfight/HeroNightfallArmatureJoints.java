@@ -1,5 +1,6 @@
 package com.whitecloud233.modid.herobrine_companion.compat.epicfight;
 
+import com.whitecloud233.modid.herobrine_companion.combat.HeroCombatDebugLog;
 import com.mojang.logging.LogUtils;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import org.slf4j.Logger;
@@ -29,13 +30,13 @@ final class HeroNightfallArmatureJoints {
 
     static void addNightfallWeaponJoints(Armature armature) {
         if (armature == null) {
-            if (HeroEpicFightDebugLog.enabled()) {
+            if (HeroCombatDebugLog.enabled()) {
                 LOGGER.warn("[HeroEFDebug] addNightfallWeaponJoints skipped: armature is null");
             }
             return;
         }
         if (armature.hasJoint("Claw_R")) {
-            if (HeroEpicFightDebugLog.enabled()) {
+            if (HeroCombatDebugLog.enabled()) {
                 LOGGER.info("[HeroEFDebug] addNightfallWeaponJoints skipped: Claw_R already present");
             }
             return;
@@ -43,7 +44,7 @@ final class HeroNightfallArmatureJoints {
         Joint toolR = armature.searchJointByName("Tool_R");
         Joint toolL = armature.searchJointByName("Tool_L");
         if (toolR == null || toolL == null) {
-            if (HeroEpicFightDebugLog.enabled()) {
+            if (HeroCombatDebugLog.enabled()) {
                 LOGGER.warn("[HeroEFDebug] addNightfallWeaponJoints skipped: Tool_R/L not found (toolR={},toolL={})",
                         toolR != null, toolL != null);
             }
@@ -76,11 +77,13 @@ final class HeroNightfallArmatureJoints {
             // 渲染矩阵缓存按 jointCount 分配，随新增关节扩容，否则按 id 索引越界
             field("poseMatrices").set(armature, OpenMatrix4f.allocateMatrixArray(oldCount + 3));
 
-            if (HeroEpicFightDebugLog.enabled()) {
-                LOGGER.info("[HeroEFDebug] Added Claw_R/Claw_L/wheel joints to Hero nightfall armature (oldCount={})", oldCount);
+            if (HeroCombatDebugLog.enabled()) {
+                LOGGER.info("[HeroEFDebug] Added Claw_R/Claw_L/wheel joints to Herobrine nightfall armature (oldCount={})", oldCount);
             }
         } catch (ReflectiveOperationException | RuntimeException exception) {
-            LOGGER.warn("Failed to add nightfall weapon joints to Hero armature", exception);
+            if (HeroCombatDebugLog.enabled()) {
+                LOGGER.warn("Failed to add nightfall weapon joints to Herobrine armature", exception);
+            }
         }
     }
 

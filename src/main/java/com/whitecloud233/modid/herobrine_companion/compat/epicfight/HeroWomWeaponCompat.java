@@ -85,7 +85,7 @@ public final class HeroWomWeaponCompat {
 
     /** 是否是 WOM 命名空间下的任意物品（含标准 Epic Fight 类型的 WOM 武器）。 */
     public static boolean isWomNamespace(ItemStack stack) {
-        if (stack == null || stack.isEmpty() || !ModList.get().isLoaded(WOM_MOD_ID)) {
+        if (stack == null || stack.isEmpty() || !com.whitecloud233.modid.herobrine_companion.compat.safety.CompatPreflight.available("wom")) {
             return false;
         }
         ResourceLocation itemId = ForgeRegistries.ITEMS.getKey(stack.getItem());

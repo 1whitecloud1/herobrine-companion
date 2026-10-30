@@ -3,6 +3,7 @@ package com.whitecloud233.modid.herobrine_companion.compat.epicfight.effect;
 import com.whitecloud233.modid.herobrine_companion.compat.epicfight.HeroEpicFightPatch;
 import com.whitecloud233.modid.herobrine_companion.compat.epicfight.HeroNightfallSkillSpec;
 import com.whitecloud233.modid.herobrine_companion.entity.HeroEntity;
+import com.whitecloud233.modid.herobrine_companion.entity.ai.combat.HeroHostileTargetPolicy;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
@@ -103,7 +104,9 @@ public abstract class AbstractHeroNightfallSkillEffect implements HeroNightfallS
         if (target instanceof net.minecraft.world.entity.player.Player player) {
             return hero.getOwnerUUID() == null || !hero.getOwnerUUID().equals(player.getUUID());
         }
-        return true;
+        // 技能范围伤害是直接 hurt()，不经过 HeroEntity#canAttack，这里必须自己问一次边界，
+        // 否则一次挥砍就把周围的原版怪和觉醒怪全清了。
+        return !HeroHostileTargetPolicy.isProtectedFromBattle(hero, target);
     }
 
     protected static void spawnSculkSwordParticles(ServerLevel level, Vec3 center, double radius, int count) {
