@@ -20,11 +20,7 @@ public record LlmChatPayload(
         if (systemPrompt == null) {
             systemPrompt = "";
         }
-        if (messages == null) {
-            messages = List.of();
-        }
-        if (tools == null) {
-            tools = List.of();
-        }
+        messages = messages == null ? List.of() : List.copyOf(messages);
+        tools = tools == null ? List.of() : List.copyOf(tools);
     }
 }

@@ -1,10 +1,12 @@
 package com.whitecloud233.herobrine_companion.client.llm;
 
 /**
+ * @deprecated 仅保留旧类型兼容；适配器统一返回 {@link LlmResponse}，不再通过字符串位置区分字段。
  * 流式响应产出（从原 AIStreamingSupport.StreamingResponse 迁来）。
  * finishReason 可为 null（正常结束或无该信息）；OpenAI 系为 "stop"/"length"，
  * Anthropic 系为 "end_turn"/"max_tokens"。
  */
+@Deprecated
 public class LlmStreamingResponse {
     public final int statusCode;
     public final String errorBody;

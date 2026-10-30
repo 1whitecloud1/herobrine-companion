@@ -1,6 +1,7 @@
 package com.whitecloud233.herobrine_companion.client.llm.format;
 
 import com.google.gson.JsonArray;
+import com.whitecloud233.herobrine_companion.client.llm.LlmHttp;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -8,7 +9,8 @@ import com.whitecloud233.herobrine_companion.client.llm.LlmChatMessage;
 import com.whitecloud233.herobrine_companion.client.llm.LlmChatPayload;
 import com.whitecloud233.herobrine_companion.client.llm.LlmFormatAdapter;
 import com.whitecloud233.herobrine_companion.client.llm.LlmSettings;
-import com.whitecloud233.herobrine_companion.client.llm.LlmStreamingResponse;
+import com.whitecloud233.herobrine_companion.client.llm.LlmResponse;
+import com.whitecloud233.herobrine_companion.client.llm.LlmFinishReason;
 import com.whitecloud233.herobrine_companion.client.llm.LlmToolInvocation;
 import com.whitecloud233.herobrine_companion.client.llm.LlmToolSpec;
 import com.whitecloud233.herobrine_companion.client.service.LLMConfig;
@@ -17,7 +19,6 @@ import org.slf4j.Logger;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -83,17 +84,11 @@ public final class OpenAiResponsesAdapter implements LlmFormatAdapter {
     }
 
     private static HttpRequest buildRequest(LlmSettings settings, JsonObject body, boolean stream) {
-        HttpRequest.Builder builder = HttpRequest.newBuilder()
-                .uri(URI.create(settings.endpoint()))
-                .header("Content-Type", "application/json; charset=UTF-8")
-                .header("Authorization", "Bearer " + settings.apiKey());
-        if (stream) {
-            builder.header("Accept", "text/event-stream");
-        }
-        if (settings.provider() == LLMConfig.Provider.OPENROUTER) {
-            builder.header("X-Title", "Herobrine Companion");
-        }
-        return builder.POST(HttpRequest.BodyPublishers.ofString(body.toString(), StandardCharsets.UTF_8)).build();
+        return LlmHttp.post(settings.endpoint(), settings.apiKey(), body.toString(), stream,
+                LlmHttp.AuthStyle.BEARER,
+                settings.provider() == LLMConfig.Provider.OPENROUTER
+                        ? new String[]{"X-Title", "Herobrine Companion"}
+                        : null);
     }
 
     @Override
@@ -159,17 +154,35 @@ public final class OpenAiResponsesAdapter implements LlmFormatAdapter {
                 }
                 String toolName = item.get("name").getAsString();
                 String arguments = item.get("arguments").getAsString();
-                JsonObject args;
-                try {
-                    args = JsonParser.parseString(arguments).getAsJsonObject();
-                } catch (Exception e) {
-                    args = new JsonObject();
-                }
+                JsonObject args = JsonParser.parseString(arguments).getAsJsonObject();
                 return new LlmToolInvocation(toolName, args);
             }
         } catch (Exception ignored) {
         }
         return null;
+    }
+
+    @Override
+    public LlmFinishReason extractFinishReason(JsonObject json) {
+        return finishReason(json);
+    }
+
+    private static LlmFinishReason finishReason(JsonObject json) {
+        try {
+            String status = json.get("status").getAsString();
+            if ("completed".equals(status)) return LlmFinishReason.COMPLETE;
+            if ("failed".equals(status) || "cancelled".equals(status)) return LlmFinishReason.ERROR;
+            if ("incomplete".equals(status)) {
+                String reason = json.getAsJsonObject("incomplete_details").get("reason").getAsString();
+                return switch (reason) {
+                    case "max_output_tokens" -> LlmFinishReason.TOKEN_LIMIT;
+                    case "content_filter" -> LlmFinishReason.CONTENT_FILTERED;
+                    default -> LlmFinishReason.UNKNOWN;
+                };
+            }
+        } catch (RuntimeException ignored) {
+        }
+        return LlmFinishReason.UNKNOWN;
     }
 
     @Override
@@ -183,14 +196,14 @@ public final class OpenAiResponsesAdapter implements LlmFormatAdapter {
     }
 
     @Override
-    public LlmStreamingResponse readStreaming(HttpClient client, HttpRequest request,
+    public LlmResponse readStreaming(HttpClient client, HttpRequest request,
                                               Consumer<String> partialConsumer, Logger logger) {
         try {
             HttpResponse<InputStream> response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
             if (response.statusCode() != 200) {
                 try (InputStream errorStream = response.body()) {
                     String errorBody = new String(errorStream.readAllBytes(), StandardCharsets.UTF_8);
-                    return LlmStreamingResponse.error(response.statusCode(), errorBody);
+                    return LlmResponse.httpFailure(response.statusCode(), errorBody);
                 }
             }
 
@@ -198,14 +211,16 @@ public final class OpenAiResponsesAdapter implements LlmFormatAdapter {
                  BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
                 StringBuilder replyBuilder = new StringBuilder();
                 ResponsesToolAccumulator toolAccumulator = new ResponsesToolAccumulator();
-                StreamEmitState emitState = new StreamEmitState();
+                StreamTextEmitter emitState = new StreamTextEmitter();
+                StreamCompletion completion = new StreamCompletion();
+                StringBuilder reasoningBuilder = new StringBuilder();
                 StringBuilder dataBuffer = new StringBuilder();
                 String eventName = null;
                 String line;
                 while ((line = reader.readLine()) != null) {
                     if (line.isEmpty()) {
                         if (!dataBuffer.isEmpty()) {
-                            processStreamingEvent(eventName, dataBuffer.toString(), replyBuilder, toolAccumulator, partialConsumer, emitState, logger);
+                            processStreamingEvent(eventName, dataBuffer.toString(), replyBuilder, reasoningBuilder, toolAccumulator, partialConsumer, emitState, completion, logger);
                             dataBuffer.setLength(0);
                         }
                         eventName = null;
@@ -221,9 +236,9 @@ public final class OpenAiResponsesAdapter implements LlmFormatAdapter {
                     }
                 }
                 if (!dataBuffer.isEmpty()) {
-                    processStreamingEvent(eventName, dataBuffer.toString(), replyBuilder, toolAccumulator, partialConsumer, emitState, logger);
+                    processStreamingEvent(eventName, dataBuffer.toString(), replyBuilder, reasoningBuilder, toolAccumulator, partialConsumer, emitState, completion, logger);
                 }
-                return LlmStreamingResponse.success(replyBuilder.toString(), toolAccumulator.getToolName(), toolAccumulator.getToolArguments());
+                return completion.response(replyBuilder.toString(), reasoningBuilder.toString(), toolAccumulator.getToolName(), toolAccumulator.getToolArguments());
             }
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -231,13 +246,14 @@ public final class OpenAiResponsesAdapter implements LlmFormatAdapter {
     }
 
     private static void processStreamingEvent(String eventName, String payload, StringBuilder replyBuilder,
-                                              ResponsesToolAccumulator toolAccumulator, Consumer<String> partialConsumer,
-                                              StreamEmitState emitState, Logger logger) {
+                                              StringBuilder reasoningBuilder, ResponsesToolAccumulator toolAccumulator, Consumer<String> partialConsumer,
+                                              StreamTextEmitter emitState, StreamCompletion completion, Logger logger) {
         try {
             if (payload == null || payload.isBlank()) {
                 return;
             }
             JsonObject json = JsonParser.parseString(payload).getAsJsonObject();
+            if (completion.readError(json)) return;
             String resolvedEvent = eventName;
             if ((resolvedEvent == null || resolvedEvent.isBlank()) && json.has("type") && !json.get("type").isJsonNull()) {
                 resolvedEvent = json.get("type").getAsString();
@@ -247,12 +263,24 @@ public final class OpenAiResponsesAdapter implements LlmFormatAdapter {
             }
 
             switch (resolvedEvent) {
+                case "response.completed", "response.incomplete", "response.failed", "response.cancelled" -> {
+                    if (json.has("response") && json.get("response").isJsonObject()) {
+                        JsonObject response = json.getAsJsonObject("response");
+                        completion.readError(response);
+                        completion.finish(finishReason(response));
+                    } else if ("response.failed".equals(resolvedEvent) || "response.cancelled".equals(resolvedEvent)) {
+                        completion.finish(LlmFinishReason.ERROR);
+                    }
+                }
+                case "response.reasoning_summary_text.delta", "response.reasoning_text.delta" -> {
+                    if (json.has("delta") && !json.get("delta").isJsonNull()) reasoningBuilder.append(json.get("delta").getAsString());
+                }
                 case "response.output_text.delta" -> {
                     if (json.has("delta") && !json.get("delta").isJsonNull()) {
                         String delta = json.get("delta").getAsString();
                         if (!delta.isEmpty()) {
                             replyBuilder.append(delta);
-                            emitStreamingText(partialConsumer, replyBuilder, emitState);
+                            emitState.emit(partialConsumer, replyBuilder);
                         }
                     }
                 }
@@ -260,13 +288,13 @@ public final class OpenAiResponsesAdapter implements LlmFormatAdapter {
                     if (json.has("item") && json.get("item").isJsonObject()) {
                         JsonObject item = json.getAsJsonObject("item");
                         if (item.has("type") && "function_call".equals(item.get("type").getAsString())) {
-                            toolAccumulator.startFunctionCall(item);
+                            toolAccumulator.startFunctionCall(json, item);
                         }
                     }
                 }
                 case "response.function_call_arguments.delta" -> {
                     if (json.has("delta") && !json.get("delta").isJsonNull()) {
-                        toolAccumulator.appendArguments(json.get("delta").getAsString());
+                        toolAccumulator.appendArguments(json, json.get("delta").getAsString());
                     }
                 }
                 default -> {
@@ -277,56 +305,39 @@ public final class OpenAiResponsesAdapter implements LlmFormatAdapter {
         }
     }
 
-    private static void emitStreamingText(Consumer<String> partialConsumer, StringBuilder replyBuilder, StreamEmitState emitState) {
-        if (partialConsumer == null || replyBuilder.isEmpty()) {
-            return;
-        }
-        long now = System.currentTimeMillis();
-        int currentLength = replyBuilder.length();
-        if ((now - emitState.lastEmitAt) < 40L && (currentLength - emitState.lastEmitLength) < 2) {
-            return;
-        }
-        emitState.lastEmitAt = now;
-        emitState.lastEmitLength = currentLength;
-        partialConsumer.accept(replyBuilder.toString());
-    }
-
-    private static class StreamEmitState {
-        private long lastEmitAt;
-        private int lastEmitLength;
-    }
-
     private static class ResponsesToolAccumulator {
         private String toolName;
+        private String itemId;
+        private Integer outputIndex;
         private final StringBuilder arguments = new StringBuilder();
-        private boolean complete;
+        private boolean sawAnotherCall;
 
-        private void startFunctionCall(JsonObject item) {
-            if (item.has("name") && !item.get("name").isJsonNull()) {
-                this.toolName = item.get("name").getAsString();
-            }
-            if (item.has("arguments") && !item.get("arguments").isJsonNull()) {
-                String present = item.get("arguments").getAsString();
-                if (!present.isBlank()) {
-                    this.arguments.append(present);
-                }
-            }
-            this.complete = true;
-        }
-
-        private void appendArguments(String delta) {
-            if (this.toolName == null) {
+        private void startFunctionCall(JsonObject event, JsonObject item) {
+            if (this.toolName != null) {
+                sawAnotherCall = true;
                 return;
             }
-            this.arguments.append(delta);
+            if (item.has("name") && !item.get("name").isJsonNull()) this.toolName = item.get("name").getAsString();
+            if (item.has("id") && !item.get("id").isJsonNull()) this.itemId = item.get("id").getAsString();
+            if (event.has("output_index")) this.outputIndex = event.get("output_index").getAsInt();
+            if (item.has("arguments") && !item.get("arguments").isJsonNull()) {
+                this.arguments.append(item.get("arguments").getAsString());
+            }
         }
 
-        private String getToolName() {
-            return this.toolName;
+        private void appendArguments(JsonObject event, String delta) {
+            if (toolName == null) return;
+            if (event.has("item_id") && itemId != null) {
+                if (!itemId.equals(event.get("item_id").getAsString())) return;
+            } else if (event.has("output_index") && outputIndex != null) {
+                if (outputIndex != event.get("output_index").getAsInt()) return;
+            } else if (sawAnotherCall) {
+                return;
+            }
+            arguments.append(delta);
         }
 
-        private String getToolArguments() {
-            return this.arguments.isEmpty() ? null : this.arguments.toString();
-        }
+        private String getToolName() { return toolName; }
+        private String getToolArguments() { return arguments.isEmpty() ? null : arguments.toString(); }
     }
 }
