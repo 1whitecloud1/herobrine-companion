@@ -1,6 +1,6 @@
 package com.whitecloud233.herobrine_companion.world.inventory;
 
-import com.whitecloud233.herobrine_companion.compat.accessories.HeroAccessoriesCompat;
+import com.whitecloud233.herobrine_companion.api.compat.HeroAccessoriesCompat;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.logic.data.HeroStateManager;
 import com.whitecloud233.herobrine_companion.util.HeroMenuValidity;
@@ -118,7 +118,7 @@ public class HeroWardrobeMenu extends AbstractContainerMenu {
     public void removed(Player player) {
         super.removed(player);
         if (this.hero != null) {
-            this.hero.isStateDirty = true;
+            this.hero.markEquipmentDirty();
             if (!this.hero.level().isClientSide) {
                 HeroStateManager.backupToGlobal(this.hero);
             }
@@ -142,7 +142,7 @@ public class HeroWardrobeMenu extends AbstractContainerMenu {
             return;
         }
 
-        hero.isStateDirty = true;
+        hero.markEquipmentDirty();
         if (!hero.level().isClientSide) {
             HeroStateManager.backupToGlobal(hero);
         }
@@ -303,7 +303,7 @@ public class HeroWardrobeMenu extends AbstractContainerMenu {
 
         private static void validateSlot(int slot) {
             if (slot != 0) {
-                throw new IndexOutOfBoundsException("Hero hand slot index out of range: " + slot);
+                throw new IndexOutOfBoundsException("Herobrine hand slot index out of range: " + slot);
             }
         }
     }

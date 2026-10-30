@@ -1,6 +1,8 @@
 package com.whitecloud233.herobrine_companion.fight.network;
 
-import com.whitecloud233.herobrine_companion.client.fight.HeroChallengeManager;
+import com.whitecloud233.herobrine_companion.fight.ChallengeSession;
+
+import com.whitecloud233.herobrine_companion.fight.HeroChallengeManager;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -31,7 +33,7 @@ public record CPacketCollapseFinished() implements CustomPacketPayload {
                 if (player.level() instanceof ServerLevel level) {
                     // 找到正在和这个玩家对峙的处于“假死阶段”的 Herobrine
                     for (var entity : level.getAllEntities()) {
-                        if (entity instanceof HeroEntity hero && hero.getPersistentData().getBoolean("IsFakeOutPhase")) {
+                        if (entity instanceof HeroEntity hero && ChallengeSession.isHeroFakeOutPhase(hero)) {
                             // 清除假死计时器
                             hero.getPersistentData().remove("FakeOutTimer");
                             // 真正的胜利结算：传回主世界，重置场地，播放胜利音效！

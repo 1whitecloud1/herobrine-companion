@@ -44,7 +44,7 @@ final class DestructionLightningStrikeTask extends TerrainTask {
 
         DestructionMode mode = DestructionMode.current();
         if (!this.pendingBlocks.isEmpty()) {
-            DestructionTerrainManager.clearBlocksInstant(this.level, this.pendingBlocks, mode, true);
+            this.queueClearBlocks(this.pendingBlocks, mode, true);
             this.pendingBlocks.clear();
         }
         return true;

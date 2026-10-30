@@ -19,9 +19,7 @@ public record DestructionGodThunderSkyNetPacket(Vec3 center, double cloudY, floa
     );
 
     public void encode(FriendlyByteBuf buf) {
-        buf.writeDouble(center.x);
-        buf.writeDouble(center.y);
-        buf.writeDouble(center.z);
+        buf.writeVec3(center);
         buf.writeDouble(cloudY);
         buf.writeFloat(radius);
         buf.writeVarInt(lifetime);
@@ -30,7 +28,7 @@ public record DestructionGodThunderSkyNetPacket(Vec3 center, double cloudY, floa
 
     private static DestructionGodThunderSkyNetPacket decode(FriendlyByteBuf buf) {
         return new DestructionGodThunderSkyNetPacket(
-                new Vec3(buf.readDouble(), buf.readDouble(), buf.readDouble()),
+                buf.readVec3(),
                 buf.readDouble(),
                 buf.readFloat(),
                 buf.readVarInt(),

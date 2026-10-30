@@ -32,19 +32,11 @@ final class WorldRendTask extends TerrainTask {
         DestructionMode mode = DestructionMode.current();
         LivingEntity caster = this.getCaster();
 
-        for (int step = 0; step < stepsPerTick; step++) {
-            if (this.currentLength >= this.maxLength) {
-                Vec3 end = this.centerPoint();
-                this.level.playSound(null, end.x, end.y, end.z, SoundEvents.GENERIC_EXPLODE, SoundSource.AMBIENT, 8.0F, 0.65F);
-                this.level.playSound(null, end.x, end.y, end.z, SoundEvents.TRIDENT_THUNDER, SoundSource.WEATHER, 6.0F, 0.75F);
-                DestructionTerrainManager.damageAndPush(this.level, caster, new AABB(end.x - 10.0D, end.y - 6.0D, end.z - 10.0D, end.x + 10.0D, end.y + 10.0D, end.z + 10.0D), end, 28.0F, 1.9D, 1.1D);
-                return true;
-            }
-
+        return this.sweep(stepsPerTick, stepSize, step -> {
             Vec3 center = this.centerPoint();
             BlockPos centerPos = new BlockPos(Mth.floor(center.x), Mth.floor(center.y), Mth.floor(center.z));
             if (!this.level.isLoaded(centerPos)) {
-                return true;
+                return false;
             }
 
             List<BlockPos> toClear = new ArrayList<>();
@@ -60,7 +52,7 @@ final class WorldRendTask extends TerrainTask {
                     toClear.add(new BlockPos(blockX, y, blockZ));
                 }
             }
-            DestructionTerrainManager.clearBlocksInstant(this.level, toClear, mode, false);
+            this.queueClearBlocks(toClear, mode, false);
 
             AABB slice = new AABB(center.x - this.halfWidth - 1.0D, center.y - 4.0D, center.z - this.halfWidth - 1.0D,
                     center.x + this.halfWidth + 1.0D, center.y + 8.0D, center.z + this.halfWidth + 1.0D);
@@ -70,11 +62,13 @@ final class WorldRendTask extends TerrainTask {
             if (step == 0) {
                 this.level.playSound(null, center.x, center.y, center.z, SoundEvents.WITHER_SHOOT, SoundSource.AMBIENT, 2.0F, 0.45F);
             }
-
-            this.currentLength += stepSize;
-        }
-
-        return false;
+            return true;
+        }, () -> {
+            Vec3 end = this.centerPoint();
+            this.level.playSound(null, end.x, end.y, end.z, SoundEvents.GENERIC_EXPLODE, SoundSource.AMBIENT, 8.0F, 0.65F);
+            this.level.playSound(null, end.x, end.y, end.z, SoundEvents.TRIDENT_THUNDER, SoundSource.WEATHER, 6.0F, 0.75F);
+            DestructionTerrainManager.damageAndPush(this.level, caster, new AABB(end.x - 10.0D, end.y - 6.0D, end.z - 10.0D, end.x + 10.0D, end.y + 10.0D, end.z + 10.0D), end, 28.0F, 1.9D, 1.1D);
+        });
     }
 }
 

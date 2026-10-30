@@ -109,7 +109,7 @@ final class BladeLineRendTask extends TerrainTask {
         double segmentLength = Math.max(0.001D, segmentStart.distanceTo(segmentEnd));
         Vec3 segmentMid = segmentStart.lerp(segmentEnd, 0.5D);
         Vec3 slashAxis = this.slashAxis();
-        Vec3 planeNormal = cross(this.forward, slashAxis);
+        Vec3 planeNormal = this.forward.cross(slashAxis);
         if (planeNormal.lengthSqr() < 1.0E-4D) {
             planeNormal = this.perpendicular;
         } else {
@@ -164,7 +164,7 @@ final class BladeLineRendTask extends TerrainTask {
 
         while (budget.hasBudget() && this.pendingBlockIndex < this.pendingBlocks.size()) {
             BlockPos pos = this.pendingBlocks.get(this.pendingBlockIndex++);
-            DestructionTerrainManager.destroyBlock(this.level, pos, budget, mode, false, true);
+            DestructionTerrainManager.destroyBlock(this.level, pos, budget, mode, true);
         }
 
         if (this.pendingBlockIndex >= this.pendingBlocks.size()) {
@@ -182,8 +182,6 @@ final class BladeLineRendTask extends TerrainTask {
         return axis.normalize();
     }
 
-    private static Vec3 cross(Vec3 a, Vec3 b) {
-        return new Vec3(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x);
-    }
+
 }
 

@@ -34,11 +34,7 @@ final class ApocalypseCrackTask extends TerrainTask {
         DestructionMode mode = DestructionMode.current();
         LivingEntity caster = this.getCaster();
 
-        for (int step = 0; step < stepsPerTick; step++) {
-            if (this.currentLength >= this.maxLength) {
-                return true;
-            }
-
+        return this.sweep(stepsPerTick, stepSize, step -> {
             Vec3 base = this.centerPoint();
             for (int side = -1; side <= 1; side += 2) {
                 Vec3 crackCenter = base.add(this.perpendicular.scale(this.sideOffset * side));
@@ -61,7 +57,7 @@ final class ApocalypseCrackTask extends TerrainTask {
                         toClear.add(new BlockPos(blockX, y, blockZ));
                     }
                 }
-                DestructionTerrainManager.clearBlocksInstant(this.level, toClear, mode, false);
+                this.queueClearBlocks(toClear, mode, false);
 
                 AABB crackBox = new AABB(crackCenter.x - this.crackHalfWidth - 1.0D, crackCenter.y - 4.0D, crackCenter.z - this.crackHalfWidth - 1.0D,
                         crackCenter.x + this.crackHalfWidth + 1.0D, crackCenter.y + 6.0D, crackCenter.z + this.crackHalfWidth + 1.0D);
@@ -72,9 +68,8 @@ final class ApocalypseCrackTask extends TerrainTask {
             if (step == 0) {
                 this.level.playSound(null, base.x, base.y, base.z, SoundEvents.GENERIC_EXPLODE, SoundSource.AMBIENT, 2.4F, 1.45F);
             }
-            this.currentLength += stepSize;
-        }
-        return false;
+            return true;
+        });
     }
 }
 

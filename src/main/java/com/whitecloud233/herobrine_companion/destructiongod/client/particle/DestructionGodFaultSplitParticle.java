@@ -1,22 +1,21 @@
 package com.whitecloud233.herobrine_companion.destructiongod.client.particle;
 
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.*;
+import com.whitecloud233.herobrine_companion.client.particle.ParticleGeometry;
+
+import com.whitecloud233.herobrine_companion.client.particle.ParticleColor;
+
+import com.whitecloud233.herobrine_companion.client.render.GlowTrailRenderTypes;
+import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.whitecloud233.herobrine_companion.destructiongod.client.cinematic.ClientSpatialRendHandler;
 import net.minecraft.client.Camera;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.Particle;
 import net.minecraft.client.particle.ParticleRenderType;
-import net.minecraft.client.renderer.GameRenderer;
-import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
-import com.mojang.blaze3d.vertex.VertexConsumer;
-import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
-import org.lwjgl.opengl.GL11;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,9 +31,6 @@ public class DestructionGodFaultSplitParticle extends Particle {
     private final int chargeTicks;
     private final List<Vec3> lineSamples = new ArrayList<>();
     private boolean splitShakeStarted = false;
-
-    private record ParticleColor(float r, float g, float b, float a) {
-    }
 
     public DestructionGodFaultSplitParticle(ClientLevel level, Vec3 origin, Vec3 direction, float length, int terrainHalfWidth, int splitDistance, int chargeTicks, int lifetime) {
         super(level, origin.x, origin.y, origin.z);
@@ -124,7 +120,7 @@ public class DestructionGodFaultSplitParticle extends Particle {
     }
 
     private void drawRibbon(Matrix4f matrix, VertexConsumer vertex, Vec3 cameraPos, List<Vec3> samples, float width, float lateralOffset, float yOffset, ParticleColor color) {
-        if (width <= 0.001F || samples.size() < 2 || color.a <= 0.001F) {
+        if (width <= 0.001F || samples.size() < 2 || color.a() <= 0.001F) {
             return;
         }
         Vec3 lateral = this.perpendicular.scale(lateralOffset);
@@ -141,29 +137,13 @@ public class DestructionGodFaultSplitParticle extends Particle {
     }
 
     private void addQuad(VertexConsumer vertex, Matrix4f matrix, Vec3 a, Vec3 b, Vec3 c, Vec3 d, ParticleColor color) {
-        vertex.addVertex(matrix, (float) a.x, (float) a.y, (float) a.z).setColor(color.r, color.g, color.b, color.a);
-        vertex.addVertex(matrix, (float) b.x, (float) b.y, (float) b.z).setColor(color.r, color.g, color.b, color.a);
-        vertex.addVertex(matrix, (float) c.x, (float) c.y, (float) c.z).setColor(color.r, color.g, color.b, color.a);
-        vertex.addVertex(matrix, (float) d.x, (float) d.y, (float) d.z).setColor(color.r, color.g, color.b, color.a);
+        ParticleGeometry.vertex(vertex, matrix, a, color);
+        ParticleGeometry.vertex(vertex, matrix, b, color);
+        ParticleGeometry.vertex(vertex, matrix, c, color);
+        ParticleGeometry.vertex(vertex, matrix, d, color);
     }
 
-    public static final ParticleRenderType RENDER_TYPE = new ParticleRenderType() {
-        @Nullable
-        @Override
-        public BufferBuilder begin(Tesselator tesselator, TextureManager manager) {
-            RenderSystem.depthMask(false);
-            RenderSystem.enableBlend();
-            RenderSystem.disableCull();
-            RenderSystem.setShader(GameRenderer::getRendertypeLightningShader);
-            RenderSystem.blendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE);
-            return tesselator.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
-        }
-
-        @Override
-        public String toString() {
-            return "DESTRUCTION_GOD_FAULT_SPLIT";
-        }
-    };
+    public static final ParticleRenderType RENDER_TYPE = GlowTrailRenderTypes.GLOW_LIGHTNING;
 
     @Override
     public ParticleRenderType getRenderType() {

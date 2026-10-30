@@ -1,5 +1,6 @@
 package com.whitecloud233.herobrine_companion.destructiongod.client.cinematic;
 
+import com.whitecloud233.herobrine_companion.util.SegmentProjection;
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.entity.projectile.CleaveBladeEntity;
 import net.minecraft.client.Minecraft;
@@ -222,13 +223,7 @@ public class ClientSpatialRendHandler {
     }
 
     private static Vec3 closestPointOnSegment(Vec3 point, Vec3 start, Vec3 end) {
-        Vec3 segment = end.subtract(start);
-        double lengthSq = segment.lengthSqr();
-        if (lengthSq < 1.0E-4D) {
-            return start;
-        }
-        double t = Mth.clamp(point.subtract(start).dot(segment) / lengthSq, 0.0D, 1.0D);
-        return start.add(segment.scale(t));
+        return new SegmentProjection(start, end).closestPoint(point);
     }
 }
 

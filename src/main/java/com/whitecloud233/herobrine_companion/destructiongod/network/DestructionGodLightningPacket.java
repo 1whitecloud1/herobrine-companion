@@ -19,19 +19,15 @@ public record DestructionGodLightningPacket(Vec3 startPos, Vec3 endPos, float wi
     );
 
     public void encode(FriendlyByteBuf buf) {
-        buf.writeDouble(startPos.x);
-        buf.writeDouble(startPos.y);
-        buf.writeDouble(startPos.z);
-        buf.writeDouble(endPos.x);
-        buf.writeDouble(endPos.y);
-        buf.writeDouble(endPos.z);
+        buf.writeVec3(startPos);
+        buf.writeVec3(endPos);
         buf.writeFloat(width);
     }
 
     private static DestructionGodLightningPacket decode(FriendlyByteBuf buf) {
         return new DestructionGodLightningPacket(
-                new Vec3(buf.readDouble(), buf.readDouble(), buf.readDouble()),
-                new Vec3(buf.readDouble(), buf.readDouble(), buf.readDouble()),
+                buf.readVec3(),
+                buf.readVec3(),
                 buf.readFloat()
         );
     }

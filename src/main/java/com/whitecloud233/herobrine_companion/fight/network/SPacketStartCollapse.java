@@ -1,6 +1,6 @@
 package com.whitecloud233.herobrine_companion.fight.network;
 
-import com.whitecloud233.herobrine_companion.client.fight.event.ClientCollapseHandler;
+import com.whitecloud233.herobrine_companion.fight.event.ClientCollapseHandler;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;

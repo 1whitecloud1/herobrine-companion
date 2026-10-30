@@ -19,12 +19,8 @@ public record DestructionGodFaultSplitPacket(Vec3 origin, Vec3 direction, float 
     );
 
     public void encode(FriendlyByteBuf buf) {
-        buf.writeDouble(origin.x);
-        buf.writeDouble(origin.y);
-        buf.writeDouble(origin.z);
-        buf.writeDouble(direction.x);
-        buf.writeDouble(direction.y);
-        buf.writeDouble(direction.z);
+        buf.writeVec3(origin);
+        buf.writeVec3(direction);
         buf.writeFloat(length);
         buf.writeVarInt(terrainHalfWidth);
         buf.writeVarInt(splitDistance);
@@ -34,8 +30,8 @@ public record DestructionGodFaultSplitPacket(Vec3 origin, Vec3 direction, float 
 
     private static DestructionGodFaultSplitPacket decode(FriendlyByteBuf buf) {
         return new DestructionGodFaultSplitPacket(
-                new Vec3(buf.readDouble(), buf.readDouble(), buf.readDouble()),
-                new Vec3(buf.readDouble(), buf.readDouble(), buf.readDouble()),
+                buf.readVec3(),
+                buf.readVec3(),
                 buf.readFloat(),
                 buf.readVarInt(),
                 buf.readVarInt(),

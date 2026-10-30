@@ -1,6 +1,6 @@
 package com.whitecloud233.herobrine_companion.destructiongod.client.network;
 
-import com.whitecloud233.herobrine_companion.client.fight.particles.PaleLightningArcParticle;
+import com.whitecloud233.herobrine_companion.fight.particles.PaleLightningArcParticle;
 import com.whitecloud233.herobrine_companion.destructiongod.client.particle.DestructionGodFaultSplitParticle;
 import com.whitecloud233.herobrine_companion.destructiongod.client.particle.DestructionGodLightningBeamParticle;
 import com.whitecloud233.herobrine_companion.destructiongod.client.particle.DestructionGodOrbParticle;

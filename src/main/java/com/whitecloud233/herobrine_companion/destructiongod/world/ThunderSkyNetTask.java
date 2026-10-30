@@ -74,7 +74,7 @@ final class ThunderSkyNetTask extends TerrainTask {
             }
 
             if (!pulseBlocks.isEmpty()) {
-                DestructionTerrainManager.clearBlocksInstant(this.level, pulseBlocks, mode, true);
+                this.queueClearBlocks(pulseBlocks, mode, true);
             }
 
             if ((this.age / this.pulseIntervalTicks) % 2 == 0) {

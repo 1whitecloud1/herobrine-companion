@@ -1,22 +1,26 @@
 package com.whitecloud233.herobrine_companion.destructiongod.client.particle;
 
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.*;
+import com.whitecloud233.herobrine_companion.client.particle.ParticleGeometry;
+
+import com.whitecloud233.herobrine_companion.client.particle.ParticleColor;
+
+import com.whitecloud233.herobrine_companion.client.render.GlowTrailRenderTypes;
+import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.Camera;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.Particle;
 import net.minecraft.client.particle.ParticleRenderType;
-import net.minecraft.client.renderer.GameRenderer;
-import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.NotNull;
 import org.joml.Matrix4f;
-import org.joml.Vector3f;
-import org.lwjgl.opengl.GL11;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Random;
+import java.util.Set;
 
 public class DestructionGodThunderSkyNetParticle extends Particle {
     private static final int PILLAR_CHARGE_TICKS = 24;
@@ -31,20 +35,6 @@ public class DestructionGodThunderSkyNetParticle extends Particle {
     private final List<Vec3> nodes = new ArrayList<>();
     private final List<LightningEdge> edges = new ArrayList<>();
     private final Set<Long> edgeKeys = new HashSet<>();
-
-    private static class ParticleColor {
-        private final float r;
-        private final float g;
-        private final float b;
-        private final float a;
-
-        private ParticleColor(float r, float g, float b, float a) {
-            this.r = r;
-            this.g = g;
-            this.b = b;
-            this.a = a;
-        }
-    }
 
     private static class LightningEdge {
         private final List<Vec3> path;
@@ -257,81 +247,15 @@ public class DestructionGodThunderSkyNetParticle extends Particle {
     }
 
     private void drawCylinder(Matrix4f transform, VertexConsumer vertex, Vec3 cameraPos, List<Vec3> points, int cylinderSegments, float radius, ParticleColor color) {
-        if (radius <= 0.0001F) {
-            return;
-        }
-        for (int i = 0; i < points.size() - 1; i++) {
-            Vec3 p1 = points.get(i).subtract(cameraPos);
-            Vec3 p2 = points.get(i + 1).subtract(cameraPos);
-            Vec3 axis = p2.subtract(p1);
-            if (axis.lengthSqr() < 0.001D) {
-                continue;
-            }
-            List<Vec3> ringA = generateRing(p1, axis, cylinderSegments, radius);
-            List<Vec3> ringB = generateRing(p2, axis, cylinderSegments, radius);
-            for (int j = 0; j < cylinderSegments; j++) {
-                Vec3 a1 = ringA.get(j);
-                Vec3 a2 = ringA.get((j + 1) % cylinderSegments);
-                Vec3 b2 = ringB.get((j + 1) % cylinderSegments);
-                Vec3 b1 = ringB.get(j);
-                addVertex(vertex, transform, a1, color);
-                addVertex(vertex, transform, a2, color);
-                addVertex(vertex, transform, b2, color);
-                addVertex(vertex, transform, b1, color);
-            }
-        }
+        if (radius <= 0.0001F) return;
+        ParticleGeometry.cylinder(transform, vertex, cameraPos, points, cylinderSegments, radius, color);
     }
 
-    private List<Vec3> generateRing(Vec3 center, Vec3 axis, int segments, float radius) {
-        List<Vec3> ring = new ArrayList<>();
-        Vector3f axis3f = toVector3f(axis).normalize();
-        Vector3f u = Math.abs(axis3f.y) < 0.999F
-                ? axis3f.cross(new Vector3f(0.0F, 1.0F, 0.0F), new Vector3f()).normalize()
-                : axis3f.cross(new Vector3f(1.0F, 0.0F, 0.0F), new Vector3f()).normalize();
-        Vector3f v = axis3f.cross(u, new Vector3f()).normalize();
-        for (int i = 0; i < segments; i++) {
-            float angle = (float) i / segments * (float) Math.PI * 2.0F;
-            Vector3f pos = toVector3f(center);
-            pos.add(u.mul((float) Math.cos(angle) * radius, new Vector3f()));
-            pos.add(v.mul((float) Math.sin(angle) * radius, new Vector3f()));
-            ring.add(toVec3(pos));
-        }
-        return ring;
-    }
-
-    private void addVertex(VertexConsumer vertex, Matrix4f matrix, Vec3 pos, ParticleColor color) {
-        vertex.addVertex(matrix, (float) pos.x, (float) pos.y, (float) pos.z).setColor(color.r, color.g, color.b, color.a);
-    }
-
-    private static Vector3f toVector3f(Vec3 vec) {
-        return new Vector3f((float) vec.x, (float) vec.y, (float) vec.z);
-    }
-
-    private static Vec3 toVec3(Vector3f vec) {
-        return new Vec3(vec.x, vec.y, vec.z);
-    }
-
-    public static final ParticleRenderType RENDER_TYPE = new ParticleRenderType() {
-        @Override
-        public BufferBuilder begin(@NotNull Tesselator tesselator, @NotNull TextureManager manager) {
-            RenderSystem.depthMask(false);
-            RenderSystem.enableBlend();
-            RenderSystem.disableCull();
-            RenderSystem.setShader(GameRenderer::getRendertypeLightningShader);
-            RenderSystem.blendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE);
-            return tesselator.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
-        }
-
-        @Override
-        public String toString() {
-            return "DESTRUCTION_GOD_THUNDER_SKYNET";
-        }
-    };
+    public static final ParticleRenderType RENDER_TYPE = GlowTrailRenderTypes.GLOW_LIGHTNING;
 
     @Override
     public @NotNull ParticleRenderType getRenderType() {
         return RENDER_TYPE;
     }
 }
-
 

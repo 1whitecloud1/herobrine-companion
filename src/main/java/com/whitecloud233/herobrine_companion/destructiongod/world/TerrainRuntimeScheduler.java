@@ -1,17 +1,22 @@
 package com.whitecloud233.herobrine_companion.destructiongod.world;
 
-import com.whitecloud233.herobrine_companion.config.Config;
 import net.minecraft.server.level.ServerLevel;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.WeakHashMap;
 
 final class TerrainRuntimeScheduler {
     private static final List<TerrainTask> ACTIVE_TASKS = new ArrayList<>();
     private static final List<TerrainTask> PENDING_TASKS = new ArrayList<>();
-    private static final List<RestorationRecord> RESTORATION_QUEUE = new ArrayList<>();
     private static boolean processingActiveTasks;
+    private static final Map<ServerLevel, DimensionTurn> DIMENSIONS = new WeakHashMap<>();
+
+    private static final class DimensionTurn {
+        long gameTime = Long.MIN_VALUE;
+        int next;
+    }
 
     private TerrainRuntimeScheduler() {
     }
@@ -25,23 +30,26 @@ final class TerrainRuntimeScheduler {
     }
 
     static boolean hasWork() {
-        return !ACTIVE_TASKS.isEmpty() || !RESTORATION_QUEUE.isEmpty();
+        return !ACTIVE_TASKS.isEmpty();
     }
 
     static void tick(ServerLevel serverLevel) {
-        TickBudget budget = new TickBudget(Math.max(64, Config.destructionGodMaxBrokenBlocksPerTick));
-
+        DimensionTurn turn = DIMENSIONS.computeIfAbsent(serverLevel, ignored -> new DimensionTurn());
+        long now = serverLevel.getGameTime();
+        // A repeated event for the same dimension and tick must not mint another budget.
+        if (turn.gameTime == now) return;
+        turn.gameTime = now;
+        TickBudget budget = new TickBudget(DestructionTuning.MAX_BROKEN_BLOCKS_PER_TICK);
+        List<TerrainTask> tasks = ACTIVE_TASKS.stream().filter(task -> task.level == serverLevel).toList();
+        int count = tasks.size();
+        int start = count == 0 ? 0 : Math.floorMod(turn.next, count);
+        // Rotate the first serviced task so a large batch cannot starve the others.
+        turn.next = count == 0 ? 0 : (start + 1) % count;
         processingActiveTasks = true;
         try {
-            Iterator<TerrainTask> iterator = ACTIVE_TASKS.iterator();
-            while (iterator.hasNext()) {
-                TerrainTask task = iterator.next();
-                if (task.level != serverLevel) {
-                    continue;
-                }
-                if (task.tick(budget)) {
-                    iterator.remove();
-                }
+            for (int index = 0; index < count; index++) {
+                TerrainTask task = tasks.get((start + index) % count);
+                if (task.tick(budget)) ACTIVE_TASKS.remove(task);
             }
         } finally {
             processingActiveTasks = false;
@@ -52,14 +60,7 @@ final class TerrainRuntimeScheduler {
             PENDING_TASKS.clear();
         }
 
-        processRestoration(serverLevel, budget);
     }
 
-    private static void processRestoration(ServerLevel level, TickBudget budget) {
-        if (RESTORATION_QUEUE.isEmpty()) {
-            return;
-        }
-        RESTORATION_QUEUE.clear();
-    }
 }
 

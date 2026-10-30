@@ -1,18 +1,19 @@
 package com.whitecloud233.herobrine_companion.destructiongod.client.particle;
 
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.*;
+import com.whitecloud233.herobrine_companion.client.particle.ParticleGeometry;
+
+import com.whitecloud233.herobrine_companion.client.particle.ParticleColor;
+
+import com.whitecloud233.herobrine_companion.client.render.GlowTrailRenderTypes;
+import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.Camera;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.Particle;
 import net.minecraft.client.particle.ParticleRenderType;
-import net.minecraft.client.renderer.GameRenderer;
-import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
-import org.lwjgl.opengl.GL11;
 
 public class DestructionGodOrbParticle extends Particle {
     private final Vec3 impactPos;
@@ -20,8 +21,6 @@ public class DestructionGodOrbParticle extends Particle {
     private final float startRadius;
     private final float maxRadius;
     private final float apexHeight;
-
-    private record ParticleColor(float r, float g, float b, float a) {}
 
     public DestructionGodOrbParticle(ClientLevel level, Vec3 startPos, Vec3 impactPos, int fallTicks, float startRadius, float maxRadius, float apexHeight) {
         super(level, startPos.x, startPos.y, startPos.z);
@@ -53,7 +52,7 @@ public class DestructionGodOrbParticle extends Particle {
     }
 
     private Vec3 sampleCenter(float progress) {
-        Vec3 start = new Vec3(this.x, this.y, this.z);
+        Vec3 start = this.getPos();
         Vec3 mid = start.lerp(this.impactPos, 0.5D).add(0.0D, this.apexHeight, 0.0D);
         double inv = 1.0D - progress;
         return start.scale(inv * inv).add(mid.scale(2.0D * inv * progress)).add(this.impactPos.scale(progress * progress));
@@ -89,37 +88,18 @@ public class DestructionGodOrbParticle extends Particle {
             Vec3 p1Inner = center.add(nu.scale(Math.cos(a1) * inner)).add(nv.scale(Math.sin(a1) * inner));
             Vec3 p2Inner = center.add(nu.scale(Math.cos(a2) * inner)).add(nv.scale(Math.sin(a2) * inner));
             Vec3 p2Outer = center.add(nu.scale(Math.cos(a2) * radius)).add(nv.scale(Math.sin(a2) * radius));
-            addVertex(vertex, matrix, p1Outer, color);
-            addVertex(vertex, matrix, p1Inner, color);
-            addVertex(vertex, matrix, p2Inner, color);
-            addVertex(vertex, matrix, p2Outer, color);
+            ParticleGeometry.vertex(vertex, matrix, p1Outer, color);
+            ParticleGeometry.vertex(vertex, matrix, p1Inner, color);
+            ParticleGeometry.vertex(vertex, matrix, p2Inner, color);
+            ParticleGeometry.vertex(vertex, matrix, p2Outer, color);
         }
-    }
-
-    private void addVertex(VertexConsumer vertex, Matrix4f matrix, Vec3 pos, ParticleColor color) {
-        vertex.addVertex(matrix, (float) pos.x, (float) pos.y, (float) pos.z).setColor(color.r, color.g, color.b, color.a);
     }
 
     private Vec3 normalize(Vec3 vector) {
         return vector.lengthSqr() < 1.0E-4D ? new Vec3(1.0D, 0.0D, 0.0D) : vector.normalize();
     }
 
-    public static final ParticleRenderType RENDER_TYPE = new ParticleRenderType() {
-        @Override
-        public BufferBuilder begin(Tesselator tesselator, TextureManager manager) {
-            RenderSystem.depthMask(false);
-            RenderSystem.enableBlend();
-            RenderSystem.disableCull();
-            RenderSystem.setShader(GameRenderer::getRendertypeLightningShader);
-            RenderSystem.blendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE);
-            return tesselator.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
-        }
-
-        @Override
-        public String toString() {
-            return "DESTRUCTION_GOD_ORB";
-        }
-    };
+    public static final ParticleRenderType RENDER_TYPE = GlowTrailRenderTypes.GLOW_LIGHTNING;
 
     @Override
     public ParticleRenderType getRenderType() {

@@ -35,9 +35,9 @@ public class SPacketChallengeArenaSlice implements CustomPacketPayload {
     }
 
     public SPacketChallengeArenaSlice(FriendlyByteBuf buf) {
-        this.center = new Vec3(buf.readDouble(), buf.readDouble(), buf.readDouble());
-        this.capNormal = new Vec3(buf.readDouble(), buf.readDouble(), buf.readDouble());
-        this.cutDirection = new Vec3(buf.readDouble(), buf.readDouble(), buf.readDouble());
+        this.center = buf.readVec3();
+        this.capNormal = buf.readVec3();
+        this.cutDirection = buf.readVec3();
         this.cutOffset = buf.readFloat();
         this.arenaRadius = buf.readFloat();
         this.fallTicks = buf.readVarInt();
@@ -46,15 +46,9 @@ public class SPacketChallengeArenaSlice implements CustomPacketPayload {
     }
 
     public void encode(FriendlyByteBuf buf) {
-        buf.writeDouble(this.center.x);
-        buf.writeDouble(this.center.y);
-        buf.writeDouble(this.center.z);
-        buf.writeDouble(this.capNormal.x);
-        buf.writeDouble(this.capNormal.y);
-        buf.writeDouble(this.capNormal.z);
-        buf.writeDouble(this.cutDirection.x);
-        buf.writeDouble(this.cutDirection.y);
-        buf.writeDouble(this.cutDirection.z);
+        buf.writeVec3(this.center);
+        buf.writeVec3(this.capNormal);
+        buf.writeVec3(this.cutDirection);
         buf.writeFloat(this.cutOffset);
         buf.writeFloat(this.arenaRadius);
         buf.writeVarInt(this.fallTicks);

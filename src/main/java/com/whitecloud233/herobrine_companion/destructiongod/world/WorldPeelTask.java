@@ -31,15 +31,11 @@ final class WorldPeelTask extends TerrainTask {
         DestructionMode mode = DestructionMode.current();
         LivingEntity caster = this.getCaster();
 
-        for (int step = 0; step < stepsPerTick; step++) {
-            if (this.currentLength >= this.maxLength) {
-                return true;
-            }
-
+        return this.sweep(stepsPerTick, stepSize, step -> {
             Vec3 center = this.centerPoint();
             BlockPos centerPos = new BlockPos(Mth.floor(center.x), Mth.floor(center.y), Mth.floor(center.z));
             if (!this.level.isLoaded(centerPos)) {
-                return true;
+                return false;
             }
 
             List<BlockPos> toClear = new ArrayList<>();
@@ -64,7 +60,7 @@ final class WorldPeelTask extends TerrainTask {
                     }
                 }
             }
-            DestructionTerrainManager.clearBlocksInstant(this.level, toClear, mode, false);
+            this.queueClearBlocks(toClear, mode, false);
 
             AABB peelBox = new AABB(center.x - this.radius, center.y - 2.0D, center.z - this.radius,
                     center.x + this.radius, center.y + 12.0D, center.z + this.radius);
@@ -74,9 +70,8 @@ final class WorldPeelTask extends TerrainTask {
             if (step == 0) {
                 this.level.playSound(null, center.x, center.y, center.z, SoundEvents.ENDERMAN_TELEPORT, SoundSource.AMBIENT, 2.5F, 0.4F);
             }
-            this.currentLength += stepSize;
-        }
-        return false;
+            return true;
+        });
     }
 }
 

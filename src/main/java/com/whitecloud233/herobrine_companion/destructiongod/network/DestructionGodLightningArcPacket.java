@@ -19,20 +19,16 @@ public record DestructionGodLightningArcPacket(Vec3 startPos, Vec3 endPos, float
     );
 
     public void encode(FriendlyByteBuf buf) {
-        buf.writeDouble(startPos.x);
-        buf.writeDouble(startPos.y);
-        buf.writeDouble(startPos.z);
-        buf.writeDouble(endPos.x);
-        buf.writeDouble(endPos.y);
-        buf.writeDouble(endPos.z);
+        buf.writeVec3(startPos);
+        buf.writeVec3(endPos);
         buf.writeFloat(width);
         buf.writeVarInt(lifetimeTicks);
     }
 
     private static DestructionGodLightningArcPacket decode(FriendlyByteBuf buf) {
         return new DestructionGodLightningArcPacket(
-                new Vec3(buf.readDouble(), buf.readDouble(), buf.readDouble()),
-                new Vec3(buf.readDouble(), buf.readDouble(), buf.readDouble()),
+                buf.readVec3(),
+                buf.readVec3(),
                 buf.readFloat(),
                 buf.readVarInt()
         );

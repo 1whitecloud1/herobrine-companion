@@ -19,12 +19,8 @@ public record DestructionGodOrbPacket(Vec3 startPos, Vec3 impactPos, int fallTic
     );
 
     public void encode(FriendlyByteBuf buf) {
-        buf.writeDouble(startPos.x);
-        buf.writeDouble(startPos.y);
-        buf.writeDouble(startPos.z);
-        buf.writeDouble(impactPos.x);
-        buf.writeDouble(impactPos.y);
-        buf.writeDouble(impactPos.z);
+        buf.writeVec3(startPos);
+        buf.writeVec3(impactPos);
         buf.writeInt(fallTicks);
         buf.writeFloat(startRadius);
         buf.writeFloat(maxRadius);
@@ -33,8 +29,8 @@ public record DestructionGodOrbPacket(Vec3 startPos, Vec3 impactPos, int fallTic
 
     private static DestructionGodOrbPacket decode(FriendlyByteBuf buf) {
         return new DestructionGodOrbPacket(
-                new Vec3(buf.readDouble(), buf.readDouble(), buf.readDouble()),
-                new Vec3(buf.readDouble(), buf.readDouble(), buf.readDouble()),
+                buf.readVec3(),
+                buf.readVec3(),
                 buf.readInt(),
                 buf.readFloat(),
                 buf.readFloat(),

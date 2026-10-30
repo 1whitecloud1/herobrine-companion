@@ -128,7 +128,7 @@ public class DestructionGodCombatGoal extends Goal {
                         CleaveBladeEntity blade = new CleaveBladeEntity(ModEntities.CLEAVE_BLADE.get(), serverLevel, rendOrigin.x, rendOrigin.y + 0.9D, rendOrigin.z, castDirection.x, castDirection.z, Math.max(14, Mth.ceil(slashLength / bladeSpeed) + 3), slashRoll);
                         blade.setDeltaMovement(castDirection.x * bladeSpeed, 0.0D, castDirection.z * bladeSpeed);
                         serverLevel.addFreshEntity(blade);
-                        RendTerrainSkill.startBladeLineRend(serverLevel, this.boss, rendOrigin, castDirection, slashLength, halfWidth, slashDepth, 0, slashRoll);
+                        DestructionTerrainManager.startBladeLineRend(serverLevel, this.boss, rendOrigin, castDirection, slashLength, halfWidth, slashDepth, 0, slashRoll);
                         sendWorldRendCinematic(serverLevel, rendOrigin);
                         serverLevel.playSound(null, rendOrigin.x, rendOrigin.y + 1.0D, rendOrigin.z, SoundEvents.TRIDENT_THUNDER, SoundSource.WEATHER, 4.5F, 0.8F);
                     }
@@ -174,7 +174,7 @@ public class DestructionGodCombatGoal extends Goal {
             int craterDepth = 48 + phase * 8;
             int fallTicks = 150;
             PacketHandler.sendToTracking(new DestructionGodOrbPacket(start, impact, fallTicks, 1.8F, (float) orbMaxRadius, 24.0F), this.boss);
-            OrbTerrainSkill.start(level, this.boss, start, impact, fallTicks, 1.8D, orbMaxRadius, craterRadius, craterDepth, 0);
+            DestructionTerrainManager.startDestructionGodOrb(level, this.boss, start, impact, fallTicks, 1.8D, orbMaxRadius, craterRadius, craterDepth, 0);
             level.sendParticles(ParticleTypes.FLASH, start.x, start.y, start.z, 6, 1.0D, 1.0D, 1.0D, 0.0D);
             level.playSound(null, start.x, start.y, start.z, SoundEvents.TRIDENT_THUNDER, SoundSource.WEATHER, 5.5F, 0.55F);
         }
@@ -256,7 +256,7 @@ public class DestructionGodCombatGoal extends Goal {
             List<Vec3> holePositions = createWhiteHolePositions(level, bossCenter, beams, holeOrbitRadius);
 
             PacketHandler.sendToTracking(new DestructionGodLightningArcPacket(bossCenter, targetCenter, 0.08F, 16), this.boss);
-            LightningTerrainSkill.startArc(level, this.boss, bossCenter, targetCenter, 1.45D + phase * 0.18D, 2);
+            DestructionTerrainManager.startDestructionLightningArc(level, this.boss, bossCenter, targetCenter, 1.45D + phase * 0.18D, 2);
 
             for (int i = 0; i < holePositions.size(); i++) {
                 Vec3 holePos = holePositions.get(i);
@@ -266,7 +266,7 @@ public class DestructionGodCombatGoal extends Goal {
                 int delay = chargeDelay + i * 2;
 
                 PacketHandler.sendToTracking(new DestructionGodLightningPacket(holePos, beamEnd, width), this.boss);
-                LightningTerrainSkill.startBeam(level, this.boss, holePos, beamEnd, width * 0.52D, delay + 2);
+                DestructionTerrainManager.startDestructionLightningBeam(level, this.boss, holePos, beamEnd, width * 0.52D, delay + 2);
             }
 
             level.playSound(null, this.boss.getX(), this.boss.getY(), this.boss.getZ(), SoundEvents.TRIDENT_THUNDER, SoundSource.WEATHER, 4.2F, 0.68F);
@@ -296,7 +296,7 @@ public class DestructionGodCombatGoal extends Goal {
             int seed = level.random.nextInt();
 
             PacketHandler.sendToTracking(new DestructionGodThunderSkyNetPacket(bodyCenter, cloudY, (float) skyRadius, visualLifetime, seed), this.boss);
-            LightningTerrainSkill.startThunderSkyNet(level, this.boss, bodyCenter, cloudY, skyRadius, netDuration, strikesPerPulse, pulseInterval, pillarLeadTicks);
+            DestructionTerrainManager.startThunderSkyNet(level, this.boss, bodyCenter, cloudY, skyRadius, netDuration, strikesPerPulse, pulseInterval, pillarLeadTicks);
 
             level.playSound(null, bodyCenter.x, bodyCenter.y, bodyCenter.z, SoundEvents.LIGHTNING_BOLT_THUNDER, SoundSource.WEATHER, 8.5F, 0.55F);
             level.playSound(null, bodyCenter.x, bodyCenter.y, bodyCenter.z, SoundEvents.WITHER_SPAWN, SoundSource.HOSTILE, 4.0F, 0.7F);
@@ -393,7 +393,7 @@ public class DestructionGodCombatGoal extends Goal {
         }
 
         if (this.boss.consumeSkillStageTrigger(1, this.boss.getSkillTriggerTick())) {
-            FaultSplitTerrainSkill.start(level, this.boss, castData.origin(), castData.direction(), castData.lineLength(), castData.terrainHalfWidth(), castData.lineHalfWidth(), castData.shiftDistance(), 0);
+            DestructionTerrainManager.startScytheFaultSplit(level, this.boss, castData.origin(), castData.direction(), castData.lineLength(), castData.terrainHalfWidth(), castData.lineHalfWidth(), castData.shiftDistance(), 0);
             level.playSound(null, castData.origin().x, castData.origin().y + 0.8D, castData.origin().z, SoundEvents.WARDEN_SONIC_BOOM, SoundSource.WEATHER, 5.0F, 0.45F);
             level.playSound(null, castData.origin().x, castData.origin().y + 0.8D, castData.origin().z, SoundEvents.TRIDENT_THUNDER, SoundSource.WEATHER, 5.2F, 0.65F);
             level.playSound(null, castData.origin().x, castData.origin().y + 0.8D, castData.origin().z, SoundEvents.GENERIC_EXPLODE, SoundSource.HOSTILE, 4.6F, 0.45F);
