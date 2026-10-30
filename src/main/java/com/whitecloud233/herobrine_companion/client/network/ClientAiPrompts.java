@@ -1,5 +1,7 @@
 package com.whitecloud233.herobrine_companion.client.network;
 
+import com.whitecloud233.herobrine_companion.util.LanguageCodes;
+
 import com.whitecloud233.herobrine_companion.client.service.ActorDialogueRequest;
 import com.whitecloud233.herobrine_companion.client.service.ActorDialogueService;
 import com.whitecloud233.herobrine_companion.client.service.AIService;
@@ -7,6 +9,9 @@ import com.whitecloud233.herobrine_companion.client.service.CrossChatHistoryStor
 import com.whitecloud233.herobrine_companion.client.service.LLMConfig;
 import com.whitecloud233.herobrine_companion.client.service.LocalChatService;
 import com.whitecloud233.herobrine_companion.config.Config;
+import com.whitecloud233.herobrine_companion.entity.dialogue.SpeechBubbleAccessor;
+import com.whitecloud233.herobrine_companion.entity.dialogue.SpeechBubbleTiming;
+import com.whitecloud233.herobrine_companion.network.AgentChatOutcomePacket;
 import com.whitecloud233.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.herobrine_companion.network.ai.ActorDialogueResultPacket;
 import com.whitecloud233.herobrine_companion.network.ai.HeroCrossChatPromptPacket;
@@ -41,6 +46,17 @@ public final class ClientAiPrompts {
     private ClientAiPrompts() {
     }
 
+    public static void sendAgentChatOutcome(String message, String reply, int kind) {
+        if (reply == null || reply.isBlank()) {
+            return;
+        }
+        String r = reply.trim();
+        if (r.startsWith("§c")) {
+            return;
+        }
+        PacketHandler.sendToServer(new AgentChatOutcomePacket(message, reply, kind));
+    }
+
     public static void handleAIObservation(int heroId, String observationDesc, String fallbackKey, int fallbackVariants,
                                            String contextTranslationKey, String contextFallbackName) {
         Minecraft mc = Minecraft.getInstance();
@@ -50,8 +66,14 @@ public final class ClientAiPrompts {
         if (shouldSuppressDuplicate(mc.player.getUUID(), heroId, observationDesc)) {
             return;
         }
+        // 环境观察发话总开关：禁用后连大模型都不再请求，聊天框与头顶气泡都不会出现台词。
+        if (!Config.aiVisionSpeechEnabled) {
+            return;
+        }
 
         boolean domesticLine = isDomesticFallbackKey(fallbackKey);
+        // 模组设置「观察台词仅显示气泡」开启后，环境观察台词只进头顶气泡，不再打印到聊天框。
+        boolean bubbleOnly = Config.aiVisionBubbleOnly;
         String resolvedContextName = resolveContextName(contextTranslationKey, contextFallbackName);
         String effectiveObservation = buildObservationDescription(fallbackKey, observationDesc, resolvedContextName);
         boolean isAiReady = !LLMConfig.isKeyMissingOrInvalid() && Config.aiVisionEnabled;
@@ -61,7 +83,9 @@ public final class ClientAiPrompts {
                         if (isUsableAiReply(reply)) {
                             Component line = LegacyFormattingComponents.parse(sanitize(reply));
                             if (domesticLine) {
-                                showHeroDialogue(mc, heroId, line, true);
+                                showHeroDialogue(mc, heroId, line, true, bubbleOnly);
+                            } else if (bubbleOnly) {
+                                showHeroBubble(mc, heroId, line);
                             } else {
                                 mc.player.sendSystemMessage(
                                         Component.literal("<Herobrine> ").withStyle(ChatFormatting.YELLOW)
@@ -69,13 +93,13 @@ public final class ClientAiPrompts {
                                 );
                             }
                         } else {
-                            showFallbackDialogue(mc, heroId, fallbackKey, fallbackVariants, resolvedContextName);
+                            showFallbackDialogue(mc, heroId, fallbackKey, fallbackVariants, resolvedContextName, bubbleOnly);
                         }
                     }));
             return;
         }
 
-        showFallbackDialogue(mc, heroId, fallbackKey, fallbackVariants, resolvedContextName);
+        showFallbackDialogue(mc, heroId, fallbackKey, fallbackVariants, resolvedContextName, bubbleOnly);
     }
 
     public static void presentCrossChatAiLine(String peerName, boolean hbMode, String speaker, String content,
@@ -141,7 +165,10 @@ public final class ClientAiPrompts {
                 ))
                 .thenApply(reply -> normalizeReply(reply, fallback))
                 .exceptionally(ignored -> fallback)
-                .thenAccept(reply -> PacketHandler.sendToServer(new ActorDialogueResultPacket(jobId, reply)));
+                .thenAccept(reply -> {
+                    PacketHandler.sendToServer(new ActorDialogueResultPacket(jobId, reply));
+                    sendAgentChatOutcome(userPrompt, reply, AgentChatOutcomePacket.KIND_ACTOR_DIALOGUE);
+                });
     }
 
     private static boolean shouldSuppressDuplicate(UUID playerUUID, int heroId, String observationDesc) {
@@ -170,14 +197,19 @@ public final class ClientAiPrompts {
     }
 
     private static void showFallbackDialogue(Minecraft mc, int heroId, String fallbackKey, int fallbackVariants,
-                                             String resolvedContextName) {
+                                             String resolvedContextName, boolean bubbleOnly) {
         Component line = buildFallbackDialogue(mc, fallbackKey, fallbackVariants, resolvedContextName);
         if (line == null) {
             return;
         }
 
         if (isDomesticFallbackKey(fallbackKey)) {
-            showHeroDialogue(mc, heroId, line, true);
+            showHeroDialogue(mc, heroId, line, true, bubbleOnly);
+            return;
+        }
+
+        if (bubbleOnly) {
+            showHeroBubble(mc, heroId, line);
             return;
         }
 
@@ -256,11 +288,11 @@ public final class ClientAiPrompts {
     private static String buildObservationDescription(String fallbackKey, String observationDesc, String resolvedContextName) {
         if (AUTONOMOUS_REST_FALLBACK_KEY.equals(fallbackKey)) {
             String subject = resolvedContextName.isBlank() ? "the spot you chose" : resolvedContextName;
-            return "You are Hero. You yourself chose to rest on [" + subject + "]. Reply to the player with one short, natural first-person line about taking a quiet break there. Do not say the player is the one resting.";
+            return "You are Herobrine. You yourself chose to rest on [" + subject + "]. Reply to the player with one short, natural first-person line about taking a quiet break there. Do not say the player is the one resting.";
         }
         if (AUTONOMOUS_COOK_FALLBACK_KEY.equals(fallbackKey)) {
             String subject = resolvedContextName.isBlank() ? "the dish you chose" : resolvedContextName;
-            return "You are Hero. You yourself decided to cook [" + subject + "] with nearby cookware, without using the player's ingredients. Reply to the player with one short, natural first-person line that shows interest in the food. Do not say the player is the one cooking.";
+            return "You are Herobrine. You yourself decided to cook [" + subject + "] with nearby cookware, without using the player's ingredients. Reply to the player with one short, natural first-person line that shows interest in the food. Do not say the player is the one cooking.";
         }
         return observationDesc == null ? "" : observationDesc;
     }
@@ -281,8 +313,8 @@ public final class ClientAiPrompts {
                 || AUTONOMOUS_COOK_FALLBACK_KEY.equals(fallbackKey);
     }
 
-    private static void showHeroDialogue(Minecraft mc, int heroId, Component line, boolean withPrefix) {
-        if (mc.player != null) {
+    private static void showHeroDialogue(Minecraft mc, int heroId, Component line, boolean withPrefix, boolean bubbleOnly) {
+        if (!bubbleOnly && mc.player != null) {
             Component chatLine = withPrefix
                     ? Component.literal("<Herobrine> ").withStyle(ChatFormatting.YELLOW)
                     .append(line.copy().withStyle(ChatFormatting.WHITE))
@@ -290,12 +322,27 @@ public final class ClientAiPrompts {
             mc.player.sendSystemMessage(chatLine);
         }
 
+        showHeroBubble(mc, heroId, line);
+    }
+
+    /**
+     * 只把台词挂在 Herobrine 头顶的气泡上，不写入聊天框。
+     *
+     * <p>由模组设置「观察台词仅显示气泡」({@code aiVisionBubbleOnly}) 开启时使用。</p>
+     */
+    private static void showHeroBubble(Minecraft mc, int heroId, Component line) {
         if (mc.level == null) {
             return;
         }
 
-        // 气泡交给 SyncSpeechBubblePacket,这里只保留聊天输出作为兜底。
-        mc.level.getEntity(heroId);
+        Entity entity = mc.level.getEntity(heroId);
+        if (entity instanceof SpeechBubbleAccessor accessor) {
+            accessor.herobrineCompanion$showSpeechBubble(line, computeBubbleDuration(line));
+        }
+    }
+
+    private static int computeBubbleDuration(Component line) {
+        return SpeechBubbleTiming.durationTicks(line);
     }
 
     private static void applyPresentedLine(Minecraft mc, String peerName, boolean hbMode, String speaker,
@@ -369,7 +416,7 @@ public final class ClientAiPrompts {
     private static String buildActorFallbackReply(String seedText, String fallbackKey, List<String> fallbackArgs) {
         if (fallbackKey != null && !fallbackKey.isBlank()) {
             Object[] args = fallbackArgs == null ? new Object[0] : fallbackArgs.toArray(new Object[0]);
-            String translated = Component.translatable(fallbackKey, args).getString();
+            String translated = Component.translatableEscape(fallbackKey, args).getString();
             String sanitized = sanitize(translated);
             if (!sanitized.isEmpty()) {
                 return sanitized;
@@ -381,16 +428,10 @@ public final class ClientAiPrompts {
     }
 
     private static boolean isChineseLocale(String languageCode) {
-        return normalizeLanguageCode(languageCode).startsWith("zh");
+        return LanguageCodes.normalize(languageCode).startsWith("zh");
     }
 
-    private static String normalizeLanguageCode(String rawLanguageCode) {
-        if (rawLanguageCode == null) {
-            return "en_us";
-        }
-        String normalized = rawLanguageCode.trim().toLowerCase(Locale.ROOT).replace('-', '_');
-        return normalized.isEmpty() ? "en_us" : normalized;
-    }
+
 
     private static String sanitize(String content) {
         return LegacyFormattingText.normalize(content == null ? "" : content.replace('\r', ' ').replace('\n', ' ').trim());

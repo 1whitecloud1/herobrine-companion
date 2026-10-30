@@ -34,7 +34,14 @@ public class ClientHooks {
     private static int crossChatAutoHbTurnLimit = 8;
 
     public static void openHeroScreen(int entityId) {
-        Minecraft.getInstance().setScreen(new HeroScreen(entityId));
+        Minecraft minecraft = Minecraft.getInstance();
+        minecraft.setScreen(new HeroScreen(entityId));
+        // 主页面确实开起来了才算「成功交互」：服务端据此发放同行手册（每人一次）。
+        // 未安装 Patchouli、或对端未注册该载荷时，notifyScreenOpened 内部会静默跳过。
+        if (minecraft.screen instanceof HeroScreen && minecraft.getConnection() != null) {
+            com.whitecloud233.herobrine_companion.network.CompanionGuideChannel
+                    .notifyScreenOpened(minecraft.getConnection().getConnection(), entityId);
+        }
     }
 
 

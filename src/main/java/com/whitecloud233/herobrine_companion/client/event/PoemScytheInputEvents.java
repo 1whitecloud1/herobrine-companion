@@ -3,7 +3,11 @@ package com.whitecloud233.herobrine_companion.client.event;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.combat.PoemAttackInput;
-import com.whitecloud233.herobrine_companion.compat.epicfight.HeroEpicFightCompat;
+import com.whitecloud233.herobrine_companion.combat.poem.StandalonePoemController;
+import com.whitecloud233.herobrine_companion.client.animation.StandalonePoemAnimation;
+import net.minecraft.world.phys.HitResult;
+import com.whitecloud233.herobrine_companion.api.compat.ClientCompat;
+import com.whitecloud233.herobrine_companion.api.compat.HeroEpicFightCompat;
 import com.whitecloud233.herobrine_companion.item.PoemOfTheEndItem;
 import com.whitecloud233.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.herobrine_companion.network.PoemGesturePacket;
@@ -23,7 +27,7 @@ import net.neoforged.neoforge.client.event.InputEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import org.lwjgl.glfw.GLFW;
 
-/** Tap attack for the native EF combo, hold for heavy, or press a modifier chord. */
+/** Tap for a contextual attack, hold for heavy, or press a modifier chord, with or without EF. */
 @EventBusSubscriber(modid = HerobrineCompanion.MODID, value = Dist.CLIENT)
 public final class PoemScytheInputEvents {
     private static final String CATEGORY = "key.categories.herobrine_companion";
@@ -74,7 +78,7 @@ public final class PoemScytheInputEvents {
                 return true;
             }
         }
-        if (key.equals(EpicFightKeys.attack().getKey())) {
+        if (key.equals(attackKey().getKey())) {
             if (pressed) send(INPUT.attackPressed(gesture(mc), Util.getMillis()));
             boolean consumed = INPUT.consumesAttack();
             if (released) send(INPUT.attackReleased(Util.getMillis()));
@@ -89,8 +93,8 @@ public final class PoemScytheInputEvents {
         Minecraft mc = Minecraft.getInstance();
         if (!context(mc)) return;
         if ((event.isAttack() || event.getKeyMapping() == mc.options.keyAttack)
-                && mc.options.keyAttack.getKey().equals(EpicFightKeys.attack().getKey())) {
-            if (down(mc, EpicFightKeys.attack())) send(INPUT.attackPressed(gesture(mc), Util.getMillis()));
+                && mc.options.keyAttack.getKey().equals(attackKey().getKey())) {
+            if (down(mc, attackKey())) send(INPUT.attackPressed(gesture(mc), Util.getMillis()));
             if (INPUT.consumesAttack() || INPUT.hasEngineControl()) {
                 event.setCanceled(true); event.setSwingHand(false);
                 discardAttack(mc);
@@ -117,7 +121,7 @@ public final class PoemScytheInputEvents {
 
     private static void advanceAttack(Minecraft mc) {
         if (INPUT.consumesAttack()) {
-            send(down(mc, EpicFightKeys.attack()) ? INPUT.attackHeld(Util.getMillis()) : INPUT.attackReleased(Util.getMillis()));
+            send(down(mc, attackKey()) ? INPUT.attackHeld(Util.getMillis()) : INPUT.attackReleased(Util.getMillis()));
         }
         if (INPUT.consumesAttack() || INPUT.hasEngineControl()) discardAttack(mc);
     }
@@ -132,7 +136,7 @@ public final class PoemScytheInputEvents {
     public static boolean blocksNativeAttack() { return INPUT.consumesAttack(); }
 
     public static boolean blocksNativeInnate() {
-        return INPUT.consumesAttack() && EpicFightKeys.innate().getKey().equals(EpicFightKeys.attack().getKey());
+        return INPUT.consumesAttack() && EpicFightKeys.innate().getKey().equals(attackKey().getKey());
     }
 
     public static boolean blocksNativeGuard() {
@@ -142,7 +146,7 @@ public final class PoemScytheInputEvents {
     private static int gesture(Minecraft mc) {
         for (int i = MODIFIERS.length - 1; i >= 0; i--) {
             KeyMapping modifier = MODIFIERS[i];
-            if (!modifier.getKey().equals(EpicFightKeys.attack().getKey()) && down(mc, modifier)
+            if (!modifier.getKey().equals(attackKey().getKey()) && down(mc, modifier)
                     && !(shift(mc) && modifier.getKey().equals(mc.options.keyUse.getKey()))) return i;
         }
         return -1;
@@ -151,7 +155,7 @@ public final class PoemScytheInputEvents {
     private static boolean sharesUse(Minecraft mc) {
         for (KeyMapping modifier : MODIFIERS) {
             if (!modifier.isUnbound() && modifier.getKey().equals(mc.options.keyUse.getKey())
-                    && !modifier.getKey().equals(EpicFightKeys.attack().getKey())) return true;
+                    && !modifier.getKey().equals(attackKey().getKey())) return true;
         }
         return false;
     }
@@ -171,7 +175,9 @@ public final class PoemScytheInputEvents {
         Player player = mc.player;
         if (player == null || mc.screen != null || mc.isPaused() || !mc.isWindowActive()
                 || !(player.getMainHandItem().getItem() instanceof PoemOfTheEndItem poem)
-                || !HeroEpicFightCompat.canUsePoemGestures(player)) {
+                || !(StandalonePoemController.standalone() ? StandalonePoemController.usable(player)
+                        && (INPUT.consumesAttack() || mc.hitResult == null || mc.hitResult.getType() != HitResult.Type.BLOCK)
+                        : HeroEpicFightCompat.canUsePoemGestures(player))) {
             reset(mc); return false;
         }
         int slot = player.getInventory().selected, mode = poem.getMode(player.getMainHandItem());
@@ -185,7 +191,7 @@ public final class PoemScytheInputEvents {
     private static void reset(Minecraft mc) {
         if (INPUT.consumesAttack() || INPUT.hasEngineControl()) discardAttack(mc);
         if (INPUT.holdsUse()) discard(mc.options.keyUse);
-        INPUT.reset();
+        INPUT.reset(!StandalonePoemController.standalone());
         contextPlayer = null; contextStack = null; contextSlot = contextMode = -1;
     }
 
@@ -195,20 +201,30 @@ public final class PoemScytheInputEvents {
     }
 
     private static void discardAttack(Minecraft mc) {
-        KeyMapping attack = EpicFightKeys.attack();
+        KeyMapping attack = attackKey();
         discard(attack);
         if (mc.options.keyAttack.getKey().equals(attack.getKey())) discard(mc.options.keyAttack);
-        if (EpicFightKeys.innate().getKey().equals(attack.getKey())) discard(EpicFightKeys.innate());
+        if (!StandalonePoemController.standalone() && EpicFightKeys.innate().getKey().equals(attack.getKey())) discard(EpicFightKeys.innate());
+    }
+
+    private static KeyMapping attackKey() {
+        return StandalonePoemController.standalone() ? Minecraft.getInstance().options.keyAttack : EpicFightKeys.attack();
     }
 
     private static void send(int gesture) {
+        if (StandalonePoemController.standalone()) {
+            INPUT.takeEngineControl();
+            if (gesture == PoemAttackInput.LIGHT) StandalonePoemAnimation.attack();
+            else if (gesture >= 0 && gesture < 3) StandalonePoemAnimation.gesture(gesture);
+            return;
+        }
         if (gesture >= 0 && gesture < 3) PacketHandler.sendToServer(new PoemGesturePacket(gesture, contextSlot, contextMode));
     }
 
     /** Loaded only after the optional EF bridge has accepted a Poem input context. */
     private static final class EpicFightKeys {
-        static KeyMapping attack() { return yesman.epicfight.client.input.EpicFightKeyMappings.ATTACK; }
-        static KeyMapping innate() { return yesman.epicfight.client.input.EpicFightKeyMappings.WEAPON_INNATE_SKILL; }
-        static KeyMapping guard() { return yesman.epicfight.client.input.EpicFightKeyMappings.GUARD; }
+        static KeyMapping attack() { return ClientCompat.epicFightKey("attack"); }
+        static KeyMapping innate() { return ClientCompat.epicFightKey("innate"); }
+        static KeyMapping guard() { return ClientCompat.epicFightKey("guard"); }
     }
 }

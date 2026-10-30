@@ -3,11 +3,14 @@ package com.whitecloud233.herobrine_companion.client.event;
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.client.gui.HeroChatScreen;
 import com.whitecloud233.herobrine_companion.client.gui.crosschat.CrossChatScreen;
+import com.whitecloud233.herobrine_companion.client.network.ClientAiPrompts;
 import com.whitecloud233.herobrine_companion.client.service.AIReplyGuard;
 import com.whitecloud233.herobrine_companion.client.service.AIService;
 import com.whitecloud233.herobrine_companion.client.service.ConversationStore;
 import com.whitecloud233.herobrine_companion.client.service.LLMConfig;
 import com.whitecloud233.herobrine_companion.client.service.LocalChatService;
+import com.whitecloud233.herobrine_companion.client.tts.TtsSpeechService;
+import com.whitecloud233.herobrine_companion.network.AgentChatOutcomePacket;
 import com.whitecloud233.herobrine_companion.network.PacketHandler;
 import com.whitecloud233.herobrine_companion.network.ai.SendCrossChatHbMessagePacket;
 import com.whitecloud233.herobrine_companion.network.ai.SendCrossChatMessagePacket;
@@ -38,7 +41,7 @@ public class ClientChatHandler {
 
     // 本地模式默认回复的翻译键和兜底文本
     private static final String DEFAULT_RESPONSE_KEY = "chat.herobrine_companion.default_silence";
-    private static final String DEFAULT_RESPONSE_FALLBACK = "§7[Hero stares at you silently...]";
+    private static final String DEFAULT_RESPONSE_FALLBACK = "§7[Herobrine stares at you silently...]";
 
     @SubscribeEvent
     public static void onClientChat(ClientChatEvent event) {
@@ -116,12 +119,18 @@ public class ClientChatHandler {
 
                             AIService.chat(message, mc.player.getUUID(), partial ->
                                     updateStreamingOverlay(mc, partial, lastOverlayUpdate, lastOverlayLength)
-                            ).thenAccept(reply -> mc.tell(() -> {
-                                showExitHint();
-                                mc.gui.getChat().addMessage(
-                                        Component.translatable("message.herobrine_companion.chat_hero", LegacyFormattingComponents.parse(reply))
-                                );
-                            }));
+                            ).thenAccept(reply -> {
+                                // M4 Phase 1:对话结果回流给服务端 agent 记忆。
+                                ClientAiPrompts.sendAgentChatOutcome(message, reply, AgentChatOutcomePacket.KIND_PLAYER_CHAT);
+                                mc.tell(() -> {
+                                    showExitHint();
+                                    mc.gui.getChat().addMessage(
+                                            Component.translatable("message.herobrine_companion.chat_hero", Component.literal(reply))
+                                    );
+                                    // 玩家发起的聊天 → 回复接入 TTS 语音（总开关/引擎由 TTS 设置页控制）
+                                    TtsSpeechService.getInstance().speakChatReply(reply);
+                                });
+                            });
                         } else {
                             AIService.chat(message, mc.player.getUUID()).thenAccept(reply -> {
                                 // 拿到大模型的回复后，切回主线程将其显示在聊天框
@@ -129,6 +138,8 @@ public class ClientChatHandler {
                                     mc.gui.getChat().addMessage(
                                             Component.translatable("message.herobrine_companion.chat_hero", LegacyFormattingComponents.parse(reply))
                                     );
+                                    // 玩家发起的聊天 → 回复接入 TTS 语音
+                                    TtsSpeechService.getInstance().speakChatReply(reply);
                                 });
                             });
                         }
@@ -145,6 +156,8 @@ public class ClientChatHandler {
                                 mc.gui.getChat().addMessage(
                                         Component.translatable("message.herobrine_companion.chat_hero", LegacyFormattingComponents.parse(reply))
                                 );
+                                // 玩家发起的聊天 → 回复接入 TTS 语音（本地模型分支）
+                                TtsSpeechService.getInstance().speakChatReply(reply);
                             });
                         });
                     } else {
@@ -179,6 +192,8 @@ public class ClientChatHandler {
                         mc.gui.getChat().addMessage(
                                 Component.translatable("message.herobrine_companion.chat_hero", heroMessage)
                         );
+                        // 词库兜底回复同样属于玩家发起的聊天，一并接入 TTS 语音
+                        TtsSpeechService.getInstance().speakChatReply(heroMessage.getString());
                     }
                 }
 

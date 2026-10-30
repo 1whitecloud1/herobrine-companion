@@ -4,7 +4,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.logging.LogUtils;
 import com.whitecloud233.herobrine_companion.client.render.AwakenedMobNameplateRenderer;
 import com.whitecloud233.herobrine_companion.client.render.EntitySpeechBubbleRenderer;
-import com.whitecloud233.herobrine_companion.compat.epicfight.HeroEpicFightCompat;
+import com.whitecloud233.herobrine_companion.api.compat.HeroEpicFightCompat;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.entity.awakened.AwakenedMobAccessor;
 import com.whitecloud233.herobrine_companion.entity.awakened.AwakenedMobProfiles;
@@ -25,6 +25,7 @@ import org.slf4j.Logger;
 
 public final class SpeechBubbleClientEvents {
     private static final Logger LOGGER = LogUtils.getLogger();
+    private static final double BOSS_LABEL_DISTANCE_SQR = 4096.0D;
     private static boolean loggedFirstOverlay;
 
     private SpeechBubbleClientEvents() {
@@ -62,7 +63,7 @@ public final class SpeechBubbleClientEvents {
     }
 
     public static void onRenderLevelStage(RenderLevelStageEvent event) {
-        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_ENTITIES || !HeroEpicFightCompat.isLoaded()) {
+        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_ENTITIES) {
             return;
         }
 
@@ -78,7 +79,7 @@ public final class SpeechBubbleClientEvents {
         boolean renderedAny = false;
 
         for (Entity renderedEntity : minecraft.level.entitiesForRendering()) {
-            if (!(renderedEntity instanceof LivingEntity entity) || !isEpicFightBossOverlayTarget(entity)) {
+            if (!(renderedEntity instanceof LivingEntity entity) || !isBossOverlayTarget(entity, minecraft)) {
                 continue;
             }
 
@@ -119,11 +120,22 @@ public final class SpeechBubbleClientEvents {
         return true;
     }
 
-    private static boolean isEpicFightBossOverlayTarget(LivingEntity entity) {
+    /**
+     * 末影龙的原版渲染器不触发 RenderNameTagEvent，气泡/名牌必须在这里补画，
+     * 与是否安装 Epic Fight 无关；凋灵只有 Epic Fight 的补丁渲染器才绕过该事件，
+     * 未加载 Epic Fight 时走正常名牌路径，无需回退。
+     */
+    private static boolean isBossOverlayTarget(LivingEntity entity, Minecraft minecraft) {
         EntityType<?> entityType = entity.getType();
-        return (entityType == EntityType.WITHER || entityType == EntityType.ENDER_DRAGON)
-                && entity instanceof AwakenedMobAccessor awakenedAccessor
-                && awakenedAccessor.herobrineCompanion$isAwakenedMob();
+        boolean dragon = entityType == EntityType.ENDER_DRAGON;
+        boolean epicFightBoss = HeroEpicFightCompat.isLoaded() && (dragon || entityType == EntityType.WITHER);
+        if (!dragon && !epicFightBoss) {
+            return false;
+        }
+        return hasSpeechBubble(entity)
+                || isAwakened(entity) && entity.hasCustomName()
+                && minecraft.player != null
+                && minecraft.player.distanceToSqr(entity) <= BOSS_LABEL_DISTANCE_SQR;
     }
 
     private static boolean hasSpeechBubble(LivingEntity entity) {
@@ -131,8 +143,13 @@ public final class SpeechBubbleClientEvents {
                 && speechAccessor.herobrineCompanion$hasSpeechBubble();
     }
 
+    private static boolean isAwakened(LivingEntity entity) {
+        return entity instanceof AwakenedMobAccessor awakenedAccessor
+                && awakenedAccessor.herobrineCompanion$isAwakenedMob();
+    }
+
     private static boolean shouldShowCompanionNameplate(LivingEntity entity) {
-        if (entity instanceof AwakenedMobAccessor awakenedAccessor && awakenedAccessor.herobrineCompanion$isAwakenedMob()) {
+        if (isAwakened(entity)) {
             return true;
         }
         return entity.hasCustomName() && AwakenedMobProfiles.supports(entity);

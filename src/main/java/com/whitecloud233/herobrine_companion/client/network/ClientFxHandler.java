@@ -1,8 +1,8 @@
 package com.whitecloud233.herobrine_companion.client.network;
 
-import com.whitecloud233.herobrine_companion.client.fight.particles.ChallengeArenaSliceParticle;
-import com.whitecloud233.herobrine_companion.client.fight.particles.PaleLightningArcParticle;
-import com.whitecloud233.herobrine_companion.client.fight.particles.PaleLightningPillarParticle;
+import com.whitecloud233.herobrine_companion.fight.particles.ChallengeArenaSliceParticle;
+import com.whitecloud233.herobrine_companion.fight.particles.PaleLightningArcParticle;
+import com.whitecloud233.herobrine_companion.fight.particles.PaleLightningPillarParticle;
 import com.whitecloud233.herobrine_companion.client.render.ChallengeBlackWhiteFlashHandler;
 import com.whitecloud233.herobrine_companion.entity.HeroEntity;
 import com.whitecloud233.herobrine_companion.fight.HeroAfterimage;

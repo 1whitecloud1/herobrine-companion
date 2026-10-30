@@ -44,7 +44,8 @@ public final class StandalonePoemEvents {
 
     @SubscribeEvent
     public static void onLogin(ClientPlayerNetworkEvent.LoggingIn event) {
-        if (StandalonePoemController.enabled()) CompletableFuture.runAsync(() -> PoemMotionLibrary.get().preload());
+        // Load regardless of the live switch: turning the action set back on must not hitch the render thread.
+        if (StandalonePoemController.standalone()) CompletableFuture.runAsync(() -> PoemMotionLibrary.get().preload());
     }
 
     @SubscribeEvent

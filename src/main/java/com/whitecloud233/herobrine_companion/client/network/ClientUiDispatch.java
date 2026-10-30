@@ -3,7 +3,9 @@ package com.whitecloud233.herobrine_companion.client.network;
 import com.whitecloud233.herobrine_companion.client.event.ClientHooks;
 import com.whitecloud233.herobrine_companion.client.gui.FakeCrashScreen;
 import com.whitecloud233.herobrine_companion.compat.cooking.HeroCookSelectionScreen;
-import com.whitecloud233.herobrine_companion.compat.cooking.HeroCookingCompat;
+import com.whitecloud233.herobrine_companion.compat.cooking.HeroMillstoneSelectionScreen;
+import com.whitecloud233.herobrine_companion.entity.cooking.CookOption;
+import com.whitecloud233.herobrine_companion.entity.cooking.MillstoneOption;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 
@@ -20,9 +22,14 @@ public final class ClientUiDispatch {
     private ClientUiDispatch() {
     }
 
-    public static void openCookSelection(int heroId, BlockPos cookwarePos, List<HeroCookingCompat.CookOptionView> options) {
+    public static void openCookSelection(int heroId, BlockPos cookwarePos, List<CookOption> options) {
         Minecraft minecraft = Minecraft.getInstance();
         minecraft.setScreen(new HeroCookSelectionScreen(heroId, cookwarePos, options, minecraft.screen));
+    }
+
+    public static void openMillstoneSelection(int heroId, BlockPos millstonePos, List<MillstoneOption> options) {
+        Minecraft minecraft = Minecraft.getInstance();
+        minecraft.setScreen(new HeroMillstoneSelectionScreen(heroId, millstonePos, options, minecraft.screen));
     }
 
     public static void openHeroChat(boolean hbInputMode) {

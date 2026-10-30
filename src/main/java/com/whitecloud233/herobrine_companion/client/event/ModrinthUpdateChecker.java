@@ -5,6 +5,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.config.Config;
+import com.whitecloud233.herobrine_companion.client.service.HttpClients;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.*;
@@ -47,9 +48,7 @@ public class ModrinthUpdateChecker {
             String url = "https://api.modrinth.com/v2/project/" + PROJECT_SLUG +
                     "/version?loaders=%5B%22neoforge%22%5D&game_versions=%5B%221.21.1%22%5D";
 
-            HttpClient client = HttpClient.newBuilder()
-                    .connectTimeout(Duration.ofSeconds(10))
-                    .build();
+            HttpClient client = HttpClients.shared(10);
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))

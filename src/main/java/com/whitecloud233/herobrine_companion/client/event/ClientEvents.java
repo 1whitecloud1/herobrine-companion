@@ -3,6 +3,8 @@ package com.whitecloud233.herobrine_companion.client.event;
 
 import com.mojang.logging.LogUtils;
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
+import com.whitecloud233.herobrine_companion.client.render.PoemOfTheEndGeoCompat;
+import com.whitecloud233.herobrine_companion.init.ModItems;
 import com.whitecloud233.herobrine_companion.client.gui.HeroContractScreen;
 import com.whitecloud233.herobrine_companion.client.gui.HeroTradeScreen;
 import com.whitecloud233.herobrine_companion.client.gui.HeroWardrobeScreen;
@@ -13,6 +15,8 @@ import com.whitecloud233.herobrine_companion.client.render.*;
 import com.whitecloud233.herobrine_companion.client.render.VoidRiftRenderer;
 import com.whitecloud233.herobrine_companion.init.*;
 import com.whitecloud233.herobrine_companion.item.PoemOfTheEndItem;
+import com.whitecloud233.herobrine_companion.init.ModBlockEntities;
+import com.whitecloud233.herobrine_companion.init.ModEntities;
 import com.whitecloud233.herobrine_companion.world.inventory.ModMenus;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
@@ -86,12 +90,9 @@ public class ClientEvents {
 
     public static void registerScreens(RegisterMenuScreensEvent event) {
         event.register(ModMenus.HERO_CONTRACT_MENU.get(), HeroContractScreen::new);
-        // 由于 HeroTradeScreen 不再继承 AbstractContainerScreen，我们需要使用强制转换或者适配器
-        // 但 RegisterMenuScreensEvent.register 要求 ScreenConstructor 的泛型必须匹配
-        // ScreenConstructor<M, U extends Screen & MenuAccess<M>>
-        // 这意味着 Screen 必须实现 MenuAccess 接口
+        // HeroTradeScreen 不继承 AbstractContainerScreen，因此这里需要与 HeroWardrobeScreen 一样
+        // 满足 ScreenConstructor<M, U extends Screen & MenuAccess<M>> 的泛型约束。
         event.register(ModMenus.HERO_TRADE_MENU.get(), HeroTradeScreen::new);
-        // 新增这一行：将 Menu 和 Screen 绑定起来
         event.register(ModMenus.HERO_WARDROBE_MENU.get(), HeroWardrobeScreen::new);
     }
 
@@ -123,10 +124,13 @@ public class ClientEvents {
 
     public static void onClientTick(ClientTickEvent.Post event) {
         Minecraft mc = Minecraft.getInstance();
-        
-        // === 实时检查并注入渲染器 ===
-        if (mc.level != null) {
-            if (mc.player != null && mc.player.tickCount % 20 == 0) {
+
+        if (mc.level != null && mc.player != null) {
+            // 处理「装扮栏里的第三方快捷按钮」排队的动作（等本模组菜单关闭后再打开目标界面）
+            com.whitecloud233.herobrine_companion.compat.screens.ExternalScreenShortcuts.tick();
+
+            // === 实时检查并注入渲染器 ===
+            if (mc.player.tickCount % 20 == 0) {
                 injectCustomRenderer(mc);
             }
         }

@@ -1,5 +1,7 @@
 package com.whitecloud233.herobrine_companion.client.event;
 
+import com.whitecloud233.herobrine_companion.util.LanguageCodes;
+
 import com.whitecloud233.herobrine_companion.HerobrineCompanion;
 import com.whitecloud233.herobrine_companion.client.service.ConversationStore;
 import com.whitecloud233.herobrine_companion.client.service.LLMConfig;
@@ -21,6 +23,7 @@ public class ClientForgeEvents {
 
     @SubscribeEvent
     public static void onClientPlayerLogin(ClientPlayerNetworkEvent.LoggingIn event) {
+        com.whitecloud233.herobrine_companion.client.network.ClientStateSync.clearSessionState();
         // 修改说明：LocalChatService 在第一次 getInstance() 时会自动连接数据库。
         // 这里调用 loadChatRules() 是为了确保每次进游戏都重新读取一遍规则。
         LocalChatService.getInstance().loadChatRules();
@@ -35,6 +38,7 @@ public class ClientForgeEvents {
 
     @SubscribeEvent
     public static void onClientPlayerLogout(ClientPlayerNetworkEvent.LoggingOut event) {
+        com.whitecloud233.herobrine_companion.client.network.ClientStateSync.clearSessionState();
         lastSyncedLanguageCode = null;
     }
 
@@ -47,7 +51,7 @@ public class ClientForgeEvents {
         if (mc == null || mc.player == null || mc.getConnection() == null) {
             return;
         }
-        String currentLanguageCode = normalizeLanguageCode(mc.options.languageCode);
+        String currentLanguageCode = LanguageCodes.normalize(mc.options.languageCode);
         if (currentLanguageCode.equals(lastSyncedLanguageCode)) {
             return;
         }
@@ -55,11 +59,5 @@ public class ClientForgeEvents {
         lastSyncedLanguageCode = currentLanguageCode;
     }
 
-    private static String normalizeLanguageCode(String rawLanguageCode) {
-        if (rawLanguageCode == null) {
-            return "en_us";
-        }
-        String normalized = rawLanguageCode.trim().toLowerCase(Locale.ROOT).replace('-', '_');
-        return normalized.isEmpty() ? "en_us" : normalized;
-    }
+
 }
